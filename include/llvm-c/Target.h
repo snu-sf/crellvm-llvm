@@ -39,11 +39,11 @@ extern "C" {
 
 /* added for vellvm - start */
 typedef enum {
-  INVALID_ALIGN = 0,
-  INTEGER_ALIGN = 'i',               
-  VECTOR_ALIGN = 'v',                
-  FLOAT_ALIGN = 'f',                 
-  AGGREGATE_ALIGN = 'a',             
+  LLVM_INVALID_ALIGN = 0,
+  LLVM_INTEGER_ALIGN = 'i',               
+  LLVM_VECTOR_ALIGN = 'v',                
+  LLVM_FLOAT_ALIGN = 'f',                 
+  LLVM_AGGREGATE_ALIGN = 'a',             
 } LLVMAlignTypeEnum;
 /* added for vellvm - end */
   
