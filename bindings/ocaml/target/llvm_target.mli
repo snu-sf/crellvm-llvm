@@ -50,6 +50,18 @@ module CodeGenFileType : sig
   | ObjectFile
 end
 
+(* added for vellvm - start *)
+module AlignType = struct
+  type t =
+  | Invalid_align
+  | Integer_align
+  | Vector_align
+  | Float_align
+  | Aggregate_align
+(*  | Stack_align *)
+end                           
+(* added for vellvm - end *)  
+                           
 (** {6 Exceptions} *)
 
 exception Error of string
@@ -130,6 +142,19 @@ module DataLayout : sig
   (** Computes the byte offset of the indexed struct element for a target.
       See the method [llvm::StructLayout::getElementContainingOffset]. *)
   val offset_of_element : Llvm.lltype -> int -> t -> Int64.t
+
+(* added for vellvm - start *)
+  val pointer_size_in_bits : TargetData.t -> int
+  val pointer_abi_alignment : TargetData.t -> int
+  val pointer_pref_alignment : TargetData.t -> int
+
+  val get_num_alignment : TargetData.t -> int
+  val get_align_type_enum : TargetData.t -> int -> AlignType.t
+  val get_abi_align : TargetData.t -> int -> int
+  val get_pref_align : TargetData.t -> int -> int
+  val get_type_bitwidth : TargetData.t -> int -> int
+(* added for vellvm - end *) 
+                                                       
 end
 
 (** {6 Target} *)

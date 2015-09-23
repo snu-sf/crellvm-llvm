@@ -460,6 +460,35 @@ public:
   ///
   /// This includes an explicitly requested alignment (if the global has one).
   unsigned getPreferredAlignmentLog(const GlobalVariable *GV) const;
+
+  /* added for vellvm - start */
+  
+  /// Expose the following methods of Alignments
+  /// Return the number of Alignments
+  unsigned getNumAlignment() { return Alignments.size(); }
+  /// returns the [i]-th AlignType from Alignments
+  unsigned getAlignTypeEnum(unsigned i) const {
+    assert(i < Alignments.size() && "getAlignTypeEnum() out of range!");
+    return Alignments[i].AlignType;
+  }
+  /// returns the [i]-th ABIAlign from Alignments
+  unsigned char getABIAlign(unsigned i) const {
+    assert(i < Alignments.size() && "getABIAlign() out of range!");
+    return Alignments[i].ABIAlign;
+  }
+  /// returns the [i]-th PrefAlign from Alignments
+  unsigned char getPrefAlign(unsigned i) const {
+    assert(i < Alignments.size() && "getPrefAlign() out of range!");
+    return Alignments[i].PrefAlign;
+  }
+  /// returns the [i]-th TypeBitWidth from Alignments
+  uint32_t getTypeBitWidth(unsigned i) const {
+    assert(i < Alignments.size() && "getTypeBitWidth() out of range!");
+    return Alignments[i].TypeBitWidth;
+  }
+  
+  /* added for vellvm - end */
+  
 };
 
 inline DataLayout *unwrap(LLVMTargetDataRef P) {
