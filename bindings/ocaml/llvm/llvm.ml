@@ -1355,3 +1355,27 @@ module PassManager = struct
   external finalize : [ `Function ] t -> bool = "llvm_passmanager_finalize"
   external dispose : [< any ] t -> unit = "llvm_passmanager_dispose"
 end
+
+(* added for vellvm - start *)
+(*===-- SlotTracker -------------------------------------------------------===*)
+
+type llslottracker
+                       
+module SlotTracker = struct
+  external create_of_module : llmodule -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfModule"          
+(*  external create_of_function : llvalue -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfFunction"          
+  external create_of_value : llvalue -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfValue" *)
+  external incorporate_function : llslottracker -> llvalue -> unit 
+                                     = "llvm_slottracker_incorporate_function"
+  external purge_function : llslottracker -> unit = "llvm_slottracker_purge_function"
+  external get_global_slot : llslottracker -> llvalue -> int 
+                                             = "llvm_slottracker_get_global_slot"
+  external get_local_slot : llslottracker -> llvalue -> int
+                                              = "llvm_slottracker_get_local_slot"
+  external dispose : llslottracker -> unit = "llvm_slottracker_dispose"
+end
+                    
+(* added for vellvm - end *)                       

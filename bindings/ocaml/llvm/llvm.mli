@@ -2574,3 +2574,61 @@ module PassManager : sig
       See the destructor of [llvm::BasePassManager]. *)
   val dispose : [< any ] t -> unit
 end
+
+(* added for vellvm - start *)
+
+(** Used to generate names for unnamed variables. See the [llvm::SlotTracker] 
+    class. *)
+type llslottracker
+
+(** {6 SlotTracker} *)
+
+(* why definition, not sig? *)
+      
+module SlotTracker : sig
+  (** [create_of_module m] constructs a new SlotTracker for a module [m].
+      See the constructor of [llvm::SlotTracker]. *)
+  external create_of_module : llmodule -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfModule"          
+
+(*                                                   
+  (** [create_of_function f] constructs a new SlotTracker for a function [f].
+      See the constructor of [llvm::SlotTracker]. *)
+  external create_of_function : llvalue -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfFunction"          
+
+  (** [create_of_value v] constructs a new SlotTracker for a value [v].
+      See the static function [llvm::createSlotTracker]. *)
+  external create_of_value : llvalue -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfValue"
+*)
+                                                   
+  (** [incorporate_function f] allows us to deal with a function [f] instead 
+   *  of just a module, use this method to get its data into the SlotTracker.
+   *  See the method [llvm::SlotTracker::incorporateFunction]. *)
+  external incorporate_function : llslottracker -> llvalue -> unit 
+                                     = "llvm_slottracker_incorporate_function"
+
+  (** [purge_function f]: After calling incorporateFunction, use this method 
+   *  to remove the most recently incorporated function from the SlotTracker.
+   *  This will reset the state of the machine back to just the module 
+   *  contents. See the method [llvm::SlotTracker::purgeFucntion]. *)
+  external purge_function : llslottracker -> unit = "llvm_slottracker_purge_function"
+
+  (** [get_global_slot s v] gets the slot number of a global value [v].
+      See the method [llvm::SlotTracker::getGlobalSlot]. *)
+  external get_global_slot : llslottracker -> llvalue -> int 
+                                           = "llvm_slottracker_get_global_slot"
+
+  (** [get_local_slot s v] gets the slot number of a local value [v].
+      See the method [llvm::SlotTracker::getLocalSlot]. *)
+  external get_local_slot : llslottracker -> llvalue -> int 
+                                            = "llvm_slottracker_get_local_slot"
+
+  (** Disposes of a SlotTracker. *)
+  external dispose : llslottracker -> unit = "llvm_slottracker_dispose"
+end       
+
+                       
+(* added for vellvm - end *)
+                       
