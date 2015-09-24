@@ -96,18 +96,18 @@ module DataLayout = struct
   external offset_of_element : Llvm.lltype -> int -> t -> Int64.t
                              = "llvm_datalayout_offset_of_element"
 (* added for vellvm - start *)
-  external pointer_size_in_bits : TargetData.t -> int = "llvm_pointer_size_in_bits"
-  external pointer_abi_alignment : TargetData.t -> int 
+  external pointer_size_in_bits : t -> int = "llvm_pointer_size_in_bits"
+  external pointer_abi_alignment : t -> int 
     = "llvm_pointer_abi_alignment"
-  external pointer_pref_alignment : TargetData.t -> int 
+  external pointer_pref_alignment : t -> int 
     = "llvm_pointer_pref_alignment"
 
-  external get_num_alignment : TargetData.t -> int = "llvm_get_num_alignment"            
-  external get_align_type_enum : TargetData.t -> int -> AlignType.t 
+  external get_num_alignment : t -> int = "llvm_get_num_alignment"            
+  external get_align_type_enum : t -> int -> AlignType.t 
     = "llvm_get_align_type_enum"
-  external get_abi_align : TargetData.t -> int -> int  = "llvm_get_abi_align"
-  external get_pref_align : TargetData.t -> int -> int  = "llvm_get_pref_align"
-  external get_type_bitwidth : TargetData.t -> int -> int  = "llvm_get_type_bit_width"
+  external get_abi_align : t -> int -> int  = "llvm_get_abi_align"
+  external get_pref_align : t -> int -> int  = "llvm_get_pref_align"
+  external get_type_bitwidth : t -> int -> int  = "llvm_get_type_bit_width"
 (* added for vellvm - end *)                                 
 end
 

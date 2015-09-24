@@ -51,7 +51,7 @@ module CodeGenFileType : sig
 end
 
 (* added for vellvm - start *)
-module AlignType = struct
+module AlignType : sig
   type t =
   | Invalid_align
   | Integer_align
@@ -144,15 +144,15 @@ module DataLayout : sig
   val offset_of_element : Llvm.lltype -> int -> t -> Int64.t
 
 (* added for vellvm - start *)
-  val pointer_size_in_bits : TargetData.t -> int
-  val pointer_abi_alignment : TargetData.t -> int
-  val pointer_pref_alignment : TargetData.t -> int
+  val pointer_size_in_bits : t -> int
+  val pointer_abi_alignment : t -> int
+  val pointer_pref_alignment : t -> int
 
-  val get_num_alignment : TargetData.t -> int
-  val get_align_type_enum : TargetData.t -> int -> AlignType.t
-  val get_abi_align : TargetData.t -> int -> int
-  val get_pref_align : TargetData.t -> int -> int
-  val get_type_bitwidth : TargetData.t -> int -> int
+  val get_num_alignment : t -> int
+  val get_align_type_enum : t -> int -> AlignType.t
+  val get_abi_align : t -> int -> int
+  val get_pref_align : t -> int -> int
+  val get_type_bitwidth : t -> int -> int
 (* added for vellvm - end *) 
                                                        
 end
