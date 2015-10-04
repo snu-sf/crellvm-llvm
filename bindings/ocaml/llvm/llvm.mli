@@ -2577,6 +2577,27 @@ end
 
 (* added for vellvm - start *)
 
+(* {6 Named Types} *)
+
+(** [named_type_begin m] returns the first position in the type symbol table 
+    for the module [m]. [named_type_begin] and [named_type_succ] can e used to 
+    iterate over the named types in order. 
+    See the method [llvm::TypeSymbolTable::begin]. *)
+val named_type_begin : llmodule -> string option
+
+(** [named_type_succ m t] returns the named type list position succeeding [t]
+    for the module [m]. 
+    See the method [llvm::TypeSymbolTable::const_iterator::operator++]. *)
+val named_type_succ : llmodule -> string -> string option
+
+(** [iter_named_type f m] applies function [f] to each of the named types 
+    of the value [m] in order. Tail recursive. *)
+val iter_named_types : (string -> unit) -> llmodule -> unit
+
+(** [fold_right_named_types f m init] is [f u1 (... (f uN init) ...)] where
+    [u1,...,uN] are the named types of the module [m]. Not tail recursive. *)
+val fold_right_named_types : (string -> 'a -> 'a) -> llmodule -> 'a -> 'a                       
+
 (** Used to generate names for unnamed variables. See the [llvm::SlotTracker] 
     class. *)
 type llslottracker

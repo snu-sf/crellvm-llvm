@@ -3018,12 +3018,19 @@ LLVMBool LLVMIsMultithreaded(void);
  * @}
  */
 
-/* added for vellvm - start */
+
 /* Used to provide a slot tracker.
  * See the llvm::SlotTracker class.
  */
 typedef struct LLVMOpaqueSlotTracker *LLVMSlotTrackerRef;
 
+  
+/* added for vellvm - start */
+
+/*===-- Named Types -------------------------------------------------------===*/
+const char *LLVMGetFirstNamedType(LLVMModuleRef M);
+const char *LLVMGetNextNamedType(LLVMModuleRef M, const char *Name);
+  
 /*===-- SlotTracker -------------------------------------------------------===*/
 
 /** Constructs a new SlotTracker for a module. 

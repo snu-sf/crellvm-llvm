@@ -2916,6 +2916,25 @@ LLVMBool LLVMIsMultithreaded() {
 }
 
 /* added for vellvm - start */
+
+/*===-- Operations on named types ---------------------------------------===*/
+
+const char *LLVMGetFirstNamedType(LLVMModuleRef M) {
+  const StringMap<StructType*> &NST = unwrap(M)->getNamedTypeList();
+  Module::const_namedty_iterator I = NST.begin();
+  if (I != NST.end())
+    return I->first().data();
+  return 0;
+}
+
+const char *LLVMGetNextNamedType(LLVMModuleRef M, const char *Name) {
+  const Module::NamedTyListType &NST = unwrap(M)->getNamedTypeList();
+  Module::const_namedty_iterator I = NST.find(Name);
+  if (++I == NST.end())
+    return 0;
+  return I->first().data();
+}
+
 /*===-- SlotTracker -------------------------------------------------------===*/
 
 LLVMSlotTrackerRef LLVMCreateSlotTrackerOfModule(LLVMModuleRef M) {

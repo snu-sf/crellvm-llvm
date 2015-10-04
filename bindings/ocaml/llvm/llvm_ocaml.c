@@ -2371,6 +2371,43 @@ CAMLprim value llvm_passmanager_dispose(LLVMPassManagerRef PM) {
 }
 
 /* added for vellvm - start */
+
+/*--... Operations on named types .........................................--*/
+
+/* llmodule -> string option */
+CAMLprim value llvm_named_type_begin(LLVMModuleRef M) {
+  const char *cname;	
+  CAMLparam0();
+  CAMLlocal2(Name, Option);
+
+  if ((cname = LLVMGetFirstNamedType(M))) {
+    Name = copy_string(cname);
+
+    Option = alloc(1, 0);
+    Field(Option, 0) = Name;
+    CAMLreturn(Option);
+  }
+  CAMLreturn(Val_int(0));
+}
+
+/* llmodule -> string -> string option */
+CAMLprim value llvm_named_type_succ(LLVMModuleRef M, value Name) {
+  const char *cname;	
+  CAMLparam1(Name);
+  CAMLlocal2(Next, Option);
+  
+  if ((cname = LLVMGetNextNamedType(M, String_val(Name)))) {
+    Next = copy_string(cname);
+
+    Option = alloc(1, 0);
+    Field(Option, 0) = (value) Next;
+    CAMLreturn(Option);
+  }
+  CAMLreturn(Val_int(0));
+}
+
+
+
 /*===-- SlotTracker -----------------------------------------------------===*/
 
 /* llslottracker -> llvalue -> unit */
