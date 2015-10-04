@@ -773,3 +773,40 @@ bool PointerType::isValidElementType(Type *ElemTy) {
 bool PointerType::isLoadableOrStorableType(Type *ElemTy) {
   return isValidElementType(ElemTy) && !ElemTy->isFunctionTy();
 }
+
+/* added for vellvm - start */
+/// Get the Module's list of named types (constant).
+const Module::NamedTyListType &Module::getNamedTypeList() const {
+  return getContext().pImpl->NamedStructTypes; 
+}    
+
+/// Get the Module's list of named types.
+Module::NamedTyListType &Module::getNamedTypeList() {
+  return getContext().pImpl->NamedStructTypes; 
+}    
+
+Module::namedty_iterator Module::namedty_begin() { 
+  return getContext().pImpl->NamedStructTypes.begin(); 
+}
+
+Module::const_namedty_iterator Module::namedty_begin() const {
+  return getContext().pImpl->NamedStructTypes.begin(); 
+}
+
+Module::namedty_iterator Module::namedty_end () {
+  return getContext().pImpl->NamedStructTypes.end(); 
+}
+
+Module::const_namedty_iterator Module::namedty_end () const {
+  return getContext().pImpl->NamedStructTypes.end(); 
+}
+
+size_t Module::namedty_size() const {
+  return getContext().pImpl->NamedStructTypes.size(); 
+}
+
+bool Module::namedty_empty() const {
+  return getContext().pImpl->NamedStructTypes.empty(); 
+}
+/* added for vellvm - end */
+
