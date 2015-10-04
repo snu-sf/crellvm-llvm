@@ -367,29 +367,29 @@ CAMLprim value llvm_targetmachine_add_analysis_passes(LLVMPassManagerRef PM,
 
 /* added for vellvm - start */
 /* TargetData.t -> int */
-CAMLprim value llvm_pointer_size_in_bits(LLVMTargetDataRef TD) {
-  return Val_int(LLVMPointerSizeInBits(TD));
+CAMLprim value llvm_pointer_size_in_bits(value DL) {
+  return Val_int(LLVMPointerSizeInBits(DataLayout_val(DL)));
 }
 
 /* TargetData.t -> int */
-CAMLprim value llvm_pointer_abi_alignment(LLVMTargetDataRef TD) {
-  return Val_int(LLVMPointerABIAlignment(TD));
+CAMLprim value llvm_pointer_abi_alignment(value DL) {
+  return Val_int(LLVMPointerABIAlignment(DataLayout_val(DL)));
 }
 
 /* TargetData.t -> int */
-CAMLprim value llvm_pointer_pref_alignment(LLVMTargetDataRef TD) {
-  return Val_int(LLVMPointerPrefAlignment(TD));
+CAMLprim value llvm_pointer_pref_alignment(value DL) {
+  return Val_int(LLVMPointerPrefAlignment(DataLayout_val(DL)));
 }
 
 
 /* TargetData.t -> int */
-CAMLprim value llvm_get_num_alignment(LLVMTargetDataRef TD) {
-  return Val_int(LLVMGetNumAlignment(TD));
+CAMLprim value llvm_get_num_alignment(value DL) {
+  return Val_int(LLVMGetNumAlignment(DataLayout_val(DL)));
 }
 
 /* TargetData.t -> int -> AlignType.t */
-CAMLprim value llvm_get_align_type_enum(LLVMTargetDataRef TD, value I) {
-  int i = LLVMGetAlignTypeEnum(TD, (Int_val(I)));
+CAMLprim value llvm_get_align_type_enum(value DL, value I) {
+  int i = LLVMGetAlignTypeEnum(DataLayout_val(DL), (Int_val(I)));
   switch (i) {
   case 0: i = 0; break;
   case 'i': i = 1; break;
@@ -402,18 +402,18 @@ CAMLprim value llvm_get_align_type_enum(LLVMTargetDataRef TD, value I) {
 }
 
 /* TargetData.t -> int -> int */
-CAMLprim value llvm_get_abi_align(LLVMTargetDataRef TD, value I) {
-  return Val_int(LLVMGetABIAlign(TD, (Int_val(I))));
+CAMLprim value llvm_get_abi_align(value DL, value I) {
+  return Val_int(LLVMGetABIAlign(DataLayout_val(DL), (Int_val(I))));
 }
 
 /* TargetData.t -> int -> int */
-CAMLprim value llvm_get_pref_align(LLVMTargetDataRef TD, value I) {
-  return Val_int(LLVMGetPrefAlign(TD, (Int_val(I))));
+CAMLprim value llvm_get_pref_align(value DL, value I) {
+  return Val_int(LLVMGetPrefAlign(DataLayout_val(DL), (Int_val(I))));
 }
 
 /* TargetData.t -> int -> int */
-CAMLprim value llvm_get_type_bit_width(LLVMTargetDataRef TD, value I) {
-  return Val_int(LLVMGetTypeBitWidth(TD, (Int_val(I))));
+CAMLprim value llvm_get_type_bit_width(value DL, value I) {
+  return Val_int(LLVMGetTypeBitWidth(DataLayout_val(DL), (Int_val(I))));
 }
 
 /* added for vellvm - end */

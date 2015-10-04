@@ -293,7 +293,7 @@ void LLVMDisposeTargetData(LLVMTargetDataRef TD);
 
 /** Returns the pointer size in bits for a target.
     See the method llvm::TargetData::getPointerSizeInBits. */
-unsigned LLVMPointerSizeInBits(LLVMTargetDataRef);
+unsigned LLVMPointerSizeInBits(LLVMTargetDataRef TD);
 
 /** Returns the pointer size in bytes for a target.
     See the method llvm::TargetData::getPointerABIAlignment. */

@@ -1357,6 +1357,36 @@ module PassManager = struct
 end
 
 (* added for vellvm - start *)
+
+(*===-- Named Types -------------------------------------------------------===*)
+external named_type_begin : llmodule -> string option = "llvm_named_type_begin"
+external named_type_succ : llmodule -> string -> string option = "llvm_named_type_succ"
+
+let iter_named_types f m =
+  let rec aux = function
+    | None -> ()
+    | Some u ->
+        f u;
+        aux (named_type_succ m u)
+  in
+  aux (named_type_begin m)
+(*
+let fold_left_named_types f init m =
+  let rec aux init u =
+    match u with
+    | None -> init
+    | Some u -> aux (f init u) (named_type_succ m u)
+  in
+  aux init (named_type_begin m)
+ *)
+let fold_right_named_types f m init =
+  let rec aux u init =
+    match u with
+    | None -> init
+    | Some u -> f u (aux (named_type_succ m u) init)
+  in
+  aux (named_type_begin m) init
+                       
 (*===-- SlotTracker -------------------------------------------------------===*)
 
 type llslottracker
