@@ -1358,6 +1358,36 @@ end
 
 (* added for vellvm - start *)
 
+(*===-- Values ------------------------------------------------------------===*)
+external escaped_value_name : llvalue -> string = "llvm_escaped_value_name"
+
+external has_name : llvalue -> bool = "llvm_has_name"
+(* exists in 3.6.2: external classify_value : llvalue -> ValueKind.t = "llvm_classify_value" *)
+(* not used                                       
+external is_inlineasm : llvalue -> bool = "llvm_is_inlineasm"
+external is_mdnode : llvalue -> bool = "llvm_is_mdnode"
+external is_mdstring : llvalue -> bool = "llvm_is_mdstring"
+*)
+external is_globalvalue : llvalue -> bool = "llvm_is_globalvalue"
+(* not used
+external is_globalvariable : llvalue -> bool = "llvm_is_globalvariable"
+external is_globalalias : llvalue -> bool = "llvm_is_globalalias"
+
+external is_function : llvalue -> bool = "llvm_is_function"
+external is_argument : llvalue -> bool = "llvm_is_argument"
+external is_basicblock : llvalue -> bool = "llvm_is_basicblock"
+external is_constantint : llvalue -> bool = "llvm_is_constantint"
+external is_constantfp : llvalue -> bool = "llvm_is_constantfp"
+external is_constantarry : llvalue -> bool = "llvm_is_constantarray"
+external is_constantstruct : llvalue -> bool = "llvm_is_constantstruct"
+external is_constantvector : llvalue -> bool = "llvm_is_constantvector"
+external is_constantexpr : llvalue -> bool = "llvm_is_constantexpr"                                                *)     
+                       
+                       
+(*--... Operations on global variables, functions, and aliases (globals) ...--*)
+external has_initializer : llvalue -> bool = "llvm_has_initializer"
+external get_initializer : llvalue -> llvalue = "LLVMGetInitializer"                       
+
 (*===-- Named Types -------------------------------------------------------===*)
 external named_type_begin : llmodule -> string option = "llvm_named_type_begin"
 external named_type_succ : llmodule -> string -> string option = "llvm_named_type_succ"

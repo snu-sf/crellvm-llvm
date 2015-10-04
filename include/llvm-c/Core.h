@@ -3027,6 +3027,14 @@ typedef struct LLVMOpaqueSlotTracker *LLVMSlotTrackerRef;
   
 /* added for vellvm - start */
 
+/* Operations on all values */  
+const char *LLVMGetEscapedValueName(LLVMValueRef Val);
+int LLVMHasName(LLVMValueRef Val);
+int LLVMIsGlobalValue(LLVMValueRef Val);
+
+/* Operations on global variables */
+int LLVMHasInitializer(LLVMValueRef GlobalVar);  
+
 /*===-- Named Types -------------------------------------------------------===*/
 const char *LLVMGetFirstNamedType(LLVMModuleRef M);
 const char *LLVMGetNextNamedType(LLVMModuleRef M, const char *Name);

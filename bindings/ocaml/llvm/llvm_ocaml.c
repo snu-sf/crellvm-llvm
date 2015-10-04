@@ -2372,6 +2372,26 @@ CAMLprim value llvm_passmanager_dispose(LLVMPassManagerRef PM) {
 
 /* added for vellvm - start */
 
+/* llvalue -> string */
+CAMLprim value llvm_escaped_value_name(LLVMValueRef Val) {
+  return copy_string(LLVMGetEscapedValueName(Val));
+}
+
+/* llvalue -> bool */
+CAMLprim value llvm_has_name(LLVMValueRef Val) {
+  return Val_bool(LLVMHasName(Val));
+}
+
+/* llvalue -> bool */
+CAMLprim value llvm_is_globalvalue(LLVMValueRef Val) {
+  return Val_bool(LLVMIsGlobalValue(Val));
+}
+
+/* llvalue -> bool */
+CAMLprim value llvm_has_initializer(LLVMValueRef GlobalVar) {
+  return Val_bool(LLVMHasInitializer(GlobalVar));
+}
+
 /*--... Operations on named types .........................................--*/
 
 /* llmodule -> string option */

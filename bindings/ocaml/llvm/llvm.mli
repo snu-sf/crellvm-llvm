@@ -2577,6 +2577,25 @@ end
 
 (* added for vellvm - start *)
 
+val escaped_value_name : llvalue -> string
+
+(** [has_name v] checks if users provided a name, otherwise [value_namee v]
+ * should be "", and [llvm::SlotTracker] will assign it a name when
+ * prettyprining. See the method [llvm::Value::hasName]. *)
+val has_name : llvalue -> bool
+
+(** [is_globalvalue v] returns [true] if the value [v] is a globalvalue, 
+    [false] otherwise. Similar to [llvm::isa<GlobalValue>]. *)
+val is_globalvalue : llvalue -> bool
+
+(** [has_initializer g] checks if the global value [g] has an initializer. See
+     method [llvm::GlobalValue::hasInitializer]. *)
+val has_initializer : llvalue -> bool
+
+(** [get_initializer g] returns the initializer of the global value [g]. See
+     method [llvm::GlobalValue::getInitializer]. *)
+val get_initializer : llvalue -> llvalue                                  
+                       
 (* {6 Named Types} *)
 
 (** [named_type_begin m] returns the first position in the type symbol table 

@@ -2917,6 +2917,63 @@ LLVMBool LLVMIsMultithreaded() {
 
 /* added for vellvm - start */
 
+/*--.. Operations on all values ............................................--*/
+const char *LLVMGetEscapedValueName(LLVMValueRef Val) {
+  // FIXME: This function is problematic. It must be out-of-bounds
+  // for some reason. So it is not safe to use.	 
+  StringRef Name = unwrap(Val)->getName();
+  char* cstr;
+
+  // Scan the name to see if it needs quotes first.
+  bool NeedsQuotes = isdigit(Name[0]);
+  if (!NeedsQuotes) {
+    for (unsigned i = 0, e = Name.size(); i != e; ++i) {
+      char C = Name[i];
+      if (!isalnum(C) && C != '-' && C != '.' && C != '_') {
+        NeedsQuotes = true;
+        break;
+      }
+    }
+  }
+  
+  // If we didn't need any quotes, just write out the name in one blast.
+  if (!NeedsQuotes) {
+    cstr = new char [Name.size()+1];
+    strcpy (cstr, Name.data());
+    return cstr;
+  }
+  
+  // Okay, we need quotes.  Output the quotes and escape any scary characters as
+  // needed.
+  std::stringstream Out;
+  Out << '"';
+  for (unsigned i = 0, e = Name.size(); i != e; ++i) {
+    unsigned char C = Name[i];
+    if (isprint(C) && C != '\\' && C != '"')
+      Out << C;
+    else
+      Out << '\\' << hexdigit(C >> 4) << hexdigit(C & 0x0F);
+  }
+  Out << '"';
+  
+  cstr = new char [Out.str().size()+1];
+  strcpy (cstr, Out.str().c_str());
+  return cstr;
+}
+
+int LLVMHasName(LLVMValueRef Val) {
+  return unwrap(Val)->hasName();	
+}
+
+int LLVMIsGlobalValue(LLVMValueRef Val) {
+  return isa<GlobalValue>(unwrap(Val));
+}
+
+int LLVMHasInitializer(LLVMValueRef Global) {
+  return unwrap<GlobalVariable>(Global)->hasInitializer();
+}
+
+
 /*===-- Operations on named types ---------------------------------------===*/
 
 const char *LLVMGetFirstNamedType(LLVMModuleRef M) {
