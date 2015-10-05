@@ -2735,21 +2735,22 @@ module APFloat : sig
   type t
 
   module Semantics : sig
-    type t =
-    | IEEEsingle
-    | IEEEdouble
-    | IEEEquad
-    | PPCDoubleDouble
-    | X87DoubleExternded
-  end
+      type t =
+        | IEEEhalf
+        | IEEEsingle
+        | IEEEdouble
+        | IEEEquad
+        | PPCDoubleDouble
+        | X87DoubleExternded
+    end
 
   module CmpResult : sig
-    type t =
-    | LessThan
-    | Equal
-    | GreaterThan
-    | Unordered
-  end    
+      type t =
+        | LessThan
+        | Equal
+        | GreaterThan
+        | Unordered
+    end    
 
   (** [bitcast_to_apint f] creates an APInt that is just a bit map of the
    * floating point constant as it would appear in memory.  It is not a

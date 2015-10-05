@@ -522,6 +522,28 @@ public:
   /// \brief Returns: X * 2^Exp for integral exponents.
   friend APFloat scalbn(APFloat X, int Exp);
 
+  /* added for vellvm - start */
+  /// extended to check floating point type */
+  bool isIEEEhalf() { 
+    return semantics == (const llvm::fltSemantics*)&IEEEhalf; 
+  }
+  bool isIEEEsingle() { 
+    return semantics == (const llvm::fltSemantics*)&IEEEsingle; 
+  }
+  bool isIEEEdouble() { 
+    return semantics == (const llvm::fltSemantics*)&IEEEdouble; 
+  }
+  bool isIEEEquad()   { 
+    return semantics == (const llvm::fltSemantics*)&IEEEquad; 
+  }
+  bool isPPCDoubleDouble() { 
+    return semantics == (const llvm::fltSemantics*)&PPCDoubleDouble; 
+  }
+  bool isX87DoubleExtended() { 
+    return semantics == (const llvm::fltSemantics*)&x87DoubleExtended; 
+  }
+  /* added for vellvm - end */
+
 private:
 
   /// \name Simple Queries

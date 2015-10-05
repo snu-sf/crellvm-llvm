@@ -3122,6 +3122,8 @@ double LLVMAPFloatConvertToFloat(LLVMAPFloatRef F) {
 
 LLVMAPFloatSemantics LLVMAPFloatGetSemantics(LLVMAPFloatRef F) {
   APFloat* APF = unwrap(F);
+  if (APF->isIEEEhalf())
+    return LLVMIEEEhalf;
   if (APF->isIEEEsingle())
     return LLVMIEEEsingle;  
   if (APF->isIEEEdouble())

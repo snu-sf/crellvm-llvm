@@ -1451,21 +1451,22 @@ module APFloat = struct
   type t
 
   module Semantics = struct
-    type t =
-    | IEEEsingle
-    | IEEEdouble
-    | IEEEquad
-    | PPCDoubleDouble
-    | X87DoubleExternded
-  end
+      type t =
+        | IEEEhalf
+        | IEEEsingle
+        | IEEEdouble
+        | IEEEquad
+        | PPCDoubleDouble
+        | X87DoubleExternded
+    end
 
   module CmpResult = struct
-    type t =
-    | LessThan
-    | Equal
-    | GreaterThan
-    | Unordered
-  end    
+      type t =
+        | LessThan
+        | Equal
+        | GreaterThan
+        | Unordered
+    end    
 
   external bitcast_to_apint : t -> APInt.t = "llvm_apfloat_bitcast_to_apint"
   external convert_to_double : t -> float = "llvm_apfloat_convert_to_double"

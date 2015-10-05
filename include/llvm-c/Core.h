@@ -3031,6 +3031,22 @@ typedef struct LLVMOpaqueSlotTracker *LLVMSlotTrackerRef;
   
 /* added for vellvm - start */
 
+typedef enum {
+  LLVMIEEEhalf         = 0,
+  LLVMIEEEsingle         ,
+  LLVMIEEEdouble         ,
+  LLVMIEEEquad           ,
+  LLVMPPCDoubleDouble    ,
+  LLVMX87DoubleExtended 
+} LLVMAPFloatSemantics;
+
+typedef enum {
+  LLVMLessThan		= 0,
+  LLVMEqual		,
+  LLVMGreaterThan	,
+  LLVMUnordered		
+} LLVMAPFloatCmpResult;	    
+
 /* Operations on all values */  
 const char *LLVMGetEscapedValueName(LLVMValueRef Val);
 int LLVMHasName(LLVMValueRef Val);
