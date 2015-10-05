@@ -2387,6 +2387,26 @@ CAMLprim value llvm_is_globalvalue(LLVMValueRef Val) {
   return Val_bool(LLVMIsGlobalValue(Val));
 }
 
+/* llvalue -> int array */
+CAMLprim value llvm_const_aggregatevalue_get_indices (LLVMValueRef Val) {
+  CAMLparam0();
+  CAMLlocal1(Indices);
+  int size = LLVMConstAggregateValueGetNumIndices(Val);
+  unsigned* idxs = (unsigned*)malloc(size * sizeof(unsigned));
+  int i;
+
+  Indices = caml_alloc(size, 0);
+  LLVMConstAggregateValueGetIndices(Val, idxs, size);
+
+  for (i = 0; i < size; i++) {
+    Store_field(Indices, i, Val_int(idxs[i]));
+    idxs[i] = Int_val(Field(Indices, i));
+  }
+
+  free(idxs);
+  CAMLreturn(Indices);
+}
+
 /* llvalue -> bool */
 CAMLprim value llvm_has_initializer(LLVMValueRef GlobalVar) {
   return Val_bool(LLVMHasInitializer(GlobalVar));
@@ -2653,6 +2673,37 @@ CAMLprim LLVMValueRef llvm_apfloat_const_apint(LLVMContextRef Ctx, value F) {
 CAMLprim value llvm_apfloat_to_string(value F) {
   CAMLparam1(F);
   CAMLreturn(copy_string(LLVMAPFloatToString(APFloat_val(F))));
+}
+
+/*--... Operations on IcmpInst ............................................--*/
+
+/* llvalue -> Icmp.t */
+CAMLprim value llvm_icmpinst_get_predicate(LLVMValueRef Inst) {
+  return Val_int(LLVMCmpInstGetPredicate(Inst)-LLVMIntEQ);
+}
+
+/* llvalue -> Icmp.t */
+CAMLprim value llvm_icmpinst_const_get_predicate(LLVMValueRef CE) {
+  return Val_int(LLVMCmpInstConstGetPredicate(CE)-LLVMIntEQ);
+}
+
+/*--... Operations on FcmpInst ............................................--*/
+
+/* llvalue -> Fcmp.t */
+CAMLprim value llvm_fcmpinst_get_predicate(LLVMValueRef Inst) {
+  return Val_int(LLVMCmpInstGetPredicate(Inst));
+}
+
+/* llvalue -> Fcmp.t */
+CAMLprim value llvm_fcmpinst_const_get_predicate(LLVMValueRef CE) {
+  return Val_int(LLVMCmpInstConstGetPredicate(CE));
+}
+
+/*--... Operations on GetElementPtrInst ....................................--*/
+
+/* llvalue -> bool */
+CAMLprim value llvm_gep_is_in_bounds(LLVMValueRef Inst) {
+  return Val_bool(LLVMGetElementPtrInstIsInBounds(Inst));
 }
 
 /*===-- SlotTracker -----------------------------------------------------===*/

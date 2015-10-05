@@ -2588,6 +2588,11 @@ val has_name : llvalue -> bool
     [false] otherwise. Similar to [llvm::isa<GlobalValue>]. *)
 val is_globalvalue : llvalue -> bool
 
+(** Assert that this is an insertvalue or extractvalue expression and return
+    the size or the list of indics. 
+    See the method [llvm::ConstantExpr::getIndices]. *)   
+val const_aggregatevalue_get_indices : llvalue -> int array                                  
+
 (** [has_initializer g] checks if the global value [g] has an initializer. See
      method [llvm::GlobalValue::hasInitializer]. *)
 val has_initializer : llvalue -> bool
@@ -2781,7 +2786,24 @@ module APFloat : sig
   val bcompare : t -> t -> bool
 
 end                                    
-                                                                         
+
+(** {7 Operations on ICmpInst} *)
+module ICmpInst : sig
+  val get_predicate : llvalue -> Icmp.t
+  val const_get_predicate : llvalue -> Icmp.t 
+end        
+
+(** {7 Operations on FCmpInst} *)
+module FCmpInst : sig
+  val get_predicate : llvalue -> Fcmp.t
+  val const_get_predicate : llvalue -> Fcmp.t 
+end                           
+
+(** {7 Operations on GetElementPtrInst} *)
+module GetElementPtrInst : sig
+  val is_in_bounds : llvalue -> bool
+end   
+                    
 (** Used to generate names for unnamed variables. See the [llvm::SlotTracker] 
     class. *)
 type llslottracker

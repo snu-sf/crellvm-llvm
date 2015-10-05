@@ -1383,7 +1383,10 @@ external is_constantstruct : llvalue -> bool = "llvm_is_constantstruct"
 external is_constantvector : llvalue -> bool = "llvm_is_constantvector"
 external is_constantexpr : llvalue -> bool = "llvm_is_constantexpr"                                                *)     
                        
-                       
+(*--... Constant expressions ...............................................--*)
+external const_aggregatevalue_get_indices : llvalue -> int array
+                           = "llvm_const_aggregatevalue_get_indices"
+                                              
 (*--... Operations on global variables, functions, and aliases (globals) ...--*)
 external has_initializer : llvalue -> bool = "llvm_has_initializer"
 external get_initializer : llvalue -> llvalue = "LLVMGetInitializer"                       
@@ -1486,7 +1489,29 @@ module APFloat = struct
     | CmpResult.GreaterThan -> false
     | CmpResult.Unordered -> bitwise_is_equal f1 f2
 
-end  
+end
+
+
+                   
+(** {7 Operations on ICmpInst} *)
+module ICmpInst = struct
+  external get_predicate : llvalue -> Icmp.t = "llvm_icmpinst_get_predicate" 
+  external const_get_predicate : llvalue -> Icmp.t 
+    = "llvm_icmpinst_const_get_predicate" 
+end        
+
+(** {7 Operations on FCmpInst} *)
+module FCmpInst = struct
+  external get_predicate : llvalue -> Fcmp.t = "llvm_fcmpinst_get_predicate" 
+  external const_get_predicate : llvalue -> Fcmp.t 
+    = "llvm_fcmpinst_const_get_predicate" 
+end                   
+
+(** {7 Operations on GetElementPtrInst} *)
+module GetElementPtrInst = struct
+  external is_in_bounds : llvalue -> bool = "llvm_gep_is_in_bounds"        
+end
+                   
       
 (*===-- SlotTracker -------------------------------------------------------===*)
 

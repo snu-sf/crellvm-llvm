@@ -2971,6 +2971,22 @@ int LLVMIsGlobalValue(LLVMValueRef Val) {
   return isa<GlobalValue>(unwrap(Val));
 }
 
+unsigned LLVMConstAggregateValueGetNumIndices(LLVMValueRef AggConstant) {
+  return unwrap<ConstantExpr>(AggConstant)->getIndices().size();
+}
+
+void LLVMConstAggregateValueGetIndices(LLVMValueRef AggConstant, 
+		                          unsigned *IdxList, 
+		                          unsigned NumIdx) {
+  ArrayRef<unsigned> idxs = unwrap<ConstantExpr>(AggConstant)->getIndices();
+  unsigned i;
+
+  for (i = 0; i < NumIdx ; i++) {
+    assert (i < idxs.size() && "Indices must be in bound.");
+    IdxList[i] = idxs[i];
+  }
+}
+
 int LLVMHasInitializer(LLVMValueRef Global) {
   return unwrap<GlobalVariable>(Global)->hasInitializer();
 }
@@ -3264,6 +3280,22 @@ const char * LLVMAPFloatToString(LLVMAPFloatRef F) {
   // cstr = new char [out.str().size()+1];
   // strcpy (cstr, out.str().c_str());
   // return cstr;
+}
+
+/*--.. Cmp instructions ....................................................--*/
+LLVMIntPredicate LLVMCmpInstGetPredicate(LLVMValueRef Inst) {
+  CmpInst *Instr = unwrap<CmpInst>(Inst);
+  return static_cast<LLVMIntPredicate>(Instr->getPredicate());
+}
+
+LLVMIntPredicate LLVMCmpInstConstGetPredicate(LLVMValueRef C) {
+  ConstantExpr *CE = unwrap<ConstantExpr>(C);
+  return static_cast<LLVMIntPredicate>(CE->getPredicate());
+}
+
+/*--.. GEP instructions ..................................................--*/
+int LLVMGetElementPtrInstIsInBounds(LLVMValueRef Inst) {
+  return unwrap<GEPOperator>(Inst)->isInBounds();
 }
 
 /*===-- SlotTracker -------------------------------------------------------===*/

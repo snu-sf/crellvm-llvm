@@ -3051,6 +3051,12 @@ typedef enum {
 const char *LLVMGetEscapedValueName(LLVMValueRef Val);
 int LLVMHasName(LLVMValueRef Val);
 int LLVMIsGlobalValue(LLVMValueRef Val);
+  
+/* Constant expressions */
+unsigned LLVMConstAggregateValueGetNumIndices(LLVMValueRef AggConstant);
+void LLVMConstAggregateValueGetIndices(LLVMValueRef AggConstant, 
+		                          unsigned *IdxList, 
+                                          unsigned NumIdx);  
 
 /* Operations on global variables */
 int LLVMHasInitializer(LLVMValueRef GlobalVar);  
@@ -3096,6 +3102,13 @@ int LLVMAPFloatBitwiseIsEqual(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
 LLVMAPFloatRef LLVMAPFloatConstFloatGetValue(LLVMValueRef ConstantVal);
 LLVMValueRef LLVMAPFloatConstAPFloat(LLVMContextRef Ctx, LLVMAPFloatRef F);
 const char * LLVMAPFloatToString(LLVMAPFloatRef F);  
+
+/* Operations on CmpInst */
+LLVMIntPredicate LLVMCmpInstGetPredicate(LLVMValueRef Inst);
+LLVMIntPredicate LLVMCmpInstConstGetPredicate(LLVMValueRef CE);
+
+/* Operations on GetElementPtrInst */
+int LLVMGetElementPtrInstIsInBounds(LLVMValueRef Inst);  
   
 /*===-- SlotTracker -------------------------------------------------------===*/
 
