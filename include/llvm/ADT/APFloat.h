@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/APInt.h"
 /* added for vellvm - start */
+#include "llvm-c/Core.h"
 #include "llvm/Support/CBindingWrapping.h"
 /* added for vellvm - end */
 

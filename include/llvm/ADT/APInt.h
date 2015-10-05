@@ -19,13 +19,14 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
+/* added for vellvm - start */
+#include "llvm/Support/CBindingWrapping.h"
+#include "llvm-c/Core.h"
+/* added for vellvm - end */
 #include <cassert>
 #include <climits>
 #include <cstring>
 #include <string>
-/* added for vellvm - start */
-#include "llvm/Support/CBindingWrapping.h"
-/* added for vellvm - end */
 
 namespace llvm {
 class FoldingSetNodeID;
