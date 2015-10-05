@@ -3038,6 +3038,44 @@ int LLVMHasInitializer(LLVMValueRef GlobalVar);
 /*===-- Named Types -------------------------------------------------------===*/
 const char *LLVMGetFirstNamedType(LLVMModuleRef M);
 const char *LLVMGetNextNamedType(LLVMModuleRef M, const char *Name);
+
+/* Operations on Users */
+void LLVMGetOperands(LLVMValueRef Val, LLVMValueRef *Operands);
+
+/* Operations on APInt */
+void LLVMDisposeAPInt(LLVMAPIntRef I);
+void LLVMAPIntDump(LLVMAPIntRef I);
+const char * LLVMAPIntToString(LLVMAPIntRef I, unsigned Radix, int Signed);
+unsigned long long LLVMAPIntGetZExtValue(LLVMAPIntRef I);
+unsigned long long LLVMAPIntGetSExtValue(LLVMAPIntRef I);
+int LLVMAPIntArrayIndex(LLVMAPIntRef I, unsigned BitPosition);
+unsigned long long LLVMAPIntGetRawData(LLVMAPIntRef I, unsigned Index);
+int LLVMAPIntIsNegative(LLVMAPIntRef I);
+int LLVMAPIntIsNonNegative(LLVMAPIntRef I);
+int LLVMAPIntIsStrictlyPositive(LLVMAPIntRef I);
+int LLVMAPIntGetBoolValue(LLVMAPIntRef I);
+unsigned LLVMAPIntGetBitWidth(LLVMAPIntRef I);
+unsigned LLVMAPIntGetNumWords(LLVMAPIntRef I);
+unsigned LLVMAPIntGetActiveBits(LLVMAPIntRef I);
+unsigned LLVMAPIntGetActiveWords(LLVMAPIntRef I);
+LLVMAPIntRef LLVMAPIntInc(LLVMAPIntRef I);
+int LLVMAPIntCompare(LLVMAPIntRef I1, LLVMAPIntRef I2);
+LLVMAPIntRef LLVMAPIntConstIntGetValue(LLVMValueRef ConstantVal);
+LLVMValueRef LLVMAPIntConstAPInt(LLVMContextRef Context, LLVMAPIntRef N);
+LLVMAPIntRef LLVMAPIntOfInt64(unsigned NumBits, unsigned long long Val,
+		              int IsSigned);
+
+/* Operations on APFloat */
+void LLVMDisposeAPFloat(LLVMAPFloatRef F);
+LLVMAPIntRef LLVMAPFloatBitcastToAPInt(LLVMAPFloatRef F);
+double LLVMAPFloatConvertToDouble(LLVMAPFloatRef F);
+double LLVMAPFloatConvertToFloat(LLVMAPFloatRef F);
+LLVMAPFloatSemantics LLVMAPFloatGetSemantics(LLVMAPFloatRef F);
+LLVMAPFloatCmpResult LLVMAPFloatCompare(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
+int LLVMAPFloatBitwiseIsEqual(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
+LLVMAPFloatRef LLVMAPFloatConstFloatGetValue(LLVMValueRef ConstantVal);
+LLVMValueRef LLVMAPFloatConstAPFloat(LLVMContextRef Ctx, LLVMAPFloatRef F);
+const char * LLVMAPFloatToString(LLVMAPFloatRef F);  
   
 /*===-- SlotTracker -------------------------------------------------------===*/
 

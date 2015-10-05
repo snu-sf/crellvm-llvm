@@ -1416,7 +1416,77 @@ let fold_right_named_types f m init =
     | Some u -> f u (aux (named_type_succ m u) init)
   in
   aux (named_type_begin m) init
-                       
+
+(*--... Operations on users ................................................--*)      
+external operands : llvalue -> llvalue array = "llvm_operands"
+
+(*--... Operations on apint ................................................--*)
+module APInt = struct 
+  type t
+
+  external dump : t -> unit = "llvm_apint_dump"
+  external _to_string : t -> int -> bool -> string = "llvm_apint_to_string"
+  let to_string i = _to_string i 10 true
+  external get_zext_value : t -> Int64.t = "llvm_apint_get_zext_value"
+  external get_sext_value : t -> Int64.t = "llvm_apint_get_sext_value"
+  external array_index : t -> int -> bool = "llvm_apint_array_index"
+  external get_raw_data : t -> int -> Int64.t = "llvm_apint_get_raw_data"
+  external is_negative : t -> bool = "llvm_apint_is_negative"
+  external is_nonnegative : t -> bool = "llvm_apint_is_nonnegative"
+  external is_strictly_positive : t -> bool = "llvm_apint_is_strictly_positive"
+  external get_bool_value : t -> bool = "llvm_apint_get_bool_value"
+  external get_bitwidth : t -> int =  "llvm_apint_get_bitwidth"
+  external get_num_words : t -> int = "llvm_apint_get_num_words"
+  external get_active_bits : t -> int = "llvm_apint_get_active_bits"
+  external get_active_words : t -> int = "llvm_apint_get_active_words"
+  external inc : t -> t = "llvm_apint_inc"
+  external compare : t -> t -> bool = "llvm_apint_compare"
+  external const_int_get_value : llvalue -> t = "llvm_apint_const_int_get_value"
+  external const_apint : llcontext -> t -> llvalue = "llvm_apint_const_apint"
+  external of_int64 : int -> Int64.t -> bool -> t = "llvm_apint_of_int64"
+end  
+
+(*--... Operations on apfloat ..............................................--*)
+module APFloat = struct
+  type t
+
+  module Semantics = struct
+    type t =
+    | IEEEsingle
+    | IEEEdouble
+    | IEEEquad
+    | PPCDoubleDouble
+    | X87DoubleExternded
+  end
+
+  module CmpResult = struct
+    type t =
+    | LessThan
+    | Equal
+    | GreaterThan
+    | Unordered
+  end    
+
+  external bitcast_to_apint : t -> APInt.t = "llvm_apfloat_bitcast_to_apint"
+  external convert_to_double : t -> float = "llvm_apfloat_convert_to_double"
+  external convert_to_float : t -> float = "llvm_apfloat_convert_to_float"
+  external get_semantics : t -> Semantics.t = "llvm_apfloat_get_semantics"
+  external compare : t -> t -> CmpResult.t = "llvm_apfloat_compare"
+  external bitwise_is_equal : t -> t -> bool = "llvm_apfloat_bitwise_is_equal"
+  external const_float_get_value : llvalue -> t = "llvm_apfloat_const_float_get_value"
+  external const_apfloat : llcontext -> t -> llvalue = "llvm_apfloat_const_apint"
+
+  external to_string : t -> string = "llvm_apfloat_to_string"
+
+  let bcompare (f1:t) (f2:t) : bool =
+    match compare f1 f2 with          
+    | CmpResult.LessThan -> false
+    | CmpResult.Equal -> true
+    | CmpResult.GreaterThan -> false
+    | CmpResult.Unordered -> bitwise_is_equal f1 f2
+
+end  
+      
 (*===-- SlotTracker -------------------------------------------------------===*)
 
 type llslottracker

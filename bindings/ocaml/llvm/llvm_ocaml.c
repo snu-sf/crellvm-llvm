@@ -2426,7 +2426,234 @@ CAMLprim value llvm_named_type_succ(LLVMModuleRef M, value Name) {
   CAMLreturn(Val_int(0));
 }
 
+/* llvalue -> llvalue */
+CAMLprim value llvm_operands(LLVMValueRef Fn) {
+  value Operands = alloc(LLVMGetNumOperands(Fn), 0);
+  LLVMGetOperands(Fn, (LLVMValueRef *) Op_val(Operands));
+  return Operands;
+}
 
+/*--... Operations on APInt ..............................................--*/
+
+#define APInt_val(v)  (*(LLVMAPIntRef *)(Data_custom_val(v)))
+
+static void llvm_finalize_apint(value IVal) {
+  LLVMDisposeAPInt(APInt_val(IVal));
+}
+
+static struct custom_operations apint_ops = {
+  (char *) "LLVMAPInt",
+  llvm_finalize_apint,
+  custom_compare_default,
+  custom_hash_default,
+  custom_serialize_default,
+  custom_deserialize_default,
+#if defined(custom_compare_ext_default)
+  custom_compare_ext_default,
+#endif
+};
+
+static value alloc_apint(LLVMAPIntRef Ref) {
+  value Val = alloc_custom(&apint_ops, sizeof(LLVMAPIntRef), 0, 1);
+  APInt_val(Val) = Ref;
+  return Val;
+}
+
+/* APInt.t -> unit */
+CAMLprim value llvm_apint_dump(value I) {
+  CAMLparam1(I);	
+  LLVMAPIntDump(APInt_val(I));
+  CAMLreturn(Val_unit);
+}
+
+/* APInt.t -> int -> bool -> string */
+CAMLprim value llvm_apint_to_string(value I, value Radix, value Signed) {
+  CAMLparam3(I, Radix, Signed);
+  CAMLreturn(copy_string(LLVMAPIntToString(APInt_val(I), Int_val(Radix), Bool_val(Signed))));
+}
+
+/* APInt.t -> Int64.t */
+CAMLprim value llvm_apint_get_zext_value(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(caml_copy_int64(LLVMAPIntGetZExtValue(APInt_val(I))));
+}
+
+/* APInt.t -> Int64.t */
+CAMLprim value llvm_apint_get_sext_value(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(caml_copy_int64(LLVMAPIntGetSExtValue(APInt_val(I))));
+}
+
+/* APInt.t -> int -> bool */
+CAMLprim value llvm_apint_array_index(value I, value BitPosition) {
+  CAMLparam2(I, BitPosition);	
+  CAMLreturn(Val_bool(LLVMAPIntArrayIndex(APInt_val(I), Int_val(BitPosition))));
+}
+
+/* APInt.t -> int -> Int64.t */
+CAMLprim value llvm_apint_get_raw_data(value I, value Index) {
+  CAMLparam2(I, Index);	
+  CAMLreturn(caml_copy_int64(LLVMAPIntGetRawData(APInt_val(I), Int_val(Index))));
+}
+
+/* APInt.t -> bool */
+CAMLprim value llvm_apint_is_negative(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(Val_bool(LLVMAPIntIsNegative(APInt_val(I))));
+}
+
+/* APInt.t -> bool */
+CAMLprim value llvm_apint_is_nonnegative(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(Val_bool(LLVMAPIntIsNonNegative(APInt_val(I))));
+}
+
+/* APInt.t -> bool */
+CAMLprim value llvm_apint_is_strictly_positive(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(Val_bool(LLVMAPIntIsStrictlyPositive(APInt_val(I))));
+}
+
+/* APInt.t -> bool */
+CAMLprim value llvm_apint_get_bool_value(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(Val_bool(LLVMAPIntGetBoolValue(APInt_val(I))));
+}
+
+/* APInt.t -> int */
+CAMLprim value llvm_apint_get_bitwidth(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(Val_int(LLVMAPIntGetBitWidth(APInt_val(I))));
+}
+
+/* APInt.t -> int */
+CAMLprim value llvm_apint_get_num_words(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(Val_int(LLVMAPIntGetNumWords(APInt_val(I))));
+}
+
+/* APInt.t -> int */
+CAMLprim value llvm_apint_get_active_bits(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(Val_int(LLVMAPIntGetActiveBits(APInt_val(I))));
+}
+
+/* APInt.t -> int */
+CAMLprim value llvm_apint_get_active_words(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(Val_int(LLVMAPIntGetActiveWords(APInt_val(I))));
+}
+
+/* APInt.t -> APInt.t */
+CAMLprim value llvm_apint_inc(value I) {
+  CAMLparam1(I);	
+  CAMLreturn(alloc_apint(LLVMAPIntInc(APInt_val(I))));
+}
+
+/* APInt,t -> APInt.t -> bool */
+CAMLprim value llvm_apint_compare(value I1, value I2) {
+  CAMLparam2(I1, I2);	
+  CAMLreturn(Val_bool(LLVMAPIntCompare(APInt_val(I1), APInt_val(I2))));
+}
+
+/* llvalue -> APInt.t */
+CAMLprim value llvm_apint_const_int_get_value(LLVMValueRef Val) {
+  CAMLparam0();	
+  CAMLreturn(alloc_apint(LLVMAPIntConstIntGetValue(Val)));
+}
+
+/* llcontext -> APInt.t -> llvalue */
+CAMLprim LLVMValueRef llvm_apint_const_apint(LLVMContextRef Ctx, value I) {
+  CAMLparam1(I);	
+  CAMLreturnT (LLVMValueRef, LLVMAPIntConstAPInt(Ctx, APInt_val(I)));
+}
+
+/* int -> Int64.t -> bool -> t */
+CAMLprim value llvm_apint_of_int64(value NumBits, value Val, value IsSigned) {
+  CAMLparam3(NumBits, Val, IsSigned);
+  CAMLreturn(alloc_apint(LLVMAPIntOfInt64(Int_val(NumBits), Int64_val(Val),
+    Bool_val(IsSigned))));  
+}	
+
+/*--... Operations on APFloat ..............................................--*/
+
+#define APFloat_val(v)  (*(LLVMAPFloatRef *)(Data_custom_val(v)))
+
+static void llvm_finalize_apfloat(value IVal) {
+  LLVMDisposeAPFloat(APFloat_val(IVal));
+}
+
+static struct custom_operations apfloat_ops = {
+  (char *) "LLVMAPFloat",
+  llvm_finalize_apfloat,
+  custom_compare_default,
+  custom_hash_default,
+  custom_serialize_default,
+  custom_deserialize_default,
+#if defined(custom_compare_ext_default)
+  custom_compare_ext_default,
+#endif
+};
+
+static value alloc_apfloat(LLVMAPFloatRef Ref) {
+  value Val = alloc_custom(&apfloat_ops, sizeof(LLVMAPFloatRef), 0, 1);
+  APFloat_val(Val) = Ref;
+  return Val;
+}
+
+/* t -> APInt.t */
+CAMLprim value llvm_apfloat_bitcast_to_apint(value F) {
+  CAMLparam1(F);	
+  CAMLreturn(alloc_apint(LLVMAPFloatBitcastToAPInt(APFloat_val(F))));
+}
+
+/* t -> float */
+CAMLprim value llvm_apfloat_convert_to_double(value F) {
+  CAMLparam1(F);
+  CAMLreturn(copy_double(LLVMAPFloatConvertToDouble(APFloat_val(F))));
+}
+
+/* t -> float */
+CAMLprim value llvm_apfloat_convert_to_float(value F) {
+  CAMLparam1(F);
+  CAMLreturn(copy_double(LLVMAPFloatConvertToFloat(APFloat_val(F))));
+}
+
+/* t -> Semantics.t */
+CAMLprim value llvm_apfloat_get_semantics(value F) {
+  CAMLparam1(F);
+  CAMLreturn(Val_int(LLVMAPFloatGetSemantics(APFloat_val(F))));
+}
+
+/* t -> t -> CmpResult.t */
+CAMLprim value llvm_apfloat_compare(value F1, value F2) {
+  CAMLparam2(F1, F2);
+  CAMLreturn(Val_int(LLVMAPFloatCompare(APFloat_val(F1), APFloat_val(F2))));
+}  
+
+/* t -> t -> bool */
+CAMLprim value llvm_apfloat_bitwise_is_equal(value F1, value F2) {
+  CAMLparam2(F1, F2);
+  CAMLreturn(Val_bool(LLVMAPFloatBitwiseIsEqual(APFloat_val(F1), APFloat_val(F2))));
+}
+
+/* llvalue -> t */
+CAMLprim value llvm_apfloat_const_float_get_value(LLVMValueRef Val) {
+  CAMLparam0();
+  CAMLreturn(alloc_apfloat(LLVMAPFloatConstFloatGetValue(Val)));  
+}
+
+/* llcontext -> t -> llvalue */
+CAMLprim LLVMValueRef llvm_apfloat_const_apint(LLVMContextRef Ctx, value F) {
+  CAMLparam1(F);	
+  CAMLreturnT (LLVMValueRef, LLVMAPFloatConstAPFloat(Ctx, APFloat_val(F)));
+}
+
+/* t -> string */
+CAMLprim value llvm_apfloat_to_string(value F) {
+  CAMLparam1(F);
+  CAMLreturn(copy_string(LLVMAPFloatToString(APFloat_val(F))));
+}
 
 /*===-- SlotTracker -----------------------------------------------------===*/
 

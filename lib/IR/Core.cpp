@@ -2994,6 +2994,274 @@ const char *LLVMGetNextNamedType(LLVMModuleRef M, const char *Name) {
   return I->first().data();
 }
 
+/*--.. Operations on Users .................................................--*/
+
+void LLVMGetOperands(LLVMValueRef Val, LLVMValueRef *OperandRefs) {
+  User *U = unwrap<User>(Val);
+  for (User::op_iterator I = U->op_begin(),
+                         E = U->op_end(); I != E; I++)
+    *OperandRefs++ = wrap(I->get());
+}
+
+/*--.. Operations on APInt .................................................--*/
+
+void LLVMDisposeAPInt(LLVMAPIntRef I) {
+  delete unwrap(I);
+}
+
+void LLVMAPIntDump(LLVMAPIntRef I) {
+  unwrap(I)->dump();
+}
+
+const char * LLVMAPIntToString(LLVMAPIntRef I, unsigned Radix, int Signed) {
+  return unwrap(I)->toString(Radix, Signed).c_str();
+}
+
+unsigned long long LLVMAPIntGetZExtValue(LLVMAPIntRef I) {
+  return unwrap(I)->getZExtValue();	
+}
+
+unsigned long long LLVMAPIntGetSExtValue(LLVMAPIntRef I) {
+  return unwrap(I)->getSExtValue();	
+}
+
+int LLVMAPIntArrayIndex(LLVMAPIntRef I, unsigned BitPosition) {
+  APInt* i = unwrap(I);	 
+  assert (BitPosition < i->getBitWidth() && "BitPosition is out of range."); 	
+  return (*i)[BitPosition];
+}
+
+unsigned long long LLVMAPIntGetRawData(LLVMAPIntRef I, unsigned Index) {
+  APInt* i = unwrap(I);	 
+  const uint64_t* pdata = NULL;
+  assert (Index < i->getNumWords() && "Index is out of range."); 	
+  pdata = i->getRawData();
+  assert (pdata && "getRawData returns NULL");
+  return pdata[Index];
+}
+
+int LLVMAPIntIsNegative(LLVMAPIntRef I) {
+  return unwrap(I)->isNegative();	
+}
+
+int LLVMAPIntIsNonNegative(LLVMAPIntRef I) {
+  return unwrap(I)->isNonNegative();	
+}
+
+int LLVMAPIntIsStrictlyPositive(LLVMAPIntRef I) {
+  return unwrap(I)->isStrictlyPositive();	
+}
+
+int LLVMAPIntGetBoolValue(LLVMAPIntRef I) {
+  return unwrap(I)->getBoolValue();	
+}
+
+unsigned LLVMAPIntGetBitWidth(LLVMAPIntRef I) {
+  return unwrap(I)->getBitWidth();	
+}
+
+unsigned LLVMAPIntGetNumWords(LLVMAPIntRef I) {
+  return unwrap(I)->getNumWords();	
+}
+
+unsigned LLVMAPIntGetActiveBits(LLVMAPIntRef I) {
+  return unwrap(I)->getActiveBits();	
+}
+
+unsigned LLVMAPIntGetActiveWords(LLVMAPIntRef I) {
+  return unwrap(I)->getActiveWords();	
+}
+
+LLVMAPIntRef LLVMAPIntInc(LLVMAPIntRef I) {
+  APInt *RI = new APInt(++(*unwrap(I)));
+  return wrap(RI);
+}
+
+int LLVMAPIntCompare(LLVMAPIntRef I1, LLVMAPIntRef I2) {
+  APInt* i1 = unwrap(I1);	 
+  APInt* i2 = unwrap(I2);	 
+  if (i1->getBitWidth() == i2->getBitWidth())
+    return *i1==*i2;
+  else 
+    return 0;
+}
+
+LLVMAPIntRef LLVMAPIntConstIntGetValue(LLVMValueRef ConstantVal) {
+  APInt *RI = new APInt(unwrap<ConstantInt>(ConstantVal)->getValue());	
+  return wrap(RI);
+}
+
+LLVMValueRef LLVMAPIntConstAPInt(LLVMContextRef Context, LLVMAPIntRef N) {
+  return wrap(ConstantInt::get(*unwrap(Context), *unwrap(N)));
+}
+
+LLVMAPIntRef LLVMAPIntOfInt64(unsigned NumBits, unsigned long long Val,
+		              int IsSigned) {
+  APInt *RI = new APInt(NumBits, Val, IsSigned);
+  return wrap(RI);
+}
+
+/*--.. Operations on APFloat .................................................--*/
+
+void LLVMDisposeAPFloat(LLVMAPFloatRef F) {
+  delete unwrap(F);
+}
+
+LLVMAPIntRef LLVMAPFloatBitcastToAPInt(LLVMAPFloatRef F) {
+  APInt *RI = new APInt(unwrap(F)->bitcastToAPInt());
+  return wrap(RI);
+}
+
+double LLVMAPFloatConvertToDouble(LLVMAPFloatRef F) {
+  return unwrap(F)->convertToDouble();
+}
+
+double LLVMAPFloatConvertToFloat(LLVMAPFloatRef F) {
+  return (double)(unwrap(F)->convertToFloat());
+}
+
+LLVMAPFloatSemantics LLVMAPFloatGetSemantics(LLVMAPFloatRef F) {
+  APFloat* APF = unwrap(F);
+  if (APF->isIEEEsingle())
+    return LLVMIEEEsingle;  
+  if (APF->isIEEEdouble())
+    return LLVMIEEEdouble;  
+  if (APF->isIEEEquad())
+    return LLVMIEEEquad;  
+  if (APF->isPPCDoubleDouble())
+    return LLVMPPCDoubleDouble;  
+  if (APF->isX87DoubleExtended())
+    return LLVMX87DoubleExtended;  
+  assert(false && "Unknown APFloat Semantics.");
+  return (LLVMAPFloatSemantics)0;
+}
+
+LLVMAPFloatCmpResult LLVMAPFloatCompare(LLVMAPFloatRef F1, LLVMAPFloatRef F2) {
+  return (LLVMAPFloatCmpResult)(unwrap(F1)->compare(*unwrap(F2)));	
+}  
+
+int LLVMAPFloatBitwiseIsEqual(LLVMAPFloatRef F1, LLVMAPFloatRef F2) {
+  return unwrap(F1)->bitwiseIsEqual(*unwrap(F2));
+}
+
+LLVMAPFloatRef LLVMAPFloatConstFloatGetValue(LLVMValueRef ConstantVal) {
+  APFloat *RF = new APFloat(unwrap<ConstantFP>(ConstantVal)->getValueAPF());	
+  return wrap(RF);
+}
+
+LLVMValueRef LLVMAPFloatConstAPFloat(LLVMContextRef Ctx, LLVMAPFloatRef F) {
+  return wrap(ConstantFP::get(*unwrap(Ctx), *unwrap(F)));
+}
+
+const char * LLVMAPFloatToString(LLVMAPFloatRef F) {
+  APFloat* apf = unwrap(F);
+  std::stringstream out;
+  char * cstr;
+
+  if (&apf->getSemantics() == &APFloat::IEEEdouble ||
+      &apf->getSemantics() == &APFloat::IEEEsingle) {
+    // We would like to output the FP constant value in exponential notation,
+    // but we cannot do this if doing so will lose precision.  Check here to
+    // make sure that we only output it in exponential format if we can parse
+    // the value back and get the same value.
+    //
+    bool ignored;
+    bool isDouble = &apf->getSemantics()==&APFloat::IEEEdouble;
+    double Val = isDouble ? apf->convertToDouble() :
+                            apf->convertToFloat();
+    std::string StrVal = ftostr(*apf);
+
+    // Check to make sure that the stringized number is not some string like
+    // "Inf" or NaN, that atof will accept, but the lexer will not.  Check
+    // that the string matches the "[-+]?[0-9]" regex.
+    //
+    if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
+        ((StrVal[0] == '-' || StrVal[0] == '+') &&
+         (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
+      // Reparse stringized version!
+      if (atof(StrVal.c_str()) == Val) {
+        out << StrVal;
+        cstr = new char [out.str().size()+1];
+        strcpy (cstr, out.str().c_str());
+        return cstr;
+      }
+    }
+    // Otherwise we could not reparse it to exactly the same value, so we must
+    // output the string in hexadecimal format!  Note that loading and storing
+    // floating point types changes the bits of NaNs on some hosts, notably
+    // x86, so we must not use these types.
+    assert(sizeof(double) == sizeof(uint64_t) &&
+           "assuming that double is 64 bits!");
+    char Buffer[40];
+    // Floats are represented in ASCII IR as double, convert.
+    if (!isDouble)
+      apf->convert(APFloat::IEEEdouble, APFloat::rmNearestTiesToEven, 
+                        &ignored);
+    out << "0x" <<
+         utohex_buffer(uint64_t(apf->bitcastToAPInt().getZExtValue()), 
+                          Buffer+40);
+    cstr = new char [out.str().size()+1];
+    strcpy (cstr, out.str().c_str());
+    return cstr;
+  }
+    
+  // Some form of long double.  These appear as a magic letter identifying
+  // the type, then a fixed number of hex digits.
+  out << "0x";
+  if (&apf->getSemantics() == &APFloat::x87DoubleExtended) {
+    out << 'K';
+    // api needed to prevent premature destruction
+    APInt api = apf->bitcastToAPInt();
+    const uint64_t* p = api.getRawData();
+    uint64_t word = p[1];
+    int shiftcount=12;
+    int width = api.getBitWidth();
+    for (int j=0; j<width; j+=4, shiftcount-=4) {
+      unsigned int nibble = (word>>shiftcount) & 15;
+      if (nibble < 10)
+        out << (unsigned char)(nibble + '0');
+      else
+        out << (unsigned char)(nibble - 10 + 'A');
+      if (shiftcount == 0 && j+4 < width) {
+        word = *p;
+        shiftcount = 64;
+        if (width-j-4 < 64)
+          shiftcount = width-j-4;
+      }
+    }
+    cstr = new char [out.str().size()+1];
+    strcpy (cstr, out.str().c_str());
+    return cstr;
+  } else if (&apf->getSemantics() == &APFloat::IEEEquad)
+    out << 'L';
+  else if (&apf->getSemantics() == &APFloat::PPCDoubleDouble)
+    out << 'M';
+  else
+    llvm_unreachable("Unsupported floating point type");
+  // api needed to prevent premature destruction
+  APInt api = apf->bitcastToAPInt();
+  const uint64_t* p = api.getRawData();
+  uint64_t word = *p;
+  int shiftcount=60;
+  int width = api.getBitWidth();
+  for (int j=0; j<width; j+=4, shiftcount-=4) {
+    unsigned int nibble = (word>>shiftcount) & 15;
+    if (nibble < 10)
+      out << (unsigned char)(nibble + '0');
+    else
+      out << (unsigned char)(nibble - 10 + 'A');
+    if (shiftcount == 0 && j+4 < width) {
+      word = *(++p);
+      shiftcount = 64;
+      if (width-j-4 < 64)
+        shiftcount = width-j-4;
+    }
+  }
+  cstr = new char [out.str().size()+1];
+  strcpy (cstr, out.str().c_str());
+  return cstr;
+}
+
 /*===-- SlotTracker -------------------------------------------------------===*/
 
 LLVMSlotTrackerRef LLVMCreateSlotTrackerOfModule(LLVMModuleRef M) {

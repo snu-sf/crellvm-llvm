@@ -2617,6 +2617,170 @@ val iter_named_types : (string -> unit) -> llmodule -> unit
     [u1,...,uN] are the named types of the module [m]. Not tail recursive. *)
 val fold_right_named_types : (string -> 'a -> 'a) -> llmodule -> 'a -> 'a                       
 
+(* {6 Users} *)                                                                         
+(** [operands v] returns the operands of value [v].
+    See the method [llvm::User::op_begin]. *)
+val operands : llvalue -> llvalue array
+
+(* {6 APInt} *)
+
+module APInt : sig
+  (** Used to represent arbitrary precision integer. See the [llvm::APInt] class. *)
+  type t
+
+  (** [dump_apint i] prints the .ll representation of the APInt [i] to standard
+      error. See the method [llvm::APInt::dump]. *)
+  external dump : t -> unit = "llvm_apint_dump"
+
+  (** [_to_string i r b] returns the APInt [i] as a string with radix [r]
+   *  and whether it is signed [b].  Note that this is an inefficient method. 
+   *  See the method [llvm::APInt::toStrng]. *)
+  external _to_string : t -> int -> bool -> string = "llvm_apint_to_string"
+
+  (** [to_string i] calls [_to_string i 10 true]. *)
+  val to_string : t -> string
+
+  (** This method attempts to return the value of this APInt as a zero extended
+      uint64_t. The bitwidth must be <= 64 or the value must fit within a
+      uint64_t. Otherwise an assertion will result.
+      See the method [llvm::APInt::getZExtValue]. *)
+  external get_zext_value : t -> Int64.t = "llvm_apint_get_zext_value"
+
+  (** This method attempts to return the value of this APInt as a sign extended
+      int64_t. The bit width must be <= 64 or the value must fit within an
+      int64_t. Otherwise an assertion will result.
+      See the method [llvm::APInt::getSExtValue]. *)
+  external get_sext_value : t -> Int64.t = "llvm_apint_get_sext_value"
+
+  (** @returns the bit value at bitPosition
+      See the method [llvm::APInt::[]]. *)
+  external array_index : t -> int -> bool = "llvm_apint_array_index"
+
+  (** This function returns a pointer to the internal storage of the APInt.
+      This is useful for writing out the APInt in binary form without any
+      conversions. 
+      See the method [llvm::APInt::get_raw_data] and [llvm::APInt::getNumWords]. *)
+  external get_raw_data : t -> int -> Int64.t = "llvm_apint_get_raw_data"
+
+  (** This tests the high bit of this APInt to determine if it is set.
+      @returns true if this APInt is negative, false otherwise
+      See the method [llvm::APInt::isNegative]. *)
+  external is_negative : t -> bool = "llvm_apint_is_negative"
+
+  (** This tests the high bit of the APInt to determine if it is unset.
+      @brief Determine if this APInt Value is non-negative (>= 0)
+      See the method [llvm::APInt::isNonNegative]. *)
+  external is_nonnegative : t -> bool = "llvm_apint_is_nonnegative"
+
+  (** This tests if the value of this APInt is positive (> 0). Note
+      that 0 is not a positive value.
+      @returns true if this APInt is positive.
+      @brief Determine if this APInt Value is positive.
+      See the method [llvm::APInt::isStrictlyPositive]. *)
+  external is_strictly_positive : t -> bool = "llvm_apint_is_strictly_positive"
+
+  (** This converts the APInt to a boolean value as a test against zero.
+      See the method [llvm::APInt::getBoolValue]. *)
+  external get_bool_value : t -> bool = "llvm_apint_get_bool_value"
+
+  (** @returns the total number of bits.
+      See the method [llvm::APInt::getBitWidth]. *)
+  external get_bitwidth : t -> int =  "llvm_apint_get_bitwidth"
+
+  (** Here one word's bitwidth equals to that of uint64_t.
+      @returns the number of words to hold the integer value of this APInt.
+      See the method [llvm::APInt::getNumWords]. *)
+  external get_num_words : t -> int = "llvm_apint_get_num_words"
+
+  (** This function returns the number of active bits which is defined as the
+      bit width minus the number of leading zeros. This is used in several
+      computations to see how "wide" the value is.
+      @brief Compute the number of active bits in the value
+      See the method [llvm::APInt::getActiveBits]. *)
+  external get_active_bits : t -> int = "llvm_apint_get_active_bits"
+
+  (** This function returns the number of active words in the value of this
+      APInt. This is used in conjunction with getActiveData to extract the raw
+      value of the APInt.
+      See the method [llvm::APInt::getActiveWords]. *)
+  external get_active_words : t -> int = "llvm_apint_get_active_words"
+
+  (** [inc i] returns a t with value ++[i]. 
+      See the method [llvm::APInt::++]. *)
+  external inc : t -> t = "llvm_apint_inc"
+
+  (** [compare i1 i2] compairs if [i1] and [i2] are equal.
+      See the method [llvm::APInt::==]. *)
+  external compare : t -> t -> bool = "llvm_apint_compare"
+
+  (** [const_int_get_value c] returns APInt value. See the method
+      [llvm::ConstInt::getValue] *)
+  external const_int_get_value : llvalue -> t = "llvm_apint_const_int_get_value"
+
+  (** [const_apint ctx i] returns the integer constant of context [ctx] and 
+      value [i]. See the method [llvm::ConstantInt::get]. *)
+  external const_apint : llcontext -> t -> llvalue = "llvm_apint_const_apint"
+
+  (** [of_int64 numBits val isSigned] creates an APInt with the bit width 
+      [numBits], the initial value [val], and the signedness [isSigned]. 
+      See the constructor [llvm::APInt] whose default [isSigned] is false.  *)
+  external of_int64 : int -> Int64.t -> bool -> t = "llvm_apint_of_int64"
+
+end  
+
+(* {6 APFloat} *)
+
+module APFloat : sig
+  (** Used to represent arbitrary precision float. See the [llvm::APFloat] class. *)
+  type t
+
+  module Semantics : sig
+    type t =
+    | IEEEsingle
+    | IEEEdouble
+    | IEEEquad
+    | PPCDoubleDouble
+    | X87DoubleExternded
+  end
+
+  module CmpResult : sig
+    type t =
+    | LessThan
+    | Equal
+    | GreaterThan
+    | Unordered
+  end    
+
+  (** [bitcast_to_apint f] creates an APInt that is just a bit map of the
+   * floating point constant as it would appear in memory.  It is not a
+   * conversion, and treating the result as a normal integer is unlikely to be
+   * useful. *)
+  external bitcast_to_apint : t -> APInt.t = "llvm_apfloat_bitcast_to_apint"
+
+  external convert_to_double : t -> float = "llvm_apfloat_convert_to_double"
+
+  external convert_to_float : t -> float = "llvm_apfloat_convert_to_float"
+
+  external get_semantics : t -> Semantics.t = "llvm_apfloat_get_semantics"
+
+  (** IEEE comparison with another floating point number (NaNs compare
+   * unordered, 0==-0). *)
+  external compare : t -> t -> CmpResult.t = "llvm_apfloat_compare"
+
+  (** Bitwise comparison for equality (QNaNs compare equal, 0!=-0). *)
+  external bitwise_is_equal : t -> t -> bool = "llvm_apfloat_bitwise_is_equal"
+
+  external const_float_get_value : llvalue -> t = "llvm_apfloat_const_float_get_value"
+
+  external const_apfloat : llcontext -> t -> llvalue = "llvm_apfloat_const_apint"
+
+  (*val to_string : t -> string*)
+  external to_string : t -> string = "llvm_apfloat_to_string"
+
+  val bcompare : t -> t -> bool
+
+end                                    
+                                                                         
 (** Used to generate names for unnamed variables. See the [llvm::SlotTracker] 
     class. *)
 type llslottracker
