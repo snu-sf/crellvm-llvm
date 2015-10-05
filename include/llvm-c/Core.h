@@ -124,7 +124,6 @@ typedef struct LLVMOpaquePassRegistry *LLVMPassRegistryRef;
  * @see llvm::Use */
 typedef struct LLVMOpaqueUse *LLVMUseRef;
 
-
 /**
  * @see llvm::DiagnosticInfo
  */
@@ -3018,6 +3017,11 @@ LLVMBool LLVMIsMultithreaded(void);
  * @}
  */
 
+/** Used to get the APInt. See the llvm::APInt class. */
+typedef struct LLVMOpaqueAPInt *LLVMAPIntRef;
+
+/** Used to get the APFloat. See the llvm::APFloat class. */
+typedef struct LLVMOpaqueAPFloat *LLVMAPFloatRef;
 
 /* Used to provide a slot tracker.
  * See the llvm::SlotTracker class.

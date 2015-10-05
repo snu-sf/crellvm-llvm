@@ -18,6 +18,9 @@
 #define LLVM_ADT_APFLOAT_H
 
 #include "llvm/ADT/APInt.h"
+/* added for vellvm - start */
+#include "llvm/Support/CBindingWrapping.h"
+/* added for vellvm - end */
 
 namespace llvm {
 
@@ -675,6 +678,10 @@ inline APFloat maxnum(const APFloat &A, const APFloat &B) {
   return (A.compare(B) == APFloat::cmpLessThan) ? B : A;
 }
 
+/* added for vellvm - start */
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(APFloat,            LLVMAPFloatRef       )
+/* added for vellvm - end */  
+  
 } // namespace llvm
 
 #endif // LLVM_ADT_APFLOAT_H
