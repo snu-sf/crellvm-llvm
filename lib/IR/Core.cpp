@@ -3290,7 +3290,7 @@ int LLVMHasFnAttr(LLVMValueRef Fn, LLVMAttribute PA) {
 
 int LLVMHasRetAttr(LLVMValueRef Fn, LLVMAttribute PA) {
   Function *Func = unwrap<Function>(Fn);
-  const AttrListPtr PAL = Func->getAttributes();
+  const AttributeSet PAL = Func->getAttributes();
   return (int) (PAL.Raw(AttributeSet::ReturnIndex) & PA);
 }	
 
@@ -3343,7 +3343,7 @@ void LLVMSetInstrParamAlignment(LLVMValueRef Instr, unsigned index,
 
 int LLVMHasInstrRetAttribute(LLVMValueRef Instr, LLVMAttribute PA) {
   CallSite Call = CallSite(unwrap<Instruction>(Instr));
-  return (int)((Call.getAttributes().Raw(ReturnIndex) & PA) != 0);
+  return (int)((Call.getAttributes().Raw(llvm::AttributeSet::ReturnIndex) & PA) != 0);
 }
 
 int LLVMHasInstrParamAttribute(LLVMValueRef Instr, unsigned index, 
@@ -3356,7 +3356,7 @@ int LLVMHasInstrParamAttribute(LLVMValueRef Instr, unsigned index,
 
 int LLVMHasInstrAttribute(LLVMValueRef Instr, LLVMAttribute PA) {
   CallSite Call = CallSite(unwrap<Instruction>(Instr));
-  return (int)((Call.getAttributes().Raw(FunctionIndex) & PA) != 0);
+  return (int)((Call.getAttributes().Raw(llvm::AttributeSet::FunctionIndex) & PA) != 0);
 }
 
 /*--.. Cmp instructions ....................................................--*/
