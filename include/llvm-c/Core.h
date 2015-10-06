@@ -3103,6 +3103,15 @@ LLVMAPFloatRef LLVMAPFloatConstFloatGetValue(LLVMValueRef ConstantVal);
 LLVMValueRef LLVMAPFloatConstAPFloat(LLVMContextRef Ctx, LLVMAPFloatRef F);
 const char * LLVMAPFloatToString(LLVMAPFloatRef F);  
 
+int LLVMHasFnAttr(LLVMValueRef Fn, LLVMAttribute PA);
+int LLVMHasRetAttr(LLVMValueRef Fn, LLVMAttribute PA);
+int LLVMHasAttribute(LLVMValueRef Arg, LLVMAttribute PA);
+
+int LLVMHasInstrRetAttribute(LLVMValueRef Instr, LLVMAttribute PA);
+int LLVMHasInstrParamAttribute(LLVMValueRef Instr, unsigned index, 
+                              LLVMAttribute PA);
+int LLVMHasInstrAttribute(LLVMValueRef Instr, LLVMAttribute PA);  
+  
 /* Operations on CmpInst */
 LLVMIntPredicate LLVMCmpInstGetPredicate(LLVMValueRef Inst);
 LLVMIntPredicate LLVMCmpInstConstGetPredicate(LLVMValueRef CE);

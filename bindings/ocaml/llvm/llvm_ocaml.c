@@ -2675,6 +2675,45 @@ CAMLprim value llvm_apfloat_to_string(value F) {
   CAMLreturn(copy_string(LLVMAPFloatToString(APFloat_val(F))));
 }
 
+/* llvalue -> Attribute.t -> bool */
+CAMLprim value llvm_has_fn_attr(LLVMValueRef Fn, value PA) {
+  return Val_bool(LLVMHasFnAttr(Fn, 1<<Int_val(PA)));
+}
+
+/* llvalue -> Attribute.t -> bool */
+CAMLprim value llvm_has_ret_attr(LLVMValueRef Fn, value PA) {
+  return Val_bool(LLVMHasRetAttr(Fn, 1<<Int_val(PA)));
+}
+
+/* llvalue -> Attribute.t -> bool */
+CAMLprim value llvm_has_param_attr(LLVMValueRef Arg, value PA) {
+  return Val_bool(LLVMHasAttribute(Arg, 1<<Int_val(PA)));
+}
+
+/* llvalue -> Attribute.t -> bool */
+CAMLprim value llvm_has_instruction_ret_attr(LLVMValueRef Instr,
+                                             value PA) {
+  CAMLparam1 (PA);	
+  CAMLreturn (Val_bool(LLVMHasInstrRetAttribute(Instr, 1<<Int_val(PA))));
+}
+
+/* llvalue -> int -> Attribute.t -> bool */
+CAMLprim value llvm_has_instruction_param_attr(LLVMValueRef Instr,
+                                               value index,
+                                               value PA) {
+  CAMLparam2 (index, PA);	 
+  CAMLreturn (Val_bool(LLVMHasInstrParamAttribute(Instr, Int_val(index), 
+    1<<Int_val(PA))));
+}
+
+/* llvalue -> Attribute.t -> bool */
+CAMLprim value llvm_has_instruction_attr(LLVMValueRef Instr, value PA) {
+  CAMLparam1 (PA);	
+  CAMLreturn (Val_bool(LLVMHasInstrAttribute(Instr, 1<<Int_val(PA))));
+}
+
+
+
 /*--... Operations on IcmpInst ............................................--*/
 
 /* llvalue -> Icmp.t */

@@ -3282,6 +3282,83 @@ const char * LLVMAPFloatToString(LLVMAPFloatRef F) {
   // return cstr;
 }
 
+int LLVMHasFnAttr(LLVMValueRef Fn, LLVMAttribute PA) {
+  Function *Func = unwrap<Function>(Fn);
+  const AttributeSet PAL = Func->getAttributes();
+  return (int) (PAL.Raw(AttributeSet::FunctionIndex) & PA);
+}	
+
+int LLVMHasRetAttr(LLVMValueRef Fn, LLVMAttribute PA) {
+  Function *Func = unwrap<Function>(Fn);
+  const AttrListPtr PAL = Func->getAttributes();
+  return (int) (PAL.Raw(AttributeSet::ReturnIndex) & PA);
+}	
+
+/*
+LLVMAttribute LLVMGetAttribute(LLVMValueRef Arg) {
+  Argument *A = unwrap<Argument>(Arg);
+  return (LLVMAttribute)A->getParent()->getAttributes().
+    Raw(A->getArgNo()+1);
+}
+*/
+
+int LLVMHasAttribute(LLVMValueRef Arg, LLVMAttribute PA) {
+  Argument *A = unwrap<Argument>(Arg);
+  return (int) (A->getParent()->getAttributes().Raw(
+    A->getArgNo()+1) & PA);
+}
+
+/*
+  void LLVMAddInstrAttribute(LLVMValueRef Instr, unsigned index,
+                           LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  AttrBuilder B(PA);
+  Call.setAttributes(
+    Call.getAttributes().addAttributes(Call->getContext(), index,
+                                       AttributeSet::get(Call->getContext(),
+                                                         index, B)));
+}
+
+void LLVMRemoveInstrAttribute(LLVMValueRef Instr, unsigned index,
+                              LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  AttrBuilder B(PA);
+  Call.setAttributes(Call.getAttributes()
+                       .removeAttributes(Call->getContext(), index,
+                                         AttributeSet::get(Call->getContext(),
+                                                           index, B)));
+}
+
+void LLVMSetInstrParamAlignment(LLVMValueRef Instr, unsigned index,
+                                unsigned align) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  AttrBuilder B;
+  B.addAlignmentAttr(align);
+  Call.setAttributes(Call.getAttributes()
+                       .addAttributes(Call->getContext(), index,
+                                      AttributeSet::get(Call->getContext(),
+                                                        index, B)));
+}
+*/
+
+int LLVMHasInstrRetAttribute(LLVMValueRef Instr, LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  return (int)((Call.getAttributes().Raw(ReturnIndex) & PA) != 0);
+}
+
+int LLVMHasInstrParamAttribute(LLVMValueRef Instr, unsigned index, 
+                              LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  // Importantly, we must do index+1, but not only index. See also
+  // LLVMHasAttribute and LLVMGetAttribute
+  return (int)(Call.getAttributes().Raw(index+1) & PA);
+}
+
+int LLVMHasInstrAttribute(LLVMValueRef Instr, LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  return (int)((Call.getAttributes().Raw(FunctionIndex) & PA) != 0);
+}
+
 /*--.. Cmp instructions ....................................................--*/
 LLVMIntPredicate LLVMCmpInstGetPredicate(LLVMValueRef Inst) {
   CmpInst *Instr = unwrap<CmpInst>(Inst);

@@ -2785,8 +2785,39 @@ module APFloat : sig
 
   val bcompare : t -> t -> bool
 
-end                                    
+end                
 
+(** [has_fn_attr f a] checks if the function [f] has attribute [a] *)
+val has_fn_attr : llvalue -> Attribute.t -> bool          
+
+(** [has_ret_attr f a] checks if the function [f]'s return typ has attribute 
+    [a] *)
+val has_ret_attr : llvalue -> Attribute.t -> bool
+
+(** [has_param_attr p a] checks attribute [a] of parameter [p]. *)
+val has_param_attr : llvalue -> Attribute.t -> bool
+
+(** [has_instruction_ret_attr ci a] checks attribute [a] of the
+    ret of the call or invoke instruction [ci].
+    In OCaml, the first arg is from 0. In LLVM, the first arg is from 1; 0
+    stores the attr of ret. So, we have to define has_instruction_ret/param_attr
+    separately. Internally, [has_instruction_param_attr ci i a] checks i+1-th
+    attr. [has_instruction_ret_attr ci a] checks 0-th attr. *)
+val has_instruction_ret_attr : llvalue -> Attribute.t -> bool
+
+(** [has_instruction_param_attr ci i a] checks attribute [a] of the
+    [i]th parameter of the call or invoke instruction [ci]. *)
+val has_instruction_param_attr : llvalue -> int -> Attribute.t -> bool
+
+(** [has_instruction_attr ci a] checks attribute [a] of the call or invoke 
+    instruction [ci]. *)
+val has_instruction_attr : llvalue -> Attribute.t -> bool
+
+
+
+
+
+                   
 (** {7 Operations on ICmpInst} *)
 module ICmpInst : sig
   val get_predicate : llvalue -> Icmp.t

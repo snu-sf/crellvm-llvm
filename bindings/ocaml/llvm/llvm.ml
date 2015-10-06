@@ -1491,7 +1491,19 @@ module APFloat = struct
 
 end
 
+external has_fn_attr : llvalue -> Attribute.t -> bool          
+                             = "llvm_has_fn_attr"
+external has_ret_attr : llvalue -> Attribute.t -> bool = "llvm_has_ret_attr"                    
 
+external has_param_attr : llvalue -> Attribute.t -> bool
+                           = "llvm_has_param_attr"
+
+external has_instruction_ret_attr : llvalue -> Attribute.t -> bool
+                                       = "llvm_has_instruction_ret_attr"
+external has_instruction_param_attr : llvalue -> int -> Attribute.t -> bool
+                                       = "llvm_has_instruction_param_attr"
+external has_instruction_attr : llvalue -> Attribute.t -> bool
+                                       = "llvm_has_instruction_attr"
                    
 (** {7 Operations on ICmpInst} *)
 module ICmpInst = struct
