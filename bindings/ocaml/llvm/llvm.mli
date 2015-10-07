@@ -2815,7 +2815,24 @@ val has_instruction_attr : llvalue -> Attribute.t -> bool
 
 
 
+(** {7 Operations on AllocationInst : AllocaInst, MallocInst} *)
+module AllocationInst : sig
+  val is_array_allocation : llvalue -> bool 
+  val get_array_size : llvalue -> llvalue
+  val get_type : llvalue -> lltype
+  val get_allocated_type : llvalue -> lltype
+  val get_alignment : llvalue -> int
+end        
 
+(** {7 Operations on LoadInst} *)
+module LoadInst : sig
+  val get_alignment : llvalue -> int
+end                     
+
+(** {7 Operations on StoreInst} *)
+module StoreInst : sig
+  val get_alignment : llvalue -> int
+end                     
 
                    
 (** {7 Operations on ICmpInst} *)
@@ -2830,11 +2847,42 @@ module FCmpInst : sig
   val const_get_predicate : llvalue -> Fcmp.t 
 end                           
 
+(** {7 Operations on BranchInst} *)
+module BranchInst : sig
+  val is_conditional : llvalue -> bool
+  val get_condition : llvalue -> llvalue
+  val get_successor : llvalue -> int -> llbasicblock
+end    
+                    
 (** {7 Operations on GetElementPtrInst} *)
 module GetElementPtrInst : sig
   val is_in_bounds : llvalue -> bool
 end   
-                    
+
+(** {7 Operations on ReturnInst} *)
+module ReturnInst : sig
+  val is_void : llvalue -> bool
+end        
+
+(** {7 Operations on InsertValueInst} *)
+module InsertValueInst : sig
+  val get_num_indices : llvalue -> int 
+  val get_indices : llvalue -> int array 
+end        
+
+(** {7 Operations on ExtractValueInst} *)
+module ExtractValueInst : sig
+  val get_num_indices : llvalue -> int 
+  val get_indices : llvalue -> int array 
+end        
+
+(** {7 Operations on CallInst} *)
+module CallInst : sig
+  (** [get_called_value v] get a pointer to the function that is invoked by this
+      instruction. See the method [llvm::CallInst::getCalledValue]. *)
+  val get_called_value : llvalue -> llvalue
+end        
+                             
 (** Used to generate names for unnamed variables. See the [llvm::SlotTracker] 
     class. *)
 type llslottracker

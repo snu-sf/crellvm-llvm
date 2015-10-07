@@ -3111,13 +3111,46 @@ int LLVMHasInstrRetAttribute(LLVMValueRef Instr, LLVMAttribute PA);
 int LLVMHasInstrParamAttribute(LLVMValueRef Instr, unsigned index, 
                               LLVMAttribute PA);
 int LLVMHasInstrAttribute(LLVMValueRef Instr, LLVMAttribute PA);  
+
+/* Operations on AllocationInst */
+int LLVMAllocationInstIsArrayAllocation(LLVMValueRef Inst);
+LLVMValueRef LLVMAllocationInstGetArraySize(LLVMValueRef Inst);
+LLVMTypeRef LLVMAllocationInstGetAllocatedType(LLVMValueRef Inst);
+unsigned LLVMAllocationInstGetAlignment(LLVMValueRef Inst);
+
+/* Operations on LoadInst */
+unsigned LLVMLoadInstGetAlignment(LLVMValueRef Inst);
+
+/* Operations on StoreInst */
+unsigned LLVMStoreInstGetAlignment(LLVMValueRef Inst);
   
 /* Operations on CmpInst */
 LLVMIntPredicate LLVMCmpInstGetPredicate(LLVMValueRef Inst);
 LLVMIntPredicate LLVMCmpInstConstGetPredicate(LLVMValueRef CE);
 
+/* Operations on BranchInst */
+int LLVMBranchInstIsConditional(LLVMValueRef Inst);
+LLVMValueRef LLVMBranchInstGetCondition(LLVMValueRef Inst);
+LLVMBasicBlockRef LLVMBranchInstGetSuccessor(LLVMValueRef Inst, unsigned idx);
+  
 /* Operations on GetElementPtrInst */
 int LLVMGetElementPtrInstIsInBounds(LLVMValueRef Inst);  
+
+/* Operations on ReturnInst */
+int LVMReturnInstIsVoid(LLVMValueRef Inst);
+
+/* Operations on InsertValueInst */
+unsigned LLVMInsertValueInstGetNumIndices(LLVMValueRef Inst);
+void LLVMInsertValueInstGetIndices(LLVMValueRef Inst, unsigned *IdxList, 
+		                   unsigned NumIdx);
+
+/* Operations on ExtractValueInst */
+unsigned LLVMExtractValueInstGetNumIndices(LLVMValueRef Inst);
+void LLVMExtractValueInstGetIndices(LLVMValueRef Inst, unsigned *IdxList, 
+		                    unsigned NumIdx);
+
+/* Operations on CallInst */
+LLVMValueRef LLVMGetCalledValue(LLVMValueRef Inst);
   
 /*===-- SlotTracker -------------------------------------------------------===*/
 

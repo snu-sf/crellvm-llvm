@@ -3359,6 +3359,42 @@ int LLVMHasInstrAttribute(LLVMValueRef Instr, LLVMAttribute PA) {
   return (int)((Call.getAttributes().Raw(llvm::AttributeSet::FunctionIndex) & PA) != 0);
 }
 
+/*--.. Allocation instructions ........................................--*/
+
+int LLVMAllocationInstIsArrayAllocation(LLVMValueRef Inst) {
+  AllocaInst *Instr = unwrap<AllocaInst>(Inst);
+  return Instr->isArrayAllocation(); 
+}
+
+LLVMValueRef LLVMAllocationInstGetArraySize(LLVMValueRef Inst) {
+  AllocaInst *Instr = unwrap<AllocaInst>(Inst);
+  return wrap(Instr->getArraySize()); 
+}
+
+LLVMTypeRef LLVMAllocationInstGetAllocatedType(LLVMValueRef Inst) {
+  AllocaInst *Instr = unwrap<AllocaInst>(Inst);
+  return wrap(Instr->getAllocatedType()); 
+}
+
+unsigned LLVMAllocationInstGetAlignment(LLVMValueRef Inst) {
+  AllocaInst *Instr = unwrap<AllocaInst>(Inst);
+  return Instr->getAlignment(); 
+}
+
+/*--.. Load instructions ...................................................--*/
+
+unsigned LLVMLoadInstGetAlignment(LLVMValueRef Inst) {
+  LoadInst *Instr = unwrap<LoadInst>(Inst);
+  return Instr->getAlignment(); 
+}
+
+/*--.. Store instructions ...................................................--*/
+
+unsigned LLVMStoreInstGetAlignment(LLVMValueRef Inst) {
+  StoreInst *Instr = unwrap<StoreInst>(Inst);
+  return Instr->getAlignment(); 
+}
+
 /*--.. Cmp instructions ....................................................--*/
 LLVMIntPredicate LLVMCmpInstGetPredicate(LLVMValueRef Inst) {
   CmpInst *Instr = unwrap<CmpInst>(Inst);
@@ -3370,9 +3406,66 @@ LLVMIntPredicate LLVMCmpInstConstGetPredicate(LLVMValueRef C) {
   return static_cast<LLVMIntPredicate>(CE->getPredicate());
 }
 
+/*--.. Branch instructions ..................................................--*/
+int LLVMBranchInstIsConditional(LLVMValueRef Inst){
+  return unwrap<BranchInst>(Inst)->isConditional();
+}
+
+LLVMValueRef LLVMBranchInstGetCondition(LLVMValueRef Inst){
+  return wrap(unwrap<BranchInst>(Inst)->getCondition());
+}
+
+LLVMBasicBlockRef LLVMBranchInstGetSuccessor(LLVMValueRef Inst, unsigned idx){
+  return wrap(unwrap<BranchInst>(Inst)->getSuccessor(idx));
+}
+
 /*--.. GEP instructions ..................................................--*/
 int LLVMGetElementPtrInstIsInBounds(LLVMValueRef Inst) {
   return unwrap<GEPOperator>(Inst)->isInBounds();
+}
+
+/*--.. Return instructions ...............................................--*/
+int LVMReturnInstIsVoid(LLVMValueRef Inst) {
+  return unwrap<ReturnInst>(Inst)->getReturnValue() == 0;
+}
+
+/*--.. InsertValue instructions.............................................--*/
+unsigned LLVMInsertValueInstGetNumIndices(LLVMValueRef Inst) {
+  return unwrap<InsertValueInst>(Inst)->getNumIndices();
+}
+
+void LLVMInsertValueInstGetIndices(LLVMValueRef Inst, unsigned *IdxList, 
+		                   unsigned NumIdx) {
+  InsertValueInst *Instr = unwrap<InsertValueInst>(Inst);
+  InsertValueInst::idx_iterator I = Instr->idx_begin();
+  unsigned i;
+
+  for (i = 0; i < NumIdx; i++) {
+    assert (I != Instr->idx_end() && "Indices must be in bound.");
+    IdxList[i] = *(I++);
+  }
+}
+
+/*--.. ExtractValue instructions............................................--*/
+unsigned LLVMExtractValueInstGetNumIndices(LLVMValueRef Inst) {
+  return unwrap<ExtractValueInst>(Inst)->getNumIndices();
+}
+
+void LLVMExtractValueInstGetIndices(LLVMValueRef Inst, unsigned *IdxList, 
+   		                    unsigned NumIdx) {
+  ExtractValueInst *Instr = unwrap<ExtractValueInst>(Inst);
+  ExtractValueInst::idx_iterator I = Instr->idx_begin();
+  unsigned i;
+
+  for (i = 0; i < NumIdx; i++) {
+    assert (I != Instr->idx_end() && "Indices must be in bound.");
+    IdxList[i] = *(I++);
+  }
+}
+
+/*--.. Call instructions............................................--*/
+LLVMValueRef LLVMGetCalledValue(LLVMValueRef Inst) {
+  return wrap(unwrap<CallInst>(Inst)->getCalledValue());
 }
 
 /*===-- SlotTracker -------------------------------------------------------===*/

@@ -2712,7 +2712,31 @@ CAMLprim value llvm_has_instruction_attr(LLVMValueRef Instr, value PA) {
   CAMLreturn (Val_bool(LLVMHasInstrAttribute(Instr, 1<<Int_val(PA))));
 }
 
+/*--... Operations on AllocationInst ....................................--*/
 
+/* llvalue -> bool */
+CAMLprim value llvm_allocationinst_is_array_allocation(LLVMValueRef Inst) {
+  return Val_bool(LLVMAllocationInstIsArrayAllocation(Inst));
+}
+
+/* llvalue -> int */
+CAMLprim value llvm_allocationinst_get_alignment(LLVMValueRef Inst) {
+  return Val_int(LLVMAllocationInstGetAlignment(Inst));
+}
+
+/*--... Operations on LoadInst ..........................................--*/
+
+/* llvalue -> int */
+CAMLprim value llvm_loadinst_get_alignment(LLVMValueRef Inst) {
+  return Val_int(LLVMLoadInstGetAlignment(Inst));
+}
+
+/*--... Operations on StoreInst ..........................................--*/
+
+/* llvalue -> int */
+CAMLprim value llvm_storeinst_get_alignment(LLVMValueRef Inst) {
+  return Val_int(LLVMStoreInstGetAlignment(Inst));
+}
 
 /*--... Operations on IcmpInst ............................................--*/
 
@@ -2738,11 +2762,92 @@ CAMLprim value llvm_fcmpinst_const_get_predicate(LLVMValueRef CE) {
   return Val_int(LLVMCmpInstConstGetPredicate(CE));
 }
 
+/*--... Operations on BranchInst ...........................................--*/
+
+/* llvalue -> bool */
+CAMLprim value llvm_branchinst_is_conditional(LLVMValueRef Inst) {
+  return Val_bool(LLVMBranchInstIsConditional(Inst));
+}
+
+/* llvalue -> int -> llbasicblock  */
+CAMLprim LLVMBasicBlockRef llvm_branchinst_get_successor(LLVMValueRef Inst, 
+		                                         value I) {
+  return LLVMBranchInstGetSuccessor(Inst, Int_val(I));
+}
+
 /*--... Operations on GetElementPtrInst ....................................--*/
 
 /* llvalue -> bool */
 CAMLprim value llvm_gep_is_in_bounds(LLVMValueRef Inst) {
   return Val_bool(LLVMGetElementPtrInstIsInBounds(Inst));
+}
+
+/*--... Operations on ReturnInst ..........................................--*/
+
+/* llvalue -> bool */
+CAMLprim value llvm_returninst_is_void(LLVMValueRef Inst) {
+  return Val_bool(LVMReturnInstIsVoid(Inst));
+}
+
+/*--... Operations on InsertValueInst ......................................--*/
+
+/* llvalue -> int */
+CAMLprim value llvm_insertvalueinst_get_num_indices(LLVMValueRef Inst) {
+  return Val_int(LLVMInsertValueInstGetNumIndices(Inst));
+}
+
+/* llvalue -> int array */
+CAMLprim value llvm_insertvalueinst_get_indices(LLVMValueRef Inst) {
+  CAMLparam0();
+  CAMLlocal1(Indices);
+  int size = LLVMInsertValueInstGetNumIndices(Inst);
+  unsigned* idxs = (unsigned*)malloc(size * sizeof(unsigned));
+  int i;
+
+  Indices = caml_alloc(size, 0);
+  LLVMInsertValueInstGetIndices(Inst, idxs, size);
+
+  for (i = 0; i < size; i++) {
+    Store_field(Indices, i, Val_int(idxs[i]));
+    idxs[i] = Int_val(Field(Indices, i));
+  }
+
+  free(idxs);
+  CAMLreturn(Indices);
+}
+
+/*--... Operations on ExtractValueInst .....................................--*/
+
+/* llvalue -> int */
+CAMLprim value llvm_extractvalueinst_get_num_indices(LLVMValueRef Inst) {
+  return Val_int(LLVMExtractValueInstGetNumIndices(Inst));
+}
+
+/* llvalue -> int array */
+CAMLprim value llvm_extractvalueinst_get_indices(LLVMValueRef Inst) {
+  CAMLparam0();
+  CAMLlocal1(Indices);
+  int size = LLVMExtractValueInstGetNumIndices(Inst);
+  unsigned* idxs = (unsigned*)malloc(size * sizeof(unsigned));
+  int i;
+
+  Indices = caml_alloc(size, 0);
+  LLVMExtractValueInstGetIndices(Inst, idxs, size);
+
+  for (i = 0; i < size; i++) {
+    Store_field(Indices, i, Val_int(idxs[i]));
+    idxs[i] = Int_val(Field(Indices, i));
+  }
+
+  free(idxs);
+  CAMLreturn(Indices);
+}
+
+/*--... Operations on ExtractValueInst .....................................--*/
+
+/* llvalue -> llvalue */
+CAMLprim LLVMValueRef llvm_callinst_get_called_value(LLVMValueRef Inst) {
+  return LLVMGetCalledValue(Inst);
 }
 
 /*===-- SlotTracker -----------------------------------------------------===*/

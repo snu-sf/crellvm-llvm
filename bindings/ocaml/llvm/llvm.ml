@@ -1504,7 +1504,32 @@ external has_instruction_param_attr : llvalue -> int -> Attribute.t -> bool
                                        = "llvm_has_instruction_param_attr"
 external has_instruction_attr : llvalue -> Attribute.t -> bool
                                        = "llvm_has_instruction_attr"
-                   
+
+(** {7 Operations on AllocationInst : AllocaInst, MallocInst} *)
+module AllocationInst = struct
+  external is_array_allocation : llvalue -> bool 
+                     = "llvm_allocationinst_is_array_allocation"
+  external get_array_size : llvalue -> llvalue
+                     = "LLVMAllocationInstGetArraySize"
+  let get_type = type_of
+  external get_allocated_type : llvalue -> lltype
+                     = "LLVMAllocationInstGetAllocatedType"
+  external get_alignment : llvalue -> int
+                     = "llvm_allocationinst_get_alignment"
+end        
+
+(** {7 Operations on LoadInst} *)
+module LoadInst = struct
+  external get_alignment : llvalue -> int
+                     = "llvm_loadinst_get_alignment"
+end                     
+
+(** {7 Operations on StoreInst} *)
+module StoreInst = struct
+  external get_alignment : llvalue -> int
+                     = "llvm_storeinst_get_alignment"
+end
+                                           
 (** {7 Operations on ICmpInst} *)
 module ICmpInst = struct
   external get_predicate : llvalue -> Icmp.t = "llvm_icmpinst_get_predicate" 
@@ -1519,11 +1544,46 @@ module FCmpInst = struct
     = "llvm_fcmpinst_const_get_predicate" 
 end                   
 
+(** {7 Operations on BranchInst} *)
+module BranchInst = struct
+  external is_conditional : llvalue -> bool = "llvm_branchinst_is_conditional" 
+  external get_condition : llvalue -> llvalue = "LLVMBranchInstGetCondition"
+  external get_successor : llvalue -> int -> llbasicblock
+                                = "llvm_branchinst_get_successor"               
+end        
+                    
 (** {7 Operations on GetElementPtrInst} *)
 module GetElementPtrInst = struct
   external is_in_bounds : llvalue -> bool = "llvm_gep_is_in_bounds"        
 end
-                   
+
+(** {7 Operations on ReturnInst} *)
+module ReturnInst = struct
+  external is_void : llvalue -> bool = "llvm_returninst_is_void"        
+end        
+
+(** {7 Operations on InsertValueInst} *)
+module InsertValueInst = struct
+  external get_num_indices : llvalue -> int 
+    = "llvm_insertvalueinst_get_num_indices"
+  external get_indices : llvalue -> int array 
+    = "llvm_insertvalueinst_get_indices"
+end        
+
+(** {7 Operations on ExtractValueInst} *)
+module ExtractValueInst = struct
+  external get_num_indices : llvalue -> int 
+    = "llvm_extractvalueinst_get_num_indices"
+  external get_indices : llvalue -> int array 
+    = "llvm_extractvalueinst_get_indices"
+end        
+
+(** {7 Operations on CallInst} *)
+module CallInst = struct
+  external get_called_value : llvalue -> llvalue
+    = "llvm_callinst_get_called_value"
+end        
+                             
       
 (*===-- SlotTracker -------------------------------------------------------===*)
 
