@@ -3171,6 +3171,20 @@ LLVMValueRef LLVMAPFloatConstAPFloat(LLVMContextRef Ctx, LLVMAPFloatRef F) {
   return wrap(ConstantFP::get(*unwrap(Ctx), *unwrap(F)));
 }
 
+// ftostr from lib/Target/CppBackend/CPPBackend.cpp - ys
+
+static inline std::string ftostr(const APFloat& V) {
+  std::string Buf;
+  if (&V.getSemantics() == &APFloat::IEEEdouble) {
+    raw_string_ostream(Buf) << V.convertToDouble();
+    return Buf;
+  } else if (&V.getSemantics() == &APFloat::IEEEsingle) {
+    raw_string_ostream(Buf) << (double)V.convertToFloat();
+    return Buf;
+  }
+  return "<unknown format in ftostr>"; // error
+}
+
 const char * LLVMAPFloatToString(LLVMAPFloatRef F) {
   APFloat* apf = unwrap(F);
   std::stringstream out;
