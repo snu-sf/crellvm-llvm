@@ -2991,6 +2991,51 @@ int LLVMHasInitializer(LLVMValueRef Global) {
   return unwrap<GlobalVariable>(Global)->hasInitializer();
 }
 
+LLVMIntrinsicID LLVMGetSupportedIntrinsicID(LLVMValueRef Fn) {
+  Function *F = dyn_cast<Function>(unwrap(Fn));
+  if (NULL == F) return LLVMNotIntrinsic;
+  switch (F->getIntrinsicID()) {
+  case Intrinsic::not_intrinsic: return LLVMNotIntrinsic;
+  default: return LLVMUnsupportedIntrinsic;
+  case Intrinsic::expect: return LLVMExpect;
+  case Intrinsic::setjmp: return LLVMSetjmp;
+  case Intrinsic::sigsetjmp: return LLVMSigSetjmp;
+  case Intrinsic::longjmp: return LLVMLongjmp;
+  case Intrinsic::siglongjmp: return LLVMSigLongjmp;
+  case Intrinsic::ctpop: return LLVMCtpop;
+  case Intrinsic::bswap: return LLVMBswap;
+  case Intrinsic::ctlz: return LLVMCtlz;
+  case Intrinsic::cttz: return LLVMCttz;
+  case Intrinsic::stacksave: return LLVMStackSave;
+  case Intrinsic::stackrestore: return LLVMStackRestore;
+  case Intrinsic::returnaddress: return LLVMReturnAddress;
+  case Intrinsic::frameaddress: return LLVMFrameAddress;
+  case Intrinsic::prefetch: return LLVMPrefetch;
+  case Intrinsic::pcmarker: return LLVMPcmarker;
+  case Intrinsic::readcyclecounter: return LLVMReadCycleCounter;
+  case Intrinsic::dbg_declare: return LLVMDbgDeclare;
+  // case Intrinsic::eh_exception: return LLVMEhException;
+  // case Intrinsic::eh_selector: return LLVMEhSelector;
+  case Intrinsic::eh_typeid_for: return LLVMEhTypeidFor;
+  case Intrinsic::var_annotation: return LLVMVarAnnotation;
+  case Intrinsic::memcpy: return LLVMMemcpy;
+  case Intrinsic::memmove: return LLVMMemmove;
+  case Intrinsic::memset: return LLVMMemset;
+  case Intrinsic::sqrt: return LLVMSqrt;
+  case Intrinsic::log: return LLVMLog;
+  case Intrinsic::log2: return LLVMLog2;
+  case Intrinsic::log10: return LLVMLog10;
+  case Intrinsic::exp: return LLVMExp;
+  case Intrinsic::exp2: return LLVMExp2;
+  case Intrinsic::pow: return LLVMPow;
+  case Intrinsic::flt_rounds: return LLVMFltRounds;
+  case Intrinsic::invariant_start: return LLVMInvariantStart;
+  case Intrinsic::lifetime_start: return LLVMLifetimeStart;
+  case Intrinsic::invariant_end: return LLVMInvariantEnd;
+  case Intrinsic::lifetime_end: return LLVMLifetimeEnd;
+  }
+}
+
 
 /*===-- Operations on named types ---------------------------------------===*/
 

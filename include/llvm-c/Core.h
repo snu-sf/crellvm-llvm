@@ -3047,6 +3047,47 @@ typedef enum {
   LLVMUnordered		
 } LLVMAPFloatCmpResult;	    
 
+typedef enum {
+  LLVMNotIntrinsic      	= 0,
+  LLVMExpect			,
+  LLVMSetjmp			,
+  LLVMSigSetjmp			,
+  LLVMLongjmp			,
+  LLVMSigLongjmp		,
+  LLVMCtpop			,
+  LLVMBswap			,
+  LLVMCtlz			,
+  LLVMCttz			,
+  LLVMStackSave			,
+  LLVMStackRestore		,
+  LLVMReturnAddress		,
+  LLVMFrameAddress		,
+  LLVMPrefetch			,
+  LLVMPcmarker			,
+  LLVMReadCycleCounter		,
+  LLVMDbgDeclare		,
+  /* LLVMEhException		, */
+  /* LLVMEhSelector		, */
+  LLVMEhTypeidFor		,
+  LLVMVarAnnotation		,
+  LLVMMemcpy			,
+  LLVMMemmove			,
+  LLVMMemset			,
+  LLVMSqrt			,
+  LLVMLog			,
+  LLVMLog2			,
+  LLVMLog10			,
+  LLVMExp			,
+  LLVMExp2			,
+  LLVMPow			,
+  LLVMFltRounds			,
+  LLVMInvariantStart		,
+  LLVMLifetimeStart		,
+  LLVMInvariantEnd		,
+  LLVMLifetimeEnd		,
+  LLVMUnsupportedIntrinsic
+} LLVMIntrinsicID;
+  
 /* Operations on all values */  
 const char *LLVMGetEscapedValueName(LLVMValueRef Val);
 int LLVMHasName(LLVMValueRef Val);
@@ -3059,7 +3100,10 @@ void LLVMConstAggregateValueGetIndices(LLVMValueRef AggConstant,
                                           unsigned NumIdx);  
 
 /* Operations on global variables */
-int LLVMHasInitializer(LLVMValueRef GlobalVar);  
+int LLVMHasInitializer(LLVMValueRef GlobalVar);
+
+/* Operations on functions */  
+LLVMIntrinsicID LLVMGetSupportedIntrinsicID(LLVMValueRef Fn);  
 
 /*===-- Named Types -------------------------------------------------------===*/
 const char *LLVMGetFirstNamedType(LLVMModuleRef M);

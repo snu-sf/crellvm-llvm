@@ -2413,6 +2413,11 @@ CAMLprim value llvm_has_initializer(LLVMValueRef GlobalVar) {
   return Val_bool(LLVMHasInitializer(GlobalVar));
 }
 
+/* llvalue -> IntrinsicID.t */
+CAMLprim value llvm_get_intrinsic_id(LLVMValueRef Fn) {
+  return Val_int(LLVMGetSupportedIntrinsicID(Fn));	
+}
+
 /*--... Operations on named types .........................................--*/
 
 /* llmodule -> string option */

@@ -2577,6 +2577,50 @@ end
 
 (* added for vellvm - start *)
 
+(** The intrinsic ID *)
+module IntrinsicID : sig
+  type t =
+  | NotIntrinsic      
+  | Expect		
+  | Setjmp		
+  | SigSetjmp		
+  | Longjmp		
+  | SigLongjmp		
+  | Ctpop		
+  | Bswap		
+  | Ctlz		
+  | Cttz		
+  | StackSave		
+  | StackRestore	
+  | ReturnAddress	
+  | FrameAddress	
+  | Prefetch		
+  | Pcmarker		
+  | ReadCycleCounter	
+  | DbgDeclare		
+  (* | EhException		 *)
+  (* | EhSelector		 *)
+  | EhTypeidFor		
+  | VarAnnotation	
+  | Memcpy		
+  | Memmove		
+  | Memset		
+  | Sqrt		
+  | Log			
+  | Log2		
+  | Log10		
+  | Exp			
+  | Exp2		
+  | Pow			
+  | FltRounds		
+  | InvariantStart	
+  | LifetimeStart	
+  | InvariantEnd	
+  | LifetimeEnd		
+  | UnsupportedIntrinsic
+end  
+                       
+
 val escaped_value_name : llvalue -> string
 
 (** [has_name v] checks if users provided a name, otherwise [value_namee v]
@@ -2600,7 +2644,11 @@ val has_initializer : llvalue -> bool
 (** [get_initializer g] returns the initializer of the global value [g]. See
      method [llvm::GlobalValue::getInitializer]. *)
 val get_initializer : llvalue -> llvalue                                  
-                       
+
+(** [get_intrinsic_id f] returns intrinsic ID of the function [f].
+    See the method [llvm::Function::getIntrinsic]. *)
+val get_intrinsic_id : llvalue -> IntrinsicID.t
+                                   
 (* {6 Named Types} *)
 
 (** [named_type_begin m] returns the first position in the type symbol table 

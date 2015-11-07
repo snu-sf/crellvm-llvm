@@ -1358,6 +1358,48 @@ end
 
 (* added for vellvm - start *)
 
+module IntrinsicID = struct
+  type t =
+  | NotIntrinsic      
+  | Expect		
+  | Setjmp		
+  | SigSetjmp		
+  | Longjmp		
+  | SigLongjmp		
+  | Ctpop		
+  | Bswap		
+  | Ctlz		
+  | Cttz		
+  | StackSave		
+  | StackRestore	
+  | ReturnAddress	
+  | FrameAddress	
+  | Prefetch		
+  | Pcmarker		
+  | ReadCycleCounter	
+  | DbgDeclare		
+  (* | EhException		 *)
+  (* | EhSelector		 *)
+  | EhTypeidFor		
+  | VarAnnotation	
+  | Memcpy		
+  | Memmove		
+  | Memset		
+  | Sqrt		
+  | Log			
+  | Log2		
+  | Log10		
+  | Exp			
+  | Exp2		
+  | Pow			
+  | FltRounds		
+  | InvariantStart	
+  | LifetimeStart	
+  | InvariantEnd	
+  | LifetimeEnd		
+  | UnsupportedIntrinsic
+end  
+                       
 (*===-- Values ------------------------------------------------------------===*)
 external escaped_value_name : llvalue -> string = "llvm_escaped_value_name"
 
@@ -1391,6 +1433,9 @@ external const_aggregatevalue_get_indices : llvalue -> int array
 external has_initializer : llvalue -> bool = "llvm_has_initializer"
 external get_initializer : llvalue -> llvalue = "LLVMGetInitializer"                       
 
+(*--... Operations on functions ............................................--*)                                                  
+external get_intrinsic_id : llvalue -> IntrinsicID.t = "llvm_get_intrinsic_id"
+                                                  
 (*===-- Named Types -------------------------------------------------------===*)
 external named_type_begin : llmodule -> string option = "llvm_named_type_begin"
 external named_type_succ : llmodule -> string -> string option = "llvm_named_type_succ"
