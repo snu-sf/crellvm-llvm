@@ -3552,4 +3552,12 @@ int LLVMSlotTrackerGetLocalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Val) {
 void LLVMDisposeSlotTracker(LLVMSlotTrackerRef ST) {
   delete unwrap(ST);
 }
+
+/* for ConstantDataArray */
+
+unsigned LLVMGetArrayLengthOfDataArray(LLVMValueRef c) {
+  ArrayType ty = static_cast<ConstantDataArray*>(unwrap(c))->getType();
+  return ty->getNumElements();
+}
+
 /* added for vellvm - end */

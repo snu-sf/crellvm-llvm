@@ -3224,8 +3224,9 @@ int LLVMSlotTrackerGetLocalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Val);
 /** Disposes a SlotTracker.
  *  See llvm::SlotTracker::~SlotTracker. */
 void LLVMDisposeSlotTracker(LLVMSlotTrackerRef ST);
-  
-/* added for vellvm - end */  
+
+unsigned LLVMGetArrayLengthOfDataArray(LLVMValueRef c);  
+/* added for vellvm - end */
   
 #ifdef __cplusplus
 }
