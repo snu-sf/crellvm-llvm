@@ -1650,5 +1650,9 @@ module SlotTracker = struct
                                               = "llvm_slottracker_get_local_slot"
   external dispose : llslottracker -> unit = "llvm_slottracker_dispose"
 end
-                    
+
+external array_length_of_dataarr : llvalue -> int = "llvm_array_length_of_data_array"
+
+
+                                          
 (* added for vellvm - end *)                       

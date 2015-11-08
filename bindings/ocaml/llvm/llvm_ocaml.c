@@ -2885,4 +2885,9 @@ CAMLprim value llvm_slottracker_dispose(LLVMSlotTrackerRef ST) {
   LLVMDisposeSlotTracker(ST);	
   return Val_unit;
 }
+
+CAMLprim value llvm_array_length_of_data_array(LLVMValueRef c) {
+  return Val_int(LLVMGetArrayLengthOfDataArray(c));
+}
+
 /* added for vellvm - end */
