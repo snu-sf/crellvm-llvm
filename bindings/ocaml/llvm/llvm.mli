@@ -2835,6 +2835,11 @@ module APFloat : sig
 
 end                
 
+(** [const_int_get_zext_value c] returns a 64-bit unsigned integer value after it
+ *  has been zero extended as appropriate for the type of this constant.
+ *  See the method [llvm::ConstInt::getZExtValue] *)
+val const_int_get_zextvalue : llvalue -> Int64.t 
+                   
 (** [has_fn_attr f a] checks if the function [f] has attribute [a] *)
 val has_fn_attr : llvalue -> Attribute.t -> bool          
 

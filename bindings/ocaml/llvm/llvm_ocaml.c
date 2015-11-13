@@ -2681,6 +2681,11 @@ CAMLprim value llvm_apfloat_to_string(value F) {
   CAMLreturn(copy_string(LLVMAPFloatToString(APFloat_val(F))));
 }
 
+/* llvalue -> Int64.t */
+CAMLprim value llvm_const_int_get_zextvalue(LLVMValueRef ConstantVal) {
+  return caml_copy_int64(LLVMConstIntGetZExtValue(ConstantVal));
+}
+
 /* llvalue -> Attribute.t -> bool */
 CAMLprim value llvm_has_fn_attr(LLVMValueRef Fn, value PA) {
   return Val_bool(LLVMHasFnAttr(Fn, 1<<Int_val(PA)));

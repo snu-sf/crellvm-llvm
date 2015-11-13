@@ -1536,6 +1536,9 @@ module APFloat = struct
 
 end
 
+external const_int_get_zextvalue : llvalue -> Int64.t 
+  = "llvm_const_int_get_zextvalue"
+
 external has_fn_attr : llvalue -> Attribute.t -> bool          
                              = "llvm_has_fn_attr"
 external has_ret_attr : llvalue -> Attribute.t -> bool = "llvm_has_ret_attr"                    
