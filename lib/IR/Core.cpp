@@ -38,7 +38,6 @@
 /* added for vellvm - start */
 #include "llvm/IR/ModuleSlotTracker.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/IR/AsmWriter.h"
 #include <sstream>
 /* added for vellvm - end */
 #include <cassert>
