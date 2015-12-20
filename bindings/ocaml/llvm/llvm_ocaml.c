@@ -2369,3 +2369,35 @@ CAMLprim value llvm_passmanager_dispose(LLVMPassManagerRef PM) {
   LLVMDisposePassManager(PM);
   return Val_unit;
 }
+
+/* added for vellvm - start */
+/*===-- SlotTracker -----------------------------------------------------===*/
+
+/* llslottracker -> llvalue -> unit */
+CAMLprim value llvm_slottracker_incorporate_function(LLVMSlotTrackerRef ST, LLVMValueRef Fn) {
+  LLVMSlotTrackerIncorporateFunction(ST, Fn);
+  return Val_unit;
+}
+
+/* llslottracker -> unit */
+CAMLprim value llvm_slottracker_purge_function(LLVMSlotTrackerRef ST) {
+  LLVMSlotTrackerPurgeFunction(ST);
+  return Val_unit;	 
+}
+
+/* llslottracker -> llvalue -> int */
+CAMLprim value llvm_slottracker_get_global_slot(LLVMSlotTrackerRef ST, LLVMValueRef Global) {
+  return Val_int(LLVMSlotTrackerGetGlobalSlot(ST, Global));
+}
+
+/* llslottracker -> llvalue -> int */
+CAMLprim value llvm_slottracker_get_local_slot(LLVMSlotTrackerRef ST, LLVMValueRef Val) {
+  return Val_int(LLVMSlotTrackerGetLocalSlot(ST, Val));
+}
+
+/* llslottracker -> unit */
+CAMLprim value llvm_slottracker_dispose(LLVMSlotTrackerRef ST) {
+  LLVMDisposeSlotTracker(ST);	
+  return Val_unit;
+}
+/* added for vellvm - end */

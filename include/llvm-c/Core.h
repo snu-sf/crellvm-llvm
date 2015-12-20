@@ -3018,6 +3018,43 @@ LLVMBool LLVMIsMultithreaded(void);
  * @}
  */
 
+/* added for vellvm - start */
+/* Used to provide a slot tracker.
+ * See the llvm::SlotTracker class.
+ */
+typedef struct LLVMOpaqueSlotTracker *LLVMSlotTrackerRef;
+
+/*===-- SlotTracker -------------------------------------------------------===*/
+
+/** Constructs a new SlotTracker for a module. 
+ *  See the constructor of llvm::SlotTracker. */
+LLVMSlotTrackerRef LLVMCreateSlotTrackerOfModule(LLVMModuleRef M);
+
+/** Allows us to deal with a function [f] instead of just a module, use 
+ * this method to get its data into the SlotTracker.
+ * See the method llvm::SlotTracker::incorporateFunction. */
+void LLVMSlotTrackerIncorporateFunction(LLVMSlotTrackerRef ST, LLVMValueRef Fn);
+
+/** After calling incorporateFunction, use this method to remove the most recently 
+ *  incorporated function from the SlotTracker. This will reset the state of 
+ *  the machine back to just the module contents. 
+ *  See the method llvm::SlotTracker::purgeFucntion. */
+void LLVMSlotTrackerPurgeFunction(LLVMSlotTrackerRef ST);
+
+/** Gets the slot number of a global value.
+    See the method llvm::SlotTracker::getGlobalSlot. */
+int LLVMSlotTrackerGetGlobalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Global);
+
+/** Gets the slot number of a local value.
+    See the method llvm::SlotTracker::getLocalSlot. */
+int LLVMSlotTrackerGetLocalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Val);
+
+/** Disposes a SlotTracker.
+ *  See llvm::SlotTracker::~SlotTracker. */
+void LLVMDisposeSlotTracker(LLVMSlotTrackerRef ST);
+  
+/* added for vellvm - end */  
+  
 #ifdef __cplusplus
 }
 #endif /* !defined(__cplusplus) */

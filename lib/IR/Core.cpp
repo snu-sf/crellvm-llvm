@@ -35,6 +35,9 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
+/* added for vellvm - start */
+#include "llvm/IR/ModuleSlotTracker.h"
+/* added for vellvm- end */
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -2911,3 +2914,33 @@ void LLVMStopMultithreaded() {
 LLVMBool LLVMIsMultithreaded() {
   return llvm_is_multithreaded();
 }
+
+/* added for vellvm - start */
+/*===-- SlotTracker -------------------------------------------------------===*/
+
+LLVMSlotTrackerRef LLVMCreateSlotTrackerOfModule(LLVMModuleRef M) {
+  return wrap(new VSlotTracker(unwrap(M)));
+}
+
+void LLVMSlotTrackerIncorporateFunction(LLVMSlotTrackerRef ST, LLVMValueRef Fn) {
+  unwrap(ST)->incorporateFunction(unwrap<Function>(Fn));
+  return;
+}
+
+void LLVMSlotTrackerPurgeFunction(LLVMSlotTrackerRef ST) {
+  unwrap(ST)->purgeFunction();
+  return;
+}
+
+int LLVMSlotTrackerGetGlobalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Global) {
+  return unwrap(ST)->getGlobalSlot(unwrap<GlobalValue>(Global));
+}
+
+int LLVMSlotTrackerGetLocalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Val) {
+  return unwrap(ST)->getLocalSlot(unwrap<Value>(Val));
+}
+
+void LLVMDisposeSlotTracker(LLVMSlotTrackerRef ST) {
+  delete unwrap(ST);
+}
+/* added for vellvm - end */
