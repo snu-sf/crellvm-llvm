@@ -2,6 +2,14 @@
 
 cmake_minimum_required(VERSION 2.8.12.2)
 
+# Compile with Boost
+  set(LLVM_REQUIRES_RTTI 1)
+  set(Boost_ADDITIONAL_VERSIONS "1.58" "1.59.0" "1.60.0")
+  find_package( Boost REQUIRED)
+  if(Boost_FOUND)
+      include_directories(${Boost_INCLUDE_DIR})
+  endif()
+  message("boost: ${Boost_INCLUDE_DIRS}")
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type selected, default to Debug")
   set(CMAKE_BUILD_TYPE "Debug")
