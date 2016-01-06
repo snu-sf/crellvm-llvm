@@ -62,6 +62,12 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include <algorithm>
 #include <climits>
+
+#include "llvm/Hint/Sender.h"
+#include <sstream>
+#include <fstream>
+#include <iostream>
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -74,6 +80,28 @@ STATISTIC(NumSunkInst , "Number of instructions sunk");
 STATISTIC(NumExpand,    "Number of expansions");
 STATISTIC(NumFactor   , "Number of factorizations");
 STATISTIC(NumReassoc  , "Number of reassociations");
+
+void write_json(const BasicBlock& bb) {
+  std::stringstream ss;
+  cereal::JSONOutputArchive oarchive(ss);
+  std::ofstream ofs("temp.txt");
+
+  hintgen::structure::position p1("bb",hintgen::structure::Command,0), p2("bb",hintgen::structure::Command,1);
+  hintgen::structure::PropagateInstr *pi=new hintgen::structure::PropagateInstr(p1,p2,hintgen::structure::Source);
+  hintgen::structure::PropagateInstr *pi2=new hintgen::structure::PropagateInstr(p2,p1,hintgen::structure::Target);
+
+  hintgen::structure::hints* temp=hintgen::HintFactory::getDefaultInstance().createHintsInstance(1, bb);
+  //Intruder intruder;
+  //intruder.begin(temp);
+  /*intrude()[]{*/
+  temp->addCommand(pi2);
+  temp->addCommand(pi);
+  //}
+  //intruder.release()->serialize(oarchive);
+  temp->serialize(oarchive);
+
+  ofs << ss.str() << std::endl;
+}
 
 Value *InstCombiner::EmitGEPOffset(User *GEP) {
   return llvm::EmitGEPOffset(Builder, DL, GEP);
@@ -201,6 +229,9 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
+
+        write_json(*I.getParent());
+
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
           I.setOperand(1, V);

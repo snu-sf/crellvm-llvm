@@ -1,0 +1,39 @@
+{
+    "function_id": "foo",
+    "module_id": "example.2.json",
+    "opt_name": "add_assoc",
+    "commands": [
+        [
+            "PropagateInstr",
+            {
+                "propagate_from": {
+                    "block_index": "bb",
+                    "instr_type": "Command",
+                    "instr_index": 1
+                },
+                "propagate_to": {
+                    "block_index": "bb",
+                    "instr_type": "Command",
+                    "instr_index": 0
+                },
+                "scope": "Target"
+            }
+        ],
+        [
+            "PropagateInstr",
+            {
+                "propagate_from": {
+                    "block_index": "bb",
+                    "instr_type": "Command",
+                    "instr_index": 0
+                },
+                "propagate_to": {
+                    "block_index": "bb",
+                    "instr_type": "Command",
+                    "instr_index": 1
+                },
+                "scope": "Source"
+            }
+        ]
+    ]
+}

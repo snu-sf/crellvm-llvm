@@ -17,6 +17,7 @@
 
 [common]
 subdirectories =
+ Hint
  Analysis
  AsmParser
  Bitcode
