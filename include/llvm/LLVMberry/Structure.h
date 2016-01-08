@@ -3,7 +3,7 @@
 #include "cereal/archives/json.hpp"
 #include "cereal/types/vector.hpp"
 
-namespace hintgen {
+namespace llvmberry {
   namespace structure {
 
 enum scope { Source = 0, Target };
@@ -62,12 +62,13 @@ private:
 
 class hints {
 public:
+  hints();
   hints(std::string _function_id, std::string _module_id, std::string _opt_name);
   void addCommand(command *c);
   void serialize(cereal::JSONOutputArchive &archive);
   
 private: 
-  std::string function_id, module_id, opt_name;
+  std::string module_id, function_id, opt_name;
   std::vector<command *> commands;
 };
 
@@ -83,4 +84,4 @@ void serialize(cereal::JSONOutputArchive &archive, command *& c) {
 */
 
 } // structure
-} // hintgen
+} // llvmberry

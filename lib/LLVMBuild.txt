@@ -17,7 +17,7 @@
 
 [common]
 subdirectories =
- Hint
+ LLVMberry
  Analysis
  AsmParser
  Bitcode
