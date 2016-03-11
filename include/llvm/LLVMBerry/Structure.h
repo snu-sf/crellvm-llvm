@@ -3,9 +3,9 @@
 
 #include <iostream>
 #include <set>
-// #include "llvm/IR/Instructions.h"
-// #include "llvm/IR/BasicBlock.h"
-// #include "llvm/IR/Constants.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
 #include "cereal/archives/json.hpp"
 #include "cereal/types/vector.hpp"
 #include <cereal/types/memory.hpp>
@@ -15,7 +15,7 @@ namespace llvmberry {
 	enum TyScope { Source = 0, Target };
 
 /* std::string getVariable(const llvm::Value &value); */
-/* bool name_instructions(llvm::Function &F); */
+bool name_instructions(llvm::Function &F);
 
 //class position and subclasses
 

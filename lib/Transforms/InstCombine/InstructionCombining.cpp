@@ -63,7 +63,7 @@
 #include <algorithm>
 #include <climits>
 
-#include "llvm/LLVMberry/ValidationUnit.h"
+#include "llvm/LLVMBerry/ValidationUnit.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -81,35 +81,6 @@ STATISTIC(NumExpand,    "Number of expansions");
 STATISTIC(NumFactor   , "Number of factorizations");
 STATISTIC(NumReassoc  , "Number of reassociations");
 
-/*
-void write_json(BasicBlock& bb) {
-  std::stringstream ss;
-  cereal::JSONOutputArchive oarchive(ss);
-  //std::ofstream ofs("temp.txt");
-
-  llvmberry::structure::position p1("bb",llvmberry::structure::Command,0), p2("bb",llvmberry::structure::Command,1);
-  llvmberry::structure::PropagateInstr *pi=new llvmberry::structure::PropagateInstr(p1,p2,llvmberry::structure::Source);
-  llvmberry::structure::PropagateInstr *pi2=new llvmberry::structure::PropagateInstr(p2,p1,llvmberry::structure::Target);
-
-  //llvmberry::WriteCodeToFile(bb, "add_assoc");
-  //llvmberry::VUTransaction::begin("add_assoc", bb);
-  //llvmberry::structure::hints* temp=llvmberry::HintFactory::getDefaultInstance().createHintsInstance(1,"add_assoc", bb);
-  //Intruder intruder;
-  //intruder.begin(temp);
-  //intrude()[]{
-  //temp->addCommand(pi2);
-  //temp->addCommand(pi);
-  //}
-  //intruder.release()->serialize(oarchive);
-  //temp->serialize(oarchive);
-
-  //std::ofstream ofs(llvmberry::VUTransaction::getFileName());
-  //ofs << ss.str() << std::endl;
-  llvmberry::VUTransaction::getHint()->addCommand(pi2);
-  llvmberry::VUTransaction::getHint()->addCommand(pi);
-  llvmberry::VUTransaction::commit("add_assoc", bb);
-}
-*/
 Value *InstCombiner::EmitGEPOffset(User *GEP) {
   return llvm::EmitGEPOffset(Builder, DL, GEP);
 }
@@ -237,17 +208,6 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
 
-          llvmberry::ValidationUnit validation_unit("add_assoc", I.getParent()->getParent());
-          
-
-          llvmberry::structure::position p1("bb",llvmberry::structure::Command,0), p2("bb",llvmberry::structure::Command,1);
-          llvmberry::structure::PropagateInstr *pi=new llvmberry::structure::PropagateInstr(p1,p2,llvmberry::structure::Source);
-          
-
-          validation_unit.getHint().addCommand(pi);
-          //validation_unit.getHint().addCommand(pi2);
-          //tx.intrude();
-
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
           I.setOperand(1, V);
@@ -262,8 +222,6 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
           } else {
             ClearSubclassDataAfterReassociation(I);
           }
-
-          validation_unit.commit();
 
           Changed = true;
           ++NumReassoc;

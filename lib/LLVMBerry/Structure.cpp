@@ -2,12 +2,11 @@
 #include <fstream>
 #include <string>
 #include <cassert>
-// #include "llvm/LLVMBerry/Structure.h"
 #include <cereal/archives/json.hpp>
 #include <cereal/types/vector.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
-#include "Structure.h"
+#include "llvm/LLVMBerry/Structure.h"
 
 namespace cereal {
   [[noreturn]] void throw_exception(std::exception const &e) { std::exit(1); }
@@ -136,23 +135,23 @@ namespace llvmberry {
 //   return val;
 // }
 
-// bool name_instructions(llvm::Function &F) {
-//   for (llvm::Function::arg_iterator AI = F.arg_begin(), AE = F.arg_end();
-//        AI != AE; ++AI)
-//     if (!AI->hasName() && !AI->getType()->isVoidTy())
-//       AI->setName("arg");
+bool name_instructions(llvm::Function &F) {
+  for (llvm::Function::arg_iterator AI = F.arg_begin(), AE = F.arg_end();
+       AI != AE; ++AI)
+    if (!AI->hasName() && !AI->getType()->isVoidTy())
+      AI->setName("arg");
 
-//   for (llvm::Function::iterator BB = F.begin(), E = F.end(); BB != E; ++BB) {
-//     if (!BB->hasName())
-//       BB->setName("bb");
+  for (llvm::Function::iterator BB = F.begin(), E = F.end(); BB != E; ++BB) {
+    if (!BB->hasName())
+      BB->setName("bb");
 
-//     for (llvm::BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E; ++I)
-//       if (!I->hasName() && !I->getType()->isVoidTy())
-//         I->setName("tmp");
-//   }
+    for (llvm::BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E; ++I)
+      if (!I->hasName() && !I->getType()->isVoidTy())
+        I->setName("tmp");
+  }
 
-//   return true;
-// }
+  return true;
+}
 
 // position
 

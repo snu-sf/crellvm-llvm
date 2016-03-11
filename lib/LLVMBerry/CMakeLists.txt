@@ -1,4 +1,4 @@
-add_llvm_library(LLVMLLVMberry
+add_llvm_library(LLVMLLVMBerry
   Structure.cpp
   ValidationUnit.cpp
   )

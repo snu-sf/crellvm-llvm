@@ -53,6 +53,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include <algorithm>
 #include <memory>
+#include "llvm/LLVMBerry/ValidationUnit.h"
 using namespace llvm;
 using namespace opt_tool;
 
@@ -189,6 +190,10 @@ static cl::opt<bool> PreserveAssemblyUseListOrder(
     "preserve-ll-uselistorder",
     cl::desc("Preserve use-list order when writing LLVM assembly."),
     cl::init(false), cl::Hidden);
+
+////// LLVMBerry option
+static cl::opt<std::string> LLVMBerryOutputDirectory("llvmberry-outputdir", cl::desc("Specify output directory of LLVMBerry"), cl::value_desc("dir"));
+
 
 static inline void addPass(legacy::PassManagerBase &PM, Pass *P) {
   // Add the pass to the pass manager...
@@ -351,6 +356,9 @@ int main(int argc, char **argv) {
   // Strip debug info before running the verifier.
   if (StripDebug)
     StripDebugInfo(*M);
+
+  // LLVMBerry : set default output folder
+  llvmberry::defaultOutputDir = LLVMBerryOutputDirectory;
 
   // Immediately run the verifier to catch any problems before starting up the
   // pass pipelines.  Otherwise we can crash on broken code during

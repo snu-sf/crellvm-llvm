@@ -1,102 +1,165 @@
-#include "llvm/LLVMberry/ValidationUnit.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
-#include <cassert>
-#include <sstream>
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Instructions.h"
 #include <fstream>
-#include <iostream>
+#include "llvm/LLVMBerry/ValidationUnit.h"
+
+namespace {
+
+static std::string makeFullFilename(std::string org_filename,
+                                    std::string extension) {
+  if (llvmberry::defaultOutputDir.empty())
+    return org_filename + extension;
+  else {
+    if (org_filename.rfind("/") == std::string::npos)
+      return llvmberry::defaultOutputDir + "/" + org_filename + extension;
+    else
+      return llvmberry::defaultOutputDir + "/" +
+             org_filename.substr(org_filename.rfind("/")) + extension;
+  }
+}
+
+} // anonymous
 
 namespace llvmberry {
 
-void writeModuleToFile(const llvm::Module& module, const std::string& filename) {
+std::string defaultOutputDir = "";
+
+void writeModuleToFile(const llvm::Module &module,
+                       const std::string &filename) {
   std::error_code errorInfo;
   llvm::StringRef filename_stref = filename.c_str();
-  
-  std::unique_ptr<llvm::tool_output_file> outputFile(new llvm::tool_output_file(filename_stref, errorInfo, llvm::sys::fs::OpenFlags::F_Text));
-  // TODO: check OpenFlags
-  
-  if (errorInfo.value()!=0) { exit(1); }
+
+  std::unique_ptr<llvm::tool_output_file> outputFile(new llvm::tool_output_file(
+      filename_stref, errorInfo, llvm::sys::fs::OpenFlags::F_Text));
+
+  if (errorInfo.value() != 0) {
+    exit(1);
+  }
 
   WriteBitcodeToFile(&module, outputFile->os());
   outputFile->keep();
 }
 
-bool inst_namer(llvm::Function &F) {
-  for (llvm::Function::arg_iterator AI=F.arg_begin(), AE=F.arg_end(); AI!=AE; ++AI)
-    if (!AI->hasName() && !AI->getType()->isVoidTy()) AI->setName("arg");
+// class ValidationUnit
+// constructor
+ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
+    : _filename(), _optname(optname), _func(func), _corehint(), _data(),
+      _return_code(COMMIT) {
+  this->begin();
+}
 
-  for (llvm::Function::iterator BB=F.begin(), E=F.end(); BB!=E;++BB) {
-    if(!BB->hasName()) BB->setName("bb");
-
-    for (llvm::BasicBlock::iterator I=BB->begin(), E=BB->end(); I!=E; ++I)
-      if (!I->hasName() && !I->getType()->isVoidTy()) I->setName("tmp");
+// destructor
+ValidationUnit::~ValidationUnit() {
+  switch (_return_code) {
+  case COMMIT:
+    this->commit();
+    break;
+  case ABORT:
+    this->abort();
+    break;
+  default:
+    assert(false && "Not a possible return code");
+    break;
   }
-
-  return true;
 }
 
-int ValidationUnit::_counter = 0;
-ValidationUnit *ValidationUnit::_instance = nullptr;
-
-ValidationUnit *ValidationUnit::getInstance() {
-  assert(ValidationUnit::_instance);
-  return ValidationUnit::_instance;
+// public functions
+const std::string &ValidationUnit::getOptimizationName() {
+  return _Instance->_optname;
 }
 
-ValidationUnit::ValidationUnit(const std::string& _optname, llvm::Function* func)
-  : _filename(), _func(func), _hints(), _data() {
+void ValidationUnit::setReturnCode(RETURN_CODE return_code) {
+  _return_code = return_code;
+}
+
+void ValidationUnit::intrude(
+    std::function<void(Dictionary &, CoreHint &)> func) {
+  func(_data, _corehint);
+}
+
+// private functions
+void ValidationUnit::begin() {
   // get module & module name
-  const llvm::Module* module = func->getParent();
+  const llvm::Module *module = _func->getParent();
   std::string moduleName = module->getModuleIdentifier();
   moduleName = moduleName.substr(0, moduleName.find_last_of("."));
 
   // set filename prefix
   std::stringstream ss;
-  ss << moduleName << '.' << func->getName().str() << '.' << ValidationUnit::_counter++;
+  ss << moduleName << '.' << _func->getName().str() << '.'
+     << ValidationUnit::_Counter++;
   _filename = ss.str();
 
   // print src
-  inst_namer(*func);
-  writeModuleToFile(*module, _filename + ".src.bc");
+  llvmberry::name_instructions(*_func);
+  writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc"));
 
-  // set hints
+  // set corehints
   std::string mid = module->getModuleIdentifier();
-  std::string fid = func->getName().str();
-  _hints = structure::hints(fid, mid, _optname);
-
-  // install this instance
-  assert(ValidationUnit::_instance == nullptr);
-  ValidationUnit::_instance = this;
-}
-
-void ValidationUnit::intrude(std::function<void(Dictionary &, structure::hints &)> func) {
-  func(_data, _hints);
+  std::string fid = _func->getName().str();
+  _corehint = CoreHint(mid, fid, _optname);
 }
 
 void ValidationUnit::commit() {
   // print tgt
-  inst_namer(*_func);
-  const llvm::Module* module = _func->getParent();
-  writeModuleToFile(*module, _filename + ".tgt.bc");
+  llvmberry::name_instructions(*_func);
+  const llvm::Module *module = _func->getParent();
+  writeModuleToFile(*module, makeFullFilename(_filename, ".tgt.bc"));
 
-  // print hints
-  std::ofstream ofs(_filename + ".hint.json");
+  // print corehints
+  std::ofstream ofs(makeFullFilename(_filename, ".hint.json"));
   cereal::JSONOutputArchive oarchive(ofs);
-  _hints.serialize(oarchive);
+  _corehint.serialize(oarchive);
   ofs << std::endl;
-
-  uninstall();
 }
 
-void ValidationUnit::abort() {
-  uninstall();
+void ValidationUnit::abort() {}
+
+// static members
+ValidationUnit *ValidationUnit::_Instance = nullptr;
+
+int ValidationUnit::_Counter = 0;
+
+ValidationUnit *ValidationUnit::GetInstance() {
+  assert(Exists() && "No ValidationUnit exists");
+  return _Instance;
 }
 
-void ValidationUnit::uninstall() {
-  assert(ValidationUnit::_instance == this);
-  ValidationUnit::_instance = nullptr;
+bool ValidationUnit::Exists() {
+  if (_Instance)
+    return true;
+  else
+    return false;
+}
+
+void ValidationUnit::Begin(const std::string &optname, llvm::Function *func) {
+  assert(!Exists() && "ValidationUnit already exists");
+  _Instance = new ValidationUnit(optname, func);
+}
+
+bool ValidationUnit::BeginIfNotExists(const std::string &optname,
+                                      llvm::Function *func) {
+  if (Exists())
+    return false;
+  _Instance = new ValidationUnit(optname, func);
+  return true;
+}
+
+void ValidationUnit::End() {
+  assert(Exists() && "No ValidationUnit exists");
+  delete _Instance;
+  _Instance = nullptr;
+}
+
+bool ValidationUnit::EndIfExists() {
+  if (!Exists())
+    return false;
+  delete _Instance;
+  _Instance = nullptr;
+  return true;
 }
 
 } // llvmberry
