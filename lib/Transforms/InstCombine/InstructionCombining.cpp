@@ -64,6 +64,8 @@
 #include <climits>
 
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/InstCombineOptimizations.h"
+
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -208,9 +210,28 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
 
+          auto *hintbuilder =
+            llvmberry::AssociativityHintBuilder::GetBuilderInstance(B, C, Opcode);
+
+          if (hintbuilder)
+            llvmberry::ValidationUnit::Begin(hintbuilder->getOptimizationName(),
+                                             I.getParent()->getParent());
+
+
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
           I.setOperand(1, V);
+
+          if (hintbuilder) {
+            hintbuilder->buildCoreHint(llvmberry::ValidationUnit::GetInstance(),
+                                       Op0, I,
+                                       dyn_cast<ConstantInt>(B),
+                                       dyn_cast<ConstantInt>(C),
+                                       dyn_cast<ConstantInt>(V)
+                                       );
+            llvmberry::ValidationUnit::End();
+          }
+          
           // Conservatively clear the optional flags, since they may not be
           // preserved by the reassociation.
           if (MaintainNoSignedWrap(I, B, C) &&
