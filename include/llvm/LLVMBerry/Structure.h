@@ -64,6 +64,8 @@ namespace llvmberry {
 		ConsCommand(enum TyScope _scope, std::string _register_name);
 		void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyPosition> make(enum TyScope _scope, std::string _register_name);
+
 	private:
 		std::unique_ptr<TyPositionCommand> position_command;
 	};
@@ -74,6 +76,8 @@ namespace llvmberry {
 	public:
 		TyRegister(std::string _name, enum TyTag _tag);
 		void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyRegister> make(std::string _name, enum TyTag _tag);
 
 	private:
 		std::string name;
@@ -91,11 +95,10 @@ namespace llvmberry {
 
   struct ConsIntType : public TyIntType { 
   public: 
-    ConsIntType(bool _signed_flag, int _value); 
+    ConsIntType(int _value); 
     void serialize(cereal::JSONOutputArchive &archive) const; 
 
   private: 
-    bool signed_flag;
     int value; 
   }; 
 
@@ -104,8 +107,10 @@ namespace llvmberry {
   struct TyConstInt { 
   public: 
     TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type);
-    TyConstInt(int _int_value, bool _signed_flag, int _value);
-    void serialize(cereal::JSONOutputArchive &archive) const; 
+    TyConstInt(int _int_value, int _value);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyConstInt> make(int _int_value, int _value);
 
   private: 
     int int_value; 
@@ -131,7 +136,7 @@ namespace llvmberry {
   struct ConsConstInt : public TyConstant {
   public:
     ConsConstInt(std::unique_ptr<TyConstInt> _const_int);
-    ConsConstInt(int _int_value, bool _signed_flag, int _value);
+    ConsConstInt(int _int_value, int _value);
     void serialize(cereal::JSONOutputArchive &archive) const;
 
   private:
@@ -157,7 +162,9 @@ namespace llvmberry {
   struct ConsSize : public TySize { 
   public: 
     ConsSize(int _size);
-    void serialize(cereal::JSONOutputArchive &archive) const; 
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TySize> make(int _size);
 
   private: 
     int size; 
@@ -178,6 +185,9 @@ namespace llvmberry {
 		ConsVar(std::string _name, enum TyTag _tag);
 		void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyPropagateExpr> make
+      (std::string _name, enum TyTag _tag);
+
 	private:
 		std::unique_ptr<TyRegister> register_name;
 	};
@@ -188,6 +198,9 @@ namespace llvmberry {
 		ConsRhs(std::string _name, enum TyTag _tag);
 		void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyPropagateExpr> make
+      (std::string _name, enum TyTag _tag);
+
 	private:
 		std::unique_ptr<TyRegister> register_name;
 	};
@@ -196,7 +209,7 @@ namespace llvmberry {
   public: 
     ConsConst(std::unique_ptr<TyConstant> _constant);
 
-    ConsConst(int _int_value, bool _signed_flag, int _value);
+    ConsConst(int _int_value, int _value);
     ConsConst(float _float_value, enum TyFloatType _float_type);
 
     void serialize(cereal::JSONOutputArchive &archive) const; 
@@ -212,6 +225,11 @@ namespace llvmberry {
 											 std::unique_ptr<TyPropagateExpr> _rhs,
 											 enum TyScope _scope);
 		void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyPropagateLessdef> make
+    (std::unique_ptr<TyPropagateExpr> _lhs,
+     std::unique_ptr<TyPropagateExpr> _rhs,
+     enum TyScope _scope);
 
 	private:
 		std::unique_ptr<TyPropagateExpr> lhs;
@@ -243,6 +261,11 @@ namespace llvmberry {
 	public:
 		ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef);
 		void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyPropagateObject> make
+      (std::unique_ptr<TyPropagateExpr> _lhs,
+       std::unique_ptr<TyPropagateExpr> _rhs,
+       enum TyScope _scope); 
 
 	private:
 		std::unique_ptr<TyPropagateLessdef> propagate_lessdef;
@@ -284,6 +307,10 @@ namespace llvmberry {
 							 std::unique_ptr<TyPosition> _to);
 		void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyPropagateRange> make
+      (std::unique_ptr<TyPosition> _from,
+       std::unique_ptr<TyPosition> _to);
+
 	private:
 		std::unique_ptr<TyPosition> from;
 		std::unique_ptr<TyPosition> to;
@@ -317,7 +344,7 @@ namespace llvmberry {
                      std::unique_ptr<TyConstInt> _c2, 
                      std::unique_ptr<TyConstInt> _c3, 
                      std::unique_ptr<TySize> _sz); 
-    void serialize(cereal::JSONOutputArchive &archive) const; 
+    void serialize(cereal::JSONOutputArchive &archive) const;
 
   private: 
     std::unique_ptr<TyRegister> x; 
@@ -340,6 +367,15 @@ namespace llvmberry {
     ConsAddAssociative(std::unique_ptr<TyAddAssociative> _add_associative);
     void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyInfrule> make
+      (std::unique_ptr<TyRegister> _x,
+       std::unique_ptr<TyRegister> _y, 
+       std::unique_ptr<TyRegister> _z, 
+       std::unique_ptr<TyConstInt> _c1, 
+       std::unique_ptr<TyConstInt> _c2, 
+       std::unique_ptr<TyConstInt> _c3, 
+       std::unique_ptr<TySize> _sz);
+
   private:
     std::unique_ptr<TyAddAssociative> add_associative;
   };
@@ -355,6 +391,12 @@ namespace llvmberry {
     ConsPropagate(std::unique_ptr<TyPropagate> _propagate);
     void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyCommand> make
+      (std::unique_ptr<TyPropagate> _propagate);
+    static std::unique_ptr<TyCommand> make
+      (std::unique_ptr<TyPropagateObject> _obj,
+       std::unique_ptr<TyPropagateRange> _range);
+
   private:
     std::unique_ptr<TyPropagate> propagate;
   };
@@ -364,6 +406,10 @@ namespace llvmberry {
     ConsInfrule(std::unique_ptr<TyPosition> _position, 
                 std::unique_ptr<TyInfrule> _infrule);
     void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyCommand> make
+      (std::unique_ptr<TyPosition> _position, 
+       std::unique_ptr<TyInfrule> _infrule);
 
   private:
     std::unique_ptr<TyPosition> position;
