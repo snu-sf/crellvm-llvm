@@ -289,6 +289,9 @@ namespace llvmberry {
 		ConsMaydiff(std::string _name, enum TyTag _tag);
 		void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyPropagateObject> make
+      (std::unique_ptr<TyRegister> reg);
+
 	private:
 		std::unique_ptr<TyRegister> register_name; // register is a keyword
 	};
@@ -299,6 +302,7 @@ namespace llvmberry {
 	struct TyPropagateRange {
 	public:
 		virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+    virtual bool isGlobal(void) const { return false; }
 	};
 
 	struct ConsBounds : public TyPropagateRange {
@@ -320,6 +324,9 @@ namespace llvmberry {
 	public:
 		ConsGlobal();
 		void serialize(cereal::JSONOutputArchive &archive) const;
+    virtual bool isGlobal(void) const { return true; }
+
+    static std::unique_ptr<TyPropagateRange> make();
 	};
 
 	struct TyPropagate {

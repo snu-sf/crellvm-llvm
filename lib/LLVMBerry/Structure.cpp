@@ -434,6 +434,12 @@ namespace llvmberry {
   ConsMaydiff::ConsMaydiff(std::string _name, enum TyTag _tag)
     : register_name(new TyRegister(_name, _tag)) { }
 
+  std::unique_ptr<TyPropagateObject> ConsMaydiff::make
+  (std::unique_ptr<TyRegister> reg) {
+    return std::unique_ptr<TyPropagateObject>
+      (new ConsMaydiff(std::move(reg)));
+  }
+
   void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
     archive.makeArray();
     archive.writeName();
@@ -469,10 +475,17 @@ namespace llvmberry {
   ConsGlobal::ConsGlobal() {}
 
   void ConsGlobal::serialize(cereal::JSONOutputArchive &archive) const {
-    archive.makeArray();
-    archive.writeName();
+    //archive.makeArray();
+    //archive.writeName();
 
-    archive.saveValue("Global"); /* TODO: how to print this in JSON */
+    //archive.saveValue("Global"); /* TODO: how to print this in JSON */
+    archive.setNextName("propagate_range");
+    std::string s("Global");
+    archive(s);
+  }
+
+  std::unique_ptr<TyPropagateRange> ConsGlobal::make() {
+    return std::unique_ptr<TyPropagateRange>(new ConsGlobal());
   }
 
   // propagate
@@ -483,7 +496,12 @@ namespace llvmberry {
       propagate_range(std::move(_propagate_range)) {}
 
   void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
-    archive(CEREAL_NVP(propagate), CEREAL_NVP(propagate_range));
+    archive(CEREAL_NVP(propagate));
+    if(propagate_range->isGlobal()) {
+      propagate_range->serialize(archive);
+    } else {
+      archive(CEREAL_NVP(propagate_range));
+    }
   }
 
   TyAddAssociative::TyAddAssociative

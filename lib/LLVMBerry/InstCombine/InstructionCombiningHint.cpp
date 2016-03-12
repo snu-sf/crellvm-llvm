@@ -102,4 +102,28 @@ void AssociativityAddHintBuilder::buildCoreHint
     });
 }
 
+// class DeadCodeElimHintBuilder
+
+DeadCodeElimHintBuilder::DeadCodeElimHintBuilder(Instruction *I) 
+: reg(llvmberry::getVariable(*I)) { }
+
+std::string DeadCodeElimHintBuilder::getOptimizationName() const {
+  return "dead_code_elim";
+}
+
+void DeadCodeElimHintBuilder::buildCoreHint(ValidationUnit *validation_unit) {
+  validation_unit->intrude([this]
+     (ValidationUnit::Dictionary &data, CoreHint &hints) {
+        hints.addCommand(
+          ConsPropagate::make(
+            ConsMaydiff::make(TyRegister::make(reg, Physical)),
+            ConsGlobal::make()
+          )
+        );
+
+        hints.addTgtNopPosition(ConsCommand::make(Source, reg));
+     }
+  );
+}
+
 } // llvmberry

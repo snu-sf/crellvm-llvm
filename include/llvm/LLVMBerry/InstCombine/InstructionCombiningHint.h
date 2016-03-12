@@ -52,6 +52,18 @@ public:
   friend class AssociativityHintBuilder;
 };
 
+// class DeadCodeElim
+
+class DeadCodeElimHintBuilder {
+public:
+  DeadCodeElimHintBuilder(Instruction *I);
+  void buildCoreHint(ValidationUnit *validation_unit);
+  std::string getOptimizationName() const;
+
+private:
+  std::string reg;
+};
+
 /* // class DeadCodeElim */
 
 /* class DeadCodeElimHintBuilder { */
