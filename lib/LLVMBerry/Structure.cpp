@@ -14,483 +14,535 @@ namespace cereal {
   template <class T>
   void save( cereal::JSONOutputArchive &archive, std::unique_ptr<T> const &ptr) {
     ptr->serialize(archive);
-    // archive( *ptr );
   }
-
-//   template <class T>
-// void save( cereal::JSONOutputArchive &archive,
-// 	   std::vector<std::unique_ptr<T>> const &v) {
-//     archive.makeArray();
-//   // archive( *ptr );
-// }
-
-
 } // cereal
 
 namespace {
 
   std::string toString(llvmberry::TyScope scope) {
     switch (scope) {
-      case llvmberry::Source:
-        return std::string("Source");
-      case llvmberry::Target:
-        return std::string("Target");
-      default:
-        assert(false && "Scope toString");
+    case llvmberry::Source:
+      return std::string("Source");
+    case llvmberry::Target:
+      return std::string("Target");
+    default:
+      assert(false && "Scope toString");
     }
   }
 
   std::string toString(llvmberry::TyTag tag) {
     switch (tag) {
-      case llvmberry::Physical:
-        return std::string("Physical");
-      case llvmberry::Previous:
-        return std::string("Previous");
-      case llvmberry::Ghost:
-        return std::string("Ghost");
-      default:
-        assert(false && "Tag toString");
+    case llvmberry::Physical:
+      return std::string("Physical");
+    case llvmberry::Previous:
+      return std::string("Previous");
+    case llvmberry::Ghost:
+      return std::string("Ghost");
+    default:
+      assert(false && "Tag toString");
     }
   }
 
   std::string toString(llvmberry::TyFloatType float_type) {
     switch (float_type) {
-      case llvmberry::FloatType:
-        return std::string("FloatType");
-      case llvmberry::DoubleType:
-        return std::string("DoubleType");
-      case llvmberry::FP128Type:
-        return std::string("FP128Type");
-      case llvmberry::X86_FP80Type:
-        return std::string("X86_FP80Type");
-      default:
-        assert(false && "FloatType toString");
+    case llvmberry::FloatType:
+      return std::string("FloatType");
+    case llvmberry::DoubleType:
+      return std::string("DoubleType");
+    case llvmberry::FP128Type:
+      return std::string("FP128Type");
+    case llvmberry::X86_FP80Type:
+      return std::string("X86_FP80Type");
+    default:
+      assert(false && "FloatType toString");
     }
   }
-
-// // unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
-// //   const llvm::BasicBlock *parent = instr.getParent();
-// //   const llvm::BasicBlock::InstListType &instList = parent->getInstList();
-
-// //   unsigned int idx = 0;
-// //   for (llvm::BasicBlock::const_iterator itr = instList.begin();
-// //        itr != instList.end(); ++itr) {
-// //     if (&instr == &(*itr))
-// //       return idx;
-// //     idx++;
-// //   }
-
-// //   return (unsigned int)-1;
-// // }
-
-// /// @return the index of the BasicBlock w.r.t. the parent function.
-// std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
-//   if (!block || !(block->getParent())) {
-//     std::stringstream retStream;
-//     retStream << ((unsigned int)-1);
-//     return retStream.str();
-//   }
-
-//   // If a block has its own name, just return it.
-//   if (block->hasName()) {
-//     return block->getName();
-//   }
-
-//   // If else, calculate the index and return it.
-//   const llvm::Function *parent = block->getParent();
-//   const llvm::Function::BasicBlockListType &blockList =
-//       parent->getBasicBlockList();
-
-//   unsigned int idx = 0;
-//   for (llvm::Function::const_iterator itr = blockList.begin();
-//        itr != blockList.end(); ++itr) {
-//     if (block == &(*itr)) {
-//       std::stringstream retStream;
-//       retStream << idx;
-//       return (retStream.str());
-//     }
-
-//     idx++;
-//   }
-//   std::stringstream retStream;
-//   retStream << ((unsigned int)-1);
-//   return retStream.str();
-// }
 
 } // anonymous
 
 namespace llvmberry {
 
-// std::string getVariable(const llvm::Value &value) {
-//   std::string val;
+  std::string getVariable(const llvm::Value &value) {
+    std::string val;
 
-//   if (llvm::isa<llvm::GlobalValue>(value)) {
-//     val = std::string("@");
-//   } else {
-//     val = std::string("%");
-//   }
+    if (llvm::isa<llvm::GlobalValue>(value)) {
+      val = std::string("@");
+    } else {
+      val = std::string("%");
+    }
 
-//   val += std::string(value.getName().data());
+    val += std::string(value.getName().data());
 
-//   return val;
-// }
-
-bool name_instructions(llvm::Function &F) {
-  for (llvm::Function::arg_iterator AI = F.arg_begin(), AE = F.arg_end();
-       AI != AE; ++AI)
-    if (!AI->hasName() && !AI->getType()->isVoidTy())
-      AI->setName("arg");
-
-  for (llvm::Function::iterator BB = F.begin(), E = F.end(); BB != E; ++BB) {
-    if (!BB->hasName())
-      BB->setName("bb");
-
-    for (llvm::BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E; ++I)
-      if (!I->hasName() && !I->getType()->isVoidTy())
-        I->setName("tmp");
+    return val;
   }
 
-  return true;
-}
+  bool name_instructions(llvm::Function &F) {
+    for (llvm::Function::arg_iterator AI = F.arg_begin(), AE = F.arg_end();
+         AI != AE; ++AI)
+      if (!AI->hasName() && !AI->getType()->isVoidTy())
+        AI->setName("arg");
 
-// position
+    for (llvm::Function::iterator BB = F.begin(), E = F.end(); BB != E; ++BB) {
+      if (!BB->hasName())
+        BB->setName("bb");
 
-TyPositionPhinode::TyPositionPhinode(std::string _block_name, std::string _prev_block_name)
-        : block_name(_block_name), prev_block_name(_prev_block_name) {}
+      for (llvm::BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E; ++I)
+        if (!I->hasName() && !I->getType()->isVoidTy())
+          I->setName("tmp");
+    }
 
-void TyPositionPhinode::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(block_name), CEREAL_NVP(prev_block_name));
-}
+    return true;
+  }
 
-TyPositionCommand::TyPositionCommand(enum TyScope _scope, std::string _register_name)
-        : scope(_scope), register_name(_register_name) {}
+  /* position */
 
-void TyPositionCommand::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("scope", toString(scope)),
-          CEREAL_NVP(register_name));
-}
+  TyPositionPhinode::TyPositionPhinode(std::string _block_name, std::string _prev_block_name)
+    : block_name(_block_name), prev_block_name(_prev_block_name) {}
 
-ConsPhinode::ConsPhinode(std::unique_ptr<TyPositionPhinode> _position_phinode)
-        : position_phinode(std::move(_position_phinode)) {}
+  void TyPositionPhinode::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(block_name), CEREAL_NVP(prev_block_name));
+  }
 
-void ConsPhinode::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  TyPositionCommand::TyPositionCommand(enum TyScope _scope, std::string _register_name)
+    : scope(_scope), register_name(_register_name) {}
 
-  archive.saveValue("Phinode");
-  archive(CEREAL_NVP(position_phinode));
-}
+  void TyPositionCommand::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(cereal::make_nvp("scope", toString(scope)),
+            CEREAL_NVP(register_name));
+  }
 
-ConsCommand::ConsCommand(std::unique_ptr<TyPositionCommand> _position_command)
-        : position_command(std::move(_position_command)) {}
+  ConsPhinode::ConsPhinode(std::unique_ptr<TyPositionPhinode> _position_phinode)
+    : position_phinode(std::move(_position_phinode)) {}
 
-void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  ConsPhinode::ConsPhinode(std::string _block_name, std::string _prev_block_name)
+    : position_phinode(new TyPositionPhinode(_block_name, _prev_block_name)) { }
 
-  archive.saveValue("Command");
-  archive(CEREAL_NVP(position_command));
-}
-// Constant classes
-ConsIntType::ConsIntType(bool _signed_flag, int _value)
-  : signed_flag(_signed_flag), value(_value) {}
+  void ConsPhinode::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
 
-void ConsIntType::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+    archive.saveValue("Phinode");
+    archive(CEREAL_NVP(position_phinode));
+  }
 
-  archive.saveValue("IntType");
-  archive.startNode();
-  archive.makeArray();
-  archive(CEREAL_NVP(signed_flag), CEREAL_NVP(value));
-  archive.finishNode();
-  //archive(CEREAL_NVP(signed_flag), CEREAL_NVP(value));
-}
+  ConsCommand::ConsCommand(std::unique_ptr<TyPositionCommand> _position_command)
+    : position_command(std::move(_position_command)) {}
 
-TyConstInt::TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type)
- : int_value(_int_value), int_type(std::move(_int_type)) {}
+  ConsCommand::ConsCommand(enum TyScope _scope, std::string _register_name)
+    : position_command(new TyPositionCommand(_scope, _register_name)) {}
 
-void TyConstInt::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("int_value", int_value), CEREAL_NVP(int_type));
-}
+  void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
 
-ConsConstInt::ConsConstInt(std::unique_ptr<TyConstInt> _const_int)
-  : const_int(std::move(_const_int)) {}
+    archive.saveValue("Command");
+    archive(CEREAL_NVP(position_command));
+  }
 
-void ConsConstInt::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  std::unique_ptr<TyPosition> ConsCommand::make(enum TyScope _scope, std::string _register_name) {
+    return std::unique_ptr<TyPosition>(new ConsCommand(_scope, _register_name));
+  }
 
-  archive.saveValue("ConstInt");
-  archive(CEREAL_NVP(const_int));
-}
+  /* value */
 
-TyConstFloat::TyConstFloat(float _float_value, enum TyFloatType _float_type)
-        : float_value(_float_value), float_type(_float_type){ }
+  // register
 
-void TyConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(float_value), 
-      cereal::make_nvp("float_type", toString(float_type)));
-}
+  TyRegister::TyRegister(std::string _name, enum TyTag _tag)
+    : name(_name), tag(_tag) {}
 
-ConsConstFloat::ConsConstFloat(std::unique_ptr<TyConstFloat> _const_float)
-        : const_float(std::move(_const_float)){ }
+  void TyRegister::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(name), cereal::make_nvp("tag", toString(tag)));
+  }
 
-void ConsConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  std::unique_ptr<TyRegister> TyRegister::make(std::string _name, enum TyTag _tag) {
+    return std::unique_ptr<TyRegister>(new TyRegister(_name, _tag));
+  }
 
-  archive.saveValue("ConstFloat");
-  archive(CEREAL_NVP(const_float));
-}
+  // constant
+  ConsIntType::ConsIntType(int _value) : value(_value) {}
 
-ConsSize::ConsSize(int _size)
-        : size(_size) {}
+  void ConsIntType::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
 
-void ConsSize::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+    archive.saveValue("IntType");
+    archive(CEREAL_NVP(value));
+  }
 
-  archive.saveValue("Size");
-  archive(CEREAL_NVP(size));
-}
-// register
+  TyConstInt::TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type)
+    : int_value(_int_value), int_type(std::move(_int_type)) { }
 
-TyRegister::TyRegister(std::string _name, enum TyTag _tag)
-        : name(_name), tag(_tag) {}
+  TyConstInt::TyConstInt(int _int_value, int _value)
+    : int_value(_int_value), int_type(new ConsIntType(_value)) { }
 
-void TyRegister::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(name), cereal::make_nvp("tag", toString(tag)));
-}
+  void TyConstInt::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(cereal::make_nvp("int_value", int_value), CEREAL_NVP(int_type));
+  }
 
-// * Propagate *
+  std::unique_ptr<TyConstInt> TyConstInt::make(int _int_value, int _value) {
+    return std::unique_ptr<TyConstInt>(new TyConstInt(_int_value, _value));
+  }
 
-// propagate expr
+  TyConstFloat::TyConstFloat(float _float_value, enum TyFloatType _float_type)
+    : float_value(_float_value), float_type(_float_type){ }
 
-ConsVar::ConsVar(std::unique_ptr<TyRegister> _register_name)
-        : register_name(std::move(_register_name)) {}
+  void TyConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(float_value),
+            cereal::make_nvp("float_type", toString(float_type)));
+  }
 
-void ConsVar::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  ConsConstInt::ConsConstInt(std::unique_ptr<TyConstInt> _const_int)
+    : const_int(std::move(_const_int)) { }
 
-  archive.saveValue("Var");
-  archive(CEREAL_NVP(register_name));
-}
+  ConsConstInt::ConsConstInt(int _int_value, int _value)
+    : const_int(new TyConstInt(_int_value, _value)) { }
 
-ConsRhs::ConsRhs(std::unique_ptr<TyRegister> _register_name)
-        : register_name(std::move(_register_name)) {}
+  void ConsConstInt::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
 
-void ConsRhs::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+    archive.saveValue("ConstInt");
+    archive(CEREAL_NVP(const_int));
+  }
 
-  archive.saveValue("Rhs");
-  archive(CEREAL_NVP(register_name));
-}
+  ConsConstFloat::ConsConstFloat(std::unique_ptr<TyConstFloat> _const_float)
+    : const_float(std::move(_const_float)){ }
 
-ConsConst::ConsConst(std::unique_ptr<TyConstant> _constant)
-        : constant(std::move(_constant)) {}
+  ConsConstFloat::ConsConstFloat(float _float_value, enum TyFloatType _float_type)
+    : const_float(new TyConstFloat(_float_value, _float_type)) { }
 
-void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  void ConsConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
 
-  archive.saveValue("Const");
-  archive(CEREAL_NVP(constant));
-}
-// propagate object
+    archive.saveValue("ConstFloat");
+    archive(CEREAL_NVP(const_float));
+  }
 
-TyPropagateLessdef::TyPropagateLessdef
-        (std::unique_ptr<TyPropagateExpr> _lhs,
-         std::unique_ptr<TyPropagateExpr> _rhs,
-         enum TyScope _scope)
-        : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
+  ConsSize::ConsSize(int _size) : size(_size) {}
 
-void TyPropagateLessdef::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs), cereal::make_nvp("scope", toString(scope)));
-}
+  void ConsSize::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
 
+    archive.saveValue("Size");
+    archive(CEREAL_NVP(size));
+  }
 
-ConsLessdef::ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef)
-        : propagate_lessdef(std::move(_propagate_lessdef)) {}
+  std::unique_ptr<TySize> ConsSize::make(int _size) {
+    return std::unique_ptr<TySize>(new ConsSize(_size));
+  }
 
-void ConsLessdef::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  /* Propagate */
 
-  archive.saveValue("Lessdef");
-  archive(CEREAL_NVP(propagate_lessdef));
-}
-TyPropagateNoalias::TyPropagateNoalias
-        (std::unique_ptr<TyRegister> _lhs,
-         std::unique_ptr<TyRegister> _rhs,
-         enum TyScope _scope)
-        : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
+  // propagate expr
 
-void TyPropagateNoalias::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs), cereal::make_nvp("scope", toString(scope)));
-}
+  ConsVar::ConsVar(std::unique_ptr<TyRegister> _register_name)
+    : register_name(std::move(_register_name)) { }
 
-ConsNoalias::ConsNoalias(std::unique_ptr<TyPropagateNoalias> _propagate_noalias)
-        : propagate_noalias(std::move(_propagate_noalias)) { }
+  ConsVar::ConsVar(std::string _name, enum TyTag _tag)
+    : register_name(new TyRegister(_name, _tag)) { }
 
-void ConsNoalias::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  void ConsVar::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
 
-  archive.saveValue("Noalias");
-  archive(CEREAL_NVP(propagate_noalias));
-}
+    archive.saveValue("Var");
+    archive(CEREAL_NVP(register_name));
+  }
 
-ConsMaydiff::ConsMaydiff(std::unique_ptr<TyRegister> _register_name)
-        : register_name(std::move(_register_name)) {}
+  std::unique_ptr<TyPropagateExpr> ConsVar::make
+  (std::string _name, enum TyTag _tag) {
+    return std::unique_ptr<TyPropagateExpr>(new ConsVar(_name, _tag));
+  }
 
-void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  ConsRhs::ConsRhs(std::unique_ptr<TyRegister> _register_name)
+    : register_name(std::move(_register_name)) {}
 
-  archive.saveValue("Maydiff");
-  archive(CEREAL_NVP(register_name));
-}
+  ConsRhs::ConsRhs(std::string _name, enum TyTag _tag)
+    : register_name(new TyRegister(_name, _tag)) { }
 
-// propagate range
+  void ConsRhs::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
 
-ConsGlobal::ConsGlobal() {}
+    archive.saveValue("Rhs");
+    archive(CEREAL_NVP(register_name));
+  }
 
-void ConsGlobal::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
+  std::unique_ptr<TyPropagateExpr> ConsRhs::make(std::string _name, enum TyTag _tag) {
+    return std::unique_ptr<TyPropagateExpr>(new ConsRhs(_name, _tag));
+  }
 
-  archive.saveValue("Global"); /* TODO: how to print this in JSON */
-}
+  ConsConst::ConsConst(std::unique_ptr<TyConstant> _constant)
+    : constant(std::move(_constant)) {}
 
-ConsBounds::ConsBounds(std::unique_ptr<TyPosition> _from,
-                       std::unique_ptr<TyPosition> _to)
-        : from(std::move(_from)), to(std::move(_to)) {}
+  ConsConst::ConsConst(int _int_value, int _value)
+    : constant(new ConsConstInt(_int_value, _value)) { }
 
-void ConsBounds::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("Bounds");
-  archive.startNode();
-  archive.makeArray();
-  archive(from, to);
-  archive.finishNode();
-}
-
-
-
-// propagate
-
-TyPropagate::TyPropagate(std::unique_ptr<TyPropagateObject> _propagate,
-                         std::unique_ptr<TyPropagateRange> _propagate_range)
-        : propagate(std::move(_propagate)),
-          propagate_range(std::move(_propagate_range)) {}
-
-void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(propagate), CEREAL_NVP(propagate_range));
-}
-
-ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)
-        : propagate(std::move(_propagate)) {}
-
-void ConsPropagate::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("Propagate");
-  archive(CEREAL_NVP(propagate));
-}
-
-void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
-  std::string function_id = std::string("@") + this->function_id;
-  archive(CEREAL_NVP(module_id));
-  archive(CEREAL_NVP(function_id));
-  archive(CEREAL_NVP(opt_name));
-  archive(CEREAL_NVP(src_nop_positions));
-  archive(CEREAL_NVP(tgt_nop_positions));
-  archive(CEREAL_NVP(commands));
-  // archive.setNextName("commands");
-  // archive.startNode();
-  // archive.makeArray();
-  // archive.writeName();
-  // for (auto it = commands.begin(); it != commands.end(); ++it) {
-  //   archive.startNode();
-  //   (*it)->serialize(archive);
-  //   archive.finishNode();
-  // }
-  // archive.finishNode();
-}
-
-// class CoreHint
-
-CoreHint::CoreHint() {}
-
-CoreHint::CoreHint(std::string _module_id, std::string _function_id,
-                   std::string _opt_name)
-        : module_id(_module_id), function_id(_function_id), opt_name(_opt_name) {
-  // _src_nop_positions.push_back(std::unique_ptr<int>(new int(3)));
-}
-
-void CoreHint::addCommand(std::unique_ptr<TyCommand> c) {
-  commands.push_back(std::move(c));
-}
-
-void CoreHint::addSrcNopPosition(std::unique_ptr<TyPosition> position) {
-  src_nop_positions.push_back(std::move(position));
-}
-
-// void CoreHint::addAddedInstrPosition(const Position &p) {
-//   added_instr_positions.push_back(p);
-// }
-
-
-// inference rules
-
-ConsInfrule::ConsInfrule(std::unique_ptr<TyPosition> _position,
-                         std::unique_ptr<TyInfrule> _infrule)
-  : position(std::move(_position)), infrule(std::move(_infrule)) {}
-
-void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("Infrule");
-  archive.startNode();
-  archive.makeArray();
-  archive(CEREAL_NVP(position));
-  archive(CEREAL_NVP(infrule));
-  archive.finishNode();
-}
-
-TyAddAssociative::TyAddAssociative(std::unique_ptr<TyRegister> _x,
-                                   std::unique_ptr<TyRegister> _y,
-                                   std::unique_ptr<TyRegister> _z,
-                                   std::unique_ptr<TyConstInt> _c1,
-                                   std::unique_ptr<TyConstInt> _c2,
-                                   std::unique_ptr<TyConstInt> _c3,
-                                   std::unique_ptr<TySize> _sz)
-  : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), 
-    c1(std::move(_c1)), c2(std::move(_c2)), c3(std::move(_c3)),
-    sz(std::move(_sz)) {}
-
-void TyAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(z),
-          CEREAL_NVP(c1), CEREAL_NVP(c2), CEREAL_NVP(c3),
-          CEREAL_NVP(sz));
-}
-
-ConsAddAssociative::ConsAddAssociative(std::unique_ptr<TyAddAssociative> _add_associative)
-  : add_associative(std::move(_add_associative)) {}
-
-void ConsAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("AddAssociative");
-  archive(CEREAL_NVP(add_associative));  
-}
+  ConsConst::ConsConst(float _float_value, enum TyFloatType _float_type)
+    : constant(new ConsConstFloat(_float_value, _float_type)) { }
+
+  void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Const");
+    archive(CEREAL_NVP(constant));
+  }
+
+  // propagate object
+
+  TyPropagateLessdef::TyPropagateLessdef
+  (std::unique_ptr<TyPropagateExpr> _lhs,
+   std::unique_ptr<TyPropagateExpr> _rhs,
+   enum TyScope _scope)
+    : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
+
+  void TyPropagateLessdef::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs), cereal::make_nvp("scope", toString(scope)));
+  }
+
+  std::unique_ptr<TyPropagateLessdef> TyPropagateLessdef::make
+  (std::unique_ptr<TyPropagateExpr> _lhs,
+   std::unique_ptr<TyPropagateExpr> _rhs,
+   enum TyScope _scope) {
+    return std::unique_ptr<TyPropagateLessdef>
+      (new TyPropagateLessdef(std::move(_lhs), std::move(_rhs), _scope));
+
+  }
+
+  TyPropagateNoalias::TyPropagateNoalias
+  (std::unique_ptr<TyRegister> _lhs,
+   std::unique_ptr<TyRegister> _rhs,
+   enum TyScope _scope)
+    : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
+
+  TyPropagateNoalias::TyPropagateNoalias
+  (std::string _lhs_name, enum TyTag _lhs_tag,
+   std::string _rhs_name, enum TyTag _rhs_tag,
+   enum TyScope _scope)
+    : lhs(new TyRegister(_lhs_name, _lhs_tag)),
+      rhs(new TyRegister(_rhs_name, _rhs_tag)),
+      scope(_scope) { }
+
+  void TyPropagateNoalias::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs), cereal::make_nvp("scope", toString(scope)));
+  }
+
+  ConsLessdef::ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef)
+    : propagate_lessdef(std::move(_propagate_lessdef)) {}
+
+  void ConsLessdef::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Lessdef");
+    archive(CEREAL_NVP(propagate_lessdef));
+  }
+
+  std::unique_ptr<TyPropagateObject> ConsLessdef::make
+  (std::unique_ptr<TyPropagateExpr> _lhs,
+   std::unique_ptr<TyPropagateExpr> _rhs,
+   enum TyScope _scope) {
+    auto ty_prop_ld = TyPropagateLessdef::make
+      (std::move(_lhs), std::move(_rhs), std::move(_scope));
+    return std::unique_ptr<TyPropagateObject>(new ConsLessdef(std::move(ty_prop_ld)));
+  }
+
+  ConsNoalias::ConsNoalias(std::unique_ptr<TyPropagateNoalias> _propagate_noalias)
+    : propagate_noalias(std::move(_propagate_noalias)) { }
+
+  ConsNoalias::ConsNoalias
+  (std::string _lhs_name, enum TyTag _lhs_tag,
+   std::string _rhs_name, enum TyTag _rhs_tag,
+   enum TyScope _scope)
+    : propagate_noalias(new TyPropagateNoalias(_lhs_name, _lhs_tag, _rhs_name, _rhs_tag, _scope)) { }
+
+  void ConsNoalias::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Noalias");
+    archive(CEREAL_NVP(propagate_noalias));
+  }
+
+  ConsMaydiff::ConsMaydiff(std::unique_ptr<TyRegister> _register_name)
+    : register_name(std::move(_register_name)) {}
+
+  ConsMaydiff::ConsMaydiff(std::string _name, enum TyTag _tag)
+    : register_name(new TyRegister(_name, _tag)) { }
+
+  void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Maydiff");
+    archive(CEREAL_NVP(register_name));
+  }
+
+  // propagate range
+
+  ConsBounds::ConsBounds(std::unique_ptr<TyPosition> _from,
+                         std::unique_ptr<TyPosition> _to)
+    : from(std::move(_from)), to(std::move(_to)) {}
+
+  void ConsBounds::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Bounds");
+    archive.startNode();
+    archive.makeArray();
+    archive(from, to);
+    archive.finishNode();
+  }
+
+  std::unique_ptr<TyPropagateRange> ConsBounds::make
+  (std::unique_ptr<TyPosition> _from,
+   std::unique_ptr<TyPosition> _to) {
+    return std::unique_ptr<TyPropagateRange>
+      (new ConsBounds(std::move(_from), std::move(_to)));
+  }
+
+  ConsGlobal::ConsGlobal() {}
+
+  void ConsGlobal::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Global");
+  }
+
+  TyPropagate::TyPropagate(std::unique_ptr<TyPropagateObject> _propagate,
+                           std::unique_ptr<TyPropagateRange> _propagate_range)
+    : propagate(std::move(_propagate)),
+      propagate_range(std::move(_propagate_range)) {}
+
+  void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(propagate), CEREAL_NVP(propagate_range));
+  }
+
+  /* inference rule */
+
+  TyAddAssociative::TyAddAssociative
+  (std::unique_ptr<TyRegister> _x,
+   std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyConstInt> _c1,
+   std::unique_ptr<TyConstInt> _c2,
+   std::unique_ptr<TyConstInt> _c3,
+   std::unique_ptr<TySize> _sz)
+    : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)),
+      c1(std::move(_c1)), c2(std::move(_c2)), c3(std::move(_c3)),
+      sz(std::move(_sz)) {}
+
+  void TyAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(z),
+            CEREAL_NVP(c1), CEREAL_NVP(c2), CEREAL_NVP(c3),
+            CEREAL_NVP(sz));
+  }
+
+  ConsAddAssociative::ConsAddAssociative(std::unique_ptr<TyAddAssociative> _add_associative)
+    : add_associative(std::move(_add_associative)) {}
+
+  void ConsAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("AddAssociative");
+    archive(CEREAL_NVP(add_associative));
+  }
+
+  std::unique_ptr<TyInfrule> ConsAddAssociative::make
+  (std::unique_ptr<TyRegister> _x,
+   std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyConstInt> _c1,
+   std::unique_ptr<TyConstInt> _c2,
+   std::unique_ptr<TyConstInt> _c3,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TyAddAssociative> _add_assoc
+      (new TyAddAssociative
+       (std::move(_x), std::move(_y), std::move(_z),
+        std::move(_c1), std::move(_c2), std::move(_c3), std::move(_sz)));
+    return std::unique_ptr<TyInfrule>(new ConsAddAssociative(std::move(_add_assoc)));
+  }
+
+  ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)
+    : propagate(std::move(_propagate)) {}
+
+  void ConsPropagate::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Propagate");
+    archive(CEREAL_NVP(propagate));
+  }
+
+  std::unique_ptr<TyCommand> ConsPropagate::make
+  (std::unique_ptr<TyPropagate> _propagate) {
+    return std::unique_ptr<TyCommand>(new ConsPropagate(std::move(_propagate)));
+  }
+
+  std::unique_ptr<TyCommand> ConsPropagate::make
+  (std::unique_ptr<TyPropagateObject> _obj,
+   std::unique_ptr<TyPropagateRange> _range) {
+    std::unique_ptr<TyPropagate> _propagate(new TyPropagate(std::move(_obj), std::move(_range)));
+    return std::unique_ptr<TyCommand>(new ConsPropagate(std::move(_propagate)));
+  }
+
+  ConsInfrule::ConsInfrule(std::unique_ptr<TyPosition> _position,
+                           std::unique_ptr<TyInfrule> _infrule)
+    : position(std::move(_position)), infrule(std::move(_infrule)) {}
+
+  void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Infrule");
+    archive.startNode();
+    archive.makeArray();
+    archive(CEREAL_NVP(position));
+    archive(CEREAL_NVP(infrule));
+    archive.finishNode();
+  }
+
+  std::unique_ptr<TyCommand> ConsInfrule::make
+  (std::unique_ptr<TyPosition> _position,
+   std::unique_ptr<TyInfrule> _infrule) {
+    return std::unique_ptr<TyCommand>(new ConsInfrule(std::move(_position), std::move(_infrule)));
+  }
+
+  // core hint
+
+  CoreHint::CoreHint() {}
+
+  CoreHint::CoreHint(std::string _module_id, std::string _function_id,
+                     std::string _opt_name)
+    : module_id(_module_id), function_id(_function_id), opt_name(_opt_name) {
+  }
+
+  void CoreHint::addCommand(std::unique_ptr<TyCommand> c) {
+    commands.push_back(std::move(c));
+  }
+
+  void CoreHint::addSrcNopPosition(std::unique_ptr<TyPosition> position) {
+    src_nop_positions.push_back(std::move(position));
+  }
+
+  void CoreHint::addTgtNopPosition(std::unique_ptr<TyPosition> position) {
+    tgt_nop_positions.push_back(std::move(position));
+  }
+
+  void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
+    std::string function_id = std::string("@") + this->function_id;
+    archive(CEREAL_NVP(module_id));
+    archive(CEREAL_NVP(function_id));
+    archive(CEREAL_NVP(opt_name));
+    archive(CEREAL_NVP(src_nop_positions));
+    archive(CEREAL_NVP(tgt_nop_positions));
+    archive(CEREAL_NVP(commands));
+  }
 
 } // llvmberry
