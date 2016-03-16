@@ -64,7 +64,6 @@
 #include <climits>
 
 #include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/InstCombineOptimizations.h"
 
 #include <sstream>
 #include <fstream>
@@ -2706,11 +2705,33 @@ bool InstCombiner::run() {
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
       llvmberry::name_instructions(*(I->getParent()->getParent()));
-      llvmberry::DeadCodeElimHintBuilder hintbuilder(I);
-      llvmberry::ValidationUnit::Begin(hintbuilder.getOptimizationName(),
+      llvmberry::ValidationUnit::Begin("dead_code_elim",
                             I->getParent()->getParent());
       EraseInstFromFunction(*I);
-      hintbuilder.buildCoreHint(llvmberry::ValidationUnit::GetInstance());
+      llvmberry::ValidationUnit::GetInstance()->intrude
+        ([&I]
+         (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+           std::string reg = llvmberry::getVariable(*I);
+
+           hints.addCommand(
+             llvmberry::ConsPropagate::make(
+               llvmberry::ConsMaydiff::make(TyRegister::make(reg, llvmberry::Physical)),
+               llvmberry::ConsGlobal::make()
+             )
+           );
+
+           if(I == I->getParent()->getFirstNonPHI()) {
+             std::string nop_block_name = llvmberry::getBasicBlockIndex(I->getParent());
+             hints.addTgtNopPosition(llvmberry::ConsNopPosition::make(nop_block_name, true));
+           } else {
+             BasicBlock::iterator prevI = I;
+             prevI--;
+             std::string nop_prev_reg = llvmberry::getVariable(*prevI);
+             hints.addTgtNopPosition(llvmberry::ConsNopPosition::make(nop_prev_reg, false));
+           }
+
+         }
+        );
       llvmberry::ValidationUnit::End();
       ++NumDeadInst;
       MadeIRChange = true;
