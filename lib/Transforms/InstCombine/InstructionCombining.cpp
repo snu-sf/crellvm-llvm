@@ -2761,7 +2761,7 @@ bool InstCombiner::run() {
 
            hints.addCommand(
              llvmberry::ConsPropagate::make(
-               llvmberry::ConsMaydiff::make(TyRegister::make(reg, llvmberry::Physical)),
+               llvmberry::ConsMaydiff::make(llvmberry::TyRegister::make(reg, llvmberry::Physical)),
                llvmberry::ConsGlobal::make()
              )
            );
