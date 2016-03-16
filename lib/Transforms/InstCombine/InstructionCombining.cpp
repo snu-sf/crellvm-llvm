@@ -2705,6 +2705,7 @@ bool InstCombiner::run() {
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
+      llvmberry::name_instructions(*(I->getParent()->getParent()));
       llvmberry::DeadCodeElimHintBuilder hintbuilder(I);
       llvmberry::ValidationUnit::Begin(hintbuilder.getOptimizationName(),
                             I->getParent()->getParent());

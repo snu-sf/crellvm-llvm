@@ -83,43 +83,42 @@ namespace {
   // //   return (unsigned int)-1;
   // // }
 
-  // /// @return the index of the BasicBlock w.r.t. the parent function.
-  // std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
-  //   if (!block || !(block->getParent())) {
-  //     std::stringstream retStream;
-  //     retStream << ((unsigned int)-1);
-  //     return retStream.str();
-  //   }
-
-  //   // If a block has its own name, just return it.
-  //   if (block->hasName()) {
-  //     return block->getName();
-  //   }
-
-  //   // If else, calculate the index and return it.
-  //   const llvm::Function *parent = block->getParent();
-  //   const llvm::Function::BasicBlockListType &blockList =
-  //       parent->getBasicBlockList();
-
-  //   unsigned int idx = 0;
-  //   for (llvm::Function::const_iterator itr = blockList.begin();
-  //        itr != blockList.end(); ++itr) {
-  //     if (block == &(*itr)) {
-  //       std::stringstream retStream;
-  //       retStream << idx;
-  //       return (retStream.str());
-  //     }
-
-  //     idx++;
-  //   }
-  //   std::stringstream retStream;
-  //   retStream << ((unsigned int)-1);
-  //   return retStream.str();
-  // }
-
 } // anonymous
 
 namespace llvmberry {
+  /// @return the index of the BasicBlock w.r.t. the parent function.
+  std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
+    if (!block || !(block->getParent())) {
+      std::stringstream retStream;
+      retStream << ((unsigned int)-1);
+      return retStream.str();
+    }
+
+    // If a block has its own name, just return it.
+    if (block->hasName()) {
+      return block->getName();
+    }
+
+    // If else, calculate the index and return it.
+    const llvm::Function *parent = block->getParent();
+    const llvm::Function::BasicBlockListType &blockList =
+        parent->getBasicBlockList();
+
+    unsigned int idx = 0;
+    for (llvm::Function::const_iterator itr = blockList.begin();
+         itr != blockList.end(); ++itr) {
+      if (block == &(*itr)) {
+        std::stringstream retStream;
+        retStream << idx;
+        return (retStream.str());
+      }
+
+      idx++;
+    }
+    std::stringstream retStream;
+    retStream << ((unsigned int)-1);
+    return retStream.str();
+  }
 
   std::string getVariable(const llvm::Value &value) {
     std::string val;

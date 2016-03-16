@@ -107,11 +107,8 @@ void AssociativityAddHintBuilder::buildCoreHint
 DeadCodeElimHintBuilder::DeadCodeElimHintBuilder(Instruction *I) 
 : reg(llvmberry::getVariable(*I)) {
   if(I == I->getParent()->getFirstNonPHI()) {
-    printf("SUNGMINDEBUG : say phi\n");
     nop_prev_isPHI = true;
-    nop_block_name = I->getParent()->getName();
-    nop_block_name = "TEST_BLOCK_NAME";
-    printf("SUNGMINDEBUG : block name : %s\n", nop_block_name.c_str());
+    nop_block_name = getBasicBlockIndex(I->getParent());
   } else {
     BasicBlock::iterator prevI = I;
     prevI--;
