@@ -14,17 +14,7 @@ namespace cereal {
   template <class T>
   void save( cereal::JSONOutputArchive &archive, std::unique_ptr<T> const &ptr) {
     ptr->serialize(archive);
-    // archive( *ptr );
   }
-
-  //   template <class T>
-  // void save( cereal::JSONOutputArchive &archive,
-  // 	   std::vector<std::unique_ptr<T>> const &v) {
-  //     archive.makeArray();
-  //   // archive( *ptr );
-  // }
-
-
 } // cereal
 
 namespace {
@@ -67,21 +57,6 @@ namespace {
       assert(false && "FloatType toString");
     }
   }
-
-  // // unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
-  // //   const llvm::BasicBlock *parent = instr.getParent();
-  // //   const llvm::BasicBlock::InstListType &instList = parent->getInstList();
-
-  // //   unsigned int idx = 0;
-  // //   for (llvm::BasicBlock::const_iterator itr = instList.begin();
-  // //        itr != instList.end(); ++itr) {
-  // //     if (&instr == &(*itr))
-  // //       return idx;
-  // //     idx++;
-  // //   }
-
-  // //   return (unsigned int)-1;
-  // // }
 
 } // anonymous
 
@@ -152,7 +127,7 @@ namespace llvmberry {
     return true;
   }
 
-  // position
+  /* position */
 
   TyPositionPhinode::TyPositionPhinode(std::string _block_name, std::string _prev_block_name)
     : block_name(_block_name), prev_block_name(_prev_block_name) {}
@@ -188,7 +163,7 @@ namespace llvmberry {
 
   ConsCommand::ConsCommand(enum TyScope _scope, std::string _register_name)
     : position_command(new TyPositionCommand(_scope, _register_name)) {}
-  
+
   void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
     archive.makeArray();
     archive.writeName();
@@ -217,6 +192,8 @@ namespace llvmberry {
     return std::unique_ptr<TyNopPosition>(new ConsNopPosition(_regname_or_blockname, _isPhi));
   }
 
+  /* value */
+
   // register
 
   TyRegister::TyRegister(std::string _name, enum TyTag _tag)
@@ -230,9 +207,8 @@ namespace llvmberry {
     return std::unique_ptr<TyRegister>(new TyRegister(_name, _tag));
   }
 
-  // Constant classes
-  ConsIntType::ConsIntType(int _value)
-    : value(_value) {}
+  // constant
+  ConsIntType::ConsIntType(int _value) : value(_value) {}
 
   void ConsIntType::serialize(cereal::JSONOutputArchive &archive) const {
     archive.makeArray();
@@ -243,7 +219,7 @@ namespace llvmberry {
   }
 
   TyConstInt::TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type)
-    : int_value(_int_value), int_type(std::move(_int_type)) {}
+    : int_value(_int_value), int_type(std::move(_int_type)) { }
 
   TyConstInt::TyConstInt(int _int_value, int _value)
     : int_value(_int_value), int_type(new ConsIntType(_value)) { }
@@ -260,10 +236,9 @@ namespace llvmberry {
     : float_value(_float_value), float_type(_float_type){ }
 
   void TyConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
-    archive(CEREAL_NVP(float_value), 
+    archive(CEREAL_NVP(float_value),
             cereal::make_nvp("float_type", toString(float_type)));
   }
-
 
   ConsConstInt::ConsConstInt(std::unique_ptr<TyConstInt> _const_int)
     : const_int(std::move(_const_int)) { }
@@ -279,7 +254,6 @@ namespace llvmberry {
     archive(CEREAL_NVP(const_int));
   }
 
-
   ConsConstFloat::ConsConstFloat(std::unique_ptr<TyConstFloat> _const_float)
     : const_float(std::move(_const_float)){ }
 
@@ -294,8 +268,7 @@ namespace llvmberry {
     archive(CEREAL_NVP(const_float));
   }
 
-  ConsSize::ConsSize(int _size)
-    : size(_size) {}
+  ConsSize::ConsSize(int _size) : size(_size) {}
 
   void ConsSize::serialize(cereal::JSONOutputArchive &archive) const {
     archive.makeArray();
@@ -309,7 +282,7 @@ namespace llvmberry {
     return std::unique_ptr<TySize>(new ConsSize(_size));
   }
 
-  // * Propagate *
+  /* Propagate */
 
   // propagate expr
 
@@ -346,8 +319,7 @@ namespace llvmberry {
     archive(CEREAL_NVP(register_name));
   }
 
-  std::unique_ptr<TyPropagateExpr> ConsRhs::make
-  (std::string _name, enum TyTag _tag) {
+  std::unique_ptr<TyPropagateExpr> ConsRhs::make(std::string _name, enum TyTag _tag) {
     return std::unique_ptr<TyPropagateExpr>(new ConsRhs(_name, _tag));
   }
 
@@ -356,7 +328,7 @@ namespace llvmberry {
 
   ConsConst::ConsConst(int _int_value, int _value)
     : constant(new ConsConstInt(_int_value, _value)) { }
-    
+
   ConsConst::ConsConst(float _float_value, enum TyFloatType _float_type)
     : constant(new ConsConstFloat(_float_value, _float_type)) { }
 
@@ -367,6 +339,7 @@ namespace llvmberry {
     archive.saveValue("Const");
     archive(CEREAL_NVP(constant));
   }
+
   // propagate object
 
   TyPropagateLessdef::TyPropagateLessdef
@@ -385,7 +358,7 @@ namespace llvmberry {
    enum TyScope _scope) {
     return std::unique_ptr<TyPropagateLessdef>
       (new TyPropagateLessdef(std::move(_lhs), std::move(_rhs), _scope));
-                                              
+
   }
 
   TyPropagateNoalias::TyPropagateNoalias
@@ -503,8 +476,6 @@ namespace llvmberry {
     return std::unique_ptr<TyPropagateRange>(new ConsGlobal());
   }
 
-  // propagate
-
   TyPropagate::TyPropagate(std::unique_ptr<TyPropagateObject> _propagate,
                            std::unique_ptr<TyPropagateRange> _propagate_range)
     : propagate(std::move(_propagate)),
@@ -519,6 +490,8 @@ namespace llvmberry {
     }
   }
 
+  /* inference rule */
+
   TyAddAssociative::TyAddAssociative
   (std::unique_ptr<TyRegister> _x,
    std::unique_ptr<TyRegister> _y,
@@ -527,7 +500,7 @@ namespace llvmberry {
    std::unique_ptr<TyConstInt> _c2,
    std::unique_ptr<TyConstInt> _c3,
    std::unique_ptr<TySize> _sz)
-    : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), 
+    : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)),
       c1(std::move(_c1)), c2(std::move(_c2)), c3(std::move(_c3)),
       sz(std::move(_sz)) {}
 
@@ -545,16 +518,16 @@ namespace llvmberry {
     archive.writeName();
 
     archive.saveValue("AddAssociative");
-    archive(CEREAL_NVP(add_associative));  
+    archive(CEREAL_NVP(add_associative));
   }
 
   std::unique_ptr<TyInfrule> ConsAddAssociative::make
   (std::unique_ptr<TyRegister> _x,
-   std::unique_ptr<TyRegister> _y, 
-   std::unique_ptr<TyRegister> _z, 
-   std::unique_ptr<TyConstInt> _c1, 
-   std::unique_ptr<TyConstInt> _c2, 
-   std::unique_ptr<TyConstInt> _c3, 
+   std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyConstInt> _c1,
+   std::unique_ptr<TyConstInt> _c2,
+   std::unique_ptr<TyConstInt> _c3,
    std::unique_ptr<TySize> _sz) {
     std::unique_ptr<TyAddAssociative> _add_assoc
       (new TyAddAssociative
@@ -603,12 +576,12 @@ namespace llvmberry {
   }
 
   std::unique_ptr<TyCommand> ConsInfrule::make
-  (std::unique_ptr<TyPosition> _position, 
+  (std::unique_ptr<TyPosition> _position,
    std::unique_ptr<TyInfrule> _infrule) {
     return std::unique_ptr<TyCommand>(new ConsInfrule(std::move(_position), std::move(_infrule)));
   }
 
-  // class CoreHint
+  // core hint
 
   CoreHint::CoreHint() {}
 
