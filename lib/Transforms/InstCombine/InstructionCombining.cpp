@@ -2753,7 +2753,6 @@ bool InstCombiner::run() {
       llvmberry::name_instructions(*(I->getParent()->getParent()));
       llvmberry::ValidationUnit::Begin("dead_code_elim",
                             I->getParent()->getParent());
-      EraseInstFromFunction(*I);
       llvmberry::ValidationUnit::GetInstance()->intrude
         ([&I]
          (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
@@ -2778,6 +2777,7 @@ bool InstCombiner::run() {
 
          }
         );
+      EraseInstFromFunction(*I);
       llvmberry::ValidationUnit::End();
       ++NumDeadInst;
       MadeIRChange = true;
