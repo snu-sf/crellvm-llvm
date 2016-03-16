@@ -70,6 +70,24 @@ namespace llvmberry {
 		std::unique_ptr<TyPositionCommand> position_command;
 	};
 
+  // abstract
+  struct TyNopPosition {
+  public:
+    virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+  };
+
+  struct ConsNopPosition : public TyNopPosition {
+  public:
+    ConsNopPosition(std::string _regname_or_blockname, bool _isPhi);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyNopPosition> make(std::string _regname_or_blockname, bool _isPhi);
+
+  private:
+    bool isPhi;
+    std::string regname_or_blockname;
+  };
+
 	enum TyTag { Physical = 0, Previous, Ghost };
 
 	struct TyRegister {
@@ -430,16 +448,16 @@ namespace llvmberry {
              std::string _function_id,
              std::string _opt_name);
     void addCommand(std::unique_ptr<TyCommand> c);
-    void addSrcNopPosition(std::unique_ptr<TyPosition> position);
-    void addTgtNopPosition(std::unique_ptr<TyPosition> position);
+    void addSrcNopPosition(std::unique_ptr<TyNopPosition> position);
+    void addTgtNopPosition(std::unique_ptr<TyNopPosition> position);
     void serialize(cereal::JSONOutputArchive &archive) const;
 
   private:
     std::string module_id;
     std::string function_id;
     std::string opt_name;
-    std::vector<std::unique_ptr<TyPosition>> src_nop_positions;
-    std::vector<std::unique_ptr<TyPosition>> tgt_nop_positions;
+    std::vector<std::unique_ptr<TyNopPosition>> src_nop_positions;
+    std::vector<std::unique_ptr<TyNopPosition>> tgt_nop_positions;
     std::vector<std::unique_ptr<TyCommand>> commands;
   };
 

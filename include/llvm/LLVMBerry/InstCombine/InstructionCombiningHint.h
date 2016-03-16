@@ -62,22 +62,10 @@ public:
 
 private:
   std::string reg;
+  std::string nop_block_name;
+  std::string nop_prev_reg;
+  bool nop_prev_isPHI;
 };
-
-/* // class DeadCodeElim */
-
-/* class DeadCodeElimHintBuilder { */
-/* public: */
-/*   DeadCodeElimHintBuilder(Instruction *instr); */
-/*   void buildCoreHint(ValidationUnit *validation_unit); */
-/*   std::string getOptimizationName() const; */
-/*   bool isValid() const; */
-
-/* private: */
-/*   bool isvalid; */
-/*   Position instr_position; */
-/*   Variable var; */
-/* }; */
 
 /* // class Distributivity */
 

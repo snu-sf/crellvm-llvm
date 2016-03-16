@@ -105,7 +105,20 @@ void AssociativityAddHintBuilder::buildCoreHint
 // class DeadCodeElimHintBuilder
 
 DeadCodeElimHintBuilder::DeadCodeElimHintBuilder(Instruction *I) 
-: reg(llvmberry::getVariable(*I)) { }
+: reg(llvmberry::getVariable(*I)) {
+  if(I == I->getParent()->getFirstNonPHI()) {
+    printf("SUNGMINDEBUG : say phi\n");
+    nop_prev_isPHI = true;
+    nop_block_name = I->getParent()->getName();
+    nop_block_name = "TEST_BLOCK_NAME";
+    printf("SUNGMINDEBUG : block name : %s\n", nop_block_name.c_str());
+  } else {
+    BasicBlock::iterator prevI = I;
+    prevI--;
+    nop_prev_isPHI = false;
+    nop_prev_reg = llvmberry::getVariable(*prevI);
+  }
+}
 
 std::string DeadCodeElimHintBuilder::getOptimizationName() const {
   return "dead_code_elim";
@@ -121,7 +134,11 @@ void DeadCodeElimHintBuilder::buildCoreHint(ValidationUnit *validation_unit) {
           )
         );
 
-        hints.addTgtNopPosition(ConsCommand::make(Source, reg));
+        if(nop_prev_isPHI) {
+          hints.addTgtNopPosition(ConsNopPosition::make(nop_block_name, true));
+        } else {
+          hints.addTgtNopPosition(ConsNopPosition::make(nop_prev_reg, false));
+        }
      }
   );
 }

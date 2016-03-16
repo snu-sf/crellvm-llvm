@@ -202,6 +202,22 @@ namespace llvmberry {
     return std::unique_ptr<TyPosition>(new ConsCommand(_scope, _register_name));
   }
 
+  ConsNopPosition::ConsNopPosition(std::string _regname_or_blockname, bool _isPhi)
+    : regname_or_blockname(_regname_or_blockname), isPhi(_isPhi) {}
+
+  void ConsNopPosition::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    if(isPhi) { std::string s("PhinodeCurrentBlockName"); archive(s); }
+    //archive.setNextName("PhinodeCurrentBlockName");
+    else { std::string s("CommandRegisterName"); archive(s); }
+    //archive.setNextName("CommandRegisterName");
+    archive(regname_or_blockname);
+  }
+
+  std::unique_ptr<TyNopPosition> ConsNopPosition::make(std::string _regname_or_blockname, bool _isPhi) {
+    return std::unique_ptr<TyNopPosition>(new ConsNopPosition(_regname_or_blockname, _isPhi));
+  }
+
   // register
 
   TyRegister::TyRegister(std::string _name, enum TyTag _tag)
@@ -606,11 +622,11 @@ namespace llvmberry {
     commands.push_back(std::move(c));
   }
 
-  void CoreHint::addSrcNopPosition(std::unique_ptr<TyPosition> position) {
+  void CoreHint::addSrcNopPosition(std::unique_ptr<TyNopPosition> position) {
     src_nop_positions.push_back(std::move(position));
   }
 
-  void CoreHint::addTgtNopPosition(std::unique_ptr<TyPosition> position) {
+  void CoreHint::addTgtNopPosition(std::unique_ptr<TyNopPosition> position) {
     tgt_nop_positions.push_back(std::move(position));
   }
 
