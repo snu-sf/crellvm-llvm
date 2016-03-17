@@ -1151,7 +1151,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         return BinaryOperator::CreateNeg(NewAdd);
       }
 
-    llvmberry::ValidationUnit::Begin("add_sub", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("add_comm_sub", I.getParent()->getParent());
     llvmberry::ValidationUnit::GetInstance()->intrude
       ([&LHS, &LHSV, &RHS, &I]
        (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
@@ -1218,8 +1218,57 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
   // A + -B  -->  A - B
   if (!isa<Constant>(RHS))
-    if (Value *V = dyn_castNegVal(RHS))
+    if (Value *V = dyn_castNegVal(RHS)){
+      llvmberry::ValidationUnit::Begin("add_sub", I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude
+        ([&V, &LHS, &RHS, &I]
+         (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+          // RHS = 0   - V       my = 0 - y
+          //   I = LHS + RHS      z = x + my
+
+          // prepare variables
+          std::string reg_my_name = llvmberry::getVariable(*RHS);
+          std::string reg_z_name = llvmberry::getVariable(I);
+
+          int bitwidth = V->getType()->getIntegerBitWidth();
+          
+          // propagate "my = 0 - y"
+          hints.addCommand
+            (llvmberry::ConsPropagate::make
+             (llvmberry::ConsLessdef::make
+              (llvmberry::ConsVar::make
+               (reg_my_name, llvmberry::Physical),
+               llvmberry::ConsRhs::make
+               (reg_my_name, llvmberry::Physical),
+               llvmberry::Source)
+              ,
+              llvmberry::ConsBounds::make
+              (llvmberry::ConsCommand::make
+               (llvmberry::Source, reg_my_name),
+               llvmberry::ConsCommand::make
+               (llvmberry::Source, reg_z_name))
+              )
+             );
+          
+          // from "z = x + my" and "my = 0 - y", create "z = x - y"
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+             (llvmberry::ConsCommand::make
+              (llvmberry::Source, reg_z_name),
+              llvmberry::ConsAddSub::make
+              (llvmberry::TyRegister::make(reg_my_name, llvmberry::Physical),
+               llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+               llvmberry::TyValue::make(*LHS),
+               llvmberry::TyValue::make(*V),
+               llvmberry::ConsSize::make(bitwidth)
+               )
+              )
+             );
+        }
+      );
+
       return BinaryOperator::CreateSub(LHS, V);
+    }
 
   if (Value *V = checkForNegativeOperand(I, Builder))
     return ReplaceInstUsesWith(I, V);
