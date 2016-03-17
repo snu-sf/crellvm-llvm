@@ -61,6 +61,39 @@ namespace {
 } // anonymous
 
 namespace llvmberry {
+  /// @return the index of the BasicBlock w.r.t. the parent function.
+  std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
+    if (!block || !(block->getParent())) {
+      std::stringstream retStream;
+      retStream << ((unsigned int)-1);
+      return retStream.str();
+    }
+
+    // If a block has its own name, just return it.
+    if (block->hasName()) {
+      return block->getName();
+    }
+
+    // If else, calculate the index and return it.
+    const llvm::Function *parent = block->getParent();
+    const llvm::Function::BasicBlockListType &blockList =
+        parent->getBasicBlockList();
+
+    unsigned int idx = 0;
+    for (llvm::Function::const_iterator itr = blockList.begin();
+         itr != blockList.end(); ++itr) {
+      if (block == &(*itr)) {
+        std::stringstream retStream;
+        retStream << idx;
+        return (retStream.str());
+      }
+
+      idx++;
+    }
+    std::stringstream retStream;
+    retStream << ((unsigned int)-1);
+    return retStream.str();
+  }
 
   std::string getVariable(const llvm::Value &value) {
     std::string val;
@@ -141,6 +174,22 @@ namespace llvmberry {
 
   std::unique_ptr<TyPosition> ConsCommand::make(enum TyScope _scope, std::string _register_name) {
     return std::unique_ptr<TyPosition>(new ConsCommand(_scope, _register_name));
+  }
+
+  ConsNopPosition::ConsNopPosition(std::string _regname_or_blockname, bool _isPhi)
+    : regname_or_blockname(_regname_or_blockname), isPhi(_isPhi) {}
+
+  void ConsNopPosition::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    if(isPhi) { std::string s("PhinodeCurrentBlockName"); archive(s); }
+    //archive.setNextName("PhinodeCurrentBlockName");
+    else { std::string s("CommandRegisterName"); archive(s); }
+    //archive.setNextName("CommandRegisterName");
+    archive(regname_or_blockname);
+  }
+
+  std::unique_ptr<TyNopPosition> ConsNopPosition::make(std::string _regname_or_blockname, bool _isPhi) {
+    return std::unique_ptr<TyNopPosition>(new ConsNopPosition(_regname_or_blockname, _isPhi));
   }
 
   /* value */
@@ -373,6 +422,12 @@ namespace llvmberry {
   ConsMaydiff::ConsMaydiff(std::string _name, enum TyTag _tag)
     : register_name(new TyRegister(_name, _tag)) { }
 
+  std::unique_ptr<TyPropagateObject> ConsMaydiff::make
+  (std::unique_ptr<TyRegister> reg) {
+    return std::unique_ptr<TyPropagateObject>
+      (new ConsMaydiff(std::move(reg)));
+  }
+
   void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
     archive.makeArray();
     archive.writeName();
@@ -408,10 +463,17 @@ namespace llvmberry {
   ConsGlobal::ConsGlobal() {}
 
   void ConsGlobal::serialize(cereal::JSONOutputArchive &archive) const {
-    archive.makeArray();
-    archive.writeName();
+    //archive.makeArray();
+    //archive.writeName();
 
-    archive.saveValue("Global");
+    //archive.saveValue("Global"); /* TODO: how to print this in JSON */
+    archive.setNextName("propagate_range");
+    std::string s("Global");
+    archive(s);
+  }
+
+  std::unique_ptr<TyPropagateRange> ConsGlobal::make() {
+    return std::unique_ptr<TyPropagateRange>(new ConsGlobal());
   }
 
   TyPropagate::TyPropagate(std::unique_ptr<TyPropagateObject> _propagate,
@@ -420,7 +482,12 @@ namespace llvmberry {
       propagate_range(std::move(_propagate_range)) {}
 
   void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
-    archive(CEREAL_NVP(propagate), CEREAL_NVP(propagate_range));
+    archive(CEREAL_NVP(propagate));
+    if(propagate_range->isGlobal()) {
+      propagate_range->serialize(archive);
+    } else {
+      archive(CEREAL_NVP(propagate_range));
+    }
   }
 
   /* inference rule */
@@ -565,11 +632,11 @@ namespace llvmberry {
     commands.push_back(std::move(c));
   }
 
-  void CoreHint::addSrcNopPosition(std::unique_ptr<TyPosition> position) {
+  void CoreHint::addSrcNopPosition(std::unique_ptr<TyNopPosition> position) {
     src_nop_positions.push_back(std::move(position));
   }
 
-  void CoreHint::addTgtNopPosition(std::unique_ptr<TyPosition> position) {
+  void CoreHint::addTgtNopPosition(std::unique_ptr<TyNopPosition> position) {
     tgt_nop_positions.push_back(std::move(position));
   }
 
