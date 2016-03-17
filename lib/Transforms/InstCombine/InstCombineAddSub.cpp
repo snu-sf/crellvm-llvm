@@ -20,8 +20,9 @@
 
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Structure.h"
+
 using namespace llvm;
-using namespace PatternMatch;
+using namespace llvm::PatternMatch;
 
 #define DEBUG_TYPE "instcombine"
 
@@ -1631,6 +1632,53 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
       if (cast<Constant>(Op1)->isNotMinSignedValue() && I.hasNoSignedWrap())
         Res->setHasNoSignedWrap(true);
     }
+
+      if(!isa<Constant>(Op1)) {
+
+      llvmberry::ValidationUnit::Begin("sub_add",
+                                       I.getParent()->getParent());
+
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&Op0, &I, &Op1, &V]
+                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+                // prepare variables
+                std::string reg0_name = llvmberry::getVariable(I); //z = x - my
+                std::string reg1_name = llvmberry::getVariable(*Op1); //my
+                std::string reg2_name = llvmberry::getVariable(*Op0); //x
+                std::string reg3_name = llvmberry::getVariable(*V); //y
+
+                unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
+
+                hints.addCommand
+                        (llvmberry::ConsPropagate::make
+                        (llvmberry::ConsLessdef::make
+                        (llvmberry::ConsVar::make (reg1_name, llvmberry::Physical), //my = -y
+                         llvmberry::ConsRhs::make (reg1_name, llvmberry::Physical),
+                         llvmberry::Source)
+                         ,
+                         llvmberry::ConsBounds::make
+                         (llvmberry::ConsCommand::make (llvmberry::Source, reg1_name), //From my to z = x -my
+                          llvmberry::ConsCommand::make (llvmberry::Source, reg0_name)))
+                        );
+
+                hints.addCommand
+                        (llvmberry::ConsInfrule::make
+                        (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsSubAdd::make
+                        (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
+                         llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
+                         llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
+                         llvmberry::TyRegister::make(reg3_name, llvmberry::Physical),
+                         llvmberry::ConsSize::make(sz_bw))));
+              }
+              );
+
+      llvmberry::ValidationUnit::End();
+
+    }
+    else {
+      //TODO: Implementation of hint generation when Op1 is Constant.
+    } 
 
     return Res;
   }

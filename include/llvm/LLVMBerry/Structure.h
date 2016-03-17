@@ -398,6 +398,23 @@ namespace llvmberry {
     std::unique_ptr<TySize> sz;
   };
 
+  struct TySubAdd {
+  public:
+    TySubAdd(std::unique_ptr<TyRegister> _z,
+             std::unique_ptr<TyRegister> _my,
+             std::unique_ptr<TyRegister> _x,
+             std::unique_ptr<TyRegister> _y,
+             std::unique_ptr<TySize> _sz);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+  private:
+    std::unique_ptr<TyRegister> my;
+    std::unique_ptr<TyRegister> z;
+    std::unique_ptr<TyRegister> x;
+    std::unique_ptr<TyRegister> y;
+    std::unique_ptr<TySize> sz;
+  };
+
   struct TyAddCommutative {
   public:
     TyAddCommutative(std::unique_ptr<TyRegister> _z,
@@ -456,7 +473,6 @@ namespace llvmberry {
   public:
     ConsAddCommutative(std::unique_ptr<TyAddCommutative> _add_comm);
     void serialize(cereal::JSONOutputArchive &archive) const;
-
     static std::unique_ptr<TyInfrule> make
       (std::unique_ptr<TyRegister> _z,
        std::unique_ptr<TyValue> _x,
@@ -466,9 +482,24 @@ namespace llvmberry {
   private:
     std::unique_ptr<TyAddCommutative> add_commutative;
   };
-  /* hint command */
 
-/* hint command */
+  struct ConsSubAdd : TyInfrule {
+  public:
+    ConsSubAdd(std::unique_ptr<TySubAdd> _sub_add);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyInfrule> make
+      (std::unique_ptr<TyRegister> _z,
+       std::unique_ptr<TyRegister> _my,
+       std::unique_ptr<TyRegister> _x,
+       std::unique_ptr<TyRegister> _y,
+       std::unique_ptr<TySize> _sz);
+
+  private:
+    std::unique_ptr<TySubAdd> sub_add;
+  };
+
+  /* hint command */
 
   struct TyCommand {
   public:
