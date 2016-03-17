@@ -469,6 +469,44 @@ namespace llvmberry {
     return std::unique_ptr<TyInfrule>(new ConsAddAssociative(std::move(_add_assoc)));
   }
 
+  TySubAdd::TySubAdd
+          (std::unique_ptr<TyRegister> _z,
+           std::unique_ptr<TyRegister> _my,
+           std::unique_ptr<TyRegister> _x,
+           std::unique_ptr<TyRegister> _y,
+           std::unique_ptr<TySize> _sz)
+          : z(std::move(_z)), my(std::move(_my)), x(std::move(_x)),
+            y(std::move(_y)), sz(std::move(_sz)) {}
+
+  void TySubAdd::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(z), CEREAL_NVP(my), CEREAL_NVP(x),
+            CEREAL_NVP(y), CEREAL_NVP(sz));
+  }
+
+  ConsSubAdd::ConsSubAdd(std::unique_ptr<TySubAdd> _sub_add)
+          : sub_add(std::move(_sub_add)) {}
+
+  void ConsSubAdd::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("SubAdd");
+    archive(CEREAL_NVP(sub_add));
+  }
+
+  std::unique_ptr<TyInfrule> ConsSubAdd::make
+          (std::unique_ptr<TyRegister> _z,
+           std::unique_ptr<TyRegister> _my,
+           std::unique_ptr<TyRegister> _x,
+           std::unique_ptr<TyRegister> _y,
+           std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TySubAdd> _sub_add
+            (new TySubAdd
+                     (std::move(_z), std::move(_my), std::move(_x),
+                      std::move(_y), std::move(_sz)));
+    return std::unique_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
+  }
+
   ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)
     : propagate(std::move(_propagate)) {}
 
