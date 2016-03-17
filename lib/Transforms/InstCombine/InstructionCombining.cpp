@@ -2768,7 +2768,7 @@ bool InstCombiner::run() {
            if(I == I->getParent()->getFirstNonPHI()) {
              std::string nop_block_name = llvmberry::getBasicBlockIndex(I->getParent());
              hints.addTgtNopPosition(llvmberry::ConsNopPosition::make(nop_block_name, true));
-           } else {
+           } else if(!isa<PHINode>(I)){
              BasicBlock::iterator prevI = I;
              prevI--;
              std::string nop_prev_reg = llvmberry::getVariable(*prevI);
