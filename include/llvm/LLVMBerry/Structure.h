@@ -313,8 +313,7 @@ namespace llvmberry {
 		ConsMaydiff(std::string _name, enum TyTag _tag);
 		void serialize(cereal::JSONOutputArchive &archive) const;
 
-    static std::unique_ptr<TyPropagateObject> make
-      (std::unique_ptr<TyRegister> reg);
+    static std::unique_ptr<TyPropagateObject> make(std::string _name, enum TyTag _tag);
 
 	private:
 		std::unique_ptr<TyRegister> register_name;

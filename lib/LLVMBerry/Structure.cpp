@@ -434,10 +434,8 @@ namespace llvmberry {
   ConsMaydiff::ConsMaydiff(std::string _name, enum TyTag _tag)
     : register_name(new TyRegister(_name, _tag)) { }
 
-  std::unique_ptr<TyPropagateObject> ConsMaydiff::make
-  (std::unique_ptr<TyRegister> reg) {
-    return std::unique_ptr<TyPropagateObject>
-      (new ConsMaydiff(std::move(reg)));
+  std::unique_ptr<TyPropagateObject> ConsMaydiff::make(std::string _name, enum TyTag _tag) {
+    return std::unique_ptr<TyPropagateObject>(new ConsMaydiff(TyRegister::make(_name, _tag)));
   }
 
   void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
