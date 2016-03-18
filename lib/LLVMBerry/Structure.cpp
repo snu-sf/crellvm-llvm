@@ -45,12 +45,16 @@ namespace {
 
   std::string toString(llvmberry::TyFloatType float_type) {
     switch (float_type) {
+    case llvmberry::HalfType:
+      return std::string("HalfType");
     case llvmberry::FloatType:
       return std::string("FloatType");
     case llvmberry::DoubleType:
       return std::string("DoubleType");
     case llvmberry::FP128Type:
       return std::string("FP128Type");
+    case llvmberry::PPC_FP128Type:
+      return std::string("PPC_FP128Type");
     case llvmberry::X86_FP80Type:
       return std::string("X86_FP80Type");
     default:
@@ -67,8 +71,10 @@ namespace llvmberry {
 
     if (llvm::isa<llvm::GlobalValue>(value)) {
       val = std::string("@");
-    } else {
+    } else if(llvm::isa<llvm::Instruction>(value) || llvm::isa<llvm::Argument>(value)) {
       val = std::string("%");
+    } else {
+      assert("value must be a global value or an instruction" && false);
     }
 
     val += std::string(value.getName().data());
@@ -172,8 +178,8 @@ namespace llvmberry {
   TyConstInt::TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type)
     : int_value(_int_value), int_type(std::move(_int_type)) { }
 
-  TyConstInt::TyConstInt(int _int_value, int _value)
-    : int_value(_int_value), int_type(new ConsIntType(_value)) { }
+  TyConstInt::TyConstInt(int _int_value, int _bitwidth)
+    : int_value(_int_value), int_type(new ConsIntType(_bitwidth)) { }
 
   void TyConstInt::serialize(cereal::JSONOutputArchive &archive) const {
     archive(cereal::make_nvp("int_value", int_value), CEREAL_NVP(int_type));
@@ -183,12 +189,54 @@ namespace llvmberry {
     return std::unique_ptr<TyConstInt>(new TyConstInt(_int_value, _value));
   }
 
-  TyConstFloat::TyConstFloat(float _float_value, enum TyFloatType _float_type)
+  TyConstFloat::TyConstFloat(double _float_value, enum TyFloatType _float_type)
     : float_value(_float_value), float_type(_float_type){ }
 
   void TyConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
     archive(CEREAL_NVP(float_value),
             cereal::make_nvp("float_type", toString(float_type)));
+  }
+
+  std::unique_ptr<TyConstFloat> TyConstFloat::make(double _float_value, enum TyFloatType _float_type) {
+    return std::unique_ptr<TyConstFloat>(new TyConstFloat(_float_value, _float_type));
+  }
+
+  // value
+  std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
+    if(llvm::isa<llvm::Instruction>(value) || llvm::isa<llvm::GlobalValue>(value) || llvm::isa<llvm::Argument>(value)){
+      return std::unique_ptr<TyValue>(new ConsId(TyRegister::make(getVariable(value), llvmberry::Physical)));
+    }else if(llvm::isa<llvm::ConstantInt>(value)){
+      const llvm::ConstantInt *v = llvm::dyn_cast<llvm::ConstantInt>(&value);
+      return std::unique_ptr<TyValue>(new ConsConstVal(
+        std::unique_ptr<TyConstant>(new ConsConstInt(
+          TyConstInt::make(v->getSExtValue(), v->getBitWidth())))));
+    }else if(llvm::isa<llvm::ConstantFP>(value)){
+      const llvm::ConstantFP *v = llvm::dyn_cast<llvm::ConstantFP>(&value);
+      const llvm::APFloat &apf = v->getValueAPF();
+      const llvm::Type *typ = v->getType();
+      
+      llvmberry::TyFloatType fty;
+      if(typ->isHalfTy())
+        fty = llvmberry::HalfType;
+      else if(typ->isFloatTy())
+        fty = llvmberry::FloatType;
+      else if(typ->isDoubleTy())
+        fty = llvmberry::DoubleType;
+      else if(typ->isX86_FP80Ty())
+        fty = llvmberry::X86_FP80Type;
+      else if(typ->isFP128Ty())
+        fty = llvmberry::FP128Type;
+      else if(typ->isPPC_FP128Ty())
+        fty = llvmberry::PPC_FP128Type;
+      else
+        assert("Unknown floating point type" && false);
+
+      return std::unique_ptr<TyValue>(new ConsConstVal(
+        std::unique_ptr<TyConstant>(new ConsConstFloat(
+          TyConstFloat::make(apf.convertToDouble(), fty)))));
+    }else{
+      assert("Unknown value type" && false);
+    }
   }
 
   ConsConstInt::ConsConstInt(std::unique_ptr<TyConstInt> _const_int)
@@ -218,6 +266,30 @@ namespace llvmberry {
     archive.saveValue("ConstFloat");
     archive(CEREAL_NVP(const_float));
   }
+
+  ConsId::ConsId(std::unique_ptr<TyRegister> _register)
+    : reg(std::move(_register)) { }
+
+  void ConsId::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("Id");
+    archive(CEREAL_NVP(reg));
+  }
+
+  ConsConstVal::ConsConstVal(std::unique_ptr<TyConstant> _constant)
+    : constant(std::move(_constant)) { }
+  
+  void ConsConstVal::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("ConstVal");
+    archive(CEREAL_NVP(constant));
+  }
+
+  // size
 
   ConsSize::ConsSize(int _size) : size(_size) {}
 
@@ -443,6 +515,33 @@ namespace llvmberry {
             CEREAL_NVP(sz));
   }
 
+  TyAddSub::TyAddSub
+  (std::unique_ptr<TyRegister> _minusy,
+   std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyValue> _x,
+   std::unique_ptr<TyValue> _y,
+   std::unique_ptr<TySize> _sz)
+    : minusy(std::move(_minusy)), z(std::move(_z)), x(std::move(_x)), 
+      y(std::move(_y)), sz(std::move(_sz)) {}
+
+  void TyAddSub::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(minusy), CEREAL_NVP(z), CEREAL_NVP(x),
+            CEREAL_NVP(y), CEREAL_NVP(sz));
+  }
+
+  TyAddCommutative::TyAddCommutative
+  (std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyValue> _x,
+   std::unique_ptr<TyValue> _y,
+   std::unique_ptr<TySize> _sz)
+    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {}
+
+  void TyAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(z), CEREAL_NVP(x),
+            CEREAL_NVP(y), CEREAL_NVP(sz));
+  }
+
+
   ConsAddAssociative::ConsAddAssociative(std::unique_ptr<TyAddAssociative> _add_associative)
     : add_associative(std::move(_add_associative)) {}
 
@@ -467,6 +566,52 @@ namespace llvmberry {
        (std::move(_x), std::move(_y), std::move(_z),
         std::move(_c1), std::move(_c2), std::move(_c3), std::move(_sz)));
     return std::unique_ptr<TyInfrule>(new ConsAddAssociative(std::move(_add_assoc)));
+  }
+
+  ConsAddSub::ConsAddSub(std::unique_ptr<TyAddSub> _add_sub)
+    : add_sub(std::move(_add_sub)) {}
+
+  void ConsAddSub::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("AddSub");
+    archive(CEREAL_NVP(add_sub));
+  }
+
+  std::unique_ptr<TyInfrule> ConsAddSub::make
+  (std::unique_ptr<TyRegister> _minusy,
+   std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyValue> _x,
+   std::unique_ptr<TyValue> _y,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TyAddSub> _add_sub
+      (new TyAddSub
+       (std::move(_minusy), std::move(_z), std::move(_x),
+        std::move(_y), std::move(_sz)));
+    return std::unique_ptr<TyInfrule>(new ConsAddSub(std::move(_add_sub)));
+  }
+
+  ConsAddCommutative::ConsAddCommutative(std::unique_ptr<TyAddCommutative> _add_comm)
+    : add_commutative(std::move(_add_comm)) {}
+  
+  void ConsAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("AddCommutative");
+    archive(CEREAL_NVP(add_commutative));
+  }
+
+  std::unique_ptr<TyInfrule> ConsAddCommutative::make
+  (std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyValue> _x,
+   std::unique_ptr<TyValue> _y,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TyAddCommutative> _add_comm
+      (new TyAddCommutative
+       (std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
+      return std::unique_ptr<TyInfrule>(new ConsAddCommutative(std::move(_add_comm)));
   }
 
   TySubAdd::TySubAdd
