@@ -2851,6 +2851,8 @@ bool InstCombiner::run() {
         InstParent->getInstList().insert(InsertPos, Result);
 
         EraseInstFromFunction(*I);
+
+        llvmberry::ValidationUnit::EndIfExists();
       } else {
 #ifndef NDEBUG
         DEBUG(dbgs() << "IC: Mod = " << OrigI << '\n'
