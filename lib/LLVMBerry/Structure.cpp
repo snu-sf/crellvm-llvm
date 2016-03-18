@@ -127,6 +127,32 @@ namespace llvmberry {
     return true;
   }
 
+  // insert nop at tgt where I is at src
+  void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I) {
+    if(I == I->getParent()->getFirstNonPHI()) {
+      std::string nop_block_name = getBasicBlockIndex(I->getParent());
+      hints.addTgtNopPosition(ConsPhinodeCurrentBlockName::make(nop_block_name));
+    } else if(!llvm::isa<llvm::PHINode>(I)) {
+      llvm::BasicBlock::iterator prevI = I;
+      prevI--;
+      std::string nop_prev_reg = getVariable(*prevI);
+      hints.addTgtNopPosition(ConsCommandRegisterName::make(nop_prev_reg));
+    }
+  }
+
+  // insert nop at src where I is at tgt
+  void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
+     if(I == I->getParent()->getFirstNonPHI()) {
+      std::string nop_block_name = getBasicBlockIndex(I->getParent());
+      hints.addSrcNopPosition(ConsPhinodeCurrentBlockName::make(nop_block_name));
+    } else if(!llvm::isa<llvm::PHINode>(I)) {
+      llvm::BasicBlock::iterator prevI = I;
+      prevI--;
+      std::string nop_prev_reg = getVariable(*prevI);
+      hints.addSrcNopPosition(ConsCommandRegisterName::make(nop_prev_reg));
+    }
+  }  
+
   /* position */
 
   TyPositionPhinode::TyPositionPhinode(std::string _block_name, std::string _prev_block_name)

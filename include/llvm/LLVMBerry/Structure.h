@@ -17,7 +17,6 @@ namespace llvmberry {
   std::string getBasicBlockIndex(const llvm::BasicBlock *block);
   std::string getVariable(const llvm::Value &value);
   bool name_instructions(llvm::Function &F);
-
   /* position */
 
 	struct TyPositionPhinode {
@@ -499,6 +498,10 @@ namespace llvmberry {
     std::vector<std::unique_ptr<TyNopPosition>> tgt_nop_positions;
     std::vector<std::unique_ptr<TyCommand>> commands;
   };
+
+  // inserting nop
+  void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
+  void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
 } // llvmberry
 
