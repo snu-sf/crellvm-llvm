@@ -92,18 +92,6 @@ namespace llvmberry {
     std::string register_name;
   };
 
-  struct ConsNopPosition : public TyNopPosition {
-  public:
-    ConsNopPosition(std::string _regname_or_blockname, bool _isPhi);
-    void serialize(cereal::JSONOutputArchive &archive) const;
-
-    static std::unique_ptr<TyNopPosition> make(std::string _regname_or_blockname, bool _isPhi);
-
-  private:
-    bool isPhi;
-    std::string regname_or_blockname;
-  };
-
   /* value */
 
   // register
