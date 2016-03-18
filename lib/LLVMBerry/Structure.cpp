@@ -652,6 +652,38 @@ namespace llvmberry {
     return std::unique_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
   }
 
+  TyMulBool::TyMulBool
+            (std::unique_ptr<TyRegister> _z,
+             std::unique_ptr<TyRegister> _x,
+             std::unique_ptr<TyRegister> _y)
+            : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)) {}
+
+  void TyMulBool::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(y));
+  }
+
+  ConsMulBool::ConsMulBool(std::unique_ptr<TyMulBool> _mul_bool)
+              : mul_bool(std::move(_mul_bool)) {}
+
+  void ConsMulBool::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("MulBool");
+    archive(CEREAL_NVP(mul_bool));
+  }
+
+  std::unique_ptr<TyInfrule> ConsMulBool::make
+          (std::unique_ptr<TyRegister> _z,
+           std::unique_ptr<TyRegister> _x,
+           std::unique_ptr<TyRegister> _y) {
+    std::unique_ptr<TyMulBool> _mul_bool
+            (new TyMulBool
+                  (std::move(_z), std::move(_x), std::move(_y)));
+
+    return std::unique_ptr<TyInfrule>(new ConsMulBool(std::move(_mul_bool)));
+  }
+
   ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)
     : propagate(std::move(_propagate)) {}
 

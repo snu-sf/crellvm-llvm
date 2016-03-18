@@ -408,11 +408,24 @@ namespace llvmberry {
     void serialize(cereal::JSONOutputArchive &archive) const;
 
   private:
-    std::unique_ptr<TyRegister> my;
     std::unique_ptr<TyRegister> z;
+    std::unique_ptr<TyRegister> my;
     std::unique_ptr<TyRegister> x;
     std::unique_ptr<TyRegister> y;
     std::unique_ptr<TySize> sz;
+  };
+
+  struct TyMulBool {
+  public:
+    TyMulBool(std::unique_ptr<TyRegister> _z,
+              std::unique_ptr<TyRegister> _x,
+              std::unique_ptr<TyRegister> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  private:
+    std::unique_ptr<TyRegister> z;
+    std::unique_ptr<TyRegister> x;
+    std::unique_ptr<TyRegister> y;
   };
 
   struct TyAddCommutative {
@@ -497,6 +510,20 @@ namespace llvmberry {
 
   private:
     std::unique_ptr<TySubAdd> sub_add;
+  };
+
+  struct ConsMulBool : TyInfrule {
+  public:
+    ConsMulBool(std::unique_ptr<TyMulBool> _mul_bool);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyInfrule> make
+      (std::unique_ptr<TyRegister> _z,
+       std::unique_ptr<TyRegister> _x,
+       std::unique_ptr<TyRegister> _y);
+
+  private:
+    std::unique_ptr<TyMulBool> mul_bool;
   };
 
   /* hint command */
