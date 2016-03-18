@@ -176,20 +176,32 @@ namespace llvmberry {
     return std::unique_ptr<TyPosition>(new ConsCommand(_scope, _register_name));
   }
 
-  ConsNopPosition::ConsNopPosition(std::string _regname_or_blockname, bool _isPhi)
-    : regname_or_blockname(_regname_or_blockname), isPhi(_isPhi) {}
+  ConsPhinodeCurrentBlockName::ConsPhinodeCurrentBlockName(std::string _block_name)
+    : block_name(_block_name) {}
 
-  void ConsNopPosition::serialize(cereal::JSONOutputArchive &archive) const {
+  void ConsPhinodeCurrentBlockName::serialize(cereal::JSONOutputArchive &archive) const {
     archive.makeArray();
-    if(isPhi) { std::string s("PhinodeCurrentBlockName"); archive(s); }
-    //archive.setNextName("PhinodeCurrentBlockName");
-    else { std::string s("CommandRegisterName"); archive(s); }
-    //archive.setNextName("CommandRegisterName");
-    archive(regname_or_blockname);
+    std::string s("PhinodeCurrentBlockName");
+    archive(s);
+    archive(block_name);
   }
 
-  std::unique_ptr<TyNopPosition> ConsNopPosition::make(std::string _regname_or_blockname, bool _isPhi) {
-    return std::unique_ptr<TyNopPosition>(new ConsNopPosition(_regname_or_blockname, _isPhi));
+  std::unique_ptr<TyNopPosition> ConsPhinodeCurrentBlockName::make(std::string _block_name) {
+    return std::unique_ptr<TyNopPosition>(new ConsPhinodeCurrentBlockName(_block_name));
+  }
+
+  ConsCommandRegisterName::ConsCommandRegisterName(std::string _register_name)
+    : register_name(_register_name) {}
+
+  void ConsCommandRegisterName::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    std::string s("CommandRegisterName");
+    archive(s);
+    archive(register_name);
+  }
+
+  std::unique_ptr<TyNopPosition> ConsCommandRegisterName::make(std::string _register_name) {
+    return std::unique_ptr<TyNopPosition>(new ConsCommandRegisterName(_register_name));
   }
 
   /* value */

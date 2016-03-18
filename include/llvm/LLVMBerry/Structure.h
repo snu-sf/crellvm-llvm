@@ -74,6 +74,24 @@ namespace llvmberry {
     virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
   };
 
+  struct ConsPhinodeCurrentBlockName : public TyNopPosition {
+  public:
+    ConsPhinodeCurrentBlockName(std::string _block_name);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+    static std::unique_ptr<TyNopPosition> make(std::string _block_name);
+  private:
+    std::string block_name;
+  };
+
+  struct ConsCommandRegisterName : public TyNopPosition {
+  public:
+    ConsCommandRegisterName(std::string _register_name);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+    static std::unique_ptr<TyNopPosition> make(std::string _register_name);
+  private:
+    std::string register_name;
+  };
+
   struct ConsNopPosition : public TyNopPosition {
   public:
     ConsNopPosition(std::string _regname_or_blockname, bool _isPhi);
