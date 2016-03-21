@@ -14,9 +14,9 @@ namespace llvmberry {
 
 	enum TyScope { Source = 0, Target };
 
+  std::string getBasicBlockIndex(const llvm::BasicBlock *block);
   std::string getVariable(const llvm::Value &value);
   bool name_instructions(llvm::Function &F);
-
   /* position */
 
 	struct TyPositionPhinode {
@@ -66,6 +66,30 @@ namespace llvmberry {
 	private:
 		std::unique_ptr<TyPositionCommand> position_command;
 	};
+
+  // abstract
+  struct TyNopPosition {
+  public:
+    virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+  };
+
+  struct ConsPhinodeCurrentBlockName : public TyNopPosition {
+  public:
+    ConsPhinodeCurrentBlockName(std::string _block_name);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+    static std::unique_ptr<TyNopPosition> make(std::string _block_name);
+  private:
+    std::string block_name;
+  };
+
+  struct ConsCommandRegisterName : public TyNopPosition {
+  public:
+    ConsCommandRegisterName(std::string _register_name);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+    static std::unique_ptr<TyNopPosition> make(std::string _register_name);
+  private:
+    std::string register_name;
+  };
 
   /* value */
 
@@ -315,6 +339,8 @@ namespace llvmberry {
 		ConsMaydiff(std::string _name, enum TyTag _tag);
 		void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyPropagateObject> make(std::string _name, enum TyTag _tag);
+
 	private:
 		std::unique_ptr<TyRegister> register_name;
 	};
@@ -324,6 +350,7 @@ namespace llvmberry {
 	struct TyPropagateRange {
 	public:
 		virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+    virtual bool isGlobal(void) const { return false; }
 	};
 
 	struct ConsBounds : public TyPropagateRange {
@@ -345,6 +372,9 @@ namespace llvmberry {
 	public:
 		ConsGlobal();
 		void serialize(cereal::JSONOutputArchive &archive) const;
+    virtual bool isGlobal(void) const { return true; }
+
+    static std::unique_ptr<TyPropagateRange> make();
 	};
 
 	struct TyPropagate {
@@ -573,18 +603,22 @@ namespace llvmberry {
              std::string _function_id,
              std::string _opt_name);
     void addCommand(std::unique_ptr<TyCommand> c);
-    void addSrcNopPosition(std::unique_ptr<TyPosition> position);
-    void addTgtNopPosition(std::unique_ptr<TyPosition> position);
+    void addSrcNopPosition(std::unique_ptr<TyNopPosition> position);
+    void addTgtNopPosition(std::unique_ptr<TyNopPosition> position);
     void serialize(cereal::JSONOutputArchive &archive) const;
 
   private:
     std::string module_id;
     std::string function_id;
     std::string opt_name;
-    std::vector<std::unique_ptr<TyPosition>> src_nop_positions;
-    std::vector<std::unique_ptr<TyPosition>> tgt_nop_positions;
+    std::vector<std::unique_ptr<TyNopPosition>> src_nop_positions;
+    std::vector<std::unique_ptr<TyNopPosition>> tgt_nop_positions;
     std::vector<std::unique_ptr<TyCommand>> commands;
   };
+
+  // inserting nop
+  void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
+  void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
 } // llvmberry
 

@@ -2750,7 +2750,26 @@ bool InstCombiner::run() {
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
+      llvmberry::name_instructions(*(I->getParent()->getParent()));
+      llvmberry::ValidationUnit::Begin("dead_code_elim",
+                            I->getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude
+        ([&I]
+         (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+           std::string reg = llvmberry::getVariable(*I);
+
+           hints.addCommand(
+             llvmberry::ConsPropagate::make(
+               llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
+               llvmberry::ConsGlobal::make()
+             )
+           );
+
+           insertTgtNopAtSrcI(hints, I);
+         }
+        );
       EraseInstFromFunction(*I);
+      llvmberry::ValidationUnit::End();
       ++NumDeadInst;
       MadeIRChange = true;
       continue;
