@@ -1765,12 +1765,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
          std::string reg_z_name = llvmberry::getVariable(I);
          std::string reg_y_name = llvmberry::getVariable(*Op1);
 
-         //ConstantInt *A_const = dyn_cast<ConstantInt>(Op0);
-         //ConstantInt *B_const = dyn_cast<ConstantInt>(Y);
-
-         //int a = (int)A_const->getSExtValue();
-         //int b = (int)B_const->getSExtValue();
-
          int bitwith = Op1->getType()->getIntegerBitWidth();
 
          hints.addCommand
@@ -1797,8 +1791,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
                (llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
                 llvmberry::TyValue::make(*Op0),
                 llvmberry::TyValue::make(*Y),
-                //llvmberry::TyConstInt::make(a, bitwith),
-                //llvmberry::TyConstInt::make(b, bitwith),
                 llvmberry::ConsSize::make(bitwith)
                )
              )
