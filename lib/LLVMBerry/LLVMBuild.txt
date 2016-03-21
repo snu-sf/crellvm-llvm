@@ -2,3 +2,4 @@
 type = Library
 name = LLVMBerry
 parent = Libraries
+required_libraries = BitWriter
