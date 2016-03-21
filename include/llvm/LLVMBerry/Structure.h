@@ -415,6 +415,23 @@ namespace llvmberry {
     std::unique_ptr<TySize> sz;
   };
 
+  struct TySubRemove {
+  public:
+    TySubRemove(std::unique_ptr<TyRegister> _z,
+                std::unique_ptr<TyRegister> _y,
+                std::unique_ptr<TyValue> _a,
+                std::unique_ptr<TyValue> _b,
+                std::unique_ptr<TySize> _sz);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+  private:
+    std::unique_ptr<TyRegister> z;
+    std::unique_ptr<TyRegister> y;
+    std::unique_ptr<TyValue> a;
+    std::unique_ptr<TyValue> b;
+    std::unique_ptr<TySize> sz;
+  };
+
   struct TyMulBool {
   public:
     TyMulBool(std::unique_ptr<TyRegister> _z,
@@ -510,6 +527,22 @@ namespace llvmberry {
 
   private:
     std::unique_ptr<TySubAdd> sub_add;
+  };
+
+  struct ConsSubRemove : TyInfrule {
+  public:
+    ConsSubRemove(std::unique_ptr<TySubRemove> _sub_remove);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyInfrule> make
+      (std::unique_ptr<TyRegister> _z,
+       std::unique_ptr<TyRegister> _y,
+       std::unique_ptr<TyValue> _a,
+       std::unique_ptr<TyValue> _b,
+       std::unique_ptr<TySize> _sz);
+
+  private:
+    std::unique_ptr<TySubRemove> sub_remove;
   };
 
   struct ConsMulBool : TyInfrule {
