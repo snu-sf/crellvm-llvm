@@ -755,6 +755,43 @@ namespace llvmberry {
     return std::unique_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
   }
 
+  TySubRemove::TySubRemove
+  (std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyValue> _a,
+   std::unique_ptr<TyValue> _b,
+   std::unique_ptr<TySize> _sz)
+    : z(std::move(_z)), y(std::move(_y)), a(std::move(_a)),
+      b(std::move(_b)), sz(std::move(_sz)) {}
+
+  void TySubRemove::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(a),
+            CEREAL_NVP(b), CEREAL_NVP(sz));
+  }
+
+  ConsSubRemove::ConsSubRemove(std::unique_ptr<TySubRemove> _sub_remove)
+    : sub_remove(std::move(_sub_remove)){ }
+
+  void ConsSubRemove::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("SubRemove");
+    archive(CEREAL_NVP(sub_remove));
+  }
+
+  std::unique_ptr<TyInfrule> ConsSubRemove::make
+  (std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyValue> _a,
+   std::unique_ptr<TyValue> _b,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TySubRemove> _sub_remove
+      (new TySubRemove
+               (std::move(_z), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
+      return std::unique_ptr<TyInfrule>(new ConsSubRemove(std::move(_sub_remove)));
+  }
+
   TyMulBool::TyMulBool
             (std::unique_ptr<TyRegister> _z,
              std::unique_ptr<TyRegister> _x,

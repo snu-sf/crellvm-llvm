@@ -1756,8 +1756,64 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     Value *Y;
     // X-(X+Y) == -Y    X-(Y+X) == -Y
     if (match(Op1, m_Add(m_Specific(Op0), m_Value(Y))) ||
-        match(Op1, m_Add(m_Value(Y), m_Specific(Op0))))
+        match(Op1, m_Add(m_Value(Y), m_Specific(Op0)))){
+      llvmberry::ValidationUnit::Begin("sub_remove", I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude
+       ([&I, &Op1, &Op0, &Y]
+                (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+        // prepare variable
+         std::string reg_z_name = llvmberry::getVariable(I);
+         std::string reg_y_name = llvmberry::getVariable(*Op1);
+
+         int bitwith = Op1->getType()->getIntegerBitWidth();
+
+         hints.addCommand
+           (llvmberry::ConsPropagate::make
+             (llvmberry::ConsLessdef::make
+               (llvmberry::ConsVar::make
+                 (reg_y_name, llvmberry::Physical),
+                 llvmberry::ConsRhs::make
+                 (reg_y_name, llvmberry::Physical),
+                 llvmberry::Source)
+               ,
+               llvmberry::ConsBounds::make
+               (llvmberry::ConsCommand::make
+                 (llvmberry::Source, reg_y_name),
+               llvmberry::ConsCommand::make
+                 (llvmberry::Source, reg_z_name))
+             )
+           );
+         hints.addCommand
+           (llvmberry::ConsInfrule::make
+             (llvmberry::ConsCommand::make
+               (llvmberry::Source, reg_y_name),
+               llvmberry::ConsAddCommutative::make
+               (llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*Op0),
+                llvmberry::TyValue::make(*Y),
+                llvmberry::ConsSize::make(bitwith)
+               )
+             )
+           );
+         hints.addCommand
+           (llvmberry::ConsInfrule::make
+             (llvmberry::ConsCommand::make
+               (llvmberry::Source, reg_z_name),
+               llvmberry::ConsSubRemove::make
+               (llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*Op0),
+                llvmberry::TyValue::make(*Y),
+                llvmberry::ConsSize::make(bitwith)
+               )
+             )
+           );
+       }
+       );
+      llvmberry::ValidationUnit::End();
+
       return BinaryOperator::CreateNeg(Y);
+    }
 
     // (X-Y)-X == -Y
     if (match(Op0, m_Sub(m_Specific(Op1), m_Value(Y))))
