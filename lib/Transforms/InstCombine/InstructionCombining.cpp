@@ -2881,26 +2881,26 @@ bool InstCombiner::run() {
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
-			    llvmberry::name_instructions(*(I->getParent()->getParent()));
-     		  llvmberry::ValidationUnit::Begin("dead_code_elim",
+          llvmberry::name_instructions(*(I->getParent()->getParent()));
+           llvmberry::ValidationUnit::Begin("dead_code_elim",
                             I->getParent()->getParent());
-     			llvmberry::ValidationUnit::GetInstance()->intrude
-         	 ([&I]
-       		 (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-            	std::string reg = llvmberry::getVariable(*I);
+           llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&I]
+            (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+              std::string reg = llvmberry::getVariable(*I);
 
-           		hints.addCommand(
-           			llvmberry::ConsPropagate::make(
-             		llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
-            	  llvmberry::ConsGlobal::make()
-           			)
-         			);
+               hints.addCommand(
+                 llvmberry::ConsPropagate::make(
+                 llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
+                llvmberry::ConsGlobal::make()
+                 )
+               );
 
-         			insertTgtNopAtSrcI(hints, I);
-       			}
-      		 );
+               insertTgtNopAtSrcI(hints, I);
+             }
+           );
           EraseInstFromFunction(*I);
-					llvmberry::ValidationUnit::End();
+          llvmberry::ValidationUnit::End();
         } else {
           Worklist.Add(I);
           Worklist.AddUsersToWorkList(*I);
@@ -2948,13 +2948,13 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (isInstructionTriviallyDead(Inst, TLI)) {
         ++NumDeadInst;
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
-	      llvmberry::name_instructions(*(Inst->getParent()->getParent()));
-  	    llvmberry::ValidationUnit::Begin("dead_code_elim",
-    	                        Inst->getParent()->getParent());
-  	    llvmberry::ValidationUnit::GetInstance()->intrude
-    	    ([&Inst]
-      	  (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-       	   std::string reg = llvmberry::getVariable(*Inst);
+        llvmberry::name_instructions(*(Inst->getParent()->getParent()));
+        llvmberry::ValidationUnit::Begin("dead_code_elim",
+                              Inst->getParent()->getParent());
+        llvmberry::ValidationUnit::GetInstance()->intrude
+          ([&Inst]
+          (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+            std::string reg = llvmberry::getVariable(*Inst);
 
            hints.addCommand(
              llvmberry::ConsPropagate::make(
@@ -2965,10 +2965,10 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
 
            insertTgtNopAtSrcI(hints, Inst);
          }
-       	 );
+          );
  
         Inst->eraseFromParent();
-				llvmberry::ValidationUnit::End();
+        llvmberry::ValidationUnit::End();
         continue;
       }
 
