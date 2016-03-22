@@ -613,6 +613,71 @@ namespace llvmberry {
        (std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
       return std::unique_ptr<TyInfrule>(new ConsAddCommutative(std::move(_add_comm)));
   }
+  
+  TyAddShift::TyAddShift
+          (std::unique_ptr<TyRegister> _y,
+           std::unique_ptr<TyValue> _v,
+           std::unique_ptr<TySize> _sz)
+          : y(std::move(_y)), v(std::move(_v)), sz(std::move(_sz)) {}
+
+  void TyAddShift::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(y), CEREAL_NVP(v), CEREAL_NVP(sz));
+  }
+
+  ConsAddShift::ConsAddShift(std::unique_ptr<TyAddShift> _add_shift)
+          : add_shift(std::move(_add_shift)) {}
+
+  void ConsAddShift::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("AddShift");
+    archive(CEREAL_NVP(add_shift));
+  }
+
+  std::unique_ptr<TyInfrule> ConsAddShift::make
+  (std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyValue> _v,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TyAddShift> _add_shift
+      (new TyAddShift
+       (std::move(_y), std::move(_v), std::move(_sz)));
+      return std::unique_ptr<TyInfrule>(new ConsAddShift(std::move(_add_shift)));
+  }
+ 
+  TyAddSignbit::TyAddSignbit
+          (std::unique_ptr<TyRegister> _x,
+           std::unique_ptr<TyValue> _e1,
+           std::unique_ptr<TyValue> _e2,
+           std::unique_ptr<TySize> _sz)
+          : x(std::move(_x)), e1(std::move(_e1)), e2(std::move(_e2)), sz(std::move(_sz)) {}
+
+  void TyAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(x), CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(sz));
+  }
+
+  ConsAddSignbit::ConsAddSignbit(std::unique_ptr<TyAddSignbit> _add_signbit)
+          : add_signbit(std::move(_add_signbit)) {}
+
+  void ConsAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("AddSignbit");
+    archive(CEREAL_NVP(add_signbit));
+  }
+
+  std::unique_ptr<TyInfrule> ConsAddSignbit::make
+  (std::unique_ptr<TyRegister> _x,
+   std::unique_ptr<TyValue> _e1,
+   std::unique_ptr<TyValue> _e2,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TyAddSignbit> _add_signbit
+      (new TyAddSignbit
+       (std::move(_x), std::move(_e1), std::move(_e2), std::move(_sz)));
+      return std::unique_ptr<TyInfrule>(new ConsAddSignbit(std::move(_add_signbit)));
+  }
+
 
   TySubAdd::TySubAdd
           (std::unique_ptr<TyRegister> _z,
