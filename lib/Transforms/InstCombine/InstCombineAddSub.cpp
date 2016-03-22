@@ -1069,8 +1069,33 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   if (ConstantInt *CI = dyn_cast<ConstantInt>(RHS)) {
     // X + (signbit) --> X ^ signbit
     const APInt &Val = CI->getValue();
-    if (Val.isSignBit())
+    if (Val.isSignBit()){
+      llvmberry::ValidationUnit::Begin("add_signbit", I.getParent()->getParent());
+    
+      llvmberry::ValidationUnit::GetInstance()->intrude
+        ([&I, &LHS, &RHS]
+           (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+             // I = LHS + RHS --> I = LHS ^ 1
+             std::string reg_x_name = llvmberry::getVariable(I);
+             int bitwidth = LHS->getType()->getIntegerBitWidth();
+
+             hints.addCommand
+               (llvmberry::ConsInfrule::make
+                (llvmberry::ConsCommand::make
+                 (llvmberry::Source, reg_x_name),
+                 llvmberry::ConsAddSignbit::make
+                  (llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
+                  llvmberry::TyValue::make(*LHS),
+                  llvmberry::TyValue::make(*RHS),
+                  llvmberry::ConsSize::make(bitwidth)
+                  )
+                 )
+                );
+           }
+        );
+
       return BinaryOperator::CreateXor(LHS, RHS);
+    }
 
     // See if SimplifyDemandedBits can simplify this.  This handles stuff like
     // (X & 254)+1 -> (X&254)|1
@@ -1136,10 +1161,39 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
   // X + X --> X << 1
   if (LHS == RHS) {
+    llvmberry::ValidationUnit::Begin("add_shift", I.getParent()->getParent());
+    
     BinaryOperator *New =
       BinaryOperator::CreateShl(LHS, ConstantInt::get(I.getType(), 1));
     New->setHasNoSignedWrap(I.hasNoSignedWrap());
     New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
+
+    llvmberry::ValidationUnit::GetInstance()->intrude
+      ([&I, &LHS, &RHS]
+       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        // I = LHS + RHS
+
+        // prepare variables
+        std::string reg_y_name = llvmberry::getVariable(I);
+        int bitwidth = LHS->getType()->getIntegerBitWidth();
+        
+        // from "y = v + v", create "y = v << 1"
+        hints.addCommand
+          (llvmberry::ConsInfrule::make
+           (llvmberry::ConsCommand::make
+            (llvmberry::Source, reg_y_name),
+            llvmberry::ConsAddShift::make
+            (llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+             llvmberry::TyValue::make(*LHS),
+             llvmberry::ConsSize::make(bitwidth)
+             )
+            )
+           );
+        
+      }
+    );
+
+
     return New;
   }
 
