@@ -192,8 +192,10 @@ static cl::opt<bool> PreserveAssemblyUseListOrder(
     cl::init(false), cl::Hidden);
 
 ////// LLVMBerry option
-static cl::opt<std::string> LLVMBerryOutputDirectory("llvmberry-outputdir", cl::desc("Specify output directory of LLVMBerry"), cl::value_desc("dir"));
-
+static cl::opt<std::string>
+    LLVMBerryOutputDirectory("llvmberry-outputdir",
+                             cl::desc("Specify output directory of LLVMBerry"),
+                             cl::value_desc("dir"));
 
 static inline void addPass(legacy::PassManagerBase &PM, Pass *P) {
   // Add the pass to the pass manager...

@@ -336,24 +336,22 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
 
   /// i1 mul -> i1 and.
   if (I.getType()->getScalarType()->isIntegerTy(1)) {
-    llvmberry::ValidationUnit::Begin("mul_bool",
-                                      I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("mul_bool", I.getParent()->getParent());
 
-    llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&I, &Op0, &Op1]
-              (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
       // prepare variables
       std::string reg0_name = llvmberry::getVariable(I);
       std::string reg1_name = llvmberry::getVariable(*Op0);
       std::string reg2_name = llvmberry::getVariable(*Op1);
 
-      hints.addCommand
-              (llvmberry::ConsInfrule::make
-              (llvmberry::ConsCommand::make(llvmberry::Source, reg0_name),
-                                            llvmberry::ConsMulBool::make
-                                            (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
-                                             llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
-                                             llvmberry::TyRegister::make(reg2_name, llvmberry::Physical))));
+      hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::ConsCommand::make(llvmberry::Source, reg0_name),
+          llvmberry::ConsMulBool::make(
+              llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
+              llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
+              llvmberry::TyRegister::make(reg2_name, llvmberry::Physical))));
     });
 
     llvmberry::ValidationUnit::End();
