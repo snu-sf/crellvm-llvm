@@ -65,6 +65,39 @@ namespace {
 } // anonymous
 
 namespace llvmberry {
+  /// @return the index of the BasicBlock w.r.t. the parent function.
+  std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
+    if (!block || !(block->getParent())) {
+      std::stringstream retStream;
+      retStream << ((unsigned int)-1);
+      return retStream.str();
+    }
+
+    // If a block has its own name, just return it.
+    if (block->hasName()) {
+      return block->getName();
+    }
+
+    // If else, calculate the index and return it.
+    const llvm::Function *parent = block->getParent();
+    const llvm::Function::BasicBlockListType &blockList =
+        parent->getBasicBlockList();
+
+    unsigned int idx = 0;
+    for (llvm::Function::const_iterator itr = blockList.begin();
+         itr != blockList.end(); ++itr) {
+      if (block == &(*itr)) {
+        std::stringstream retStream;
+        retStream << idx;
+        return (retStream.str());
+      }
+
+      idx++;
+    }
+    std::stringstream retStream;
+    retStream << ((unsigned int)-1);
+    return retStream.str();
+  }
 
   std::string getVariable(const llvm::Value &value) {
     std::string val;
@@ -99,6 +132,32 @@ namespace llvmberry {
 
     return true;
   }
+
+  // insert nop at tgt where I is at src
+  void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I) {
+    if(I == I->getParent()->getFirstNonPHI()) {
+      std::string nop_block_name = getBasicBlockIndex(I->getParent());
+      hints.addTgtNopPosition(ConsPhinodeCurrentBlockName::make(nop_block_name));
+    } else if(!llvm::isa<llvm::PHINode>(I)) {
+      llvm::BasicBlock::iterator prevI = I;
+      prevI--;
+      std::string nop_prev_reg = getVariable(*prevI);
+      hints.addTgtNopPosition(ConsCommandRegisterName::make(nop_prev_reg));
+    }
+  }
+
+  // insert nop at src where I is at tgt
+  void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
+     if(I == I->getParent()->getFirstNonPHI()) {
+      std::string nop_block_name = getBasicBlockIndex(I->getParent());
+      hints.addSrcNopPosition(ConsPhinodeCurrentBlockName::make(nop_block_name));
+    } else if(!llvm::isa<llvm::PHINode>(I)) {
+      llvm::BasicBlock::iterator prevI = I;
+      prevI--;
+      std::string nop_prev_reg = getVariable(*prevI);
+      hints.addSrcNopPosition(ConsCommandRegisterName::make(nop_prev_reg));
+    }
+  }  
 
   /* position */
 
@@ -147,6 +206,34 @@ namespace llvmberry {
 
   std::unique_ptr<TyPosition> ConsCommand::make(enum TyScope _scope, std::string _register_name) {
     return std::unique_ptr<TyPosition>(new ConsCommand(_scope, _register_name));
+  }
+
+  ConsPhinodeCurrentBlockName::ConsPhinodeCurrentBlockName(std::string _block_name)
+    : block_name(_block_name) {}
+
+  void ConsPhinodeCurrentBlockName::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    std::string s("PhinodeCurrentBlockName");
+    archive(s);
+    archive(block_name);
+  }
+
+  std::unique_ptr<TyNopPosition> ConsPhinodeCurrentBlockName::make(std::string _block_name) {
+    return std::unique_ptr<TyNopPosition>(new ConsPhinodeCurrentBlockName(_block_name));
+  }
+
+  ConsCommandRegisterName::ConsCommandRegisterName(std::string _register_name)
+    : register_name(_register_name) {}
+
+  void ConsCommandRegisterName::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    std::string s("CommandRegisterName");
+    archive(s);
+    archive(register_name);
+  }
+
+  std::unique_ptr<TyNopPosition> ConsCommandRegisterName::make(std::string _register_name) {
+    return std::unique_ptr<TyNopPosition>(new ConsCommandRegisterName(_register_name));
   }
 
   /* value */
@@ -445,6 +532,10 @@ namespace llvmberry {
   ConsMaydiff::ConsMaydiff(std::string _name, enum TyTag _tag)
     : register_name(new TyRegister(_name, _tag)) { }
 
+  std::unique_ptr<TyPropagateObject> ConsMaydiff::make(std::string _name, enum TyTag _tag) {
+    return std::unique_ptr<TyPropagateObject>(new ConsMaydiff(TyRegister::make(_name, _tag)));
+  }
+
   void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
     archive.makeArray();
     archive.writeName();
@@ -480,10 +571,17 @@ namespace llvmberry {
   ConsGlobal::ConsGlobal() {}
 
   void ConsGlobal::serialize(cereal::JSONOutputArchive &archive) const {
-    archive.makeArray();
-    archive.writeName();
+    //archive.makeArray();
+    //archive.writeName();
 
-    archive.saveValue("Global");
+    //archive.saveValue("Global"); /* TODO: how to print this in JSON */
+    archive.setNextName("propagate_range");
+    std::string s("Global");
+    archive(s);
+  }
+
+  std::unique_ptr<TyPropagateRange> ConsGlobal::make() {
+    return std::unique_ptr<TyPropagateRange>(new ConsGlobal());
   }
 
   TyPropagate::TyPropagate(std::unique_ptr<TyPropagateObject> _propagate,
@@ -492,7 +590,12 @@ namespace llvmberry {
       propagate_range(std::move(_propagate_range)) {}
 
   void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
-    archive(CEREAL_NVP(propagate), CEREAL_NVP(propagate_range));
+    archive(CEREAL_NVP(propagate));
+    if(propagate_range->isGlobal()) {
+      propagate_range->serialize(archive);
+    } else {
+      archive(CEREAL_NVP(propagate_range));
+    }
   }
 
   /* inference rule */
@@ -613,6 +716,71 @@ namespace llvmberry {
        (std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
       return std::unique_ptr<TyInfrule>(new ConsAddCommutative(std::move(_add_comm)));
   }
+  
+  TyAddShift::TyAddShift
+          (std::unique_ptr<TyRegister> _y,
+           std::unique_ptr<TyValue> _v,
+           std::unique_ptr<TySize> _sz)
+          : y(std::move(_y)), v(std::move(_v)), sz(std::move(_sz)) {}
+
+  void TyAddShift::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(y), CEREAL_NVP(v), CEREAL_NVP(sz));
+  }
+
+  ConsAddShift::ConsAddShift(std::unique_ptr<TyAddShift> _add_shift)
+          : add_shift(std::move(_add_shift)) {}
+
+  void ConsAddShift::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("AddShift");
+    archive(CEREAL_NVP(add_shift));
+  }
+
+  std::unique_ptr<TyInfrule> ConsAddShift::make
+  (std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyValue> _v,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TyAddShift> _add_shift
+      (new TyAddShift
+       (std::move(_y), std::move(_v), std::move(_sz)));
+      return std::unique_ptr<TyInfrule>(new ConsAddShift(std::move(_add_shift)));
+  }
+ 
+  TyAddSignbit::TyAddSignbit
+          (std::unique_ptr<TyRegister> _x,
+           std::unique_ptr<TyValue> _e1,
+           std::unique_ptr<TyValue> _e2,
+           std::unique_ptr<TySize> _sz)
+          : x(std::move(_x)), e1(std::move(_e1)), e2(std::move(_e2)), sz(std::move(_sz)) {}
+
+  void TyAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(x), CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(sz));
+  }
+
+  ConsAddSignbit::ConsAddSignbit(std::unique_ptr<TyAddSignbit> _add_signbit)
+          : add_signbit(std::move(_add_signbit)) {}
+
+  void ConsAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("AddSignbit");
+    archive(CEREAL_NVP(add_signbit));
+  }
+
+  std::unique_ptr<TyInfrule> ConsAddSignbit::make
+  (std::unique_ptr<TyRegister> _x,
+   std::unique_ptr<TyValue> _e1,
+   std::unique_ptr<TyValue> _e2,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TyAddSignbit> _add_signbit
+      (new TyAddSignbit
+       (std::move(_x), std::move(_e1), std::move(_e2), std::move(_sz)));
+      return std::unique_ptr<TyInfrule>(new ConsAddSignbit(std::move(_add_signbit)));
+  }
+
 
   TySubAdd::TySubAdd
           (std::unique_ptr<TyRegister> _z,
@@ -650,6 +818,43 @@ namespace llvmberry {
                      (std::move(_z), std::move(_my), std::move(_x),
                       std::move(_y), std::move(_sz)));
     return std::unique_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
+  }
+
+  TySubRemove::TySubRemove
+  (std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyValue> _a,
+   std::unique_ptr<TyValue> _b,
+   std::unique_ptr<TySize> _sz)
+    : z(std::move(_z)), y(std::move(_y)), a(std::move(_a)),
+      b(std::move(_b)), sz(std::move(_sz)) {}
+
+  void TySubRemove::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(a),
+            CEREAL_NVP(b), CEREAL_NVP(sz));
+  }
+
+  ConsSubRemove::ConsSubRemove(std::unique_ptr<TySubRemove> _sub_remove)
+    : sub_remove(std::move(_sub_remove)){ }
+
+  void ConsSubRemove::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("SubRemove");
+    archive(CEREAL_NVP(sub_remove));
+  }
+
+  std::unique_ptr<TyInfrule> ConsSubRemove::make
+  (std::unique_ptr<TyRegister> _z,
+   std::unique_ptr<TyRegister> _y,
+   std::unique_ptr<TyValue> _a,
+   std::unique_ptr<TyValue> _b,
+   std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TySubRemove> _sub_remove
+      (new TySubRemove
+               (std::move(_z), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
+      return std::unique_ptr<TyInfrule>(new ConsSubRemove(std::move(_sub_remove)));
   }
 
   TyMulBool::TyMulBool
@@ -742,11 +947,11 @@ namespace llvmberry {
     commands.push_back(std::move(c));
   }
 
-  void CoreHint::addSrcNopPosition(std::unique_ptr<TyPosition> position) {
+  void CoreHint::addSrcNopPosition(std::unique_ptr<TyNopPosition> position) {
     src_nop_positions.push_back(std::move(position));
   }
 
-  void CoreHint::addTgtNopPosition(std::unique_ptr<TyPosition> position) {
+  void CoreHint::addTgtNopPosition(std::unique_ptr<TyNopPosition> position) {
     tgt_nop_positions.push_back(std::move(position));
   }
 

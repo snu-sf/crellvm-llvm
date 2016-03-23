@@ -14,9 +14,9 @@ namespace llvmberry {
 
 	enum TyScope { Source = 0, Target };
 
+  std::string getBasicBlockIndex(const llvm::BasicBlock *block);
   std::string getVariable(const llvm::Value &value);
   bool name_instructions(llvm::Function &F);
-
   /* position */
 
 	struct TyPositionPhinode {
@@ -66,6 +66,30 @@ namespace llvmberry {
 	private:
 		std::unique_ptr<TyPositionCommand> position_command;
 	};
+
+  // abstract
+  struct TyNopPosition {
+  public:
+    virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+  };
+
+  struct ConsPhinodeCurrentBlockName : public TyNopPosition {
+  public:
+    ConsPhinodeCurrentBlockName(std::string _block_name);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+    static std::unique_ptr<TyNopPosition> make(std::string _block_name);
+  private:
+    std::string block_name;
+  };
+
+  struct ConsCommandRegisterName : public TyNopPosition {
+  public:
+    ConsCommandRegisterName(std::string _register_name);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+    static std::unique_ptr<TyNopPosition> make(std::string _register_name);
+  private:
+    std::string register_name;
+  };
 
   /* value */
 
@@ -315,6 +339,8 @@ namespace llvmberry {
 		ConsMaydiff(std::string _name, enum TyTag _tag);
 		void serialize(cereal::JSONOutputArchive &archive) const;
 
+    static std::unique_ptr<TyPropagateObject> make(std::string _name, enum TyTag _tag);
+
 	private:
 		std::unique_ptr<TyRegister> register_name;
 	};
@@ -324,6 +350,7 @@ namespace llvmberry {
 	struct TyPropagateRange {
 	public:
 		virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+    virtual bool isGlobal(void) const { return false; }
 	};
 
 	struct ConsBounds : public TyPropagateRange {
@@ -345,6 +372,9 @@ namespace llvmberry {
 	public:
 		ConsGlobal();
 		void serialize(cereal::JSONOutputArchive &archive) const;
+    virtual bool isGlobal(void) const { return true; }
+
+    static std::unique_ptr<TyPropagateRange> make();
 	};
 
 	struct TyPropagate {
@@ -397,6 +427,34 @@ namespace llvmberry {
     std::unique_ptr<TyValue> y;
     std::unique_ptr<TySize> sz;
   };
+  
+  struct TyAddShift {
+  public:
+    TyAddShift(std::unique_ptr<TyRegister> _y,
+               std::unique_ptr<TyValue> v,
+               std::unique_ptr<TySize> _sz);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+  private:
+    std::unique_ptr<TyRegister> y;
+    std::unique_ptr<TyValue> v;
+    std::unique_ptr<TySize> sz;
+  };
+
+  struct TyAddSignbit {
+  public:
+    TyAddSignbit(std::unique_ptr<TyRegister> _x,
+                 std::unique_ptr<TyValue> _e1,
+                 std::unique_ptr<TyValue> _e2,
+                 std::unique_ptr<TySize> _sz);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+  private:
+    std::unique_ptr<TyRegister> x;
+    std::unique_ptr<TyValue> e1;
+    std::unique_ptr<TyValue> e2;
+    std::unique_ptr<TySize> sz;
+  };
 
   struct TySubAdd {
   public:
@@ -412,6 +470,23 @@ namespace llvmberry {
     std::unique_ptr<TyRegister> my;
     std::unique_ptr<TyRegister> x;
     std::unique_ptr<TyRegister> y;
+    std::unique_ptr<TySize> sz;
+  };
+
+  struct TySubRemove {
+  public:
+    TySubRemove(std::unique_ptr<TyRegister> _z,
+                std::unique_ptr<TyRegister> _y,
+                std::unique_ptr<TyValue> _a,
+                std::unique_ptr<TyValue> _b,
+                std::unique_ptr<TySize> _sz);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+  private:
+    std::unique_ptr<TyRegister> z;
+    std::unique_ptr<TyRegister> y;
+    std::unique_ptr<TyValue> a;
+    std::unique_ptr<TyValue> b;
     std::unique_ptr<TySize> sz;
   };
 
@@ -496,6 +571,33 @@ namespace llvmberry {
     std::unique_ptr<TyAddCommutative> add_commutative;
   };
 
+  struct ConsAddShift : TyInfrule {
+  public:
+    ConsAddShift(std::unique_ptr<TyAddShift> _add_shift);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+    static std::unique_ptr<TyInfrule> make
+      (std::unique_ptr<TyRegister> _y,
+       std::unique_ptr<TyValue> _v,
+       std::unique_ptr<TySize> _sz);
+
+  private:
+    std::unique_ptr<TyAddShift> add_shift;
+  };
+
+  struct ConsAddSignbit : TyInfrule {
+  public:
+    ConsAddSignbit(std::unique_ptr<TyAddSignbit> _add_signbit);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+    static std::unique_ptr<TyInfrule> make
+      (std::unique_ptr<TyRegister> _x,
+       std::unique_ptr<TyValue> _e1,
+       std::unique_ptr<TyValue> _e2,
+       std::unique_ptr<TySize> _sz);
+  
+  private:
+    std::unique_ptr<TyAddSignbit> add_signbit;
+  };
+
   struct ConsSubAdd : TyInfrule {
   public:
     ConsSubAdd(std::unique_ptr<TySubAdd> _sub_add);
@@ -510,6 +612,22 @@ namespace llvmberry {
 
   private:
     std::unique_ptr<TySubAdd> sub_add;
+  };
+
+  struct ConsSubRemove : TyInfrule {
+  public:
+    ConsSubRemove(std::unique_ptr<TySubRemove> _sub_remove);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyInfrule> make
+      (std::unique_ptr<TyRegister> _z,
+       std::unique_ptr<TyRegister> _y,
+       std::unique_ptr<TyValue> _a,
+       std::unique_ptr<TyValue> _b,
+       std::unique_ptr<TySize> _sz);
+
+  private:
+    std::unique_ptr<TySubRemove> sub_remove;
   };
 
   struct ConsMulBool : TyInfrule {
@@ -573,18 +691,22 @@ namespace llvmberry {
              std::string _function_id,
              std::string _opt_name);
     void addCommand(std::unique_ptr<TyCommand> c);
-    void addSrcNopPosition(std::unique_ptr<TyPosition> position);
-    void addTgtNopPosition(std::unique_ptr<TyPosition> position);
+    void addSrcNopPosition(std::unique_ptr<TyNopPosition> position);
+    void addTgtNopPosition(std::unique_ptr<TyNopPosition> position);
     void serialize(cereal::JSONOutputArchive &archive) const;
 
   private:
     std::string module_id;
     std::string function_id;
     std::string opt_name;
-    std::vector<std::unique_ptr<TyPosition>> src_nop_positions;
-    std::vector<std::unique_ptr<TyPosition>> tgt_nop_positions;
+    std::vector<std::unique_ptr<TyNopPosition>> src_nop_positions;
+    std::vector<std::unique_ptr<TyNopPosition>> tgt_nop_positions;
     std::vector<std::unique_ptr<TyCommand>> commands;
   };
+
+  // inserting nop
+  void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
+  void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
 } // llvmberry
 
