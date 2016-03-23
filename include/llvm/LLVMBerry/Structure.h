@@ -431,19 +431,34 @@ namespace llvmberry {
   struct TySubAdd {
   public:
     TySubAdd(std::unique_ptr<TyRegister> _z,
-             std::unique_ptr<TyRegister> _my,
+             std::unique_ptr<TyValue> _my,
              std::unique_ptr<TyRegister> _x,
-             std::unique_ptr<TyRegister> _y,
+             std::unique_ptr<TyValue> _y,
              std::unique_ptr<TySize> _sz);
     void serialize(cereal::JSONOutputArchive &archive) const;
 
   private:
     std::unique_ptr<TyRegister> z;
-    std::unique_ptr<TyRegister> my;
+    std::unique_ptr<TyValue> my;
     std::unique_ptr<TyRegister> x;
-    std::unique_ptr<TyRegister> y;
+    std::unique_ptr<TyValue> y;
     std::unique_ptr<TySize> sz;
   };
+
+  struct TyNegVal {
+  public:
+    TyNegVal(std::unique_ptr<TyConstInt> _c1,
+             std::unique_ptr<TyConstInt> _c2,
+             std::unique_ptr<TySize> _sz);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+  private:
+    std::unique_ptr<TyConstInt> c1;
+    std::unique_ptr<TyConstInt> c2;
+    std::unique_ptr<TySize> sz;
+
+  };
+
 
   struct TyMulBool {
   public:
@@ -533,13 +548,27 @@ namespace llvmberry {
 
     static std::unique_ptr<TyInfrule> make
       (std::unique_ptr<TyRegister> _z,
-       std::unique_ptr<TyRegister> _my,
+       std::unique_ptr<TyValue> _my,
        std::unique_ptr<TyRegister> _x,
-       std::unique_ptr<TyRegister> _y,
+       std::unique_ptr<TyValue> _y,
        std::unique_ptr<TySize> _sz);
 
   private:
     std::unique_ptr<TySubAdd> sub_add;
+  };
+
+  struct ConsNegVal : TyInfrule {
+  public:
+    ConsNegVal(std::unique_ptr<TyNegVal> _neg_val);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyInfrule> make
+            (std::unique_ptr<TyConstInt> _c1,
+             std::unique_ptr<TyConstInt> _c2,
+             std::unique_ptr<TySize> _sz);
+
+  private:
+    std::unique_ptr<TyNegVal> neg_val;
   };
 
   struct ConsMulBool : TyInfrule {

@@ -719,9 +719,9 @@ namespace llvmberry {
 
   TySubAdd::TySubAdd
           (std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyRegister> _my,
+           std::unique_ptr<TyValue> _my,
            std::unique_ptr<TyRegister> _x,
-           std::unique_ptr<TyRegister> _y,
+           std::unique_ptr<TyValue> _y,
            std::unique_ptr<TySize> _sz)
           : z(std::move(_z)), my(std::move(_my)), x(std::move(_x)),
             y(std::move(_y)), sz(std::move(_sz)) {}
@@ -744,9 +744,9 @@ namespace llvmberry {
 
   std::unique_ptr<TyInfrule> ConsSubAdd::make
           (std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyRegister> _my,
+           std::unique_ptr<TyValue> _my,
            std::unique_ptr<TyRegister> _x,
-           std::unique_ptr<TyRegister> _y,
+           std::unique_ptr<TyValue> _y,
            std::unique_ptr<TySize> _sz) {
     std::unique_ptr<TySubAdd> _sub_add
             (new TySubAdd
@@ -754,6 +754,37 @@ namespace llvmberry {
                       std::move(_y), std::move(_sz)));
     return std::unique_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
   }
+
+  TyNegVal::TyNegVal
+            (std::unique_ptr<TyConstInt> _c1,
+             std::unique_ptr<TyConstInt> _c2,
+             std::unique_ptr<TySize> _sz)
+             : c1(std::move(_c1)), c2(std::move(_c2)),sz(std::move(_sz)) {}
+
+    void TyNegVal::serialize(cereal::JSONOutputArchive &archive) const {
+          archive(CEREAL_NVP(c1), CEREAL_NVP(c2), CEREAL_NVP(sz));
+            }
+
+      ConsNegVal::ConsNegVal(std::unique_ptr<TyNegVal> _neg_val)
+                  : neg_val(std::move(_neg_val)) {}
+
+        void ConsNegVal::serialize(cereal::JSONOutputArchive &archive) const {
+              archive.makeArray();
+              archive.writeName();
+
+              archive.saveValue("NegVal");
+              archive(CEREAL_NVP(neg_val));
+             }
+
+          std::unique_ptr<TyInfrule> ConsNegVal::make
+                      (std::unique_ptr<TyConstInt> _c1,
+                       std::unique_ptr<TyConstInt> _c2,
+                       std::unique_ptr<TySize> _sz) {
+                       std::unique_ptr<TyNegVal> _neg_val
+                       (new TyNegVal
+                            (std::move(_c1), std::move(_c2), std::move(_sz)));
+          return std::unique_ptr<TyInfrule>(new ConsNegVal(std::move(_neg_val)));
+          }
 
   TyMulBool::TyMulBool
             (std::unique_ptr<TyRegister> _z,

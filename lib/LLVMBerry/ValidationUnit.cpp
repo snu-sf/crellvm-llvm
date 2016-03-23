@@ -148,6 +148,12 @@ bool ValidationUnit::BeginIfNotExists(const std::string &optname,
   return true;
 }
 
+bool ValidationUnit::HasBegun(){
+  if(!Exists())
+    return false;
+  return true;
+}
+
 void ValidationUnit::End() {
   assert(Exists() && "No ValidationUnit exists");
   delete _Instance;

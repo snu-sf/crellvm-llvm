@@ -46,6 +46,7 @@ public:
   static void Begin(const std::string &optname, llvm::Function *func);
   static bool BeginIfNotExists(const std::string &optname,
                                llvm::Function *func);
+  static bool HasBegun();
   static void End();
   static bool EndIfExists();
 

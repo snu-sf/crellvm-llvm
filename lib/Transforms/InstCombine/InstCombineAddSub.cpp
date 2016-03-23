@@ -1605,6 +1605,63 @@ Value *InstCombiner::OptimizePointerDifference(Value *LHS, Value *RHS,
   return Builder->CreateIntCast(Result, Ty, true);
 }
 
+void generateHintforNegValue(Value *V, BinaryOperator &I) {
+
+  if (BinaryOperator::isNeg(V)) {
+    if (llvmberry::ValidationUnit::HasBegun()) {
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&V, &I]
+                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+                std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
+                std::string reg1_name = llvmberry::getVariable(*V); //my
+
+                hints.addCommand
+                        (llvmberry::ConsPropagate::make
+                                 (llvmberry::ConsLessdef::make
+                                          (llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), //my = -y
+                                           llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical),
+                                           llvmberry::Source),
+                                  llvmberry::ConsBounds::make
+                                          (llvmberry::ConsCommand::make(llvmberry::Source,
+                                                                        reg1_name), //From my to z = x -my
+                                           llvmberry::ConsCommand::make(llvmberry::Source, reg0_name)))
+                        );
+              }
+              );
+    }
+  }
+
+  // Constants can be considered to be negated values if they can be folded.
+  if (ConstantInt *C = dyn_cast<ConstantInt>(V)) {
+    if (llvmberry::ValidationUnit::HasBegun()) {
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&I, &V, &C]
+                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+                std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
+
+                unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
+                int c1 = (int)C->getSExtValue();
+                int c2 = std::abs(c1);
+
+                hints.addCommand
+                        (llvmberry::ConsInfrule::make
+                                 (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsNegVal::make
+                                         (llvmberry::TyConstInt::make(c1,sz_bw),
+                                          llvmberry::TyConstInt::make(c2,sz_bw),
+                                          llvmberry::ConsSize::make(sz_bw))));
+              }
+              );
+    }
+  }
+
+//  if(ConstantDataVector *C = dyn_cast<ConstantDataVector>(V))
+//  {
+    //Todo??
+//  }
+}
+
 Instruction *InstCombiner::visitSub(BinaryOperator &I) {
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
 
@@ -1633,55 +1690,40 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         Res->setHasNoSignedWrap(true);
     }
 
-      if(!isa<Constant>(Op1)) {
-
-      llvmberry::ValidationUnit::Begin("sub_add",
-                                       I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("sub_add",
+                                     I.getParent()->getParent());
+    //dyncastNegvall 을  또하면서 힌트를 내밷자
+    //한번더  힌트릴내 밷자
+    generateHintforNegValue(Op1, I);  //
 
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&Op0, &I, &Op1, &V]
                        (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
 
-                // prepare variables
-                std::string reg0_name = llvmberry::getVariable(I); //z = x - my
-                std::string reg1_name = llvmberry::getVariable(*Op1); //my
-                std::string reg2_name = llvmberry::getVariable(*Op0); //x
-                std::string reg3_name = llvmberry::getVariable(*V); //y
+                  std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
+          //        std::string reg1_name = llvmberry::getVariable(*Op1); //my
+                  std::string reg2_name = llvmberry::getVariable(*Op0); //x
+           //       std::string reg3_name = llvmberry::getVariable(*Op0); //y
 
-                unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
+                  unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
 
-                hints.addCommand
-                        (llvmberry::ConsPropagate::make
-                        (llvmberry::ConsLessdef::make
-                        (llvmberry::ConsVar::make (reg1_name, llvmberry::Physical), //my = -y
-                         llvmberry::ConsRhs::make (reg1_name, llvmberry::Physical),
-                         llvmberry::Source)
-                         ,
-                         llvmberry::ConsBounds::make
-                         (llvmberry::ConsCommand::make (llvmberry::Source, reg1_name), //From my to z = x -my
-                          llvmberry::ConsCommand::make (llvmberry::Source, reg0_name)))
-                        );
 
-                hints.addCommand
-                        (llvmberry::ConsInfrule::make
-                        (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsSubAdd::make
-                        (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
-                         llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
-                         llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
-                         llvmberry::TyRegister::make(reg3_name, llvmberry::Physical),
-                         llvmberry::ConsSize::make(sz_bw))));
-              }
+                  hints.addCommand
+                          (llvmberry::ConsInfrule::make
+                                   (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsSubAdd::make
+                                           (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
+                                            llvmberry::TyValue::make(*Op1),
+                                            llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
+                                            llvmberry::TyValue::make(*V),
+                                            llvmberry::ConsSize::make(sz_bw))));
+                }
               );
 
       llvmberry::ValidationUnit::End();
 
-    }
-    else {
-      //TODO: Implementation of hint generation when Op1 is Constant.
-    } 
-
     return Res;
   }
+
 
   if (I.getType()->isIntegerTy(1))
     return BinaryOperator::CreateXor(Op0, Op1);
