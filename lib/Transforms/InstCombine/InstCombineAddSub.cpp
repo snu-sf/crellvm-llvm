@@ -1692,21 +1692,17 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
     llvmberry::ValidationUnit::Begin("sub_add",
                                      I.getParent()->getParent());
-    //dyncastNegvall 을  또하면서 힌트를 내밷자
-    //한번더  힌트릴내 밷자
-    generateHintforNegValue(Op1, I);  //
+    
+    generateHintforNegValue(Op1, I); //Op1 will be propagate to Z if is id and infrule will be applied if is constant  
 
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&Op0, &I, &Op1, &V]
                        (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
 
                   std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
-          //        std::string reg1_name = llvmberry::getVariable(*Op1); //my
                   std::string reg2_name = llvmberry::getVariable(*Op0); //x
-           //       std::string reg3_name = llvmberry::getVariable(*Op0); //y
 
                   unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
-
 
                   hints.addCommand
                           (llvmberry::ConsInfrule::make
