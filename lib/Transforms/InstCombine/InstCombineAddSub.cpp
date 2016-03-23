@@ -1069,30 +1069,24 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   if (ConstantInt *CI = dyn_cast<ConstantInt>(RHS)) {
     // X + (signbit) --> X ^ signbit
     const APInt &Val = CI->getValue();
-    if (Val.isSignBit()){
-      llvmberry::ValidationUnit::Begin("add_signbit", I.getParent()->getParent());
-    
-      llvmberry::ValidationUnit::GetInstance()->intrude
-        ([&I, &LHS, &RHS]
-           (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-             // I = LHS + RHS --> I = LHS ^ 1
-             std::string reg_x_name = llvmberry::getVariable(I);
-             int bitwidth = LHS->getType()->getIntegerBitWidth();
+    if (Val.isSignBit()) {
+      llvmberry::ValidationUnit::Begin("add_signbit",
+                                       I.getParent()->getParent());
 
-             hints.addCommand
-               (llvmberry::ConsInfrule::make
-                (llvmberry::ConsCommand::make
-                 (llvmberry::Source, reg_x_name),
-                 llvmberry::ConsAddSignbit::make
-                  (llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
-                  llvmberry::TyValue::make(*LHS),
-                  llvmberry::TyValue::make(*RHS),
-                  llvmberry::ConsSize::make(bitwidth)
-                  )
-                 )
-                );
-           }
-        );
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &LHS, &RHS](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        // I = LHS + RHS --> I = LHS ^ 1
+        std::string reg_x_name = llvmberry::getVariable(I);
+        int bitwidth = LHS->getType()->getIntegerBitWidth();
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_x_name),
+            llvmberry::ConsAddSignbit::make(
+                llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*LHS), llvmberry::TyValue::make(*RHS),
+                llvmberry::ConsSize::make(bitwidth))));
+      });
 
       return BinaryOperator::CreateXor(LHS, RHS);
     }
@@ -1162,37 +1156,30 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   // X + X --> X << 1
   if (LHS == RHS) {
     llvmberry::ValidationUnit::Begin("add_shift", I.getParent()->getParent());
-    
+
     BinaryOperator *New =
       BinaryOperator::CreateShl(LHS, ConstantInt::get(I.getType(), 1));
     New->setHasNoSignedWrap(I.hasNoSignedWrap());
     New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
 
-    llvmberry::ValidationUnit::GetInstance()->intrude
-      ([&I, &LHS, &RHS]
-       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-        // I = LHS + RHS
+    llvmberry::ValidationUnit::GetInstance()->intrude(
+        [&I, &LHS, &RHS](llvmberry::ValidationUnit::Dictionary &data,
+                         llvmberry::CoreHint &hints) {
+          // I = LHS + RHS
 
-        // prepare variables
-        std::string reg_y_name = llvmberry::getVariable(I);
-        int bitwidth = LHS->getType()->getIntegerBitWidth();
-        
-        // from "y = v + v", create "y = v << 1"
-        hints.addCommand
-          (llvmberry::ConsInfrule::make
-           (llvmberry::ConsCommand::make
-            (llvmberry::Source, reg_y_name),
-            llvmberry::ConsAddShift::make
-            (llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-             llvmberry::TyValue::make(*LHS),
-             llvmberry::ConsSize::make(bitwidth)
-             )
-            )
-           );
-        
-      }
-    );
+          // prepare variables
+          std::string reg_y_name = llvmberry::getVariable(I);
+          int bitwidth = LHS->getType()->getIntegerBitWidth();
 
+          // from "y = v + v", create "y = v << 1"
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
+              llvmberry::ConsAddShift::make(
+                  llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                  llvmberry::TyValue::make(*LHS),
+                  llvmberry::ConsSize::make(bitwidth))));
+
+        });
 
     return New;
   }
@@ -1206,121 +1193,86 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         return BinaryOperator::CreateNeg(NewAdd);
       }
 
-    llvmberry::ValidationUnit::Begin("add_comm_sub", I.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude
-      ([&LHS, &LHSV, &RHS, &I]
-       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-        // LHS = 0   - LHSV    my = 0  - y
-        //   I = LHS + RHS      z = my + x
+    llvmberry::ValidationUnit::Begin("add_comm_sub",
+                                     I.getParent()->getParent());
+    llvmberry::ValidationUnit::GetInstance()->intrude([&LHS, &LHSV, &RHS, &I](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
+      // LHS = 0   - LHSV    my = 0  - y
+      //   I = LHS + RHS      z = my + x
 
-        // prepare variables
-        std::string reg_my_name = llvmberry::getVariable(*LHS);
-        std::string reg_z_name = llvmberry::getVariable(I);
+      // prepare variables
+      std::string reg_my_name = llvmberry::getVariable(*LHS);
+      std::string reg_z_name = llvmberry::getVariable(I);
 
-        int bitwidth = LHSV->getType()->getIntegerBitWidth();
-        
-        // propagate "my = 0 - y"
-        hints.addCommand
-          (llvmberry::ConsPropagate::make
-           (llvmberry::ConsLessdef::make
-            (llvmberry::ConsVar::make
-             (reg_my_name, llvmberry::Physical),
-             llvmberry::ConsRhs::make
-             (reg_my_name, llvmberry::Physical),
-             llvmberry::Source)
-            ,
-            llvmberry::ConsBounds::make
-            (llvmberry::ConsCommand::make
-             (llvmberry::Source, reg_my_name),
-             llvmberry::ConsCommand::make
-             (llvmberry::Source, reg_z_name))
-            )
-           );
-        
-        // from "z = my + x", create "z = x + my"
-        hints.addCommand
-          (llvmberry::ConsInfrule::make
-           (llvmberry::ConsCommand::make
-            (llvmberry::Source, reg_z_name),
-            llvmberry::ConsAddCommutative::make
-            (llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-             llvmberry::TyValue::make(*LHS),
-             llvmberry::TyValue::make(*RHS),
-             llvmberry::ConsSize::make(bitwidth)
-             )
-            )
-           );
-        
-        // from "z = x + my" and "my = 0 - y", create "z = x - y"
-        hints.addCommand
-          (llvmberry::ConsInfrule::make
-           (llvmberry::ConsCommand::make
-            (llvmberry::Source, reg_z_name),
-            llvmberry::ConsAddSub::make
-            (llvmberry::TyRegister::make(reg_my_name, llvmberry::Physical),
-             llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-             llvmberry::TyValue::make(*RHS),
-             llvmberry::TyValue::make(*LHSV),
-             llvmberry::ConsSize::make(bitwidth)
-             )
-            )
-           );
-      }
-    );
+      int bitwidth = LHSV->getType()->getIntegerBitWidth();
+
+      // propagate "my = 0 - y"
+      hints.addCommand(llvmberry::ConsPropagate::make(
+          llvmberry::ConsLessdef::make(
+              llvmberry::ConsVar::make(reg_my_name, llvmberry::Physical),
+              llvmberry::ConsRhs::make(reg_my_name, llvmberry::Physical),
+              llvmberry::Source),
+          llvmberry::ConsBounds::make(
+              llvmberry::ConsCommand::make(llvmberry::Source, reg_my_name),
+              llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+
+      // from "z = my + x", create "z = x + my"
+      hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+          llvmberry::ConsAddCommutative::make(
+              llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+              llvmberry::TyValue::make(*LHS), llvmberry::TyValue::make(*RHS),
+              llvmberry::ConsSize::make(bitwidth))));
+
+      // from "z = x + my" and "my = 0 - y", create "z = x - y"
+      hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+          llvmberry::ConsAddSub::make(
+              llvmberry::TyRegister::make(reg_my_name, llvmberry::Physical),
+              llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+              llvmberry::TyValue::make(*RHS), llvmberry::TyValue::make(*LHSV),
+              llvmberry::ConsSize::make(bitwidth))));
+    });
 
     return BinaryOperator::CreateSub(RHS, LHSV);
   }
 
   // A + -B  -->  A - B
   if (!isa<Constant>(RHS))
-    if (Value *V = dyn_castNegVal(RHS)){
+    if (Value *V = dyn_castNegVal(RHS)) {
       llvmberry::ValidationUnit::Begin("add_sub", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude
-        ([&V, &LHS, &RHS, &I]
-         (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-          // RHS = 0   - V       my = 0 - y
-          //   I = LHS + RHS      z = x + my
+      llvmberry::ValidationUnit::GetInstance()->intrude([&V, &LHS, &RHS, &I](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        // RHS = 0   - V       my = 0 - y
+        //   I = LHS + RHS      z = x + my
 
-          // prepare variables
-          std::string reg_my_name = llvmberry::getVariable(*RHS);
-          std::string reg_z_name = llvmberry::getVariable(I);
+        // prepare variables
+        std::string reg_my_name = llvmberry::getVariable(*RHS);
+        std::string reg_z_name = llvmberry::getVariable(I);
 
-          int bitwidth = V->getType()->getIntegerBitWidth();
-          
-          // propagate "my = 0 - y"
-          hints.addCommand
-            (llvmberry::ConsPropagate::make
-             (llvmberry::ConsLessdef::make
-              (llvmberry::ConsVar::make
-               (reg_my_name, llvmberry::Physical),
-               llvmberry::ConsRhs::make
-               (reg_my_name, llvmberry::Physical),
-               llvmberry::Source)
-              ,
-              llvmberry::ConsBounds::make
-              (llvmberry::ConsCommand::make
-               (llvmberry::Source, reg_my_name),
-               llvmberry::ConsCommand::make
-               (llvmberry::Source, reg_z_name))
-              )
-             );
-          
-          // from "z = x + my" and "my = 0 - y", create "z = x - y"
-          hints.addCommand
-            (llvmberry::ConsInfrule::make
-             (llvmberry::ConsCommand::make
-              (llvmberry::Source, reg_z_name),
-              llvmberry::ConsAddSub::make
-              (llvmberry::TyRegister::make(reg_my_name, llvmberry::Physical),
-               llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-               llvmberry::TyValue::make(*LHS),
-               llvmberry::TyValue::make(*V),
-               llvmberry::ConsSize::make(bitwidth)
-               )
-              )
-             );
-        }
-      );
+        int bitwidth = V->getType()->getIntegerBitWidth();
+
+        // propagate "my = 0 - y"
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg_my_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_my_name, llvmberry::Physical),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::ConsCommand::make(llvmberry::Source, reg_my_name),
+                llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+
+        // from "z = x + my" and "my = 0 - y", create "z = x - y"
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+            llvmberry::ConsAddSub::make(
+                llvmberry::TyRegister::make(reg_my_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*LHS), llvmberry::TyValue::make(*V),
+                llvmberry::ConsSize::make(bitwidth))));
+      });
 
       return BinaryOperator::CreateSub(LHS, V);
     }
@@ -1687,52 +1639,48 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         Res->setHasNoSignedWrap(true);
     }
 
-      if(!isa<Constant>(Op1)) {
+    if (!isa<Constant>(Op1)) {
 
-      llvmberry::ValidationUnit::Begin("sub_add",
-                                       I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("sub_add", I.getParent()->getParent());
 
-      llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&Op0, &I, &Op1, &V]
-                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      llvmberry::ValidationUnit::GetInstance()->intrude([&Op0, &I, &Op1, &V](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
 
-                // prepare variables
-                std::string reg0_name = llvmberry::getVariable(I); //z = x - my
-                std::string reg1_name = llvmberry::getVariable(*Op1); //my
-                std::string reg2_name = llvmberry::getVariable(*Op0); //x
-                std::string reg3_name = llvmberry::getVariable(*V); //y
+        // prepare variables
+        std::string reg0_name = llvmberry::getVariable(I); // z = x - my
+        std::string reg1_name = llvmberry::getVariable(*Op1); // my
+        std::string reg2_name = llvmberry::getVariable(*Op0); // x
+        std::string reg3_name = llvmberry::getVariable(*V); // y
 
-                unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
+        unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
 
-                hints.addCommand
-                        (llvmberry::ConsPropagate::make
-                        (llvmberry::ConsLessdef::make
-                        (llvmberry::ConsVar::make (reg1_name, llvmberry::Physical), //my = -y
-                         llvmberry::ConsRhs::make (reg1_name, llvmberry::Physical),
-                         llvmberry::Source)
-                         ,
-                         llvmberry::ConsBounds::make
-                         (llvmberry::ConsCommand::make (llvmberry::Source, reg1_name), //From my to z = x -my
-                          llvmberry::ConsCommand::make (llvmberry::Source, reg0_name)))
-                        );
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg1_name,
+                                         llvmberry::Physical), // my = -y
+                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::ConsCommand::make(llvmberry::Source,
+                                             reg1_name), // From my to z = x -my
+                llvmberry::ConsCommand::make(llvmberry::Source, reg0_name))));
 
-                hints.addCommand
-                        (llvmberry::ConsInfrule::make
-                        (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsSubAdd::make
-                        (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
-                         llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
-                         llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
-                         llvmberry::TyRegister::make(reg3_name, llvmberry::Physical),
-                         llvmberry::ConsSize::make(sz_bw))));
-              }
-              );
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::ConsCommand::make(llvmberry::Source, reg0_name),
+            llvmberry::ConsSubAdd::make(
+                llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg3_name, llvmberry::Physical),
+                llvmberry::ConsSize::make(sz_bw))));
+      });
 
       llvmberry::ValidationUnit::End();
 
+    } else {
+      // TODO: Implementation of hint generation when Op1 is Constant.
     }
-    else {
-      //TODO: Implementation of hint generation when Op1 is Constant.
-    } 
 
     return Res;
   }
@@ -1810,60 +1758,40 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     Value *Y;
     // X-(X+Y) == -Y    X-(Y+X) == -Y
     if (match(Op1, m_Add(m_Specific(Op0), m_Value(Y))) ||
-        match(Op1, m_Add(m_Value(Y), m_Specific(Op0)))){
-      llvmberry::ValidationUnit::Begin("sub_remove", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude
-       ([&I, &Op1, &Op0, &Y]
-                (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+        match(Op1, m_Add(m_Value(Y), m_Specific(Op0)))) {
+      llvmberry::ValidationUnit::Begin("sub_remove",
+                                       I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &Op0, &Y](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
         // prepare variable
-         std::string reg_z_name = llvmberry::getVariable(I);
-         std::string reg_y_name = llvmberry::getVariable(*Op1);
+        std::string reg_z_name = llvmberry::getVariable(I);
+        std::string reg_y_name = llvmberry::getVariable(*Op1);
 
-         int bitwith = Op1->getType()->getIntegerBitWidth();
+        int bitwith = Op1->getType()->getIntegerBitWidth();
 
-         hints.addCommand
-           (llvmberry::ConsPropagate::make
-             (llvmberry::ConsLessdef::make
-               (llvmberry::ConsVar::make
-                 (reg_y_name, llvmberry::Physical),
-                 llvmberry::ConsRhs::make
-                 (reg_y_name, llvmberry::Physical),
-                 llvmberry::Source)
-               ,
-               llvmberry::ConsBounds::make
-               (llvmberry::ConsCommand::make
-                 (llvmberry::Source, reg_y_name),
-               llvmberry::ConsCommand::make
-                 (llvmberry::Source, reg_z_name))
-             )
-           );
-         hints.addCommand
-           (llvmberry::ConsInfrule::make
-             (llvmberry::ConsCommand::make
-               (llvmberry::Source, reg_y_name),
-               llvmberry::ConsAddCommutative::make
-               (llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*Op0),
-                llvmberry::TyValue::make(*Y),
-                llvmberry::ConsSize::make(bitwith)
-               )
-             )
-           );
-         hints.addCommand
-           (llvmberry::ConsInfrule::make
-             (llvmberry::ConsCommand::make
-               (llvmberry::Source, reg_z_name),
-               llvmberry::ConsSubRemove::make
-               (llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
+                llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
+            llvmberry::ConsAddCommutative::make(
                 llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*Op0),
-                llvmberry::TyValue::make(*Y),
-                llvmberry::ConsSize::make(bitwith)
-               )
-             )
-           );
-       }
-       );
+                llvmberry::TyValue::make(*Op0), llvmberry::TyValue::make(*Y),
+                llvmberry::ConsSize::make(bitwith))));
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+            llvmberry::ConsSubRemove::make(
+                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*Op0), llvmberry::TyValue::make(*Y),
+                llvmberry::ConsSize::make(bitwith))));
+      });
       llvmberry::ValidationUnit::End();
 
       return BinaryOperator::CreateNeg(Y);
