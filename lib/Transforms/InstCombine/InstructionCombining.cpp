@@ -245,7 +245,7 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
             hints.addCommand(llvmberry::ConsPropagate::make(
                 llvmberry::ConsLessdef::make(
                     llvmberry::ConsVar::make(reg1_name, llvmberry::Physical),
-                    llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical),
+                    llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, llvmberry::Source),
                     llvmberry::Source),
                 llvmberry::ConsBounds::make(
                     llvmberry::ConsCommand::make(llvmberry::Source, reg1_name),
