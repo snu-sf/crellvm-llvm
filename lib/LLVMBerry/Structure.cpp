@@ -381,6 +381,11 @@ void ConsId::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(reg));
 }
 
+std::unique_ptr<TyValue> ConsId::make(std::string _name, enum TyTag _tag) {
+  std::unique_ptr<TyRegister> _reg(new TyRegister(_name, _tag));
+  return std::unique_ptr<TyValue>(new ConsId(std::move(_reg)));
+}
+
 ConsConstVal::ConsConstVal(std::unique_ptr<TyConstant> _constant)
     : constant(std::move(_constant)) {}
 
@@ -426,28 +431,33 @@ void ConsVar::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(register_name));
 }
 
-std::unique_ptr<TyPropagateExpr> ConsVar::make(std::string _name,
+std::unique_ptr<TyExpr> ConsVar::make(std::string _name,
                                                enum TyTag _tag) {
-  return std::unique_ptr<TyPropagateExpr>(new ConsVar(_name, _tag));
+  return std::unique_ptr<TyExpr>(new ConsVar(_name, _tag));
 }
 
-ConsRhs::ConsRhs(std::unique_ptr<TyRegister> _register_name)
-    : register_name(std::move(_register_name)) {}
+ConsRhs::ConsRhs(std::unique_ptr<TyRegister> _register_name, enum TyScope _scope)
+    : register_name(std::move(_register_name)), scope(_scope) {}
 
-ConsRhs::ConsRhs(std::string _name, enum TyTag _tag)
-    : register_name(new TyRegister(_name, _tag)) {}
+ConsRhs::ConsRhs(std::string _name, enum TyTag _tag, enum TyScope _scope)
+    : register_name(new TyRegister(_name, _tag)), scope(_scope) {}
 
 void ConsRhs::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
 
   archive.saveValue("Rhs");
-  archive(CEREAL_NVP(register_name));
+  archive.startNode();
+  archive.makeArray();
+  archive(CEREAL_NVP(register_name), cereal::make_nvp("scope", toString(scope)));
+  archive.finishNode();
+
 }
 
-std::unique_ptr<TyPropagateExpr> ConsRhs::make(std::string _name,
-                                               enum TyTag _tag) {
-  return std::unique_ptr<TyPropagateExpr>(new ConsRhs(_name, _tag));
+std::unique_ptr<TyExpr> ConsRhs::make(std::string _name,
+                                               enum TyTag _tag,
+                                               enum TyScope _scope) {
+  return std::unique_ptr<TyExpr>(new ConsRhs(_name, _tag, _scope));
 }
 
 ConsConst::ConsConst(std::unique_ptr<TyConstant> _constant)
@@ -469,8 +479,8 @@ void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
 
 // propagate object
 
-TyPropagateLessdef::TyPropagateLessdef(std::unique_ptr<TyPropagateExpr> _lhs,
-                                       std::unique_ptr<TyPropagateExpr> _rhs,
+TyPropagateLessdef::TyPropagateLessdef(std::unique_ptr<TyExpr> _lhs,
+                                       std::unique_ptr<TyExpr> _rhs,
                                        enum TyScope _scope)
     : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
 
@@ -480,8 +490,8 @@ void TyPropagateLessdef::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 std::unique_ptr<TyPropagateLessdef>
-TyPropagateLessdef::make(std::unique_ptr<TyPropagateExpr> _lhs,
-                         std::unique_ptr<TyPropagateExpr> _rhs,
+TyPropagateLessdef::make(std::unique_ptr<TyExpr> _lhs,
+                         std::unique_ptr<TyExpr> _rhs,
                          enum TyScope _scope) {
   return std::unique_ptr<TyPropagateLessdef>(
       new TyPropagateLessdef(std::move(_lhs), std::move(_rhs), _scope));
@@ -516,8 +526,8 @@ void ConsLessdef::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 std::unique_ptr<TyPropagateObject>
-ConsLessdef::make(std::unique_ptr<TyPropagateExpr> _lhs,
-                  std::unique_ptr<TyPropagateExpr> _rhs, enum TyScope _scope) {
+ConsLessdef::make(std::unique_ptr<TyExpr> _lhs,
+                  std::unique_ptr<TyExpr> _rhs, enum TyScope _scope) {
   auto ty_prop_ld = TyPropagateLessdef::make(std::move(_lhs), std::move(_rhs),
                                              std::move(_scope));
   return std::unique_ptr<TyPropagateObject>(
