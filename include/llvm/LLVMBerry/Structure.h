@@ -17,6 +17,8 @@ enum TyScope { Source = 0, Target };
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
+void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I);
+
 /* position */
 
 struct TyPositionPhinode {
@@ -39,7 +41,7 @@ private:
   std::string register_name;
 };
 
-struct TyPosition {
+struct TyPosition{
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 };
@@ -467,18 +469,33 @@ private:
 
 struct TySubAdd {
 public:
-  TySubAdd(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _my,
-           std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y,
-           std::unique_ptr<TySize> _sz);
-  void serialize(cereal::JSONOutputArchive &archive) const;
+    TySubAdd(std::unique_ptr<TyRegister> _z,
+             std::unique_ptr<TyValue> _my,
+             std::unique_ptr<TyRegister> _x,
+             std::unique_ptr<TyValue> _y,
+             std::unique_ptr<TySize> _sz);
+    void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> my;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TySize> sz;
-};
+    std::unique_ptr<TyRegister> z;
+    std::unique_ptr<TyValue> my;
+    std::unique_ptr<TyRegister> x;
+    std::unique_ptr<TyValue> y;
+    std::unique_ptr<TySize> sz;
+  };
+
+struct TyNegVal {
+public:
+    TyNegVal(std::unique_ptr<TyConstInt> _c1,
+             std::unique_ptr<TyConstInt> _c2,
+             std::unique_ptr<TySize> _sz);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+    std::unique_ptr<TyConstInt> c1;
+    std::unique_ptr<TyConstInt> c2;
+    std::unique_ptr<TySize> sz;
+  };
 
 struct TySubRemove {
 public:
@@ -580,6 +597,20 @@ private:
   std::unique_ptr<TyAddShift> add_shift;
 };
 
+struct ConsNegVal : TyInfrule {
+public:
+    ConsNegVal(std::unique_ptr<TyNegVal> _neg_val);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyInfrule> make
+            (std::unique_ptr<TyConstInt> _c1,
+             std::unique_ptr<TyConstInt> _c2,
+             std::unique_ptr<TySize> _sz);
+
+private:
+    std::unique_ptr<TyNegVal> neg_val;
+  };
+
 struct ConsAddSignbit : TyInfrule {
 public:
   ConsAddSignbit(std::unique_ptr<TyAddSignbit> _add_signbit);
@@ -599,9 +630,9 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
-                                         std::unique_ptr<TyRegister> _my,
+                                         std::unique_ptr<TyValue> _my,
                                          std::unique_ptr<TyRegister> _x,
-                                         std::unique_ptr<TyRegister> _y,
+                                         std::unique_ptr<TyValue> _y,
                                          std::unique_ptr<TySize> _sz);
 
 private:

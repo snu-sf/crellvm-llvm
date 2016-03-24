@@ -48,9 +48,9 @@ public:
                                llvm::Function *func);
   static void End();
   static bool EndIfExists();
+  static bool Exists();
 
 private:
-  static bool Exists();
   static ValidationUnit *_Instance;
   static int _Counter;
 };
