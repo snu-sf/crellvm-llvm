@@ -7,6 +7,7 @@
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
 #include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/ValidationUnit.h"
 
 namespace cereal {
 [[noreturn]] void throw_exception(std::exception const &e) { std::exit(1); }
@@ -158,6 +159,61 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
     std::string nop_prev_reg = getVariable(*prevI);
     hints.addSrcNopPosition(ConsCommandRegisterName::make(nop_prev_reg));
   }
+}
+
+void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
+
+  if (llvm::BinaryOperator::isNeg(V)) {
+    if (llvmberry::ValidationUnit::Exists()) {
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&V, &I]
+                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+                std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
+                std::string reg1_name = llvmberry::getVariable(*V); //my
+
+                hints.addCommand
+                        (llvmberry::ConsPropagate::make
+                                 (llvmberry::ConsLessdef::make
+                                          (llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), //my = -y
+                                           llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, llvmberry::       Source),
+                                           llvmberry::Source),
+                                  llvmberry::ConsBounds::make
+                                          (llvmberry::ConsCommand::make(llvmberry::Source,
+                                                                        reg1_name), //From my to z = x -my
+                                           llvmberry::ConsCommand::make(llvmberry::Source, reg0_name)))
+                        );
+              }
+              );
+    }
+  }
+  // Constants can be considered to be negated values if they can be folded.
+  if (llvm::ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(V)) {
+    if (llvmberry::ValidationUnit::Exists()) {
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&I, &V, &C]
+                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+                std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
+
+                unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
+                int c1 = (int)C->getSExtValue();
+                int c2 = std::abs(c1);
+
+                hints.addCommand
+                        (llvmberry::ConsInfrule::make
+                                 (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsNegVal::make
+                                         (llvmberry::TyConstInt::make(c1,sz_bw),
+                                          llvmberry::TyConstInt::make(c2,sz_bw),
+                                          llvmberry::ConsSize::make(sz_bw))));
+              }
+              );
+    }
+  }
+//  if(ConstantDataVector *C = dyn_cast<ConstantDataVector>(V))
+//  {
+//  Todo
+//  }
 }
 
 /* position */

@@ -1611,63 +1611,6 @@ Value *InstCombiner::OptimizePointerDifference(Value *LHS, Value *RHS,
   return Builder->CreateIntCast(Result, Ty, true);
 }
 
-void generateHintforNegValue(Value *V, BinaryOperator &I) {
-
-  if (BinaryOperator::isNeg(V)) {
-    if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&V, &I]
-                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-
-                std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
-                std::string reg1_name = llvmberry::getVariable(*V); //my
-
-                hints.addCommand
-                        (llvmberry::ConsPropagate::make
-                                 (llvmberry::ConsLessdef::make
-                                          (llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), //my = -y
-                                           llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, llvmberry::Source),
-                                           llvmberry::Source),
-                                  llvmberry::ConsBounds::make
-                                          (llvmberry::ConsCommand::make(llvmberry::Source,
-                                                                        reg1_name), //From my to z = x -my
-                                           llvmberry::ConsCommand::make(llvmberry::Source, reg0_name)))
-                        );
-              }
-              );
-    }
-  }
-
-  // Constants can be considered to be negated values if they can be folded.
-  if (ConstantInt *C = dyn_cast<ConstantInt>(V)) {
-    if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&I, &V, &C]
-                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-
-                std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
-
-                unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
-                int c1 = (int)C->getSExtValue();
-                int c2 = std::abs(c1);
-
-                hints.addCommand
-                        (llvmberry::ConsInfrule::make
-                                 (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsNegVal::make
-                                         (llvmberry::TyConstInt::make(c1,sz_bw),
-                                          llvmberry::TyConstInt::make(c2,sz_bw),
-                                          llvmberry::ConsSize::make(sz_bw))));
-              }
-              );
-    }
-  }
-
-//  if(ConstantDataVector *C = dyn_cast<ConstantDataVector>(V))
-//  {
-    //Todo??
-//  }
-}
-
 Instruction *InstCombiner::visitSub(BinaryOperator &I) {
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
 
@@ -1699,7 +1642,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     llvmberry::ValidationUnit::Begin("sub_add",
                                      I.getParent()->getParent());
     
-    generateHintforNegValue(Op1, I); //Op1 will be propagate to Z if is id and infrule will be applied if is constant  
+    llvmberry::generateHintforNegValue(Op1, I); //Op1 will be propagate to Z if is id and infrule will be applied if is constant  
 
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&Op0, &I, &Op1, &V]

@@ -17,6 +17,8 @@ enum TyScope { Source = 0, Target };
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
+void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I);
+
 /* position */
 
 struct TyPositionPhinode {
