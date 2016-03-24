@@ -1,5 +1,0 @@
-cdcc58ad lib/LLVMBerry/ValidationUnit.cpp (Sanghoon Park 2016-03-10 12:33:13 +0900 138) void ValidationUnit::Begin(const std::string &optname, llvm::Function *func) {
-cdcc58ad lib/LLVMBerry/ValidationUnit.cpp (Sanghoon Park 2016-03-10 12:33:13 +0900 139)   assert(!Exists() && "ValidationUnit already exists");
-cdcc58ad lib/LLVMBerry/ValidationUnit.cpp (Sanghoon Park 2016-03-10 12:33:13 +0900 140)   _Instance = new ValidationUnit(optname, func);
-9cf5bc90 lib/LLVMberry/ValidationUnit.cpp (Sanghoon Park 2016-01-08 17:14:03 +0900 141) }
-9cf5bc90 lib/LLVMberry/ValidationUnit.cpp (Sanghoon Park 2016-01-08 17:14:03 +0900 142) 
