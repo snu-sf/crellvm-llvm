@@ -200,6 +200,9 @@ public:
   ConsId(std::unique_ptr<TyRegister> _register);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
+  static std::unique_ptr<TyValue> make(std::string _name,
+                                       enum TyTag _tag);
+
 private:
   std::unique_ptr<TyRegister> reg;
 };
@@ -235,38 +238,40 @@ private:
 
 // propagate expression
 
-struct TyPropagateExpr {
+struct TyExpr {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 };
 
-struct ConsVar : public TyPropagateExpr {
+struct ConsVar : public TyExpr {
 public:
   ConsVar(std::unique_ptr<TyRegister> _register_name);
   ConsVar(std::string _name, enum TyTag _tag);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPropagateExpr> make(std::string _name,
-                                               enum TyTag _tag);
+  static std::unique_ptr<TyExpr> make(std::string _name,
+                                      enum TyTag _tag);
 
 private:
   std::unique_ptr<TyRegister> register_name;
 };
 
-struct ConsRhs : public TyPropagateExpr {
+struct ConsRhs : public TyExpr {
 public:
-  ConsRhs(std::unique_ptr<TyRegister> _register_name);
-  ConsRhs(std::string _name, enum TyTag _tag);
+  ConsRhs(std::unique_ptr<TyRegister> _register_name, enum TyScope _scope);
+  ConsRhs(std::string _name, enum TyTag _tag, enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPropagateExpr> make(std::string _name,
-                                               enum TyTag _tag);
+  static std::unique_ptr<TyExpr> make(std::string _name,
+                                      enum TyTag _tag,
+                                      enum TyScope _scope);
 
 private:
   std::unique_ptr<TyRegister> register_name;
+  enum TyScope scope;
 };
 
-struct ConsConst : public TyPropagateExpr {
+struct ConsConst : public TyExpr {
 public:
   ConsConst(std::unique_ptr<TyConstant> _constant);
 
@@ -283,18 +288,18 @@ private:
 
 struct TyPropagateLessdef {
 public:
-  TyPropagateLessdef(std::unique_ptr<TyPropagateExpr> _lhs,
-                     std::unique_ptr<TyPropagateExpr> _rhs,
+  TyPropagateLessdef(std::unique_ptr<TyExpr> _lhs,
+                     std::unique_ptr<TyExpr> _rhs,
                      enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::unique_ptr<TyPropagateLessdef>
-  make(std::unique_ptr<TyPropagateExpr> _lhs,
-       std::unique_ptr<TyPropagateExpr> _rhs, enum TyScope _scope);
+  make(std::unique_ptr<TyExpr> _lhs,
+       std::unique_ptr<TyExpr> _rhs, enum TyScope _scope);
 
 private:
-  std::unique_ptr<TyPropagateExpr> lhs;
-  std::unique_ptr<TyPropagateExpr> rhs;
+  std::unique_ptr<TyExpr> lhs;
+  std::unique_ptr<TyExpr> rhs;
   enum TyScope scope;
 };
 
@@ -324,8 +329,8 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::unique_ptr<TyPropagateObject>
-  make(std::unique_ptr<TyPropagateExpr> _lhs,
-       std::unique_ptr<TyPropagateExpr> _rhs, enum TyScope _scope);
+  make(std::unique_ptr<TyExpr> _lhs,
+       std::unique_ptr<TyExpr> _rhs, enum TyScope _scope);
 
 private:
   std::unique_ptr<TyPropagateLessdef> propagate_lessdef;

@@ -1211,7 +1211,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       hints.addCommand(llvmberry::ConsPropagate::make(
           llvmberry::ConsLessdef::make(
               llvmberry::ConsVar::make(reg_my_name, llvmberry::Physical),
-              llvmberry::ConsRhs::make(reg_my_name, llvmberry::Physical),
+              llvmberry::ConsRhs::make(reg_my_name, llvmberry::Physical, llvmberry::Source),
               llvmberry::Source),
           llvmberry::ConsBounds::make(
               llvmberry::ConsCommand::make(llvmberry::Source, reg_my_name),
@@ -1258,7 +1258,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         hints.addCommand(llvmberry::ConsPropagate::make(
             llvmberry::ConsLessdef::make(
                 llvmberry::ConsVar::make(reg_my_name, llvmberry::Physical),
-                llvmberry::ConsRhs::make(reg_my_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_my_name, llvmberry::Physical, llvmberry::Source),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
                 llvmberry::ConsCommand::make(llvmberry::Source, reg_my_name),
@@ -1626,7 +1626,7 @@ void generateHintforNegValue(Value *V, BinaryOperator &I) {
                         (llvmberry::ConsPropagate::make
                                  (llvmberry::ConsLessdef::make
                                           (llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), //my = -y
-                                           llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical),
+                                           llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, llvmberry::Source),
                                            llvmberry::Source),
                                   llvmberry::ConsBounds::make
                                           (llvmberry::ConsCommand::make(llvmberry::Source,
@@ -1815,7 +1815,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         hints.addCommand(llvmberry::ConsPropagate::make(
             llvmberry::ConsLessdef::make(
                 llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
                 llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
