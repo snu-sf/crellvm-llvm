@@ -46,12 +46,11 @@ public:
   static void Begin(const std::string &optname, llvm::Function *func);
   static bool BeginIfNotExists(const std::string &optname,
                                llvm::Function *func);
-  static bool HasBegun();
   static void End();
   static bool EndIfExists();
+  static bool Exists();
 
 private:
-  static bool Exists();
   static ValidationUnit *_Instance;
   static int _Counter;
 };

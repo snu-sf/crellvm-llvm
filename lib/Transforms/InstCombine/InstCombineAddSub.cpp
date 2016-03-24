@@ -1614,7 +1614,7 @@ Value *InstCombiner::OptimizePointerDifference(Value *LHS, Value *RHS,
 void generateHintforNegValue(Value *V, BinaryOperator &I) {
 
   if (BinaryOperator::isNeg(V)) {
-    if (llvmberry::ValidationUnit::HasBegun()) {
+    if (llvmberry::ValidationUnit::Exists()) {
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&V, &I]
                        (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
@@ -1640,7 +1640,7 @@ void generateHintforNegValue(Value *V, BinaryOperator &I) {
 
   // Constants can be considered to be negated values if they can be folded.
   if (ConstantInt *C = dyn_cast<ConstantInt>(V)) {
-    if (llvmberry::ValidationUnit::HasBegun()) {
+    if (llvmberry::ValidationUnit::Exists()) {
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&I, &V, &C]
                        (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
