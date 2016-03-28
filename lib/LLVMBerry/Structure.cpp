@@ -929,6 +929,46 @@ void ConsAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
     return std::unique_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
   }
 
+TyMulNeg::TyMulNeg
+          (std::unique_ptr<TyRegister> _z,
+           std::unique_ptr<TyValue> _mx,
+           std::unique_ptr<TyValue> _my,
+           std::unique_ptr<TyValue> _x,
+           std::unique_ptr<TyValue> _y,
+           std::unique_ptr<TySize> _sz)
+          : z(std::move(_z)), mx(std::move(_mx)), my(std::move(_my)), x(std::move(_x)),
+            y(std::move(_y)), sz(std::move(_sz)) {}
+
+  void TyMulNeg::serialize(cereal::JSONOutputArchive &archive) const {
+    archive(CEREAL_NVP(z), CEREAL_NVP(mx), CEREAL_NVP(my),
+            CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
+  }
+
+  ConsMulNeg::ConsMulNeg(std::unique_ptr<TyMulNeg> _mul_neg)
+          : mul_neg(std::move(_mul_neg)) {}
+
+  void ConsMulNeg::serialize(cereal::JSONOutputArchive &archive) const {
+    archive.makeArray();
+    archive.writeName();
+
+    archive.saveValue("MulNeg");
+    archive(CEREAL_NVP(mul_neg));
+  }
+
+  std::unique_ptr<TyInfrule> ConsMulNeg::make
+          (std::unique_ptr<TyRegister> _z,
+           std::unique_ptr<TyValue> _mx,
+           std::unique_ptr<TyValue> _my,
+           std::unique_ptr<TyValue> _x,
+           std::unique_ptr<TyValue> _y,
+           std::unique_ptr<TySize> _sz) {
+    std::unique_ptr<TyMulNeg> _mul_neg
+            (new TyMulNeg
+                     (std::move(_z), std::move(_mx), std::move(_my),
+                      std::move(_x), std::move(_y), std::move(_sz)));
+    return std::unique_ptr<TyInfrule>(new ConsMulNeg(std::move(_mul_neg)));
+  }
+
   TyNegVal::TyNegVal
             (std::unique_ptr<TyConstInt> _c1,
              std::unique_ptr<TyConstInt> _c2,

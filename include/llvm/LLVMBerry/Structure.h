@@ -511,16 +511,35 @@ private:
 
 struct TyNegVal {
 public:
-    TyNegVal(std::unique_ptr<TyConstInt> _c1,
-             std::unique_ptr<TyConstInt> _c2,
-             std::unique_ptr<TySize> _sz);
-    void serialize(cereal::JSONOutputArchive &archive) const;
+  TyNegVal(std::unique_ptr<TyConstInt> _c1,
+           std::unique_ptr<TyConstInt> _c2,
+           std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-    std::unique_ptr<TyConstInt> c1;
-    std::unique_ptr<TyConstInt> c2;
-    std::unique_ptr<TySize> sz;
-  };
+  std::unique_ptr<TyConstInt> c1;
+  std::unique_ptr<TyConstInt> c2;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TyMulNeg {
+public:
+  TyMulNeg(std::unique_ptr<TyRegister> _z,
+           std::unique_ptr<TyValue> _mx,
+           std::unique_ptr<TyValue> _my,
+           std::unique_ptr<TyValue> _x,
+           std::unique_ptr<TyValue> _y,
+           std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyValue> mx;
+  std::unique_ptr<TyValue> my;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TySize> sz;
+};
 
 struct TySubRemove {
 public:
@@ -698,6 +717,22 @@ public:
 private:
   std::unique_ptr<TySubRemove> sub_remove;
 };
+
+struct ConsMulNeg : TyInfrule {
+public:
+    ConsMulNeg(std::unique_ptr<TyMulNeg> _mul_neg);
+    void serialize(cereal::JSONOutputArchive &archive) const;
+
+    static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
+                                           std::unique_ptr<TyValue> _mx,
+                                           std::unique_ptr<TyValue> _my,
+                                           std::unique_ptr<TyValue> _x,
+                                           std::unique_ptr<TyValue> _y,
+                                           std::unique_ptr<TySize> _sz);
+
+private:
+    std::unique_ptr<TyMulNeg> mul_neg;
+  };
 
 struct ConsMulBool : TyInfrule {
 public:
