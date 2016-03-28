@@ -787,6 +787,27 @@ std::unique_ptr<TyInfrule> ConsAddCommutative::make(
       new ConsAddCommutative(std::move(_add_comm)));
 }
 
+TyAddOnebit::TyAddOnebit(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)){
+}
+void TyAddOnebit::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsAddOnebit::ConsAddOnebit(std::unique_ptr<TyAddOnebit> _add_onebit) : add_onebit(std::move(_add_onebit)){
+}
+std::unique_ptr<TyInfrule> ConsAddOnebit::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y){
+  std::unique_ptr<TyAddOnebit> _val(new TyAddOnebit(std::move(_z), std::move(_x), std::move(_y)));
+  return std::unique_ptr<TyInfrule>(new ConsAddOnebit(std::move(_val)));
+}
+void ConsAddOnebit::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddOnebit");
+  archive(CEREAL_NVP(add_onebit));
+}
+
 TyAddShift::TyAddShift(std::unique_ptr<TyRegister> _y,
                        std::unique_ptr<TyValue> _v, std::unique_ptr<TySize> _sz)
     : y(std::move(_y)), v(std::move(_v)), sz(std::move(_sz)) {}
@@ -844,6 +865,30 @@ std::unique_ptr<TyInfrule> ConsAddSignbit::make(std::unique_ptr<TyRegister> _x,
       std::move(_x), std::move(_e1), std::move(_e2), std::move(_sz)));
   return std::unique_ptr<TyInfrule>(
       new ConsAddSignbit(std::move(_add_signbit)));
+}
+
+TyAddZextBool::TyAddZextBool(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _b, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz) : x(std::move(_x)), y(std::move(_y)), b(std::move(_b)), c(std::move(_c)), cprime(std::move(_cprime)), sz(std::move(_sz)){
+}
+void TyAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(c));
+  archive(CEREAL_NVP(cprime));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAddZextBool::ConsAddZextBool(std::unique_ptr<TyAddZextBool> _add_zext_bool) : add_zext_bool(std::move(_add_zext_bool)){
+}
+std::unique_ptr<TyInfrule> ConsAddZextBool::make(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _b, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz){
+  std::unique_ptr<TyAddZextBool> _val(new TyAddZextBool(std::move(_x), std::move(_y), std::move(_b), std::move(_c), std::move(_cprime), std::move(_sz)));
+  return std::unique_ptr<TyInfrule>(new ConsAddZextBool(std::move(_val)));
+}
+void ConsAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddZextBool");
+  archive(CEREAL_NVP(add_zext_bool));
 }
 
   TySubAdd::TySubAdd
