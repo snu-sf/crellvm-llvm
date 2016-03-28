@@ -2870,20 +2870,19 @@ bool InstCombiner::run() {
            llvmberry::ValidationUnit::Begin("dead_code_elim",
                             I->getParent()->getParent());
            llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&I]
-            (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-              std::string reg = llvmberry::getVariable(*I);
+             ([&I]
+             (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+               std::string reg = llvmberry::getVariable(*I);
 
                hints.addCommand(
                  llvmberry::ConsPropagate::make(
-                 llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
-                llvmberry::ConsGlobal::make()
+                   llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
+                   llvmberry::ConsGlobal::make()
                  )
                );
 
                insertTgtNopAtSrcI(hints, I);
-             }
-           );
+             });
           EraseInstFromFunction(*I);
           llvmberry::ValidationUnit::End();
         } else {
@@ -2941,16 +2940,15 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
           (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
             std::string reg = llvmberry::getVariable(*Inst);
 
-           hints.addCommand(
-             llvmberry::ConsPropagate::make(
-               llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
-               llvmberry::ConsGlobal::make()
-             )
-           );
+            hints.addCommand(
+              llvmberry::ConsPropagate::make(
+                llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
+                llvmberry::ConsGlobal::make()
+              )
+            );
 
-           insertTgtNopAtSrcI(hints, Inst);
-         }
-          );
+            insertTgtNopAtSrcI(hints, Inst);
+          });
  
         Inst->eraseFromParent();
         llvmberry::ValidationUnit::End();
