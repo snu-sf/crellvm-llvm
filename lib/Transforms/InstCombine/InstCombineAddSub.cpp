@@ -1664,7 +1664,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
                 }
               );
 
-      llvmberry::ValidationUnit::End();
 
     return Res;
   }
