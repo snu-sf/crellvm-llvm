@@ -2725,9 +2725,67 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
         return false;
   }
 
+  llvmberry::ValidationUnit::Begin("sink_inst",
+                                   I->getParent()->getParent());
+  // tgt nop in InsertPos
+//  llvmberry::insertTgtNopAtSrcI(llvmberry::ValidationUnit::GetInstance()->getHint(), I);
+  llvmberry::ValidationUnit::GetInstance()->intrude
+    ([&I](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+     insertTgtNopAtSrcI(hints,I);
+   //  std::string reg0_name = llvmberry::getVariable(*I);
+     }
+    );
+
+
   BasicBlock::iterator InsertPos = DestBlock->getFirstInsertionPt();
-  I->moveBefore(InsertPos);
-  ++NumSunkInst;
+ // I->moveBefore(InsertPos);
+ // ++NumSunkInst;
+// src nop in I location
+//  BasicBlock::iterator prevInsert = InsertPos;
+  llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&InsertPos](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+             insertSrcNopAtTgtI(hints,InsertPos);
+             }
+            );
+I->moveBefore(InsertPos);
+++NumSunkInst;
+BasicBlock::iterator prevInsert = --InsertPos;
+//  llvmberry::insertSrcNopAtTgtI(llvmberry::ValidationUnit::GetInstance()->getHint(),InsertPos);
+
+  llvmberry::ValidationUnit::GetInstance()->intrude
+          ([&I, &prevInsert]
+                   (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+            std::string reg0_name = llvmberry::getVariable(*I);  //original position
+            std::string reg2_name = llvmberry::getVariable(*prevInsert); //moved position
+
+            hints.addCommand
+                    (llvmberry::ConsPropagate::make
+                             (llvmberry::ConsLessdef::make
+                                      (llvmberry::ConsVar::make(reg0_name, llvmberry::Physical),
+                                       llvmberry::ConsRhs::make(reg0_name, llvmberry::Physical, llvmberry::Source),
+                                       llvmberry::Source),
+                              llvmberry::ConsBounds::make
+                                      (llvmberry::ConsCommand::make(llvmberry::Source,
+                                                                    reg0_name), //source propagate
+                                       llvmberry::ConsCommand::make(llvmberry::Target, reg2_name)))
+                    );
+
+            hints.addCommand
+                    (llvmberry::ConsPropagate::make //maydiff propagate
+                             (llvmberry::ConsMaydiff::make
+                                      (reg0_name, llvmberry::Physical),
+                              llvmberry::ConsBounds::make
+                                      (llvmberry::ConsCommand::make(llvmberry::Source,
+                                                                    reg0_name), 
+                                       llvmberry::ConsCommand::make(llvmberry::Target, reg2_name)))
+                    );
+
+          }
+          );
+
+
+
   return true;
 }
 
@@ -2803,6 +2861,7 @@ bool InstCombiner::run() {
           // Okay, the CFG is simple enough, try to sink this instruction.
           if (TryToSinkInstruction(I, UserParent)) {
             MadeIRChange = true;
+            llvmberry::ValidationUnit::EndIfExists();
             // We'll add uses of the sunk instruction below, but since sinking
             // can expose opportunities for it's *operands* add them to the
             // worklist
