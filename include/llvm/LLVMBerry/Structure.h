@@ -31,14 +31,37 @@ private:
   std::string prev_block_name;
 };
 
-struct TyPositionCommand {
+// exception for option type
+struct TyRegisterNameOption {
 public:
-  TyPositionCommand(enum TyScope _scope, std::string _register_name);
+  virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+};
+
+struct ConsRegisterNameNone : TyRegisterNameOption {
+public:
+  ConsRegisterNameNone();
+  void serialize(cereal::JSONOutputArchive &archive) const;
+};
+
+struct ConsRegisterNameSome : TyRegisterNameOption {
+public:
+  ConsRegisterNameSome(enum TyScope _scope, std::string _register_name);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
   enum TyScope scope;
   std::string register_name;
+};
+
+struct TyPositionCommand {
+public:
+  TyPositionCommand(std::string _block_name, int _index, std::unique_ptr<TyRegisterNameOption> _register_name);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::string block_name;
+  int index;
+  std::unique_ptr<TyRegisterNameOption> register_name;
 };
 
 struct TyPosition{
@@ -60,11 +83,10 @@ private:
 struct ConsCommand : public TyPosition {
 public:
   ConsCommand(std::unique_ptr<TyPositionCommand> _position_command);
-  ConsCommand(enum TyScope _scope, std::string _register_name);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
-                                          std::string _register_name);
+  static std::unique_ptr<TyPosition> make(const llvm::Instruction &I,
+                                          enum TyScope _scope);
 
 private:
   std::unique_ptr<TyPositionCommand> position_command;

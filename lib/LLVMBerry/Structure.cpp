@@ -63,6 +63,21 @@ std::string toString(llvmberry::TyFloatType float_type) {
   }
 }
 
+unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
+  const llvm::BasicBlock *parent = instr.getParent();
+  const llvm::BasicBlock::InstListType &instList = parent->getInstList();
+
+  unsigned int idx = 0;
+  for (llvm::BasicBlock::const_iterator itr = instList.begin();
+       itr != instList.end(); ++itr) {
+    if (&instr == &(*itr))
+      return idx;
+    idx++;
+  }
+
+  return (unsigned int)-1;
+}
+  
 } // anonymous
 
 namespace llvmberry {
@@ -135,6 +150,27 @@ bool name_instructions(llvm::Function &F) {
   return true;
 }
 
+int getCommandIndex(const llvm::Value &V) {
+  if (!llvm::isa<llvm::Instruction>(V))
+    return -1; // not an instruction
+
+  const llvm::Instruction *instr = llvm::dyn_cast<llvm::Instruction>(&V);
+
+  std::string block_name = getBasicBlockIndex(instr->getParent());
+
+  if (llvm::isa<llvm::PHINode>(instr)) {
+    return -1; // A phinode is not a command
+  } else if (instr->isTerminator()) {
+    return -1; // A terminator is not a command
+  } else {
+    unsigned int rawIndex = getRawInstrIndex(*instr);
+    const llvm::BasicBlock *parent = instr->getParent();
+    unsigned int firstNonPhiRawIndex =
+        getRawInstrIndex(*parent->getFirstNonPHI());
+    return (int)(rawIndex - firstNonPhiRawIndex);
+  }
+}
+  
 // insert nop at tgt where I is at src
 void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I) {
   if (I == I->getParent()->getFirstNonPHI()) {
@@ -165,55 +201,54 @@ void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
 
   if (llvm::BinaryOperator::isNeg(V)) {
     if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&V, &I]
-                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      llvmberry::ValidationUnit::GetInstance()->intrude([&V, &I](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
 
-                std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
-                std::string reg1_name = llvmberry::getVariable(*V); //my
+        std::string reg0_name = llvmberry::getVariable(I); // z = x -my
+        std::string reg1_name = llvmberry::getVariable(*V); // my
 
-                hints.addCommand
-                        (llvmberry::ConsPropagate::make
-                                 (llvmberry::ConsLessdef::make
-                                          (llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), //my = -y
-                                           llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, llvmberry::       Source),
-                                           llvmberry::Source),
-                                  llvmberry::ConsBounds::make
-                                          (llvmberry::ConsCommand::make(llvmberry::Source,
-                                                                        reg1_name), //From my to z = x -my
-                                           llvmberry::ConsCommand::make(llvmberry::Source, reg0_name)))
-                        );
-              }
-              );
+        llvm::Instruction *Vins = llvm::dyn_cast<llvm::Instruction>(V);
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg1_name,
+                                         llvmberry::Physical), // my = -y
+                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical,
+                                         llvmberry::Source),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::ConsCommand::make(
+                    *Vins, llvmberry::Source), // From my to z = x -my
+                llvmberry::ConsCommand::make(I, llvmberry::Source))));
+      });
     }
   }
   // Constants can be considered to be negated values if they can be folded.
   if (llvm::ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(V)) {
     if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&I, &V, &C]
-                       (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V, &C](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
 
-                std::string reg0_name = llvmberry::getVariable(I);  //z = x -my
+        std::string reg0_name = llvmberry::getVariable(I); // z = x -my
 
-                unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
-                int c1 = (int)C->getSExtValue();
-                int c2 = std::abs(c1);
+        unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
+        int c1 = (int)C->getSExtValue();
+        int c2 = std::abs(c1);
 
-                hints.addCommand
-                        (llvmberry::ConsInfrule::make
-                                 (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsNegVal::make
-                                         (llvmberry::TyConstInt::make(c1,sz_bw),
-                                          llvmberry::TyConstInt::make(c2,sz_bw),
-                                          llvmberry::ConsSize::make(sz_bw))));
-              }
-              );
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::ConsCommand::make(I, llvmberry::Source),
+            llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
+                                        llvmberry::TyConstInt::make(c2, sz_bw),
+                                        llvmberry::ConsSize::make(sz_bw))));
+      });
     }
   }
-//  if(ConstantDataVector *C = dyn_cast<ConstantDataVector>(V))
-//  {
-//  Todo
-//  }
+  //  if(ConstantDataVector *C = dyn_cast<ConstantDataVector>(V))
+  //  {
+  //  Todo
+  //  }
 }
 
 /* position */
@@ -226,13 +261,41 @@ void TyPositionPhinode::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(block_name), CEREAL_NVP(prev_block_name));
 }
 
-TyPositionCommand::TyPositionCommand(enum TyScope _scope,
-                                     std::string _register_name)
+ConsRegisterNameNone::ConsRegisterNameNone() {}
+
+void ConsRegisterNameNone::serialize(cereal::JSONOutputArchive &archive) const {
+  // TODO: check
+  archive.setNextName("register_name");
+  std::string s("None");
+  archive(s);
+
+  // archive("None");
+}
+
+ConsRegisterNameSome::ConsRegisterNameSome(enum TyScope _scope,
+                                           std::string _register_name)
     : scope(_scope), register_name(_register_name) {}
 
+void ConsRegisterNameSome::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("Some");
+  archive.startNode();
+  archive.makeArray();
+  archive(toString(scope), register_name);
+  archive.finishNode();
+}
+
+TyPositionCommand::TyPositionCommand(
+    std::string _block_name, int _index,
+    std::unique_ptr<TyRegisterNameOption> _register_name)
+    : block_name(_block_name), index(_index),
+      register_name(std::move(_register_name)) {}
+
 void TyPositionCommand::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("scope", toString(scope)),
-          CEREAL_NVP(register_name));
+  archive(CEREAL_NVP(block_name), CEREAL_NVP(index));
+  archive(CEREAL_NVP(register_name));
 }
 
 ConsPhinode::ConsPhinode(std::unique_ptr<TyPositionPhinode> _position_phinode)
@@ -252,9 +315,6 @@ void ConsPhinode::serialize(cereal::JSONOutputArchive &archive) const {
 ConsCommand::ConsCommand(std::unique_ptr<TyPositionCommand> _position_command)
     : position_command(std::move(_position_command)) {}
 
-ConsCommand::ConsCommand(enum TyScope _scope, std::string _register_name)
-    : position_command(new TyPositionCommand(_scope, _register_name)) {}
-
 void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
@@ -263,9 +323,27 @@ void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(position_command));
 }
 
-std::unique_ptr<TyPosition> ConsCommand::make(enum TyScope _scope,
-                                              std::string _register_name) {
-  return std::unique_ptr<TyPosition>(new ConsCommand(_scope, _register_name));
+std::unique_ptr<TyPosition> ConsCommand::make(const llvm::Instruction &I,
+                                              enum TyScope _scope) {
+  int _index = getCommandIndex(I);
+
+  std::string _block_name = getBasicBlockIndex(I.getParent());
+  std::string _register_name = getVariable(I);
+
+  std::unique_ptr<TyRegisterNameOption> reg_option;
+
+  if (_register_name.empty()) {
+    reg_option =
+        std::unique_ptr<TyRegisterNameOption>(new ConsRegisterNameNone());
+  } else {
+    reg_option = std::unique_ptr<TyRegisterNameOption>(
+        new ConsRegisterNameSome(_scope, _register_name));
+  }
+
+  std::unique_ptr<TyPositionCommand> _pos_cmd(
+      new TyPositionCommand(_block_name, _index, std::move(reg_option)));
+
+  return std::unique_ptr<TyPosition>(new ConsCommand(std::move(_pos_cmd)));
 }
 
 ConsPhinodeCurrentBlockName::ConsPhinodeCurrentBlockName(
