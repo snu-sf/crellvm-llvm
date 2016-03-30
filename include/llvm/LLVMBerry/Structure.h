@@ -17,7 +17,12 @@ enum TyScope { Source = 0, Target };
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
-void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I);
+void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I);
+void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
+        llvm::BinaryOperator *X, 
+        llvm::SelectInst *Y, 
+        bool needs_commutativity,
+        bool is_leftform);
 
 /* position */
 
@@ -427,6 +432,65 @@ private:
   std::unique_ptr<TySize> sz;
 };
 
+struct TyAddConstNot{
+public : 
+  TyAddConstNot(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyConstInt> c1;
+  std::unique_ptr<TyConstInt> c2;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TyAddMask{
+public : 
+  TyAddMask(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyRegister> yprime;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyConstInt> c1;
+  std::unique_ptr<TyConstInt> c2;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TyAddSelectZero{
+public : 
+  TyAddSelectZero(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyValue> c;
+  std::unique_ptr<TyValue> n;
+  std::unique_ptr<TyValue> a;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TyAddSelectZero2{
+public : 
+  TyAddSelectZero2(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyValue> c;
+  std::unique_ptr<TyValue> n;
+  std::unique_ptr<TyValue> a;
+  std::unique_ptr<TySize> sz;
+};
+
 struct TyAddOnebit{
 public : 
   TyAddOnebit(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y);
@@ -601,6 +665,16 @@ private:
   std::unique_ptr<TyAddAssociative> add_associative;
 };
 
+struct ConsAddConstNot : public TyInfrule{
+public : 
+  ConsAddConstNot(std::unique_ptr<TyAddConstNot> _add_const_not);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyAddConstNot> add_const_not;
+};
+
 struct ConsAddOnebit : public TyInfrule{
 public : 
   ConsAddOnebit(std::unique_ptr<TyAddOnebit> _add_onebit);
@@ -609,6 +683,36 @@ public :
 
 private : 
   std::unique_ptr<TyAddOnebit> add_onebit;
+};
+
+struct ConsAddMask : public TyInfrule{
+public : 
+  ConsAddMask(std::unique_ptr<TyAddMask> _add_mask);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyAddMask> add_mask;
+};
+
+struct ConsAddSelectZero : public TyInfrule{
+public : 
+  ConsAddSelectZero(std::unique_ptr<TyAddSelectZero> _add_select_zero);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyAddSelectZero> add_select_zero;
+};
+
+struct ConsAddSelectZero2 : public TyInfrule{
+public : 
+  ConsAddSelectZero2(std::unique_ptr<TyAddSelectZero2> _add_select_zero2);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyAddSelectZero2> add_select_zero2;
 };
 
 struct ConsAddSub : TyInfrule {

@@ -1286,8 +1286,49 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
   if (Constant *CRHS = dyn_cast<Constant>(RHS)) {
     Value *X;
-    if (match(LHS, m_Not(m_Value(X)))) // ~X + C --> (C-1) - X
+    if (match(LHS, m_Not(m_Value(X)))){ // ~X + C --> (C-1) - X
+      llvmberry::ValidationUnit::Begin("add_const_not", I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&CRHS, &LHS, &I, &X](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        // Y = X ^ -1
+        // Z = Y + C1
+        Instruction *Y = dyn_cast<Instruction>(LHS);
+        ConstantInt *C1_ptr = dyn_cast<ConstantInt>(CRHS);
+        int C1 = C1_ptr->getSExtValue();
+        Instruction *Z = &I;
+
+        // prepare variables
+        std::string reg_y_name = llvmberry::getVariable(*Y);
+        std::string reg_z_name = llvmberry::getVariable(*Z);
+        std::string reg_x_name = llvmberry::getVariable(*X);
+
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        // propagate "Y = X ^ -1"
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
+                llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+
+        // To Z, apply add_const_not
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+            llvmberry::ConsAddConstNot::make(
+                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*X),
+                llvmberry::TyConstInt::make(C1, bitwidth),
+                llvmberry::TyConstInt::make(C1 - 1, bitwidth),
+                llvmberry::ConsSize::make(bitwidth))));
+      });
+
       return BinaryOperator::CreateSub(SubOne(CRHS), X);
+    }
   }
 
   if (ConstantInt *CRHS = dyn_cast<ConstantInt>(RHS)) {
@@ -1308,8 +1349,72 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       APInt AddRHSHighBitsAnd(AddRHSHighBits & C2->getValue());
 
       if (AddRHSHighBits == AddRHSHighBitsAnd) {
+        llvmberry::ValidationUnit::Begin("add_mask", I.getParent()->getParent());
+        
         // Okay, the xform is safe.  Insert the new add pronto.
         Value *NewAdd = Builder->CreateAdd(X, CRHS, LHS->getName());
+        
+        llvmberry::ValidationUnit::GetInstance()->intrude([&I, &LHS, &CRHS, &X, &C2, &NewAdd](
+            llvmberry::ValidationUnit::Dictionary &data,
+            llvmberry::CoreHint &hints) {
+          //   <src>     |     <tgt>
+          // Y = X & c2  | Y  = X  & c2
+          // nop         | Y' = X  + c1
+          // Z = Y + c1  | Z  = Y' & c2
+          
+          int c1 = CRHS->getSExtValue();
+          int c2 = C2->getSExtValue();
+          Instruction *Y = dyn_cast<Instruction>(LHS);
+          Instruction *Z = dyn_cast<Instruction>(&I);
+          Instruction *Yprime = dyn_cast<Instruction>(NewAdd);
+
+          // prepare variables
+          std::string reg_y_name = llvmberry::getVariable(*Y);
+          std::string reg_z_name = llvmberry::getVariable(*Z);
+          std::string reg_x_name = llvmberry::getVariable(*X);
+          std::string reg_yprime_name = llvmberry::getVariable(*Yprime);
+
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+
+          // propagate "Y = X & c2" in target
+          hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsLessdef::make(
+                  llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Target),
+                  llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
+                  llvmberry::Target),
+              llvmberry::ConsBounds::make(
+                  llvmberry::ConsCommand::make(llvmberry::Target, reg_y_name),
+                  llvmberry::ConsCommand::make(llvmberry::Target, reg_z_name))));
+
+          // propagate "Y' = X + c1" in target
+          hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsLessdef::make(
+                  llvmberry::ConsRhs::make(reg_yprime_name, llvmberry::Physical, llvmberry::Target),
+                  llvmberry::ConsVar::make(reg_yprime_name, llvmberry::Physical),
+                  llvmberry::Target),
+              llvmberry::ConsBounds::make(
+                  llvmberry::ConsCommand::make(llvmberry::Target, reg_yprime_name),
+                  llvmberry::ConsCommand::make(llvmberry::Target, reg_z_name))));
+
+          // To Z, apply add_mask
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              llvmberry::ConsCommand::make(llvmberry::Target, reg_z_name),
+              llvmberry::ConsAddMask::make(
+                  llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                  llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                  llvmberry::TyRegister::make(reg_yprime_name, llvmberry::Physical),
+                  llvmberry::TyValue::make(*X),
+                  llvmberry::TyConstInt::make(c1, bitwidth),
+                  llvmberry::TyConstInt::make(c2, bitwidth),
+                  llvmberry::ConsSize::make(bitwidth))));
+          
+          // Propagate yp_var maydiff global
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                  llvmberry::ConsMaydiff::make(reg_yprime_name, llvmberry::Physical),
+                  llvmberry::ConsGlobal::make()));
+                  
+          insertSrcNopAtTgtI(hints, Yprime);
+        });
         return BinaryOperator::CreateAnd(NewAdd, C2);
       }
     }
@@ -1324,9 +1429,11 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   {
     SelectInst *SI = dyn_cast<SelectInst>(LHS);
     Value *A = RHS;
+    bool llvmberry_needsCommutativity = false;
     if (!SI) {
       SI = dyn_cast<SelectInst>(RHS);
       A = LHS;
+      llvmberry_needsCommutativity = true;
     }
     if (SI && SI->hasOneUse()) {
       Value *TV = SI->getTrueValue();
@@ -1335,13 +1442,25 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
       // Can we fold the add into the argument of the select?
       // We check both true and false select arguments for a matching subtract.
-      if (match(FV, m_Zero()) && match(TV, m_Sub(m_Value(N), m_Specific(A))))
+      if (match(FV, m_Zero()) && match(TV, m_Sub(m_Value(N), m_Specific(A)))){
+        llvmberry::ValidationUnit::Begin("add_select_zero", I.getParent()->getParent());
+        llvmberry::generateHintForAddSelectZero(&I, dyn_cast<BinaryOperator>(TV), SI,
+                llvmberry_needsCommutativity,
+                true);
+        
         // Fold the add into the true select value.
         return SelectInst::Create(SI->getCondition(), N, A);
+      }
 
-      if (match(TV, m_Zero()) && match(FV, m_Sub(m_Value(N), m_Specific(A))))
+      if (match(TV, m_Zero()) && match(FV, m_Sub(m_Value(N), m_Specific(A)))){
+        llvmberry::ValidationUnit::Begin("add_select_zero2", I.getParent()->getParent());
+        llvmberry::generateHintForAddSelectZero(&I, dyn_cast<BinaryOperator>(FV), SI,
+                llvmberry_needsCommutativity,
+                false);
+
         // Fold the add into the false select value.
         return SelectInst::Create(SI->getCondition(), A, N);
+      }
     }
   }
 
@@ -1642,7 +1761,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     llvmberry::ValidationUnit::Begin("sub_add",
                                      I.getParent()->getParent());
     
-    llvmberry::generateHintforNegValue(Op1, I); //Op1 will be propagate to Z if is id and infrule will be applied if is constant  
+    llvmberry::generateHintForNegValue(Op1, I); //Op1 will be propagate to Z if is id and infrule will be applied if is constant  
 
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&Op0, &I, &Op1, &V]

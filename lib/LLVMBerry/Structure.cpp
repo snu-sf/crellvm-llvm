@@ -161,7 +161,7 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
   }
 }
 
-void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
+void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
 
   if (llvm::BinaryOperator::isNeg(V)) {
     if (llvmberry::ValidationUnit::Exists()) {
@@ -214,6 +214,97 @@ void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
 //  {
 //  Todo
 //  }
+}
+
+void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
+                                  llvm::BinaryOperator *X, 
+                                  llvm::SelectInst *Y, 
+                                  bool needs_commutativity,
+                                  bool is_leftform){
+  assert(Z);
+  assert(X);
+  assert(Y);
+  llvmberry::ValidationUnit::GetInstance()->intrude([&Z, &X, &Y, 
+                needs_commutativity, is_leftform](
+      llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    // is_leftform == true : 
+    //   <src>                          |     <tgt>
+    // X = n - a                        | Z = n - a
+    // Y = select c ? x : 0             | Y = select c ? x : 0
+    // Z = Y + a                        | Z = select c ? n : a
+ 
+    // is_leftform == false : 
+    //   <src>                          |     <tgt>
+    // X = n - a                        | Z = n - a
+    // Y = select c ? 0 : x             | Y = select c ? 0 : x
+    // Z = Y + a                        | Z = select c ? a : n
+    
+    llvm::Value *c = Y->getCondition();
+    llvm::Value *n = X->getOperand(0);
+    llvm::Value *a = X->getOperand(1);
+    llvm::Value *a_Z = Z->getOperand(1);
+    int bitwidth = Z->getType()->getIntegerBitWidth();
+
+    // prepare variables
+    std::string reg_y_name = llvmberry::getVariable(*Y);
+    std::string reg_z_name = llvmberry::getVariable(*Z);
+    std::string reg_x_name = llvmberry::getVariable(*X);
+
+    // Propagate "X = n - a"
+    hints.addCommand(llvmberry::ConsPropagate::make(
+        llvmberry::ConsLessdef::make(
+            llvmberry::ConsVar::make(reg_x_name, llvmberry::Physical),
+            llvmberry::ConsRhs::make(reg_x_name, llvmberry::Physical, llvmberry::Source),
+            llvmberry::Source),
+        llvmberry::ConsBounds::make(
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_x_name),
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+
+    // Propagate "Y = select c ? x : 0" or "Y = select c ? 0 : x"
+    hints.addCommand(llvmberry::ConsPropagate::make(
+        llvmberry::ConsLessdef::make(
+            llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
+            llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
+            llvmberry::Source),
+        llvmberry::ConsBounds::make(
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
+            llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+
+    if(needs_commutativity){
+      hints.addCommand(llvmberry::ConsInfrule::make(
+        llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+        llvmberry::ConsAddCommutative::make(
+            llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+            llvmberry::TyValue::make(*Y),
+            llvmberry::TyValue::make(*a_Z),
+            llvmberry::ConsSize::make(bitwidth))));
+    }
+    
+    if(is_leftform){
+      hints.addCommand(llvmberry::ConsInfrule::make(
+        llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+        llvmberry::ConsAddSelectZero::make(
+            llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+            llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
+            llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+            llvmberry::TyValue::make(*c),
+            llvmberry::TyValue::make(*n),
+            llvmberry::TyValue::make(*a),
+            llvmberry::ConsSize::make(bitwidth))));
+    }else{
+      hints.addCommand(llvmberry::ConsInfrule::make(
+        llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+        llvmberry::ConsAddSelectZero2::make(
+            llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+            llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
+            llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+            llvmberry::TyValue::make(*c),
+            llvmberry::TyValue::make(*n),
+            llvmberry::TyValue::make(*a),
+            llvmberry::ConsSize::make(bitwidth))));
+    }
+  });
 }
 
 /* position */
@@ -696,6 +787,105 @@ TyAddAssociative::TyAddAssociative(std::unique_ptr<TyRegister> _x,
 void TyAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(z), CEREAL_NVP(c1),
           CEREAL_NVP(c2), CEREAL_NVP(c3), CEREAL_NVP(sz));
+}
+
+TyAddConstNot::TyAddConstNot(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
+}
+void TyAddConstNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(c1));
+  archive(CEREAL_NVP(c2));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAddConstNot::ConsAddConstNot(std::unique_ptr<TyAddConstNot> _add_const_not) : add_const_not(std::move(_add_const_not)){
+}
+std::unique_ptr<TyInfrule> ConsAddConstNot::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz){
+  std::unique_ptr<TyAddConstNot> _val(new TyAddConstNot(std::move(_z), std::move(_y), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
+  return std::unique_ptr<TyInfrule>(new ConsAddConstNot(std::move(_val)));
+}
+void ConsAddConstNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddConstNot");
+  archive(CEREAL_NVP(add_const_not));
+}
+
+TyAddMask::TyAddMask(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), yprime(std::move(_yprime)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
+}
+void TyAddMask::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(yprime));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(c1));
+  archive(CEREAL_NVP(c2));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAddMask::ConsAddMask(std::unique_ptr<TyAddMask> _add_mask) : add_mask(std::move(_add_mask)){
+}
+std::unique_ptr<TyInfrule> ConsAddMask::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz){
+  std::unique_ptr<TyAddMask> _val(new TyAddMask(std::move(_z), std::move(_y), std::move(_yprime), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
+  return std::unique_ptr<TyInfrule>(new ConsAddMask(std::move(_val)));
+}
+void ConsAddMask::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddMask");
+  archive(CEREAL_NVP(add_mask));
+}
+
+TyAddSelectZero::TyAddSelectZero(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), c(std::move(_c)), n(std::move(_n)), a(std::move(_a)), sz(std::move(_sz)){
+}
+void TyAddSelectZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(c));
+  archive(CEREAL_NVP(n));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAddSelectZero::ConsAddSelectZero(std::unique_ptr<TyAddSelectZero> _add_select_zero) : add_select_zero(std::move(_add_select_zero)){
+}
+std::unique_ptr<TyInfrule> ConsAddSelectZero::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz){
+  std::unique_ptr<TyAddSelectZero> _val(new TyAddSelectZero(std::move(_z), std::move(_x), std::move(_y), std::move(_c), std::move(_n), std::move(_a), std::move(_sz)));
+  return std::unique_ptr<TyInfrule>(new ConsAddSelectZero(std::move(_val)));
+}
+void ConsAddSelectZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddSelectZero");
+  archive(CEREAL_NVP(add_select_zero));
+}
+
+TyAddSelectZero2::TyAddSelectZero2(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), c(std::move(_c)), n(std::move(_n)), a(std::move(_a)), sz(std::move(_sz)){
+}
+void TyAddSelectZero2::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(c));
+  archive(CEREAL_NVP(n));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAddSelectZero2::ConsAddSelectZero2(std::unique_ptr<TyAddSelectZero2> _add_select_zero2) : add_select_zero2(std::move(_add_select_zero2)){
+}
+std::unique_ptr<TyInfrule> ConsAddSelectZero2::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz){
+  std::unique_ptr<TyAddSelectZero2> _val(new TyAddSelectZero2(std::move(_z), std::move(_x), std::move(_y), std::move(_c), std::move(_n), std::move(_a), std::move(_sz)));
+  return std::unique_ptr<TyInfrule>(new ConsAddSelectZero2(std::move(_val)));
+}
+void ConsAddSelectZero2::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddSelectZero2");
+  archive(CEREAL_NVP(add_select_zero2));
 }
 
 TyAddSub::TyAddSub(std::unique_ptr<TyRegister> _minusy,
