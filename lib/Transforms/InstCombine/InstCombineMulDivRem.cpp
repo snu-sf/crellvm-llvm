@@ -317,7 +317,6 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
                                       llvmberry::ConsSize::make(sz_bw))));
         }
       );
-      llvmberry::ValidationUnit::End(); 
       return BO;
     }
   }
