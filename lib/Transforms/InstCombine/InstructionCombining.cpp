@@ -2761,8 +2761,8 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                        llvmberry::ConsRhs::make(reg0_name, llvmberry::Physical, llvmberry::Source),
                                        llvmberry::Source),
                               llvmberry::ConsBounds::make
-                                      (llvmberry::ConsCommand::make(llvmberry::Source, reg0_name), 
-                                       llvmberry::ConsCommand::make(llvmberry::Target, reg0_name)))
+                                      (llvmberry::TyPosition::make(llvmberry::Source, *I), 
+                                       llvmberry::TyPosition::make(llvmberry::Target, *I)))
                     );
 //prev maydiff propagate global -> issue
             hints.addCommand
@@ -2777,8 +2777,8 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                              (llvmberry::ConsMaydiff::make
                                       (reg0_name, llvmberry::Physical),
                               llvmberry::ConsBounds::make
-                                      (llvmberry::ConsCommand::make(llvmberry::Source, reg0_name), 
-                                       llvmberry::ConsCommand::make(llvmberry::Target, reg0_name)))
+                                      (llvmberry::TyPosition::make(llvmberry::Source, *I), 
+                                       llvmberry::TyPosition::make(llvmberry::Target, *I)))
                     );
 
           }
