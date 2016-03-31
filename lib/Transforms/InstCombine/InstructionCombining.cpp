@@ -2757,14 +2757,18 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
              hints.addCommand
                     (llvmberry::ConsPropagate::make   //source propagate
                              (llvmberry::ConsLessdef::make
-                                      (llvmberry::ConsVar::make(reg0_name, llvmberry::Physical),
-                                       llvmberry::ConsRhs::make(reg0_name, llvmberry::Physical, llvmberry::Source),
+                                      (llvmberry::ConsVar::make
+                                       (reg0_name, llvmberry::Physical),
+                                       llvmberry::ConsRhs::make
+                                       (reg0_name, llvmberry::Physical, llvmberry::Source),
                                        llvmberry::Source),
                               llvmberry::ConsBounds::make
-                                      (llvmberry::TyPosition::make(llvmberry::Source, *I), 
-                                       llvmberry::TyPosition::make(llvmberry::Target, *I)))
+                                      (llvmberry::TyPosition::make
+                                       (llvmberry::Source, *I), 
+                                       llvmberry::TyPosition::make
+                                       (llvmberry::Target, *I)))
                     );
-//prev maydiff propagate global -> issue
+//prev maydiff propagate global -> issue 86
             hints.addCommand
                     (llvmberry::ConsPropagate::make
                              (llvmberry::ConsMaydiff::make
@@ -2777,8 +2781,10 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                              (llvmberry::ConsMaydiff::make
                                       (reg0_name, llvmberry::Physical),
                               llvmberry::ConsBounds::make
-                                      (llvmberry::TyPosition::make(llvmberry::Source, *I), 
-                                       llvmberry::TyPosition::make(llvmberry::Target, *I)))
+                                      (llvmberry::TyPosition::make
+                                       (llvmberry::Source, *I), 
+                                       llvmberry::TyPosition::make
+                                       (llvmberry::Target, *I)))
                     );
 
           }
@@ -2786,7 +2792,9 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
 
   I->moveBefore(InsertPos);
   ++NumSunkInst;
-
+  
+  llvmberry::ValidationUnit::End();
+  
   return true;
 }
 
@@ -2862,7 +2870,6 @@ bool InstCombiner::run() {
           // Okay, the CFG is simple enough, try to sink this instruction.
           if (TryToSinkInstruction(I, UserParent)) {
             MadeIRChange = true;
-            llvmberry::ValidationUnit::EndIfExists();
             // We'll add uses of the sunk instruction below, but since sinking
             // can expose opportunities for it's *operands* add them to the
             // worklist
