@@ -2786,7 +2786,6 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                        llvmberry::TyPosition::make
                                        (llvmberry::Target, *I)))
                     );
-
           }
           );
 
@@ -2794,7 +2793,6 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
   ++NumSunkInst;
   
   llvmberry::ValidationUnit::End();
-  
   return true;
 }
 
