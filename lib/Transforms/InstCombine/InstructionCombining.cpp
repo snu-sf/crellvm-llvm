@@ -208,7 +208,6 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
-
           llvmberry::ValidationUnit::Begin("associativity_add",
                                            I.getParent()->getParent());
 
@@ -216,56 +215,72 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
           I.setOperand(0, A);
           I.setOperand(1, V);
 
-          llvmberry::ValidationUnit::GetInstance()->intrude([&Op0, &I, &B, &C,
-                                                             &V](
-              llvmberry::ValidationUnit::Dictionary &data,
-              llvmberry::CoreHint &hints) {
-            // Op0: A op B
-            // I: Op0 op C
-            // V: B op C
+          if (isa<ConstantInt>(B) && isa<ConstantInt>(C) && isa<ConstantInt>(V) && (Opcode == Instruction::Add)) {
 
-            // prepare variables
-            std::string reg0_name =
-                llvmberry::getVariable(*(Op0->getOperand(0)));
-            std::string reg1_name = llvmberry::getVariable(*Op0);
-            std::string reg2_name = llvmberry::getVariable(I);
+            llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&Op0, &I, &B, &C, &V]
+               (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+                // Op0: A op B
+                // I: Op0 op C
+                // V: B op C
 
-            ConstantInt *B_const = dyn_cast<ConstantInt>(B);
-            ConstantInt *C_const = dyn_cast<ConstantInt>(C);
-            ConstantInt *V_const = dyn_cast<ConstantInt>(V);
+                // prepare variables
+                std::string reg0_name = llvmberry::getVariable(*(Op0->getOperand(0)));
+                std::string reg1_name = llvmberry::getVariable(*Op0);
+                std::string reg2_name = llvmberry::getVariable(I);
 
-            unsigned b_bw = B_const->getBitWidth();
-            unsigned c_bw = C_const->getBitWidth();
-            unsigned v_bw = V_const->getBitWidth();
+                ConstantInt *B_const = dyn_cast<ConstantInt>(B);
+                ConstantInt *C_const = dyn_cast<ConstantInt>(C);
+                ConstantInt *V_const = dyn_cast<ConstantInt>(V);
 
-            int b = (int)B_const->getSExtValue();
-            int c = (int)C_const->getSExtValue();
-            int v = (int)V_const->getSExtValue();
+                unsigned b_bw = B_const->getBitWidth();
+                unsigned c_bw = C_const->getBitWidth();
+                unsigned v_bw = V_const->getBitWidth();
 
-            hints.addCommand(llvmberry::ConsPropagate::make(
-                llvmberry::ConsLessdef::make(
-                    llvmberry::ConsVar::make(reg1_name, llvmberry::Physical),
-                    llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, llvmberry::Source),
-                    llvmberry::Source),
-                llvmberry::ConsBounds::make(
-                    llvmberry::ConsCommand::make(llvmberry::Source, reg1_name),
-                    llvmberry::ConsCommand::make(llvmberry::Source,
-                                                 reg2_name))));
+                int b = (int)B_const->getSExtValue();
+                int c = (int)C_const->getSExtValue();
+                int v = (int)V_const->getSExtValue();
 
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                llvmberry::ConsCommand::make(llvmberry::Source, reg2_name),
-                llvmberry::ConsAddAssociative::make(
-                    llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
-                    llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
-                    llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
-                    llvmberry::TyConstInt::make(b, b_bw),
-                    llvmberry::TyConstInt::make(c, c_bw),
-                    llvmberry::TyConstInt::make(v, v_bw),
-                    llvmberry::ConsSize::make(b_bw))));
-          });
+                hints.addCommand
+                  (llvmberry::ConsPropagate::make
+                   (llvmberry::ConsLessdef::make
+                    (llvmberry::ConsVar::make
+                     (reg1_name, llvmberry::Physical),
+                     llvmberry::ConsRhs::make
+                     (reg1_name, llvmberry::Physical, llvmberry::Source),
+                     llvmberry::Source)
+                    ,
+                    llvmberry::ConsBounds::make
+                    (llvmberry::ConsCommand::make
+                     (llvmberry::Source, reg1_name),
+                     llvmberry::ConsCommand::make
+                     (llvmberry::Source, reg2_name))
+                    )
+                   );
 
+                hints.addCommand
+                  (llvmberry::ConsInfrule::make
+                   (llvmberry::ConsCommand::make
+                    (llvmberry::Source, reg2_name),
+                    llvmberry::ConsAddAssociative::make
+                    (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
+                     llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
+                     llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
+                     llvmberry::TyConstInt::make(b, b_bw),
+                     llvmberry::TyConstInt::make(c, c_bw),
+                     llvmberry::TyConstInt::make(v, v_bw),
+                     llvmberry::ConsSize::make(b_bw)
+                     )
+                    )
+                   );
+              }
+               );
+
+          } else {
+            llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+          }
           llvmberry::ValidationUnit::End();
-
+          
           // Conservatively clear the optional flags, since they may not be
           // preserved by the reassociation.
           if (MaintainNoSignedWrap(I, B, C) &&
@@ -2909,7 +2924,25 @@ bool InstCombiner::run() {
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
+          llvmberry::name_instructions(*(I->getParent()->getParent()));
+           llvmberry::ValidationUnit::Begin("dead_code_elim",
+                            I->getParent()->getParent());
+           llvmberry::ValidationUnit::GetInstance()->intrude
+             ([&I]
+             (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+               std::string reg = llvmberry::getVariable(*I);
+
+               hints.addCommand(
+                 llvmberry::ConsPropagate::make(
+                   llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
+                   llvmberry::ConsGlobal::make()
+                 )
+               );
+
+               insertTgtNopAtSrcI(hints, I);
+             });
           EraseInstFromFunction(*I);
+          llvmberry::ValidationUnit::End();
         } else {
           Worklist.Add(I);
           Worklist.AddUsersToWorkList(*I);
@@ -2957,7 +2990,26 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (isInstructionTriviallyDead(Inst, TLI)) {
         ++NumDeadInst;
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
+        llvmberry::name_instructions(*(Inst->getParent()->getParent()));
+        llvmberry::ValidationUnit::Begin("dead_code_elim",
+                              Inst->getParent()->getParent());
+        llvmberry::ValidationUnit::GetInstance()->intrude
+          ([&Inst]
+          (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+            std::string reg = llvmberry::getVariable(*Inst);
+
+            hints.addCommand(
+              llvmberry::ConsPropagate::make(
+                llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
+                llvmberry::ConsGlobal::make()
+              )
+            );
+
+            insertTgtNopAtSrcI(hints, Inst);
+          });
+ 
         Inst->eraseFromParent();
+        llvmberry::ValidationUnit::End();
         continue;
       }
 
