@@ -23,99 +23,67 @@ void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I);
 
 struct TyPositionPhinode {
 public:
-  TyPositionPhinode(std::string _block_name, std::string _prev_block_name);
+  TyPositionPhinode(std::string _prev_block_name);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::string block_name;
   std::string prev_block_name;
-};
-
-// exception for option type
-struct TyRegisterNameOption {
-public:
-  virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
-};
-
-struct ConsRegisterNameNone : TyRegisterNameOption {
-public:
-  ConsRegisterNameNone();
-  void serialize(cereal::JSONOutputArchive &archive) const;
-};
-
-struct ConsRegisterNameSome : TyRegisterNameOption {
-public:
-  ConsRegisterNameSome(enum TyScope _scope, std::string _register_name);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  enum TyScope scope;
-  std::string register_name;
 };
 
 struct TyPositionCommand {
 public:
-  TyPositionCommand(std::string _block_name, int _index, std::unique_ptr<TyRegisterNameOption> _register_name);
+  TyPositionCommand(int _index, std::string _register_name);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::string block_name;
   int index;
-  std::unique_ptr<TyRegisterNameOption> register_name;
+  std::string register_name;
 };
 
-struct TyPosition{
+struct TyInstrIndex{
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 };
 
-struct ConsPhinode : public TyPosition {
+struct ConsPhinode : public TyInstrIndex {
 public:
   ConsPhinode(std::unique_ptr<TyPositionPhinode> _position_phinode);
-  ConsPhinode(std::string _block_name, std::string _prev_block_name);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
   std::unique_ptr<TyPositionPhinode> position_phinode;
-  int n;
 };
 
-struct ConsCommand : public TyPosition {
+struct ConsCommand : public TyInstrIndex {
 public:
   ConsCommand(std::unique_ptr<TyPositionCommand> _position_command);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPosition> make(const llvm::Instruction &I,
-                                          enum TyScope _scope);
+  /* static std::unique_ptr<TyPosition> make(const llvm::Instruction &I, */
+  /*                                         enum TyScope _scope); */
 
 private:
   std::unique_ptr<TyPositionCommand> position_command;
 };
 
-// abstract
-struct TyNopPosition {
+struct TyPosition {
 public:
-  virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
-};
-
-struct ConsPhinodeCurrentBlockName : public TyNopPosition {
-public:
-  ConsPhinodeCurrentBlockName(std::string _block_name);
+  TyPosition(enum TyScope _scope, std::string _block_name,
+             std::unique_ptr<TyInstrIndex> _instr_index);
   void serialize(cereal::JSONOutputArchive &archive) const;
-  static std::unique_ptr<TyNopPosition> make(std::string _block_name);
+
+  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
+                                          const llvm::Instruction &I);
+  static std::unique_ptr<TyPosition>
+  make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB);
+  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
+                                          std::string _block_name,
+                                          std::string _prev_block_name);
 
 private:
+  enum TyScope scope;
   std::string block_name;
-};
-
-struct ConsCommandRegisterName : public TyNopPosition {
-public:
-  ConsCommandRegisterName(std::string _register_name);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-  static std::unique_ptr<TyNopPosition> make(std::string _register_name);
-
-private:
-  std::string register_name;
+  std::unique_ptr<TyInstrIndex> instr_index;
 };
 
 /* value */
@@ -813,16 +781,14 @@ public:
   CoreHint(std::string _module_id, std::string _function_id,
            std::string _opt_name);
   void addCommand(std::unique_ptr<TyCommand> c);
-  void addSrcNopPosition(std::unique_ptr<TyNopPosition> position);
-  void addTgtNopPosition(std::unique_ptr<TyNopPosition> position);
+  void addNopPosition(std::unique_ptr<TyPosition> position);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
   std::string module_id;
   std::string function_id;
   std::string opt_name;
-  std::vector<std::unique_ptr<TyNopPosition>> src_nop_positions;
-  std::vector<std::unique_ptr<TyNopPosition>> tgt_nop_positions;
+  std::vector<std::unique_ptr<TyPosition>> nop_positions;
   std::vector<std::unique_ptr<TyCommand>> commands;
 };
 

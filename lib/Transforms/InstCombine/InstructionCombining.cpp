@@ -253,17 +253,17 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
                      llvmberry::Source)
                     ,
                     llvmberry::ConsBounds::make
-                    (llvmberry::ConsCommand::make
-                     (*reg1_instr, llvmberry::Source),
-                     llvmberry::ConsCommand::make
-                     (I, llvmberry::Source))
+                    (llvmberry::TyPosition::make
+                     (llvmberry::Source, *reg1_instr),
+                     llvmberry::TyPosition::make
+                     (llvmberry::Source, I))
                     )
                    );
 
                 hints.addCommand
                   (llvmberry::ConsInfrule::make
-                   (llvmberry::ConsCommand::make
-                    (I, llvmberry::Source),
+                   (llvmberry::TyPosition::make
+                    (llvmberry::Source, I),
                     llvmberry::ConsAddAssociative::make
                     (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
                      llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),

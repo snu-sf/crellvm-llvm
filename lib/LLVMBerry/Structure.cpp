@@ -170,30 +170,30 @@ int getCommandIndex(const llvm::Value &V) {
     return (int)(rawIndex - firstNonPhiRawIndex);
   }
 }
-  
+
 // insert nop at tgt where I is at src
 void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I) {
+  std::string empty_str = "";
   if (I == I->getParent()->getFirstNonPHI()) {
     std::string nop_block_name = getBasicBlockIndex(I->getParent());
-    hints.addTgtNopPosition(ConsPhinodeCurrentBlockName::make(nop_block_name));
+    hints.addNopPosition(TyPosition::make(TyScope::Target, nop_block_name, empty_str));
   } else if (!llvm::isa<llvm::PHINode>(I)) {
     llvm::BasicBlock::iterator prevI = I;
     prevI--;
-    std::string nop_prev_reg = getVariable(*prevI);
-    hints.addTgtNopPosition(ConsCommandRegisterName::make(nop_prev_reg));
+    hints.addNopPosition(TyPosition::make(TyScope::Target, *prevI));
   }
 }
 
 // insert nop at src where I is at tgt
 void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
+  std::string empty_str = "";
   if (I == I->getParent()->getFirstNonPHI()) {
     std::string nop_block_name = getBasicBlockIndex(I->getParent());
-    hints.addSrcNopPosition(ConsPhinodeCurrentBlockName::make(nop_block_name));
+    hints.addNopPosition(TyPosition::make(TyScope::Source, nop_block_name, empty_str));
   } else if (!llvm::isa<llvm::PHINode>(I)) {
     llvm::BasicBlock::iterator prevI = I;
     prevI--;
-    std::string nop_prev_reg = getVariable(*prevI);
-    hints.addSrcNopPosition(ConsCommandRegisterName::make(nop_prev_reg));
+    hints.addNopPosition(TyPosition::make(TyScope::Source, *prevI));
   }
 }
 
@@ -218,9 +218,9 @@ void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
                                          llvmberry::Source),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
-                llvmberry::ConsCommand::make(
-                    *Vins, llvmberry::Source), // From my to z = x -my
-                llvmberry::ConsCommand::make(I, llvmberry::Source))));
+                llvmberry::TyPosition::make(llvmberry::Source,
+                                            *Vins), // From my to z = x -my
+                llvmberry::TyPosition::make(llvmberry::Source, I))));
       });
     }
   }
@@ -238,7 +238,7 @@ void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
         int c2 = std::abs(c1);
 
         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::ConsCommand::make(I, llvmberry::Source),
+            llvmberry::TyPosition::make(llvmberry::Source, I),
             llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
                                         llvmberry::TyConstInt::make(c2, sz_bw),
                                         llvmberry::ConsSize::make(sz_bw))));
@@ -253,56 +253,22 @@ void generateHintforNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
 
 /* position */
 
-TyPositionPhinode::TyPositionPhinode(std::string _block_name,
-                                     std::string _prev_block_name)
-    : block_name(_block_name), prev_block_name(_prev_block_name) {}
+TyPositionPhinode::TyPositionPhinode(std::string _prev_block_name)
+    : prev_block_name(_prev_block_name) {}
 
 void TyPositionPhinode::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(block_name), CEREAL_NVP(prev_block_name));
+  archive(CEREAL_NVP(prev_block_name));
 }
 
-ConsRegisterNameNone::ConsRegisterNameNone() {}
-
-void ConsRegisterNameNone::serialize(cereal::JSONOutputArchive &archive) const {
-  // TODO: check
-  archive.setNextName("register_name");
-  std::string s("None");
-  archive(s);
-
-  // archive("None");
-}
-
-ConsRegisterNameSome::ConsRegisterNameSome(enum TyScope _scope,
-                                           std::string _register_name)
-    : scope(_scope), register_name(_register_name) {}
-
-void ConsRegisterNameSome::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("Some");
-  archive.startNode();
-  archive.makeArray();
-  archive(toString(scope), register_name);
-  archive.finishNode();
-}
-
-TyPositionCommand::TyPositionCommand(
-    std::string _block_name, int _index,
-    std::unique_ptr<TyRegisterNameOption> _register_name)
-    : block_name(_block_name), index(_index),
-      register_name(std::move(_register_name)) {}
+TyPositionCommand::TyPositionCommand(int _index, std::string _register_name)
+    : index(_index), register_name(_register_name) {}
 
 void TyPositionCommand::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(block_name), CEREAL_NVP(index));
-  archive(CEREAL_NVP(register_name));
+  archive(CEREAL_NVP(index), CEREAL_NVP(register_name));
 }
 
 ConsPhinode::ConsPhinode(std::unique_ptr<TyPositionPhinode> _position_phinode)
     : position_phinode(std::move(_position_phinode)) {}
-
-ConsPhinode::ConsPhinode(std::string _block_name, std::string _prev_block_name)
-    : position_phinode(new TyPositionPhinode(_block_name, _prev_block_name)) {}
 
 void ConsPhinode::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -323,62 +289,72 @@ void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(position_command));
 }
 
-std::unique_ptr<TyPosition> ConsCommand::make(const llvm::Instruction &I,
-                                              enum TyScope _scope) {
-  int _index = getCommandIndex(I);
+// std::unique_ptr<TyPosition> ConsCommand::make(const llvm::Instruction &I,
+//                                               enum TyScope _scope) {
+//   int _index = getCommandIndex(I);
+
+//   std::string _block_name = getBasicBlockIndex(I.getParent());
+//   std::string _register_name = getVariable(I);
+
+//   std::unique_ptr<TyRegisterNameOption> reg_option;
+
+//   if (_register_name.empty()) {
+//     reg_option =
+//         std::unique_ptr<TyRegisterNameOption>(new ConsRegisterNameNone());
+//   } else {
+//     reg_option = std::unique_ptr<TyRegisterNameOption>(
+//         new ConsRegisterNameSome(_scope, _register_name));
+//   }
+
+//   std::unique_ptr<TyPositionCommand> _pos_cmd(
+//       new TyPositionCommand(_block_name, _index, std::move(reg_option)));
+
+//   return std::unique_ptr<TyPosition>(new ConsCommand(std::move(_pos_cmd)));
+// }
+
+TyPosition::TyPosition(enum TyScope _scope, std::string _block_name,
+                       std::unique_ptr<TyInstrIndex> _instr_index)
+    : scope(_scope), block_name(_block_name),
+      instr_index(std::move(_instr_index)) {}
+
+void TyPosition::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(scope), CEREAL_NVP(block_name), CEREAL_NVP(instr_index));
+}
+
+std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+                                             const llvm::Instruction &I) {
 
   std::string _block_name = getBasicBlockIndex(I.getParent());
   std::string _register_name = getVariable(I);
 
-  std::unique_ptr<TyRegisterNameOption> reg_option;
-
-  if (_register_name.empty()) {
-    reg_option =
-        std::unique_ptr<TyRegisterNameOption>(new ConsRegisterNameNone());
-  } else {
-    reg_option = std::unique_ptr<TyRegisterNameOption>(
-        new ConsRegisterNameSome(_scope, _register_name));
-  }
+  int _index = getCommandIndex(I);
 
   std::unique_ptr<TyPositionCommand> _pos_cmd(
-      new TyPositionCommand(_block_name, _index, std::move(reg_option)));
+      new TyPositionCommand(_index, _register_name));
 
-  return std::unique_ptr<TyPosition>(new ConsCommand(std::move(_pos_cmd)));
+  std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+  return std::unique_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_cmd)));
 }
 
-ConsPhinodeCurrentBlockName::ConsPhinodeCurrentBlockName(
-    std::string _block_name)
-    : block_name(_block_name) {}
+std::unique_ptr<TyPosition>
+TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
-void ConsPhinodeCurrentBlockName::serialize(
-    cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  std::string s("PhinodeCurrentBlockName");
-  archive(s);
-  archive(block_name);
+  const llvm::TerminatorInst *term = BB.getTerminator();
+  return std::move(make(_scope, *term));
 }
 
-std::unique_ptr<TyNopPosition>
-ConsPhinodeCurrentBlockName::make(std::string _block_name) {
-  return std::unique_ptr<TyNopPosition>(
-      new ConsPhinodeCurrentBlockName(_block_name));
-}
+std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+                                             std::string _block_name,
+                                             std::string _prev_block_name) {
+  std::unique_ptr<TyPositionPhinode> _pos_phi(
+      new TyPositionPhinode(_prev_block_name));
 
-ConsCommandRegisterName::ConsCommandRegisterName(std::string _register_name)
-    : register_name(_register_name) {}
+  std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
 
-void ConsCommandRegisterName::serialize(
-    cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  std::string s("CommandRegisterName");
-  archive(s);
-  archive(register_name);
-}
-
-std::unique_ptr<TyNopPosition>
-ConsCommandRegisterName::make(std::string _register_name) {
-  return std::unique_ptr<TyNopPosition>(
-      new ConsCommandRegisterName(_register_name));
+  return std::unique_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_phi)));
 }
 
 /* value */
@@ -1201,12 +1177,8 @@ void CoreHint::addCommand(std::unique_ptr<TyCommand> c) {
   commands.push_back(std::move(c));
 }
 
-void CoreHint::addSrcNopPosition(std::unique_ptr<TyNopPosition> position) {
-  src_nop_positions.push_back(std::move(position));
-}
-
-void CoreHint::addTgtNopPosition(std::unique_ptr<TyNopPosition> position) {
-  tgt_nop_positions.push_back(std::move(position));
+void CoreHint::addNopPosition(std::unique_ptr<TyPosition> position) {
+  nop_positions.push_back(std::move(position));
 }
 
 void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1214,8 +1186,7 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(module_id));
   archive(CEREAL_NVP(function_id));
   archive(CEREAL_NVP(opt_name));
-  archive(CEREAL_NVP(src_nop_positions));
-  archive(CEREAL_NVP(tgt_nop_positions));
+  archive(CEREAL_NVP(nop_positions));
   archive(CEREAL_NVP(commands));
 }
 

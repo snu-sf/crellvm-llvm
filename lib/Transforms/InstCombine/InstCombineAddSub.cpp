@@ -1081,7 +1081,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         int bitwidth = LHS->getType()->getIntegerBitWidth();
 
         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::ConsCommand::make(I, llvmberry::Source),
+            llvmberry::TyPosition::make(llvmberry::Source, I),
             llvmberry::ConsAddSignbit::make(
                 llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
                 llvmberry::TyValue::make(*LHS), llvmberry::TyValue::make(*RHS),
@@ -1173,7 +1173,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
           // from "y = v + v", create "y = v << 1"
           hints.addCommand(llvmberry::ConsInfrule::make(
-              llvmberry::ConsCommand::make(I, llvmberry::Source),
+              llvmberry::TyPosition::make(llvmberry::Source, I),
               llvmberry::ConsAddShift::make(
                   llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
                   llvmberry::TyValue::make(*LHS),
@@ -1217,12 +1217,12 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
                                        llvmberry::Source),
               llvmberry::Source),
           llvmberry::ConsBounds::make(
-              llvmberry::ConsCommand::make(*reg_my_instr, llvmberry::Source),
-              llvmberry::ConsCommand::make(I, llvmberry::Source))));
+              llvmberry::TyPosition::make(llvmberry::Source, *reg_my_instr),
+              llvmberry::TyPosition::make(llvmberry::Source, I))));
 
       // from "z = my + x", create "z = x + my"
       hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::ConsCommand::make(I, llvmberry::Source),
+          llvmberry::TyPosition::make(llvmberry::Source, I),
           llvmberry::ConsAddCommutative::make(
               llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
               llvmberry::TyValue::make(*LHS), llvmberry::TyValue::make(*RHS),
@@ -1230,7 +1230,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
       // from "z = x + my" and "my = 0 - y", create "z = x - y"
       hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::ConsCommand::make(I, llvmberry::Source),
+          llvmberry::TyPosition::make(llvmberry::Source, I),
           llvmberry::ConsAddSub::make(
               llvmberry::TyRegister::make(reg_my_name, llvmberry::Physical),
               llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
@@ -1267,12 +1267,12 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
                                          llvmberry::Source),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
-                llvmberry::ConsCommand::make(*reg_my_instr, llvmberry::Source),
-                llvmberry::ConsCommand::make(I, llvmberry::Source))));
+                llvmberry::TyPosition::make(llvmberry::Source, *reg_my_instr),
+                llvmberry::TyPosition::make(llvmberry::Source, I))));
 
         // from "z = x + my" and "my = 0 - y", create "z = x - y"
         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::ConsCommand::make(I, llvmberry::Source),
+            llvmberry::TyPosition::make(llvmberry::Source, I),
             llvmberry::ConsAddSub::make(
                 llvmberry::TyRegister::make(reg_my_name, llvmberry::Physical),
                 llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
@@ -1658,12 +1658,10 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
       std::string reg0_name = llvmberry::getVariable(I); // z = x -my
       std::string reg2_name = llvmberry::getVariable(*Op0); // x
 
-      Instruction *reg2_instr = dyn_cast<Instruction>(Op0);
-
       unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
 
       hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::ConsCommand::make(I, llvmberry::Source),
+          llvmberry::TyPosition::make(llvmberry::Source, I),
           llvmberry::ConsSubAdd::make(
               llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
               llvmberry::TyValue::make(*Op1),
@@ -1771,16 +1769,16 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
                                          llvmberry::Source),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
-                llvmberry::ConsCommand::make(*reg_y_instr, llvmberry::Source),
-                llvmberry::ConsCommand::make(I, llvmberry::Source))));
+                llvmberry::TyPosition::make(llvmberry::Source, *reg_y_instr),
+                llvmberry::TyPosition::make(llvmberry::Source, I))));
         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::ConsCommand::make(*reg_y_instr, llvmberry::Source),
+            llvmberry::TyPosition::make(llvmberry::Source, *reg_y_instr),
             llvmberry::ConsAddCommutative::make(
                 llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
                 llvmberry::TyValue::make(*Op0), llvmberry::TyValue::make(*Y),
                 llvmberry::ConsSize::make(bitwith))));
         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::ConsCommand::make(I, llvmberry::Source),
+            llvmberry::TyPosition::make(llvmberry::Source, I),
             llvmberry::ConsSubRemove::make(
                 llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
                 llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
