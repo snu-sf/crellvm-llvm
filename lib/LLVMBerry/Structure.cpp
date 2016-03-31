@@ -289,29 +289,6 @@ void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(position_command));
 }
 
-// std::unique_ptr<TyPosition> ConsCommand::make(const llvm::Instruction &I,
-//                                               enum TyScope _scope) {
-//   int _index = getCommandIndex(I);
-
-//   std::string _block_name = getBasicBlockIndex(I.getParent());
-//   std::string _register_name = getVariable(I);
-
-//   std::unique_ptr<TyRegisterNameOption> reg_option;
-
-//   if (_register_name.empty()) {
-//     reg_option =
-//         std::unique_ptr<TyRegisterNameOption>(new ConsRegisterNameNone());
-//   } else {
-//     reg_option = std::unique_ptr<TyRegisterNameOption>(
-//         new ConsRegisterNameSome(_scope, _register_name));
-//   }
-
-//   std::unique_ptr<TyPositionCommand> _pos_cmd(
-//       new TyPositionCommand(_block_name, _index, std::move(reg_option)));
-
-//   return std::unique_ptr<TyPosition>(new ConsCommand(std::move(_pos_cmd)));
-// }
-
 TyPosition::TyPosition(enum TyScope _scope, std::string _block_name,
                        std::unique_ptr<TyInstrIndex> _instr_index)
     : scope(_scope), block_name(_block_name),
