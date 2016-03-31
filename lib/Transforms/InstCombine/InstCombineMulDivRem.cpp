@@ -295,28 +295,28 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       llvmberry::ValidationUnit::Begin("mul_neg",
                                        I.getParent()->getParent());
 
-      llvmberry::generateHintforNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
-      llvmberry::generateHintforNegValue(Op1, I);
+      llvmberry::generateHintForNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
+      llvmberry::generateHintForNegValue(Op1, I);
 
-      llvmberry::ValidationUnit::GetInstance()->intrude([&Op0, &Op1, &Op0v,
-                                                         &Op1v, &I](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      llvmberry::ValidationUnit::GetInstance()->intrude
+        ([&Op0, &Op1, &Op0v, &Op1v, &I]
+                 (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
 
-        std::string reg0_name = llvmberry::getVariable(I); // z = mx *my
+          std::string reg0_name = llvmberry::getVariable(I);  //z = mx *my
 
-        unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
+          unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
 
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Source, I),
-            llvmberry::ConsMulNeg::make(
-                llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*Op0), llvmberry::TyValue::make(*Op1),
-                llvmberry::TyValue::make(*Op0v),
-                llvmberry::TyValue::make(*Op1v),
-                llvmberry::ConsSize::make(sz_bw))));
-      });
-      llvmberry::ValidationUnit::End();
+          hints.addCommand
+                   (llvmberry::ConsInfrule::make
+                             (llvmberry::TyPosition::make (llvmberry::Source, I), llvmberry::ConsMulNeg::make
+                                     (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
+                                      llvmberry::TyValue::make(*Op0),
+                                      llvmberry::TyValue::make(*Op1),
+                                      llvmberry::TyValue::make(*Op0v),
+                                      llvmberry::TyValue::make(*Op1v),
+                                      llvmberry::ConsSize::make(sz_bw))));
+        }
+      );
       return BO;
     }
   }
