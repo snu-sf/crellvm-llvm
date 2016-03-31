@@ -293,8 +293,8 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
             llvmberry::ConsRhs::make(reg_x_name, llvmberry::Physical, llvmberry::Source),
             llvmberry::Source),
         llvmberry::ConsBounds::make(
-            llvmberry::ConsCommand::make(llvmberry::Source, reg_x_name),
-            llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+            llvmberry::TyPosition::make(llvmberry::Source, *X),
+            llvmberry::TyPosition::make(llvmberry::Source, *Z))));
 
     // Propagate "Y = select c ? x : 0" or "Y = select c ? 0 : x"
     hints.addCommand(llvmberry::ConsPropagate::make(
@@ -303,12 +303,12 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
             llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
             llvmberry::Source),
         llvmberry::ConsBounds::make(
-            llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
-            llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+            llvmberry::TyPosition::make(llvmberry::Source, *Y),
+            llvmberry::TyPosition::make(llvmberry::Source, *Z))));
 
     if(needs_commutativity){
       hints.addCommand(llvmberry::ConsInfrule::make(
-        llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+        llvmberry::TyPosition::make(llvmberry::Source, *Z),
         llvmberry::ConsAddCommutative::make(
             llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
             llvmberry::TyValue::make(*Y),
@@ -318,7 +318,7 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
     
     if(is_leftform){
       hints.addCommand(llvmberry::ConsInfrule::make(
-        llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+        llvmberry::TyPosition::make(llvmberry::Source, *Z),
         llvmberry::ConsAddSelectZero::make(
             llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
             llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
@@ -329,7 +329,7 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
             llvmberry::ConsSize::make(bitwidth))));
     }else{
       hints.addCommand(llvmberry::ConsInfrule::make(
-        llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+        llvmberry::TyPosition::make(llvmberry::Source, *Z),
         llvmberry::ConsAddSelectZero2::make(
             llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
             llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
@@ -386,7 +386,7 @@ TyPosition::TyPosition(enum TyScope _scope, std::string _block_name,
       instr_index(std::move(_instr_index)) {}
 
 void TyPosition::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(scope), CEREAL_NVP(block_name), CEREAL_NVP(instr_index));
+  archive(cereal::make_nvp("scope", toString(scope)), CEREAL_NVP(block_name), CEREAL_NVP(instr_index));
 }
 
 std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,

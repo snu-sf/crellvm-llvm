@@ -1318,12 +1318,12 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
                 llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
-                llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
-                llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name))));
+                llvmberry::TyPosition::make(llvmberry::Source, *Y),
+                llvmberry::TyPosition::make(llvmberry::Source, *Z))));
 
         // To Z, apply add_const_not
         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+            llvmberry::TyPosition::make(llvmberry::Source, *Z),
             llvmberry::ConsAddConstNot::make(
                 llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
                 llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
@@ -1389,8 +1389,8 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
                   llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
                   llvmberry::Target),
               llvmberry::ConsBounds::make(
-                  llvmberry::ConsCommand::make(llvmberry::Target, reg_y_name),
-                  llvmberry::ConsCommand::make(llvmberry::Target, reg_z_name))));
+                  llvmberry::TyPosition::make(llvmberry::Target, *Y),
+                  llvmberry::TyPosition::make(llvmberry::Target, *Z))));
 
           // propagate "Y' = X + c1" in target
           hints.addCommand(llvmberry::ConsPropagate::make(
@@ -1399,12 +1399,12 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
                   llvmberry::ConsVar::make(reg_yprime_name, llvmberry::Physical),
                   llvmberry::Target),
               llvmberry::ConsBounds::make(
-                  llvmberry::ConsCommand::make(llvmberry::Target, reg_yprime_name),
-                  llvmberry::ConsCommand::make(llvmberry::Target, reg_z_name))));
+                  llvmberry::TyPosition::make(llvmberry::Target, *Yprime),
+                  llvmberry::TyPosition::make(llvmberry::Target, *Z))));
 
           // To Z, apply add_mask
           hints.addCommand(llvmberry::ConsInfrule::make(
-              llvmberry::ConsCommand::make(llvmberry::Target, reg_z_name),
+              llvmberry::TyPosition::make(llvmberry::Target, *Z),
               llvmberry::ConsAddMask::make(
                   llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
                   llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
