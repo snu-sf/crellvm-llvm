@@ -3,6 +3,7 @@
 
 #include <boost/any.hpp>
 #include <memory>
+#include <string>
 #include <stack>
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Instruction.h"
@@ -36,6 +37,7 @@ private:
 
   std::string _filename;
   std::string _optname;
+  std::string *_srcfile_buffer;
   llvm::Function *_func;
   CoreHint _corehint;
   Dictionary _data;

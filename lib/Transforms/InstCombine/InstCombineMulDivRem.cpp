@@ -295,8 +295,8 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       llvmberry::ValidationUnit::Begin("mul_neg",
                                        I.getParent()->getParent());
 
-      llvmberry::generateHintforNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
-      llvmberry::generateHintforNegValue(Op1, I);
+      llvmberry::generateHintForNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
+      llvmberry::generateHintForNegValue(Op1, I);
 
       llvmberry::ValidationUnit::GetInstance()->intrude
         ([&Op0, &Op1, &Op0v, &Op1v, &I]
