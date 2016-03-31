@@ -1098,8 +1098,53 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
     // zext(bool) + C -> bool ? C + 1 : C
     if (ZExtInst *ZI = dyn_cast<ZExtInst>(LHS))
-      if (ZI->getSrcTy()->isIntegerTy(1))
+      if (ZI->getSrcTy()->isIntegerTy(1)){
+        llvmberry::ValidationUnit::Begin("add_zext_bool",
+                                       I.getParent()->getParent());
+
+        llvmberry::ValidationUnit::GetInstance()->intrude([&I, &ZI, &CI](
+            llvmberry::ValidationUnit::Dictionary &data,
+            llvmberry::CoreHint &hints) {
+          BinaryOperator &Y = I;
+          ZExtInst *X = ZI;
+          ConstantInt *C = CI;
+          // src : 
+          // x = zext i1 b to i<sz> 
+          // y = x + c          
+          //
+          // tgt : 
+          // x = zext i1 b to i<sz> 
+          // y = select i1 b, (c + 1), c
+          std::string reg_x_name = llvmberry::getVariable(*X);
+          std::string reg_y_name = llvmberry::getVariable(Y);
+          int c = (int)C->getSExtValue();
+          int c_bitwidth = C->getBitWidth();
+          int cprime = c + 1;
+          int cprime_bitwidth = c_bitwidth;
+   
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                llvmberry::ConsLessdef::make(
+                    llvmberry::ConsVar::make(reg_x_name, llvmberry::Physical),
+                    llvmberry::ConsRhs::make(reg_x_name, llvmberry::Physical, llvmberry::Source),
+                    llvmberry::Source),
+                llvmberry::ConsBounds::make(
+                    llvmberry::ConsCommand::make(llvmberry::Source, reg_x_name),
+                    llvmberry::ConsCommand::make(llvmberry::Source,
+                                                 reg_y_name))));
+
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              llvmberry::ConsCommand::make(llvmberry::Source, reg_y_name),
+              llvmberry::ConsAddZextBool::make(
+                  llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
+                  llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                  llvmberry::TyValue::make(*X->getOperand(0)),
+                  llvmberry::TyConstInt::make(c, c_bitwidth),
+                  llvmberry::TyConstInt::make(cprime, cprime_bitwidth),
+                  llvmberry::ConsSize::make(c_bitwidth))));
+        });
+
         return SelectInst::Create(ZI->getOperand(0), AddOne(CI), CI);
+      }
 
     Value *XorLHS = nullptr; ConstantInt *XorRHS = nullptr;
     if (match(LHS, m_Xor(m_Value(XorLHS), m_ConstantInt(XorRHS)))) {
@@ -1150,8 +1195,31 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     if (Instruction *NV = FoldOpIntoPhi(I))
       return NV;
 
-  if (I.getType()->getScalarType()->isIntegerTy(1))
+  if (I.getType()->getScalarType()->isIntegerTy(1)){
+    llvmberry::ValidationUnit::Begin("add_onebit",
+                                   I.getParent()->getParent());
+
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
+      BinaryOperator &Z = I;
+      // src : 
+      // z = x + y (both are i1 type) 
+      //
+      // tgt : 
+      // z = x ^ y
+      std::string reg_z_name = llvmberry::getVariable(Z);
+
+      hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::ConsCommand::make(llvmberry::Source, reg_z_name),
+          llvmberry::ConsAddOnebit::make(
+              llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+              llvmberry::TyValue::make(*Z.getOperand(0)),
+              llvmberry::TyValue::make(*Z.getOperand(1)))));
+    });
+    
     return BinaryOperator::CreateXor(LHS, RHS);
+  }
 
   // X + X --> X << 1
   if (LHS == RHS) {
