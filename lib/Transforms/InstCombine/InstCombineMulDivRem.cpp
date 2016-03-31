@@ -295,8 +295,8 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       llvmberry::ValidationUnit::Begin("mul_neg",
                                        I.getParent()->getParent());
 
-      llvmberry::generateHintforNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
-      llvmberry::generateHintforNegValue(Op1, I);
+      llvmberry::generateHintForNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
+      llvmberry::generateHintForNegValue(Op1, I);
 
       llvmberry::ValidationUnit::GetInstance()->intrude
         ([&Op0, &Op1, &Op0v, &Op1v, &I]
@@ -308,7 +308,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
 
           hints.addCommand
                    (llvmberry::ConsInfrule::make
-                             (llvmberry::ConsCommand::make (llvmberry::Source, reg0_name), llvmberry::ConsMulNeg::make
+                             (llvmberry::TyPosition::make (llvmberry::Source, I), llvmberry::ConsMulNeg::make
                                      (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
                                       llvmberry::TyValue::make(*Op0),
                                       llvmberry::TyValue::make(*Op1),
@@ -373,7 +373,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       std::string reg2_name = llvmberry::getVariable(*Op1);
 
       hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::ConsCommand::make(llvmberry::Source, reg0_name),
+          llvmberry::TyPosition::make(llvmberry::Source, I),
           llvmberry::ConsMulBool::make(
               llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
               llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
