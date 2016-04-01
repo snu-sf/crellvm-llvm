@@ -2361,16 +2361,21 @@ bool GVN::processInstruction(Instruction *I) {
               llvmberry::TyPosition::make(llvmberry::Source, *I),
               llvmberry::TyPosition::make(llvmberry::Source, *user_I))));
 
-      hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::TyPosition::make(llvmberry::Source, *user_I),
-          llvmberry::ConsReplaceRhs::make(
-              llvmberry::TyRegister::make(to_rem, llvmberry::Physical),
-              llvmberry::ConsId::make(leader, llvmberry::Physical),
-              llvmberry::ConsVar::make(user, llvmberry::Physical),
-              llvmberry::ConsRhs::make(user, llvmberry::Physical,
-                                       llvmberry::Source),
-              llvmberry::ConsRhs::make(user, llvmberry::Physical,
-                                       llvmberry::Target))));
+      if (!user.empty()) {
+        dbgs() << "isnonempty: " << user << "\n";
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, *user_I),
+            llvmberry::ConsReplaceRhs::make(
+                llvmberry::TyRegister::make(to_rem, llvmberry::Physical),
+                llvmberry::ConsId::make(leader, llvmberry::Physical),
+                llvmberry::ConsVar::make(user, llvmberry::Physical),
+                llvmberry::ConsRhs::make(user, llvmberry::Physical,
+                                         llvmberry::Source),
+                llvmberry::ConsRhs::make(user, llvmberry::Physical,
+                                         llvmberry::Target))));
+      } else {
+        dbgs() << "isempty\n";
+      }
     }
   });
 
