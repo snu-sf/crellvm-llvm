@@ -611,6 +611,17 @@ private:
   std::unique_ptr<TyExpr> e2_p;
 };
 
+struct TyIntroGhost{
+public :
+  TyIntroGhost(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TyRegister> z;
+};
+
 struct TyInfrule {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
@@ -803,6 +814,16 @@ public:
 
 private:
   std::unique_ptr<TyReplaceRhs> replace_rhs;
+};
+
+struct ConsIntroGhost : public TyInfrule{
+public :
+  ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyIntroGhost> intro_ghost;
 };
 
 /* hint command */
