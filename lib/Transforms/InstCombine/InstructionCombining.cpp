@@ -233,6 +233,8 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
                 ConstantInt *C_const = dyn_cast<ConstantInt>(C);
                 ConstantInt *V_const = dyn_cast<ConstantInt>(V);
 
+                Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
+                
                 unsigned b_bw = B_const->getBitWidth();
                 unsigned c_bw = C_const->getBitWidth();
                 unsigned v_bw = V_const->getBitWidth();
@@ -251,17 +253,17 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
                      llvmberry::Source)
                     ,
                     llvmberry::ConsBounds::make
-                    (llvmberry::ConsCommand::make
-                     (llvmberry::Source, reg1_name),
-                     llvmberry::ConsCommand::make
-                     (llvmberry::Source, reg2_name))
+                    (llvmberry::TyPosition::make
+                     (llvmberry::Source, *reg1_instr),
+                     llvmberry::TyPosition::make
+                     (llvmberry::Source, I))
                     )
                    );
 
                 hints.addCommand
                   (llvmberry::ConsInfrule::make
-                   (llvmberry::ConsCommand::make
-                    (llvmberry::Source, reg2_name),
+                   (llvmberry::TyPosition::make
+                    (llvmberry::Source, I),
                     llvmberry::ConsAddAssociative::make
                     (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
                      llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
@@ -2740,9 +2742,57 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
         return false;
   }
 
+  llvmberry::ValidationUnit::Begin("sink_inst",
+                                   I->getParent()->getParent());
+
   BasicBlock::iterator InsertPos = DestBlock->getFirstInsertionPt();
+  
+  llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&I, &InsertPos](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+
+             insertSrcNopAtTgtI(hints,InsertPos);  //src nop
+             insertTgtNopAtSrcI(hints, I);         //tgt nop
+             std::string reg0_name = llvmberry::getVariable(*I);  //original position
+
+             hints.addCommand
+                    (llvmberry::ConsPropagate::make   //source propagate
+                             (llvmberry::ConsLessdef::make
+                                      (llvmberry::ConsVar::make
+                                       (reg0_name, llvmberry::Physical),
+                                       llvmberry::ConsRhs::make
+                                       (reg0_name, llvmberry::Physical, llvmberry::Source),
+                                       llvmberry::Source),
+                              llvmberry::ConsBounds::make
+                                      (llvmberry::TyPosition::make
+                                       (llvmberry::Source, *I), 
+                                       llvmberry::TyPosition::make
+                                       (llvmberry::Target, *I)))
+                    );
+//prev maydiff propagate global -> issue 86
+            hints.addCommand
+                    (llvmberry::ConsPropagate::make
+                             (llvmberry::ConsMaydiff::make
+                                      (reg0_name, llvmberry::Previous),
+                              llvmberry::ConsGlobal::make())
+                    );
+
+            hints.addCommand
+                    (llvmberry::ConsPropagate::make //maydiff propagate
+                             (llvmberry::ConsMaydiff::make
+                                      (reg0_name, llvmberry::Physical),
+                              llvmberry::ConsBounds::make
+                                      (llvmberry::TyPosition::make
+                                       (llvmberry::Source, *I), 
+                                       llvmberry::TyPosition::make
+                                       (llvmberry::Target, *I)))
+                    );
+          }
+          );
+
   I->moveBefore(InsertPos);
   ++NumSunkInst;
+  
+  llvmberry::ValidationUnit::End();
   return true;
 }
 

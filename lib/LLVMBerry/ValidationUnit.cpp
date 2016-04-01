@@ -32,6 +32,12 @@ namespace llvmberry {
 
 std::string defaultOutputDir = "";
 
+void writeModuleToBuffer(const llvm::Module &module,
+                         std::string *buffer) {
+  llvm::raw_string_ostream strstream(*buffer);
+  WriteBitcodeToFile(&module, strstream);
+}
+
 void writeModuleToFile(const llvm::Module &module,
                        const std::string &filename) {
   std::error_code errorInfo;
@@ -69,6 +75,7 @@ ValidationUnit::~ValidationUnit() {
     assert(false && "Not a possible return code");
     break;
   }
+  delete _srcfile_buffer;
 }
 
 // public functions
@@ -100,7 +107,9 @@ void ValidationUnit::begin() {
 
   // print src
   llvmberry::name_instructions(*_func);
-  writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc"));
+  _srcfile_buffer = new std::string();
+  writeModuleToBuffer(*module, _srcfile_buffer);
+  //writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc.org"));
 
   // set corehints
   std::string mid = module->getModuleIdentifier();
@@ -109,6 +118,11 @@ void ValidationUnit::begin() {
 }
 
 void ValidationUnit::commit() {
+  // print src
+  std::ofstream src_ofs(makeFullFilename(_filename, ".src.bc"), std::ios::out);
+  src_ofs << *_srcfile_buffer;
+  src_ofs.close();
+
   // print tgt
   llvmberry::name_instructions(*_func);
   const llvm::Module *module = _func->getParent();
