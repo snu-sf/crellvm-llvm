@@ -406,6 +406,20 @@ std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
       new TyPosition(_scope, _block_name, std::move(_cmd)));
 }
 
+std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope, const llvm::BasicBlock &BB, int index){
+
+    std::string _block_name = getBasicBlockIndex(&BB);
+    std::string empty_str = "";
+
+    std::unique_ptr<TyPositionCommand> _cmd(
+      new TyPositionCommand(index, empty_str));
+    std::unique_ptr<TyInstrIndex> _instr_index(new ConsCommand(std::move(_cmd)));
+
+    return std::unique_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_instr_index)));
+  }
+
+
 std::unique_ptr<TyPosition>
 TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
