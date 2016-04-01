@@ -129,6 +129,8 @@ std::string getVariable(const llvm::Value &value) {
 
   val += std::string(value.getName().data());
 
+  if (val == "%") val = "";
+
   return val;
 }
 
@@ -156,8 +158,6 @@ int getCommandIndex(const llvm::Value &V) {
 
   const llvm::Instruction *instr = llvm::dyn_cast<llvm::Instruction>(&V);
 
-  std::string block_name = getBasicBlockIndex(instr->getParent());
-
   if (llvm::isa<llvm::PHINode>(instr)) {
     return -1; // A phinode is not a command
   } else if (instr->isTerminator()) {
@@ -168,6 +168,18 @@ int getCommandIndex(const llvm::Value &V) {
     unsigned int firstNonPhiRawIndex =
         getRawInstrIndex(*parent->getFirstNonPHI());
     return (int)(rawIndex - firstNonPhiRawIndex);
+  }
+}
+
+int getTerminatorIndex(const llvm::TerminatorInst *instr) {
+  if (instr->isTerminator()) {
+    unsigned int rawIndex = getRawInstrIndex(*instr);
+    const llvm::BasicBlock *parent = instr->getParent();
+    unsigned int firstNonPhiRawIndex =
+        getRawInstrIndex(*parent->getFirstNonPHI());
+    return (int)(rawIndex - firstNonPhiRawIndex);
+  } else {
+    return -1; // not a terminator
   }
 }
 
@@ -410,7 +422,20 @@ std::unique_ptr<TyPosition>
 TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
   const llvm::TerminatorInst *term = BB.getTerminator();
-  return std::move(make(_scope, *term));
+
+  std::string _block_name = getBasicBlockIndex(&BB);
+  std::string _register_name = "";
+
+  int _index = getTerminatorIndex(term);
+
+  std::unique_ptr<TyPositionCommand> _pos_cmd(
+      new TyPositionCommand(_index, _register_name));
+
+  std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+  return std::unique_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_cmd)));
+
 }
 
 std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
