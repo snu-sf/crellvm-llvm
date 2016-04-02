@@ -18,6 +18,7 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Infrules.h"
 using namespace llvm;
 using namespace PatternMatch;
 
