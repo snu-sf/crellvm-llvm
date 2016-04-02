@@ -10,7 +10,6 @@
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
-
 namespace llvmberry{
 
 TyAddAssociative::TyAddAssociative(std::unique_ptr<TyRegister> _x,
@@ -272,7 +271,10 @@ TyAddSignbit::TyAddSignbit(std::unique_ptr<TyRegister> _x,
       sz(std::move(_sz)) {}
 
 void TyAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(x), CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(sz));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(e1));
+  archive(CEREAL_NVP(e2));
+  archive(CEREAL_NVP(sz));
 }
 
 ConsAddSignbit::ConsAddSignbit(std::unique_ptr<TyAddSignbit> _add_signbit)

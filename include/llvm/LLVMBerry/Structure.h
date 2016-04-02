@@ -10,6 +10,16 @@
 #include "cereal/types/vector.hpp"
 #include <cereal/types/memory.hpp>
 
+
+namespace cereal {
+[[noreturn]] void throw_exception(std::exception const &e);
+
+template <class T>
+void save(cereal::JSONOutputArchive &archive, std::unique_ptr<T> const &ptr) {
+  ptr->serialize(archive);
+}
+} // cereal
+
 namespace llvmberry {
 
 enum TyScope { Source = 0, Target };

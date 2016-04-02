@@ -1,6 +1,6 @@
 add_llvm_library(LLVMLLVMBerry
-  Structure.cpp
   Infrules.cpp
+  Structure.cpp
   ValidationUnit.cpp
   )
 

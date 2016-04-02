@@ -11,13 +11,8 @@
 #include "llvm/LLVMBerry/Infrules.h"
 
 namespace cereal {
-[[noreturn]] void throw_exception(std::exception const &e) { std::exit(1); }
-
-template <class T>
-void save(cereal::JSONOutputArchive &archive, std::unique_ptr<T> const &ptr) {
-  ptr->serialize(archive);
+ [[noreturn]] void throw_exception(std::exception const &e){ std::exit(1); }
 }
-} // cereal
 
 namespace {
 
@@ -898,8 +893,8 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(module_id));
   archive(CEREAL_NVP(function_id));
   archive(CEREAL_NVP(opt_name));
-  archive(CEREAL_NVP(nop_positions));
   archive(CEREAL_NVP(commands));
+  archive(CEREAL_NVP(nop_positions));
 }
 
 } // llvmberry
