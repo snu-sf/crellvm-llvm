@@ -243,7 +243,7 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
 
         unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
         int c1 = (int)C->getSExtValue();
-        int c2 = std::abs(c1);
+        int c2 = -c1;
 
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, I),
