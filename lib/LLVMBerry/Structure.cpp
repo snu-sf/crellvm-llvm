@@ -31,6 +31,39 @@ std::string toString(llvmberry::TyScope scope) {
   }
 }
 
+std::string toString(llvmberry::TyBop bop) {
+  switch (bop) {
+  case llvmberry::Bop_add:
+    return std::string("Bop_add");
+  case llvmberry::Bop_sub:
+    return std::string("Bop_sub");
+  case llvmberry::Bop_mul:
+    return std::string("Bop_mul");
+  case llvmberry::Bop_udiv:
+    return std::string("Bop_udiv");
+  case llvmberry::Bop_sdiv:
+    return std::string("Bop_sdiv");
+  case llvmberry::Bop_urem:
+    return std::string("Bop_urem");
+  case llvmberry::Bop_srem:
+    return std::string("Bop_srem");
+  case llvmberry::Bop_shl:
+    return std::string("Bop_shl");
+  case llvmberry::Bop_lshr:
+    return std::string("Bop_lshr");
+  case llvmberry::Bop_ashr:
+    return std::string("Bop_ashr");
+  case llvmberry::Bop_and:
+    return std::string("Bop_and");
+  case llvmberry::Bop_or:
+    return std::string("Bop_or");
+  case llvmberry::Bop_xor:
+    return std::string("Bop_xor");
+  default:
+    assert(false && "Bop toString");
+  }
+}
+
 std::string toString(llvmberry::TyTag tag) {
   switch (tag) {
   case llvmberry::Physical:
@@ -1283,6 +1316,39 @@ std::unique_ptr<TyInfrule> ConsMulBool::make(std::unique_ptr<TyRegister> _z,
       new TyMulBool(std::move(_z), std::move(_x), std::move(_y)));
 
   return std::unique_ptr<TyInfrule>(new ConsMulBool(std::move(_mul_bool)));
+}
+
+TyBopBoth::TyBopBoth(enum TyBop _bop,
+                       std::unique_ptr<TyValue> _x,
+                       std::unique_ptr<TyValue> _y,
+                       std::unique_ptr<TyValue> _z,
+                       std::unique_ptr<TySize> _sz)
+  : bop(_bop), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), sz(std::move(_sz)) {}
+
+void TyBopBoth::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(cereal::make_nvp("b", toString(bop)), CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(z), CEREAL_NVP(sz));
+}
+
+ConsBopBoth::ConsBopBoth(std::unique_ptr<TyBopBoth> _bop_both)
+  : bop_both(std::move(_bop_both)) {}
+
+void ConsBopBoth::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("BopBoth");
+  archive(CEREAL_NVP(bop_both));
+}
+
+std::unique_ptr<TyInfrule> ConsBopBoth::make(enum TyBop _bop,
+                                             std::unique_ptr<TyValue> _x,
+                                             std::unique_ptr<TyValue> _y,
+                                             std::unique_ptr<TyValue> _z,
+                                             std::unique_ptr<TySize> _sz) {
+  std::unique_ptr<TyBopBoth> _bop_both(
+      new TyBopBoth(_bop, std::move(_x), std::move(_y), std::move(_z), std::move(_sz)));
+
+  return std::unique_ptr<TyInfrule>(new ConsBopBoth(std::move(_bop_both)));
 }
 
 ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)

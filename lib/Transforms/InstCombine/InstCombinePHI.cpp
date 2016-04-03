@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/InstructionSimplify.h"
+#include "llvm/LLVMBerry/ValidationUnit.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "instcombine"
@@ -75,6 +76,9 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     return nullptr;
 
   // Otherwise, this is safe to transform!
+  
+  llvmberry::ValidationUnit::Begin("fold_phi_bin",
+                                   FirstInst->getParent()->getParent());
 
   Value *InLHS = FirstInst->getOperand(0);
   Value *InRHS = FirstInst->getOperand(1);

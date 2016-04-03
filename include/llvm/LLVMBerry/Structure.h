@@ -13,6 +13,7 @@
 namespace llvmberry {
 
 enum TyScope { Source = 0, Target };
+enum TyBop { Bop_add = 0, Bop_sub, Bop_mul, Bop_udiv, Bop_sdiv, Bop_urem, Bop_srem, Bop_shl, Bop_lshr, Bop_ashr, Bop_and, Bop_or, Bop_xor };
 
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
@@ -622,6 +623,20 @@ private:
   std::unique_ptr<TyRegister> y;
 };
 
+struct TyBopBoth {
+public:
+  TyBopBoth(enum TyBop _bop, std::unique_ptr<TyValue> _x,
+            std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyBop bop;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TyValue> z;
+  std::unique_ptr<TySize> sz;
+};
+
 struct TyAddCommutative {
 public:
   TyAddCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x,
@@ -839,6 +854,21 @@ public:
 
 private:
   std::unique_ptr<TyMulBool> mul_bool;
+};
+
+struct ConsBopBoth : TyInfrule {
+public:
+  ConsBopBoth(std::unique_ptr<TyBopBoth> _bop_both);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::unique_ptr<TyInfrule> make(enum TyBop _bop,
+                                         std::unique_ptr<TyValue> _x,
+                                         std::unique_ptr<TyValue> _y,
+                                         std::unique_ptr<TyValue> _z,
+                                         std::unique_ptr<TySize> _sz);
+
+private:
+  std::unique_ptr<TyBopBoth> bop_both;
 };
 
 /* hint command */
