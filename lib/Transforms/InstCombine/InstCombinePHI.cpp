@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/InstructionSimplify.h"
+#include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 using namespace llvm;
 
@@ -140,11 +141,39 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
         for(unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
           Instruction *I = cast<Instruction>(PN.getIncomingValue(i));
           std::string reg = llvmberry::getVariable(*I);
+          Value *CommonOperand = nullptr;
+          if(NewLHS) CommonOperand = I->getOperand(1);
+          else CommonOperand = I->getOperand(0);
+          std::string reg_common = llvmberry::getVariable(*CommonOperand);
 
           hints.addCommand(llvmberry::ConsPropagate::make(
                 llvmberry::ConsLessdef::make(
                   llvmberry::ConsVar::make(reg, llvmberry::Physical),
                   llvmberry::ConsRhs::make(reg, llvmberry::Physical, llvmberry::Source),
+                  llvmberry::Source),
+                llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, *I),
+                  llvmberry::TyPosition::make_end_of_block(llvmberry::Source, *(I->getParent())))));
+
+          hints.addCommand(llvmberry::ConsInfrule::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *I),
+                llvmberry::ConsIntroEq::make(
+                  llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                  "G")));
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                llvmberry::ConsLessdef::make(
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Physical),
+                  llvmberry::ConsVar::make("G", llvmberry::Ghost),
+                  llvmberry::Source),
+                llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, *I),
+                  llvmberry::TyPosition::make_end_of_block(llvmberry::Source, *(I->getParent())))));
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                llvmberry::ConsLessdef::make(
+                  llvmberry::ConsVar::make("G", llvmberry::Ghost),
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Physical),
                   llvmberry::Source),
                 llvmberry::ConsBounds::make(
                   llvmberry::TyPosition::make(llvmberry::Source, *I),

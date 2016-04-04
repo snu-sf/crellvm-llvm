@@ -281,6 +281,16 @@ private:
   std::unique_ptr<TySize> sz;
 };
 
+struct TyIntroEq {
+public:
+  TyIntroEq(std::unique_ptr<TyValue> _x, std::string ghost_name);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyRegister> g;
+};
+
 struct TyMulBool {
 public:
   TyMulBool(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x,
@@ -537,6 +547,17 @@ public:
                                          std::unique_ptr<TySize> _sz);
 private:
   std::unique_ptr<TyBopBoth> bop_both;
+};
+
+struct ConsIntroEq : TyInfrule {
+public:
+  ConsIntroEq(std::unique_ptr<TyIntroEq> _intro_eq);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _x, std::string ghost_name);
+
+private:
+  std::unique_ptr<TyIntroEq> intro_eq;
 };
 
 struct ConsSubSdiv : public TyInfrule{
