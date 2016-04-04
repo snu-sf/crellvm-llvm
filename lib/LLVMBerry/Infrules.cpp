@@ -12,6 +12,50 @@
 
 namespace llvmberry{
 
+// TODO: floating point binary operators are not handled yet.
+enum TyBop BopOf(llvm::BinaryOperator *I) {
+  switch(I->getOpcode()) {
+    case 8:
+      return Bop_add;
+//    case 9:
+//      return fadd;
+    case 10:
+      return Bop_sub;
+//    case 11:
+//      return fsub;
+    case 12:
+      return Bop_mul;
+//    case 13:
+//      return fmul;
+    case 14:
+      return Bop_udiv;
+    case 15:
+      return Bop_sdiv;
+//    case 16:
+//      return fdiv;
+    case 17:
+      return Bop_urem;
+    case 18:
+      return Bop_srem;
+//    case 19:
+//      return frem;
+    case 20:
+      return Bop_shl;
+    case 21:
+      return Bop_lshr;
+    case 22:
+      return Bop_ashr;
+    case 23:
+      return Bop_and;
+    case 24:
+      return Bop_or;
+    case 25:
+      return Bop_xor;
+    default:
+      assert(false && "Bopof default");
+  }
+}
+
 std::string toString(enum TyBop bop) {
   switch (bop) {
   case Bop_add:

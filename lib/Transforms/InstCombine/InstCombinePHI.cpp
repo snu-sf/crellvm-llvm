@@ -185,6 +185,30 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   llvmberry::ConsVar::make(reg_common, llvmberry::Previous),
                   llvmberry::ConsVar::make("G", llvmberry::Ghost),
                   llvmberry::ConsVar::make(reg_common, llvmberry::Physical))));
+
+
+          if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
+          int size = I->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
+
+            if(NewRHS) {
+            // b >= c -> a + b >= a + c
+            // reg_common = a, reg_block_special = b, newphi = c
+            std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(1)));
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::ConsBopBoth::make(
+                    llvmberry::BopOf(BinOp),
+                    llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                    llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
+                    llvmberry::ConsId::make(newphi, llvmberry::Physical),
+                    llvmberry::ConsSize::make(size))));
+            } else {
+              // TODO. bop_both on the right side. b >= c -> b + a >= c + a
+            }
+          } else if(dyn_cast<CmpInst>(I)) {
+            // TODO . validate when folding Compare Instruction.
+            // currently validating only when folding Binary Operator Instruction.
+          }
         }
       });
  

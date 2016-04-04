@@ -8,6 +8,8 @@
 
 namespace llvmberry{
 
+enum TyBop BopOf(llvm::BinaryOperator *I);
+
 struct TyAddAssociative {
 public:
   TyAddAssociative(std::unique_ptr<TyRegister> _x,
