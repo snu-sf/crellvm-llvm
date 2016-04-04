@@ -2327,10 +2327,8 @@ bool GVN::processInstruction(Instruction *I) {
     std::string to_rem = llvmberry::getVariable(*I);
 
     Instruction *leader_I = dyn_cast<Instruction>(repl);
-    dbgs() << "YY\n"; // TODO: remove
 
     for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
-      dbgs() << "XX\n"; // TODO: remove
       std::string user = llvmberry::getVariable(*UI->getUser());
       Instruction *user_I = dyn_cast<Instruction>(UI->getUser());
 
