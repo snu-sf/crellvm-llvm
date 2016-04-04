@@ -136,6 +136,20 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
               llvmberry::ConsBounds::make(
                 llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), ""),
                 llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
+
+        for(unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+          Instruction *I = cast<Instruction>(PN.getIncomingValue(i));
+          std::string reg = llvmberry::getVariable(*I);
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                llvmberry::ConsLessdef::make(
+                  llvmberry::ConsVar::make(reg, llvmberry::Physical),
+                  llvmberry::ConsRhs::make(reg, llvmberry::Physical, llvmberry::Source),
+                  llvmberry::Source),
+                llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, *I),
+                  llvmberry::TyPosition::make_end_of_block(llvmberry::Source, *(I->getParent())))));
+        }
       });
  
   if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
