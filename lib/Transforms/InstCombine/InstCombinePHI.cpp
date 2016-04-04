@@ -99,7 +99,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     RHSVal = NewRHS;
   }
 
-  // Add all operands to the new PHIs.
+ // Add all operands to the new PHIs.
   if (NewLHS || NewRHS) {
     for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
       Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
@@ -114,6 +114,30 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     }
   }
 
+  llvmberry::ValidationUnit::GetInstance()->intrude(
+      [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
+         llvmberry::CoreHint &hints) {
+        std::string oldphi = llvmberry::getVariable(PN);
+        std::string newphi;
+        Instruction *NewPHI = nullptr;
+        if(NewLHS) NewPHI = NewLHS;
+        if(NewRHS) NewPHI = NewRHS;
+        newphi = llvmberry::getVariable(*NewPHI);
+        llvmberry::insertSrcNopAtTgtI(hints, NewPHI);
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
+              llvmberry::ConsGlobal::make()));
+
+        BasicBlock::iterator InsertPos = NewPHI->getParent()->getFirstInsertionPt();
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
+              llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), ""),
+                llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
+      });
+ 
   if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
     CmpInst *NewCI = CmpInst::Create(CIOp->getOpcode(), CIOp->getPredicate(),
                                      LHSVal, RHSVal);
