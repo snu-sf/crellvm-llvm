@@ -416,6 +416,8 @@ struct TyCommand {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 };
+ 
+/* hint command */
 
 struct TyInfrule {
 public:

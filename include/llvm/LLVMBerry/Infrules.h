@@ -306,7 +306,32 @@ private:
   std::unique_ptr<TySize> sz;
 };
 
+struct TyTransitivity {
+public:
+  TyTransitivity(std::unique_ptr<TyExpr> _e1, std::unique_ptr<TyExpr> _e2,
+                 std::unique_ptr<TyExpr> _e3);
+  void serialize(cereal::JSONOutputArchive &archive) const;
 
+private:
+  std::unique_ptr<TyExpr> e1;
+  std::unique_ptr<TyExpr> e2;
+  std::unique_ptr<TyExpr> e3;
+};
+
+struct TyReplaceRhs {
+public:
+  TyReplaceRhs(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyValue> _y,
+               std::unique_ptr<TyExpr> _e1, std::unique_ptr<TyExpr> _e2,
+               std::unique_ptr<TyExpr> _e2_p);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TyExpr> e1;
+  std::unique_ptr<TyExpr> e2;
+  std::unique_ptr<TyExpr> e2_p;
+};
 
 struct ConsAddAssociative : TyInfrule {
 public:
@@ -561,6 +586,34 @@ public:
 
 private:
   std::unique_ptr<TyMulBool> mul_bool;
+};
+
+struct ConsTransitivity : TyInfrule {
+public:
+  ConsTransitivity(std::unique_ptr<TyTransitivity> _transitivity);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyExpr> _e1,
+                                         std::unique_ptr<TyExpr> _e2,
+                                         std::unique_ptr<TyExpr> _e3);
+
+private:
+  std::unique_ptr<TyTransitivity> transitivity;
+};
+
+struct ConsReplaceRhs : TyInfrule {
+public:
+  ConsReplaceRhs(std::unique_ptr<TyReplaceRhs> _replace_rhs);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x,
+                                         std::unique_ptr<TyValue> _y,
+                                         std::unique_ptr<TyExpr> _e1,
+                                         std::unique_ptr<TyExpr> _e2,
+                                         std::unique_ptr<TyExpr> _e2_p);
+
+private:
+  std::unique_ptr<TyReplaceRhs> replace_rhs;
 };
 
 } // llvmberry

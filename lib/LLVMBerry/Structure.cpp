@@ -824,7 +824,6 @@ void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   }
 }
 
-/* inference rule */
 ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)
     : propagate(std::move(_propagate)) {}
 
