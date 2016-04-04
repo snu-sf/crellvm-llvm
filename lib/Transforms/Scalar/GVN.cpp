@@ -52,6 +52,7 @@
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Infrules.h"
 
 #include <vector>
 using namespace llvm;
