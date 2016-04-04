@@ -123,13 +123,13 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
         if(NewLHS) NewPHI = NewLHS;
         if(NewRHS) NewPHI = NewRHS;
         newphi = llvmberry::getVariable(*NewPHI);
-        llvmberry::insertSrcNopAtTgtI(hints, NewPHI);
 
         hints.addCommand(llvmberry::ConsPropagate::make(
               llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
               llvmberry::ConsGlobal::make()));
 
         BasicBlock::iterator InsertPos = NewPHI->getParent()->getFirstInsertionPt();
+        llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
 
         hints.addCommand(llvmberry::ConsPropagate::make(
               llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
