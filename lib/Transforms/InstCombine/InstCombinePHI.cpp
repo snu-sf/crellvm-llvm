@@ -99,7 +99,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     RHSVal = NewRHS;
   }
 
- // Add all operands to the new PHIs.
+  // Add all operands to the new PHIs.
   if (NewLHS || NewRHS) {
     for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
       Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));

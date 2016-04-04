@@ -8,15 +8,11 @@
 #include <cereal/types/polymorphic.hpp>
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Infrules.h"
 
 namespace cereal {
-[[noreturn]] void throw_exception(std::exception const &e) { std::exit(1); }
-
-template <class T>
-void save(cereal::JSONOutputArchive &archive, std::unique_ptr<T> const &ptr) {
-  ptr->serialize(archive);
+ [[noreturn]] void throw_exception(std::exception const &e){ std::exit(1); }
 }
-} // cereal
 
 namespace {
 
@@ -28,39 +24,6 @@ std::string toString(llvmberry::TyScope scope) {
     return std::string("Target");
   default:
     assert(false && "Scope toString");
-  }
-}
-
-std::string toString(llvmberry::TyBop bop) {
-  switch (bop) {
-  case llvmberry::Bop_add:
-    return std::string("Bop_add");
-  case llvmberry::Bop_sub:
-    return std::string("Bop_sub");
-  case llvmberry::Bop_mul:
-    return std::string("Bop_mul");
-  case llvmberry::Bop_udiv:
-    return std::string("Bop_udiv");
-  case llvmberry::Bop_sdiv:
-    return std::string("Bop_sdiv");
-  case llvmberry::Bop_urem:
-    return std::string("Bop_urem");
-  case llvmberry::Bop_srem:
-    return std::string("Bop_srem");
-  case llvmberry::Bop_shl:
-    return std::string("Bop_shl");
-  case llvmberry::Bop_lshr:
-    return std::string("Bop_lshr");
-  case llvmberry::Bop_ashr:
-    return std::string("Bop_ashr");
-  case llvmberry::Bop_and:
-    return std::string("Bop_and");
-  case llvmberry::Bop_or:
-    return std::string("Bop_or");
-  case llvmberry::Bop_xor:
-    return std::string("Bop_xor");
-  default:
-    assert(false && "Bop toString");
   }
 }
 
@@ -162,6 +125,8 @@ std::string getVariable(const llvm::Value &value) {
 
   val += std::string(value.getName().data());
 
+  if (val == "%") val = "";
+
   return val;
 }
 
@@ -189,8 +154,6 @@ int getCommandIndex(const llvm::Value &V) {
 
   const llvm::Instruction *instr = llvm::dyn_cast<llvm::Instruction>(&V);
 
-  std::string block_name = getBasicBlockIndex(instr->getParent());
-
   if (llvm::isa<llvm::PHINode>(instr)) {
     return -1; // A phinode is not a command
   } else if (instr->isTerminator()) {
@@ -201,6 +164,18 @@ int getCommandIndex(const llvm::Value &V) {
     unsigned int firstNonPhiRawIndex =
         getRawInstrIndex(*parent->getFirstNonPHI());
     return (int)(rawIndex - firstNonPhiRawIndex);
+  }
+}
+
+int getTerminatorIndex(const llvm::TerminatorInst *instr) {
+  if (instr->isTerminator()) {
+    unsigned int rawIndex = getRawInstrIndex(*instr);
+    const llvm::BasicBlock *parent = instr->getParent();
+    unsigned int firstNonPhiRawIndex =
+        getRawInstrIndex(*parent->getFirstNonPHI());
+    return (int)(rawIndex - firstNonPhiRawIndex);
+  } else {
+    return -1; // not a terminator
   }
 }
 
@@ -268,7 +243,7 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
 
         unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
         int c1 = (int)C->getSExtValue();
-        int c2 = std::abs(c1);
+        int c2 = -c1;
 
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, I),
@@ -443,7 +418,20 @@ std::unique_ptr<TyPosition>
 TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
   const llvm::TerminatorInst *term = BB.getTerminator();
-  return std::move(make(_scope, *term));
+
+  std::string _block_name = getBasicBlockIndex(&BB);
+  std::string _register_name = "";
+
+  int _index = getTerminatorIndex(term);
+
+  std::unique_ptr<TyPositionCommand> _pos_cmd(
+      new TyPositionCommand(_index, _register_name));
+
+  std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+  return std::unique_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_cmd)));
+
 }
 
 std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
@@ -837,520 +825,6 @@ void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 /* inference rule */
-
-TyAddAssociative::TyAddAssociative(std::unique_ptr<TyRegister> _x,
-                                   std::unique_ptr<TyRegister> _y,
-                                   std::unique_ptr<TyRegister> _z,
-                                   std::unique_ptr<TyConstInt> _c1,
-                                   std::unique_ptr<TyConstInt> _c2,
-                                   std::unique_ptr<TyConstInt> _c3,
-                                   std::unique_ptr<TySize> _sz)
-    : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c1(std::move(_c1)),
-      c2(std::move(_c2)), c3(std::move(_c3)), sz(std::move(_sz)) {}
-
-void TyAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(z), CEREAL_NVP(c1),
-          CEREAL_NVP(c2), CEREAL_NVP(c3), CEREAL_NVP(sz));
-}
-
-TyAddConstNot::TyAddConstNot(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
-}
-void TyAddConstNot::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(c1));
-  archive(CEREAL_NVP(c2));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsAddConstNot::ConsAddConstNot(std::unique_ptr<TyAddConstNot> _add_const_not) : add_const_not(std::move(_add_const_not)){
-}
-std::unique_ptr<TyInfrule> ConsAddConstNot::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddConstNot> _val(new TyAddConstNot(std::move(_z), std::move(_y), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddConstNot(std::move(_val)));
-}
-void ConsAddConstNot::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("AddConstNot");
-  archive(CEREAL_NVP(add_const_not));
-}
-
-TyAddMask::TyAddMask(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), yprime(std::move(_yprime)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
-}
-void TyAddMask::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(yprime));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(c1));
-  archive(CEREAL_NVP(c2));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsAddMask::ConsAddMask(std::unique_ptr<TyAddMask> _add_mask) : add_mask(std::move(_add_mask)){
-}
-std::unique_ptr<TyInfrule> ConsAddMask::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddMask> _val(new TyAddMask(std::move(_z), std::move(_y), std::move(_yprime), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddMask(std::move(_val)));
-}
-void ConsAddMask::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("AddMask");
-  archive(CEREAL_NVP(add_mask));
-}
-
-TyAddSelectZero::TyAddSelectZero(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), c(std::move(_c)), n(std::move(_n)), a(std::move(_a)), sz(std::move(_sz)){
-}
-void TyAddSelectZero::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(c));
-  archive(CEREAL_NVP(n));
-  archive(CEREAL_NVP(a));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsAddSelectZero::ConsAddSelectZero(std::unique_ptr<TyAddSelectZero> _add_select_zero) : add_select_zero(std::move(_add_select_zero)){
-}
-std::unique_ptr<TyInfrule> ConsAddSelectZero::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddSelectZero> _val(new TyAddSelectZero(std::move(_z), std::move(_x), std::move(_y), std::move(_c), std::move(_n), std::move(_a), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddSelectZero(std::move(_val)));
-}
-void ConsAddSelectZero::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("AddSelectZero");
-  archive(CEREAL_NVP(add_select_zero));
-}
-
-TyAddSelectZero2::TyAddSelectZero2(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), c(std::move(_c)), n(std::move(_n)), a(std::move(_a)), sz(std::move(_sz)){
-}
-void TyAddSelectZero2::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(c));
-  archive(CEREAL_NVP(n));
-  archive(CEREAL_NVP(a));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsAddSelectZero2::ConsAddSelectZero2(std::unique_ptr<TyAddSelectZero2> _add_select_zero2) : add_select_zero2(std::move(_add_select_zero2)){
-}
-std::unique_ptr<TyInfrule> ConsAddSelectZero2::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddSelectZero2> _val(new TyAddSelectZero2(std::move(_z), std::move(_x), std::move(_y), std::move(_c), std::move(_n), std::move(_a), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddSelectZero2(std::move(_val)));
-}
-void ConsAddSelectZero2::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("AddSelectZero2");
-  archive(CEREAL_NVP(add_select_zero2));
-}
-
-TyAddSub::TyAddSub(std::unique_ptr<TyRegister> _minusy,
-                   std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x,
-                   std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz)
-    : minusy(std::move(_minusy)), z(std::move(_z)), x(std::move(_x)),
-      y(std::move(_y)), sz(std::move(_sz)) {}
-
-void TyAddSub::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(minusy), CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(y),
-          CEREAL_NVP(sz));
-}
-
-TyAddCommutative::TyAddCommutative(std::unique_ptr<TyRegister> _z,
-                                   std::unique_ptr<TyValue> _x,
-                                   std::unique_ptr<TyValue> _y,
-                                   std::unique_ptr<TySize> _sz)
-    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {
-}
-
-void TyAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
-}
-
-ConsAddAssociative::ConsAddAssociative(
-    std::unique_ptr<TyAddAssociative> _add_associative)
-    : add_associative(std::move(_add_associative)) {}
-
-void ConsAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("AddAssociative");
-  archive(CEREAL_NVP(add_associative));
-}
-
-std::unique_ptr<TyInfrule> ConsAddAssociative::make(
-    std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y,
-    std::unique_ptr<TyRegister> _z, std::unique_ptr<TyConstInt> _c1,
-    std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3,
-    std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddAssociative> _add_assoc(new TyAddAssociative(
-      std::move(_x), std::move(_y), std::move(_z), std::move(_c1),
-      std::move(_c2), std::move(_c3), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(
-      new ConsAddAssociative(std::move(_add_assoc)));
-}
-
-ConsAddSub::ConsAddSub(std::unique_ptr<TyAddSub> _add_sub)
-    : add_sub(std::move(_add_sub)) {}
-
-void ConsAddSub::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("AddSub");
-  archive(CEREAL_NVP(add_sub));
-}
-
-std::unique_ptr<TyInfrule> ConsAddSub::make(std::unique_ptr<TyRegister> _minusy,
-                                            std::unique_ptr<TyRegister> _z,
-                                            std::unique_ptr<TyValue> _x,
-                                            std::unique_ptr<TyValue> _y,
-                                            std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddSub> _add_sub(
-      new TyAddSub(std::move(_minusy), std::move(_z), std::move(_x),
-                   std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddSub(std::move(_add_sub)));
-}
-
-ConsAddCommutative::ConsAddCommutative(
-    std::unique_ptr<TyAddCommutative> _add_comm)
-    : add_commutative(std::move(_add_comm)) {}
-
-void ConsAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("AddCommutative");
-  archive(CEREAL_NVP(add_commutative));
-}
-
-std::unique_ptr<TyInfrule> ConsAddCommutative::make(
-    std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x,
-    std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddCommutative> _add_comm(new TyAddCommutative(
-      std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(
-      new ConsAddCommutative(std::move(_add_comm)));
-}
-
-TyAddOnebit::TyAddOnebit(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)){
-}
-void TyAddOnebit::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-}
-
-ConsAddOnebit::ConsAddOnebit(std::unique_ptr<TyAddOnebit> _add_onebit) : add_onebit(std::move(_add_onebit)){
-}
-std::unique_ptr<TyInfrule> ConsAddOnebit::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y){
-  std::unique_ptr<TyAddOnebit> _val(new TyAddOnebit(std::move(_z), std::move(_x), std::move(_y)));
-  return std::unique_ptr<TyInfrule>(new ConsAddOnebit(std::move(_val)));
-}
-void ConsAddOnebit::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("AddOnebit");
-  archive(CEREAL_NVP(add_onebit));
-}
-
-TyAddShift::TyAddShift(std::unique_ptr<TyRegister> _y,
-                       std::unique_ptr<TyValue> _v, std::unique_ptr<TySize> _sz)
-    : y(std::move(_y)), v(std::move(_v)), sz(std::move(_sz)) {}
-
-void TyAddShift::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(y), CEREAL_NVP(v), CEREAL_NVP(sz));
-}
-
-ConsAddShift::ConsAddShift(std::unique_ptr<TyAddShift> _add_shift)
-    : add_shift(std::move(_add_shift)) {}
-
-void ConsAddShift::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("AddShift");
-  archive(CEREAL_NVP(add_shift));
-}
-
-std::unique_ptr<TyInfrule> ConsAddShift::make(std::unique_ptr<TyRegister> _y,
-                                              std::unique_ptr<TyValue> _v,
-                                              std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddShift> _add_shift(
-      new TyAddShift(std::move(_y), std::move(_v), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddShift(std::move(_add_shift)));
-}
-
-TyAddSignbit::TyAddSignbit(std::unique_ptr<TyRegister> _x,
-                           std::unique_ptr<TyValue> _e1,
-                           std::unique_ptr<TyValue> _e2,
-                           std::unique_ptr<TySize> _sz)
-    : x(std::move(_x)), e1(std::move(_e1)), e2(std::move(_e2)),
-      sz(std::move(_sz)) {}
-
-void TyAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(x), CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(sz));
-}
-
-ConsAddSignbit::ConsAddSignbit(std::unique_ptr<TyAddSignbit> _add_signbit)
-    : add_signbit(std::move(_add_signbit)) {}
-
-void ConsAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("AddSignbit");
-  archive(CEREAL_NVP(add_signbit));
-}
-
-std::unique_ptr<TyInfrule> ConsAddSignbit::make(std::unique_ptr<TyRegister> _x,
-                                                std::unique_ptr<TyValue> _e1,
-                                                std::unique_ptr<TyValue> _e2,
-                                                std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddSignbit> _add_signbit(new TyAddSignbit(
-      std::move(_x), std::move(_e1), std::move(_e2), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(
-      new ConsAddSignbit(std::move(_add_signbit)));
-}
-
-TyAddZextBool::TyAddZextBool(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _b, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz) : x(std::move(_x)), y(std::move(_y)), b(std::move(_b)), c(std::move(_c)), cprime(std::move(_cprime)), sz(std::move(_sz)){
-}
-void TyAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(b));
-  archive(CEREAL_NVP(c));
-  archive(CEREAL_NVP(cprime));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsAddZextBool::ConsAddZextBool(std::unique_ptr<TyAddZextBool> _add_zext_bool) : add_zext_bool(std::move(_add_zext_bool)){
-}
-std::unique_ptr<TyInfrule> ConsAddZextBool::make(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _b, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddZextBool> _val(new TyAddZextBool(std::move(_x), std::move(_y), std::move(_b), std::move(_c), std::move(_cprime), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddZextBool(std::move(_val)));
-}
-void ConsAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("AddZextBool");
-  archive(CEREAL_NVP(add_zext_bool));
-}
-
-  TySubAdd::TySubAdd
-          (std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyValue> _my,
-           std::unique_ptr<TyRegister> _x,
-           std::unique_ptr<TyValue> _y,
-           std::unique_ptr<TySize> _sz)
-          : z(std::move(_z)), my(std::move(_my)), x(std::move(_x)),
-            y(std::move(_y)), sz(std::move(_sz)) {}
-
-  void TySubAdd::serialize(cereal::JSONOutputArchive &archive) const {
-    archive(CEREAL_NVP(z), CEREAL_NVP(my), CEREAL_NVP(x),
-            CEREAL_NVP(y), CEREAL_NVP(sz));
-  }
-
-  ConsSubAdd::ConsSubAdd(std::unique_ptr<TySubAdd> _sub_add)
-          : sub_add(std::move(_sub_add)) {}
-
-  void ConsSubAdd::serialize(cereal::JSONOutputArchive &archive) const {
-    archive.makeArray();
-    archive.writeName();
-
-    archive.saveValue("SubAdd");
-    archive(CEREAL_NVP(sub_add));
-  }
-
-  std::unique_ptr<TyInfrule> ConsSubAdd::make
-          (std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyValue> _my,
-           std::unique_ptr<TyRegister> _x,
-           std::unique_ptr<TyValue> _y,
-           std::unique_ptr<TySize> _sz) {
-    std::unique_ptr<TySubAdd> _sub_add
-            (new TySubAdd
-                     (std::move(_z), std::move(_my), std::move(_x),
-                      std::move(_y), std::move(_sz)));
-    return std::unique_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
-  }
-
-TyMulNeg::TyMulNeg
-          (std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyValue> _mx,
-           std::unique_ptr<TyValue> _my,
-           std::unique_ptr<TyValue> _x,
-           std::unique_ptr<TyValue> _y,
-           std::unique_ptr<TySize> _sz)
-          : z(std::move(_z)), mx(std::move(_mx)), my(std::move(_my)), x(std::move(_x)),
-            y(std::move(_y)), sz(std::move(_sz)) {}
-
-  void TyMulNeg::serialize(cereal::JSONOutputArchive &archive) const {
-    archive(CEREAL_NVP(z), CEREAL_NVP(mx), CEREAL_NVP(my),
-            CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
-  }
-
-  ConsMulNeg::ConsMulNeg(std::unique_ptr<TyMulNeg> _mul_neg)
-          : mul_neg(std::move(_mul_neg)) {}
-
-  void ConsMulNeg::serialize(cereal::JSONOutputArchive &archive) const {
-    archive.makeArray();
-    archive.writeName();
-
-    archive.saveValue("MulNeg");
-    archive(CEREAL_NVP(mul_neg));
-  }
-
-  std::unique_ptr<TyInfrule> ConsMulNeg::make
-          (std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyValue> _mx,
-           std::unique_ptr<TyValue> _my,
-           std::unique_ptr<TyValue> _x,
-           std::unique_ptr<TyValue> _y,
-           std::unique_ptr<TySize> _sz) {
-    std::unique_ptr<TyMulNeg> _mul_neg
-            (new TyMulNeg
-                     (std::move(_z), std::move(_mx), std::move(_my),
-                      std::move(_x), std::move(_y), std::move(_sz)));
-    return std::unique_ptr<TyInfrule>(new ConsMulNeg(std::move(_mul_neg)));
-  }
-
-  TyNegVal::TyNegVal
-            (std::unique_ptr<TyConstInt> _c1,
-             std::unique_ptr<TyConstInt> _c2,
-             std::unique_ptr<TySize> _sz)
-             : c1(std::move(_c1)), c2(std::move(_c2)),sz(std::move(_sz)) {}
-
-    void TyNegVal::serialize(cereal::JSONOutputArchive &archive) const {
-          archive(CEREAL_NVP(c1), CEREAL_NVP(c2), CEREAL_NVP(sz));
-            }
-
-      ConsNegVal::ConsNegVal(std::unique_ptr<TyNegVal> _neg_val)
-                  : neg_val(std::move(_neg_val)) {}
-
-        void ConsNegVal::serialize(cereal::JSONOutputArchive &archive) const {
-              archive.makeArray();
-              archive.writeName();
-
-              archive.saveValue("NegVal");
-              archive(CEREAL_NVP(neg_val));
-             }
-
-          std::unique_ptr<TyInfrule> ConsNegVal::make
-                      (std::unique_ptr<TyConstInt> _c1,
-                       std::unique_ptr<TyConstInt> _c2,
-                       std::unique_ptr<TySize> _sz) {
-                       std::unique_ptr<TyNegVal> _neg_val
-                       (new TyNegVal
-                            (std::move(_c1), std::move(_c2), std::move(_sz)));
-          return std::unique_ptr<TyInfrule>(new ConsNegVal(std::move(_neg_val)));
-          }
-
- TySubRemove::TySubRemove(std::unique_ptr<TyRegister> _z,
-                         std::unique_ptr<TyRegister> _y,
-                         std::unique_ptr<TyValue> _a,
-                         std::unique_ptr<TyValue> _b,
-                         std::unique_ptr<TySize> _sz)
-    : z(std::move(_z)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)),
-      sz(std::move(_sz)) {}
-
-void TySubRemove::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(a), CEREAL_NVP(b),
-          CEREAL_NVP(sz));
-}
-
-ConsSubRemove::ConsSubRemove(std::unique_ptr<TySubRemove> _sub_remove)
-    : sub_remove(std::move(_sub_remove)) {}
-
-void ConsSubRemove::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("SubRemove");
-  archive(CEREAL_NVP(sub_remove));
-}
-
-std::unique_ptr<TyInfrule> ConsSubRemove::make(std::unique_ptr<TyRegister> _z,
-                                               std::unique_ptr<TyRegister> _y,
-                                               std::unique_ptr<TyValue> _a,
-                                               std::unique_ptr<TyValue> _b,
-                                               std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TySubRemove> _sub_remove(
-      new TySubRemove(std::move(_z), std::move(_y), std::move(_a),
-                      std::move(_b), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSubRemove(std::move(_sub_remove)));
-}
-
-TyMulBool::TyMulBool(std::unique_ptr<TyRegister> _z,
-                     std::unique_ptr<TyRegister> _x,
-                     std::unique_ptr<TyRegister> _y)
-    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)) {}
-
-void TyMulBool::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(y));
-}
-
-ConsMulBool::ConsMulBool(std::unique_ptr<TyMulBool> _mul_bool)
-    : mul_bool(std::move(_mul_bool)) {}
-
-void ConsMulBool::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("MulBool");
-  archive(CEREAL_NVP(mul_bool));
-}
-
-std::unique_ptr<TyInfrule> ConsMulBool::make(std::unique_ptr<TyRegister> _z,
-                                             std::unique_ptr<TyRegister> _x,
-                                             std::unique_ptr<TyRegister> _y) {
-  std::unique_ptr<TyMulBool> _mul_bool(
-      new TyMulBool(std::move(_z), std::move(_x), std::move(_y)));
-
-  return std::unique_ptr<TyInfrule>(new ConsMulBool(std::move(_mul_bool)));
-}
-
-TyBopBoth::TyBopBoth(enum TyBop _bop,
-                       std::unique_ptr<TyValue> _x,
-                       std::unique_ptr<TyValue> _y,
-                       std::unique_ptr<TyValue> _z,
-                       std::unique_ptr<TySize> _sz)
-  : bop(_bop), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), sz(std::move(_sz)) {}
-
-void TyBopBoth::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("b", toString(bop)), CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(z), CEREAL_NVP(sz));
-}
-
-ConsBopBoth::ConsBopBoth(std::unique_ptr<TyBopBoth> _bop_both)
-  : bop_both(std::move(_bop_both)) {}
-
-void ConsBopBoth::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("BopBoth");
-  archive(CEREAL_NVP(bop_both));
-}
-
-std::unique_ptr<TyInfrule> ConsBopBoth::make(enum TyBop _bop,
-                                             std::unique_ptr<TyValue> _x,
-                                             std::unique_ptr<TyValue> _y,
-                                             std::unique_ptr<TyValue> _z,
-                                             std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyBopBoth> _bop_both(
-      new TyBopBoth(_bop, std::move(_x), std::move(_y), std::move(_z), std::move(_sz)));
-
-  return std::unique_ptr<TyInfrule>(new ConsBopBoth(std::move(_bop_both)));
-}
-
 ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)
     : propagate(std::move(_propagate)) {}
 
@@ -1419,8 +893,8 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(module_id));
   archive(CEREAL_NVP(function_id));
   archive(CEREAL_NVP(opt_name));
-  archive(CEREAL_NVP(nop_positions));
   archive(CEREAL_NVP(commands));
+  archive(CEREAL_NVP(nop_positions));
 }
 
 } // llvmberry
