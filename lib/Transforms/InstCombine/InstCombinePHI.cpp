@@ -178,6 +178,13 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 llvmberry::ConsBounds::make(
                   llvmberry::TyPosition::make(llvmberry::Source, *I),
                   llvmberry::TyPosition::make_end_of_block(llvmberry::Source, *(I->getParent())))));
+
+          hints.addCommand(llvmberry::ConsInfrule::make(
+                llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                llvmberry::ConsTransitivity::make(
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Previous),
+                  llvmberry::ConsVar::make("G", llvmberry::Ghost),
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Physical))));
         }
       });
  
