@@ -33,7 +33,6 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
         llvm::SelectInst *Y, 
         bool needs_commutativity,
         bool is_leftform);
-
 /* position */
 
 struct TyPositionPhinode {
@@ -93,6 +92,9 @@ public:
   make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB);
   static std::unique_ptr<TyPosition> make(enum TyScope _scope,
                                           std::string _block_name,
+                                          std::string _prev_block_name);
+  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
+                                          const llvm::Instruction &I,
                                           std::string _prev_block_name);
 
 private:
@@ -537,6 +539,8 @@ struct TyCommand {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 };
+ 
+/* hint command */
 
 struct TyInfrule {
 public:

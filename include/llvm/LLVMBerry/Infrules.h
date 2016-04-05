@@ -294,8 +294,7 @@ private:
 
 struct TyTransitivity {
 public:
-  TyTransitivity(std::unique_ptr<TyExpr> _e1,
-                 std::unique_ptr<TyExpr> _e2,
+  TyTransitivity(std::unique_ptr<TyExpr> _e1, std::unique_ptr<TyExpr> _e2,
                  std::unique_ptr<TyExpr> _e3);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
@@ -344,7 +343,6 @@ private :
   std::unique_ptr<TyValue> x;
   std::unique_ptr<TyRegister> g;
 };
-
 
 struct ConsAddAssociative : TyInfrule {
 public:

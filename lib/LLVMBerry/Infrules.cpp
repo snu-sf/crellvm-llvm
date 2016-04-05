@@ -588,18 +588,18 @@ std::unique_ptr<TyInfrule> ConsMulBool::make(std::unique_ptr<TyRegister> _z,
   return std::unique_ptr<TyInfrule>(new ConsMulBool(std::move(_mul_bool)));
 }
 
-TyTransitivity::TyTransitivity
-(std::unique_ptr<TyExpr> _e1,
- std::unique_ptr<TyExpr> _e2,
- std::unique_ptr<TyExpr> _e3)
-  : e1(std::move(_e1)), e2(std::move(_e2)), e3(std::move(_e3)) {}
-  
+TyTransitivity::TyTransitivity(std::unique_ptr<TyExpr> _e1,
+                               std::unique_ptr<TyExpr> _e2,
+                               std::unique_ptr<TyExpr> _e3)
+    : e1(std::move(_e1)), e2(std::move(_e2)), e3(std::move(_e3)) {}
+
 void TyTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
 }
 
-ConsTransitivity::ConsTransitivity(std::unique_ptr<TyTransitivity> _transitivity)
-  : transitivity(std::move(_transitivity)) {}
+ConsTransitivity::ConsTransitivity(
+    std::unique_ptr<TyTransitivity> _transitivity)
+    : transitivity(std::move(_transitivity)) {}
 
 void ConsTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -609,13 +609,13 @@ void ConsTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(transitivity));
 }
 
-std::unique_ptr<TyInfrule> ConsTransitivity::make
-(std::unique_ptr<TyExpr> _e1,
- std::unique_ptr<TyExpr> _e2,
- std::unique_ptr<TyExpr> _e3) {
-  std::unique_ptr<TyTransitivity> _transitivity
-    (new TyTransitivity(std::move(_e1), std::move(_e2), std::move(_e3)));
-  return std::unique_ptr<TyInfrule>(new ConsTransitivity(std::move(_transitivity)));
+std::unique_ptr<TyInfrule> ConsTransitivity::make(std::unique_ptr<TyExpr> _e1,
+                                                  std::unique_ptr<TyExpr> _e2,
+                                                  std::unique_ptr<TyExpr> _e3) {
+  std::unique_ptr<TyTransitivity> _transitivity(
+      new TyTransitivity(std::move(_e1), std::move(_e2), std::move(_e3)));
+  return std::unique_ptr<TyInfrule>(
+      new ConsTransitivity(std::move(_transitivity)));
 }
 
 TyTransitivityTgt::TyTransitivityTgt
@@ -648,24 +648,22 @@ std::unique_ptr<TyInfrule> ConsTransitivityTgt::make
   return std::unique_ptr<TyInfrule>(new ConsTransitivityTgt(std::move(_transitivity_tgt)));
 }
 
-TyReplaceRhs::TyReplaceRhs
-(std::unique_ptr<TyRegister> _x,
- std::unique_ptr<TyValue> _y,
- std::unique_ptr<TyExpr> _e1,
- std::unique_ptr<TyExpr> _e2,
- std::unique_ptr<TyExpr> _e2_p)
-  : x(std::move(_x)), y(std::move(_y)),
-    e1(std::move(_e1)), e2(std::move(_e2)), e2_p(std::move(_e2_p)) {}
-  
+TyReplaceRhs::TyReplaceRhs(std::unique_ptr<TyRegister> _x,
+                           std::unique_ptr<TyValue> _y,
+                           std::unique_ptr<TyExpr> _e1,
+                           std::unique_ptr<TyExpr> _e2,
+                           std::unique_ptr<TyExpr> _e2_p)
+    : x(std::move(_x)), y(std::move(_y)), e1(std::move(_e1)),
+      e2(std::move(_e2)), e2_p(std::move(_e2_p)) {}
+
 void TyReplaceRhs::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(x), CEREAL_NVP(y),
-          CEREAL_NVP(e1), CEREAL_NVP(e2),
+  archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(e1), CEREAL_NVP(e2),
           cereal::make_nvp("e2\'", e2_p));
 }
 
 ConsReplaceRhs::ConsReplaceRhs(std::unique_ptr<TyReplaceRhs> _replace_rhs)
-  : replace_rhs(std::move(_replace_rhs)) {}
-  
+    : replace_rhs(std::move(_replace_rhs)) {}
+
 void ConsReplaceRhs::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
@@ -674,16 +672,16 @@ void ConsReplaceRhs::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(replace_rhs));
 }
 
-std::unique_ptr<TyInfrule> ConsReplaceRhs::make
-(std::unique_ptr<TyRegister> _x,
- std::unique_ptr<TyValue> _y,
- std::unique_ptr<TyExpr> _e1,
- std::unique_ptr<TyExpr> _e2,
- std::unique_ptr<TyExpr> _e2_p) {
-  std::unique_ptr<TyReplaceRhs> _replace_rhs
-    (new TyReplaceRhs(std::move(_x), std::move(_y),
-                      std::move(_e1), std::move(_e2), std::move(_e2_p)));
-  return std::unique_ptr<TyInfrule>(new ConsReplaceRhs(std::move(_replace_rhs)));
+std::unique_ptr<TyInfrule> ConsReplaceRhs::make(std::unique_ptr<TyRegister> _x,
+                                                std::unique_ptr<TyValue> _y,
+                                                std::unique_ptr<TyExpr> _e1,
+                                                std::unique_ptr<TyExpr> _e2,
+                                                std::unique_ptr<TyExpr> _e2_p) {
+  std::unique_ptr<TyReplaceRhs> _replace_rhs(
+      new TyReplaceRhs(std::move(_x), std::move(_y), std::move(_e1),
+                       std::move(_e2), std::move(_e2_p)));
+  return std::unique_ptr<TyInfrule>(
+      new ConsReplaceRhs(std::move(_replace_rhs)));
 }
 
 TyIntroGhost::TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g) : x(std::move(_x)), g(std::move(_g)){
@@ -694,16 +692,17 @@ void TyIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(g));
 }
 
-ConsIntroGhost::ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost) : intro_ghost(std::move(_intro_ghost)){
-}
-std::unique_ptr<TyInfrule> ConsIntroGhost::make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g){
+ConsIntroGhost::ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost) : intro_ghost(std::move(_intro_ghost)) {}
+
+std::unique_ptr<TyInfrule> ConsIntroGhost::make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g) {
   std::unique_ptr<TyIntroGhost> _val(new TyIntroGhost(std::move(_x), std::move(_g)));
   return std::unique_ptr<TyInfrule>(new ConsIntroGhost(std::move(_val)));
 }
+
 void ConsIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
   archive.writeName();
   archive.saveValue("IntroGhost");
   archive(CEREAL_NVP(intro_ghost));
 }
-}
+} // llvmberry
