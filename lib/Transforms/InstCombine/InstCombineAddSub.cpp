@@ -1118,9 +1118,9 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           // y = select i1 b, (c + 1), c
           std::string reg_x_name = llvmberry::getVariable(*X);
           std::string reg_y_name = llvmberry::getVariable(Y);
-          int c = (int)C->getSExtValue();
+          int64_t c = C->getSExtValue();
           int c_bitwidth = C->getBitWidth();
-          int cprime = c + 1;
+          int64_t cprime = c + 1;
           int cprime_bitwidth = c_bitwidth;
    
           hints.addCommand(llvmberry::ConsPropagate::make(
@@ -1369,7 +1369,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         // Z = Y + C1
         Instruction *Y = dyn_cast<Instruction>(LHS);
         ConstantInt *C1_ptr = dyn_cast<ConstantInt>(CRHS);
-        int C1 = C1_ptr->getSExtValue();
+        int64_t C1 = C1_ptr->getSExtValue();
         Instruction *Z = &I;
 
         // prepare variables
@@ -1436,8 +1436,8 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           // nop         | Y' = X  + c1
           // Z = Y + c1  | Z  = Y' & c2
           
-          int c1 = CRHS->getSExtValue();
-          int c2 = C2->getSExtValue();
+          int64_t c1 = CRHS->getSExtValue();
+          int64_t c2 = C2->getSExtValue();
           Instruction *Y = dyn_cast<Instruction>(LHS);
           Instruction *Z = dyn_cast<Instruction>(&I);
           Instruction *Yprime = dyn_cast<Instruction>(NewAdd);
@@ -2106,8 +2106,8 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
         int bitwidth = Z->getType()->getIntegerBitWidth();
         ConstantInt *C_ci = dyn_cast<ConstantInt>(C);
-        int c_val = (int)C_ci->getSExtValue();
-        int cprime_val = -c_val;
+        int64_t c_val = C_ci->getSExtValue();
+        int64_t cprime_val = -c_val;
 
         hints.addCommand(llvmberry::ConsPropagate::make(
             llvmberry::ConsLessdef::make(
