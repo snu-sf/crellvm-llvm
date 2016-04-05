@@ -23,7 +23,6 @@ void save(cereal::JSONOutputArchive &archive, std::unique_ptr<T> const &ptr) {
 namespace llvmberry {
 
 enum TyScope { Source = 0, Target };
-enum TyBop { Bop_add = 0, Bop_sub, Bop_mul, Bop_udiv, Bop_sdiv, Bop_urem, Bop_srem, Bop_shl, Bop_lshr, Bop_ashr, Bop_and, Bop_or, Bop_xor };
 
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);

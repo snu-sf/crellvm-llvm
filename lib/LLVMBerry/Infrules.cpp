@@ -10,82 +10,93 @@
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
-namespace llvmberry{
-
-// TODO: floating point binary operators are not handled yet.
-enum TyBop BopOf(llvm::BinaryOperator *I) {
-  switch(I->getOpcode()) {
-    case 8:
-      return Bop_add;
-//    case 9:
-//      return fadd;
-    case 10:
-      return Bop_sub;
-//    case 11:
-//      return fsub;
-    case 12:
-      return Bop_mul;
-//    case 13:
-//      return fmul;
-    case 14:
-      return Bop_udiv;
-    case 15:
-      return Bop_sdiv;
-//    case 16:
-//      return fdiv;
-    case 17:
-      return Bop_urem;
-    case 18:
-      return Bop_srem;
-//    case 19:
-//      return frem;
-    case 20:
-      return Bop_shl;
-    case 21:
-      return Bop_lshr;
-    case 22:
-      return Bop_ashr;
-    case 23:
-      return Bop_and;
-    case 24:
-      return Bop_or;
-    case 25:
-      return Bop_xor;
-    default:
-      assert(false && "Bopof default");
-  }
-}
-
-std::string toString(enum TyBop bop) {
+namespace {
+std::string toString(llvmberry::TyBop bop){
   switch (bop) {
-  case Bop_add:
-    return std::string("Bop_add");
-  case Bop_sub:
-    return std::string("Bop_sub");
-  case Bop_mul:
-    return std::string("Bop_mul");
-  case Bop_udiv:
-    return std::string("Bop_udiv");
-  case Bop_sdiv:
-    return std::string("Bop_sdiv");
-  case Bop_urem:
-    return std::string("Bop_urem");
-  case Bop_srem:
-    return std::string("Bop_srem");
-  case Bop_shl:
-    return std::string("Bop_shl");
-  case Bop_lshr:
-    return std::string("Bop_lshr");
-  case Bop_ashr:
-    return std::string("Bop_ashr");
-  case Bop_and:
-    return std::string("Bop_and");
-  case Bop_or:
-    return std::string("Bop_or");
-  case Bop_xor:
-    return std::string("Bop_xor");
+    case llvmberry::BopAdd:
+      return std::string("BopAdd");
+    case llvmberry::BopSub:
+      return std::string("BopSub");
+    case llvmberry::BopMul:
+      return std::string("BopMul");
+    case llvmberry::BopUdiv:
+      return std::string("BopUdiv");
+    case llvmberry::BopSdiv:
+      return std::string("BopSdiv");
+    case llvmberry::BopUrem:
+      return std::string("BopUrem");
+    case llvmberry::BopSrem:
+      return std::string("BopSrem");
+    case llvmberry::BopShl:
+      return std::string("BopShl");
+    case llvmberry::BopLshr:
+      return std::string("BopLshr");
+    case llvmberry::BopAshr:
+      return std::string("BopAshr");
+    case llvmberry::BopAnd:
+      return std::string("BopAnd");
+    case llvmberry::BopOr:
+      return std::string("BopOr");
+    case llvmberry::BopXor:
+      return std::string("BopXor");
+    case llvmberry::BopFadd:
+      return std::string("BopFadd");
+    case llvmberry::BopFsub:
+      return std::string("BopFsub");
+    case llvmberry::BopFmul:
+      return std::string("BopFmul");
+    case llvmberry::BopFdiv:
+      return std::string("BopFdiv");
+    case llvmberry::BopFrem:
+      return std::string("BopFrem");
   default:
     assert(false && "Bop toString");
+  }
+}
+} // anonymous namespace
+
+namespace llvmberry{
+
+TyBop BopOf(llvm::BinaryOperator *I) {
+  switch(I->getOpcode()) {
+    case 8:
+      return BopAdd;
+    case 9:
+      return BopFadd;
+    case 10:
+      return BopSub;
+    case 11:
+      return BopFsub;
+    case 12:
+      return BopMul;
+    case 13:
+      return BopFmul;
+    case 14:
+      return BopUdiv;
+    case 15:
+      return BopSdiv;
+    case 16:
+      return BopFdiv;
+    case 17:
+      return BopUrem;
+    case 18:
+      return BopSrem;
+    case 19:
+      return BopFrem;
+    case 20:
+      return BopShl;
+    case 21:
+      return BopLshr;
+    case 22:
+      return BopAshr;
+    case 23:
+      return BopAnd;
+    case 24:
+      return BopOr;
+    case 25:
+      return BopXor;
+    default:
+      assert(false && "Bopof default");
   }
 }
 
@@ -636,7 +647,7 @@ std::unique_ptr<TyInfrule> ConsSubRemove::make(std::unique_ptr<TyRegister> _z,
   return std::unique_ptr<TyInfrule>(new ConsSubRemove(std::move(_sub_remove)));
 }
 
-TyBopBoth::TyBopBoth(enum TyBop _bop,
+TyBopBoth::TyBopBoth(TyBop _bop,
                        std::unique_ptr<TyValue> _x,
                        std::unique_ptr<TyValue> _y,
                        std::unique_ptr<TyValue> _z,
@@ -658,7 +669,7 @@ void ConsBopBoth::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(bop_both));
 }
 
-std::unique_ptr<TyInfrule> ConsBopBoth::make(enum TyBop _bop,
+std::unique_ptr<TyInfrule> ConsBopBoth::make(TyBop _bop,
                                              std::unique_ptr<TyValue> _x,
                                              std::unique_ptr<TyValue> _y,
                                              std::unique_ptr<TyValue> _z,
