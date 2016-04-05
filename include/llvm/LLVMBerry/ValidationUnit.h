@@ -12,6 +12,7 @@
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Infrules.h"
 
 namespace llvmberry {
 
