@@ -119,7 +119,8 @@ private:
   enum TyTag tag;
 };
 
-// constant
+
+// type
 
 struct TyIntType {
 public:
@@ -143,6 +144,52 @@ enum TyFloatType {
   PPC_FP128Type,
   X86_FP80Type
 };
+
+struct TyValueType{
+public : 
+  virtual void serialize(cereal::JSONOutputArchive& archive) const = 0;
+  static std::unique_ptr<TyValueType> make(const llvm::Type &type);
+};
+
+struct ConsIntValueType : public TyValueType{
+public : 
+  ConsIntValueType(std::unique_ptr<TyIntType> _int_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyIntType> int_type;
+};
+
+struct ConsFloatValueType : public TyValueType{
+public : 
+  ConsFloatValueType(TyFloatType _float_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  TyFloatType float_type;
+};
+
+struct ConsNamedType : public TyValueType{
+public : 
+  ConsNamedType(std::string _s);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::string s;
+};
+
+struct ConsPtrType : public TyValueType{
+public : 
+  ConsPtrType(int _address_space, std::unique_ptr<TyValueType> _valuetype);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  int address_space;
+  std::unique_ptr<TyValueType> valuetype;
+};
+
+
+// constants
 
 struct TyConstInt {
 public:
@@ -195,6 +242,8 @@ private:
   std::unique_ptr<TyConstFloat> const_float;
 };
 
+// value
+
 struct TyValue {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
@@ -222,6 +271,67 @@ public:
 private:
   std::unique_ptr<TyConstant> constant;
 };
+
+
+// instruction
+
+struct TyInstruction {
+public:
+  virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+  static std::unique_ptr<TyInstruction> make(const llvm::Instruction &inst);
+};
+
+enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl, BopLshr, BopAshr,
+        BopAnd, BopOr, BopXor, BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
+
+struct TyBinaryOperator{
+public : 
+  TyBinaryOperator(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::unique_ptr<TyBinaryOperator> make(const llvm::BinaryOperator &bop);
+
+private : 
+  TyBop opcode;
+  std::unique_ptr<TyValueType> operandtype;
+  std::unique_ptr<TyValue> operand1;
+  std::unique_ptr<TyValue> operand2;
+};
+
+struct TyLoadInst{
+public : 
+  TyLoadInst(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::unique_ptr<TyLoadInst> make(const llvm::LoadInst &li);
+
+private : 
+  std::unique_ptr<TyValueType> pointertype;
+  std::unique_ptr<TyValueType> valtype;
+  std::unique_ptr<TyValue> ptrvalue;
+  int align;
+};
+
+struct ConsBinaryOp : public TyInstruction{
+public : 
+  ConsBinaryOp(std::unique_ptr<TyBinaryOperator> _binary_operator);
+  static std::unique_ptr<TyInstruction> make(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
+  static std::unique_ptr<TyInstruction> make(const llvm::BinaryOperator &bop);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyBinaryOperator> binary_operator;
+};
+
+struct ConsLoadInst : public TyInstruction{
+public : 
+  ConsLoadInst(std::unique_ptr<TyLoadInst> _load_inst);
+  static std::unique_ptr<TyInstruction> make(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align);
+  static std::unique_ptr<TyInstruction> make(const llvm::LoadInst &li);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyLoadInst> load_inst;
+};
+
 
 // size
 
@@ -289,6 +399,17 @@ public:
 
 private:
   std::unique_ptr<TyConstant> constant;
+};
+
+struct ConsInsn : public TyExpr{
+public : 
+  ConsInsn(std::unique_ptr<TyInstruction> _instruction);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  
+  static std::unique_ptr<TyExpr> make(const llvm::Instruction &i);
+
+private : 
+  std::unique_ptr<TyInstruction> instruction;
 };
 
 // propagate object
