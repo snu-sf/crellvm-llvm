@@ -283,6 +283,7 @@ public:
 
 enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl, BopLshr, BopAshr,
         BopAnd, BopOr, BopXor, BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
+enum TyBopSide { Left, Right };
 
 struct TyBinaryOperator{
 public : 

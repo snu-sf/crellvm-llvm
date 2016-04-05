@@ -271,12 +271,15 @@ private:
 
 struct TyBopBoth {
 public:
-  TyBopBoth(enum TyBop _bop, std::unique_ptr<TyValue> _x,
+  TyBopBoth(enum TyBop _bop, enum TyScope _scope, enum TyBopSide _bop_side, std::unique_ptr<TyValue> _x,
             std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::string getInfruleName() const;
 
 private:
   enum TyBop bop;
+  enum TyScope scope;
+  enum TyBopSide bop_side;
   std::unique_ptr<TyValue> x;
   std::unique_ptr<TyValue> y;
   std::unique_ptr<TyValue> z;
@@ -543,6 +546,8 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::unique_ptr<TyInfrule> make(enum TyBop _bop,
+                                         enum TyScope _scope,
+                                         enum TyBopSide _bop_side,
                                          std::unique_ptr<TyValue> _x,
                                          std::unique_ptr<TyValue> _y,
                                          std::unique_ptr<TyValue> _z,

@@ -198,12 +198,24 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
                   llvmberry::ConsBopBoth::make(
                     llvmberry::BopOf(BinOp),
+                    llvmberry::Target,
+                    llvmberry::Left,
                     llvmberry::ConsId::make(reg_common, llvmberry::Physical),
                     llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
                     llvmberry::ConsId::make(newphi, llvmberry::Physical),
                     llvmberry::ConsSize::make(size))));
             } else {
-              // TODO. bop_both on the right side. b >= c -> b + a >= c + a
+            std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(0)));
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::ConsBopBoth::make(
+                    llvmberry::BopOf(BinOp),
+                    llvmberry::Target,
+                    llvmberry::Right,
+                    llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                    llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
+                    llvmberry::ConsId::make(newphi, llvmberry::Physical),
+                    llvmberry::ConsSize::make(size))));
             }
           } else if(dyn_cast<CmpInst>(I)) {
             // TODO . validate when folding Compare Instruction.
