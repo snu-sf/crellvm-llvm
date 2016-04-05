@@ -400,8 +400,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       hints.addCommand
         (llvmberry::ConsPropagate::make
           (llvmberry::ConsLessdef::make
-           (llvmberry::ConsVar::make
-             (reg_store, llvmberry::Physical),
+           (llvmberry::ConsInsn::make(*OnlyStore),
             llvmberry::ConsVar::make
              (reg_store, llvmberry::Ghost),
             llvmberry::Source),
@@ -410,22 +409,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
               (llvmberry::Source, *OnlyStore),
              llvmberry::TyPosition::make
               (llvmberry::Source, *LI))));
-
-/*
-      hints.addCommand
-        (llvmberry::ConsPropagate::make
-          (llvmberry::ConsLessdef::make
-           (llvmberry::ConsVar::make
-             (reg_store, llvmberry::Ghost),
-            llvmberry::ConsRhs::make
-             (reg_store, llvmberry::Physical, llvmberry::Source),
-            llvmberry::Target),
-           llvmberry::ConsBounds::make
-            (llvmberry::TyPosition::make
-              (*OnlyStore, llvmberry::Target),
-             llvmberry::TyPosition::make
-              (*LI, llvmberry::Target))));
-*/      
 
       hints.addCommand
         (llvmberry::ConsPropagate::make
@@ -441,16 +424,12 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
              llvmberry::TyPosition::make
               (llvmberry::Target, *LI))));
 
-
       hints.addCommand
         (llvmberry::ConsInfrule::make
           (llvmberry::TyPosition::make
             (llvmberry::Source, *OnlyStore),
           (llvmberry::ConsIntroGhost::make
-            (llvmberry::ConsVar::make
-              (reg_store, llvmberry::Physical),
-            //(llvmberry::TyRegister::make(reg_store, llvmberry::Physical),
-             llvmberry::TyValue::make(*(OnlyStore->getOperand(0))),
+            (llvmberry::TyValue::make(*(OnlyStore->getOperand(0))),
              llvmberry::TyRegister::make(reg_store, llvmberry::Ghost)))));
 
       hints.addCommand
@@ -458,7 +437,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           (llvmberry::TyPosition::make
             (llvmberry::Source, *OnlyStore), 
           (llvmberry::ConsTransitivity::make
-            (llvmberry::ConsVar::make(reg_store, llvmberry::Physical),
+            (llvmberry::ConsInsn::make(*OnlyStore),
              std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst
               (storeval, bitwidth)),
              llvmberry::ConsVar::make(reg_store, llvmberry::Ghost)))));
@@ -496,8 +475,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           (llvmberry::TyPosition::make
             (llvmberry::Source, *LI),
           (llvmberry::ConsIntroGhost::make
-            (llvmberry::ConsVar::make(reg_store, llvmberry::Physical),
-             std::unique_ptr<llvmberry::TyValue>
+            (std::unique_ptr<llvmberry::TyValue>
               (new llvmberry::ConsId(llvmberry::TyRegister::make
                                       (reg_store, llvmberry::Ghost))),
              llvmberry::TyRegister::make(reg_store+"."+reg_load, llvmberry::Ghost)))));
@@ -507,10 +485,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           (llvmberry::TyPosition::make
             (llvmberry::Source, *LI), 
           (llvmberry::ConsTransitivity::make
-            (llvmberry::ConsVar::make(reg_store, llvmberry::Physical),
+            (llvmberry::ConsInsn::make(*OnlyStore),
              llvmberry::ConsVar::make(reg_store, llvmberry::Ghost),
-             //std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst
-             // (storeval, bitwidth)),
              llvmberry::ConsVar::make(reg_store+"."+reg_load, llvmberry::Ghost)))));
 
       hints.addCommand
@@ -519,9 +495,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
             (llvmberry::Source, *LI), 
           (llvmberry::ConsTransitivity::make
             (llvmberry::ConsVar::make(reg_load, llvmberry::Physical),
-             llvmberry::ConsVar::make(reg_store, llvmberry::Ghost),
-             //std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst
-             // (storeval, bitwidth)),
+             llvmberry::ConsInsn::make(*OnlyStore),
              llvmberry::ConsVar::make(reg_store+"."+reg_load, llvmberry::Ghost)))));
 
       hints.addCommand
@@ -533,27 +507,16 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
              llvmberry::ConsVar::make(reg_store, llvmberry::Ghost),
              std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst
               (storeval, bitwidth))))));
-
-      /*hints.addCommand
-        (llvmberry::ConsInfrule::make
-          (llvmberry::TyPosition::make
-            (llvmberry::Source, reg_load),
-           llvmberry::ConsEqGenerateSameHeapValue::make
-            //(llvmberry::TyRegister::make(reg_load, llvmberry::Physical),
-            (llvmberry::TyValue::make(*(LI->getOperand(0))),
-             llvmberry::TyRegister::make(reg_store, llvmberry::Physical),
-             llvmberry::TyValue::make(*ReplVal),
-             llvmberry::ConsType::make(*(OnlyStore->getOperand(1))),
-             llvmberry::ConsAlign::make(4))));
-             */
     });
-    //llvmberry::ValidationUnit::EndIfExists(); 
+
     // If the replacement value is the load, this must occur in unreachable
     // code.
     if (ReplVal == LI)
       ReplVal = UndefValue::get(LI->getType());
     LI->replaceAllUsesWith(ReplVal);
+
     llvmberry::ValidationUnit::End();
+
     if (AST && LI->getType()->isPointerTy())
       AST->deleteValue(LI);
     LI->eraseFromParent();

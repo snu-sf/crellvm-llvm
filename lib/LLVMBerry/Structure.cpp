@@ -705,25 +705,25 @@ std::unique_ptr<TyValueType> TyValueType::make(const llvm::Type &type){
     assert("TyValueType::make(const llvmType &) : unknown value type" && false);
     vt = nullptr;
   }
-  return std::unique_ptr<TyValueType>(vt);
-}
+    return std::unique_ptr<TyValueType>(vt);
+  }
 
-ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
-}
-void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("IntValueType");
-  archive(CEREAL_NVP(int_type));
-}
+  ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
+  }
+  void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
+    archive.makeArray();
+    archive.writeName();
+    archive.saveValue("IntValueType");
+    archive(CEREAL_NVP(int_type));
+  }
 
-ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
-}
-void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("FloatValueType");
-  archive(cereal::make_nvp("float_type", toString(float_type)));
+  ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
+  }
+  void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
+    archive.makeArray();
+    archive.writeName();
+    archive.saveValue("FloatValueType");
+    archive(cereal::make_nvp("float_type", toString(float_type)));
 }
 
 ConsNamedType::ConsNamedType(std::string _s) : s(std::move(_s)){
@@ -824,7 +824,7 @@ std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
   return std::unique_ptr<TyLoadInst>(new TyLoadInst(
         TyValueType::make(*si.getOperand(1)->getType()),
         TyValueType::make(*si.getOperand(0)->getType()),
-        TyValue::make(*si.getOperand(0)),
+        TyValue::make(*si.getOperand(1)),
         si.getAlignment()));
 }
 
