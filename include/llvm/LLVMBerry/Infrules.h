@@ -43,6 +43,21 @@ private :
   std::unique_ptr<TySize> sz;
 };
 
+struct TyAddDistSub{
+public : 
+  TyAddDistSub(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _minusx, std::unique_ptr<TyRegister> _minusy, std::unique_ptr<TyRegister> _w, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> minusx;
+  std::unique_ptr<TyRegister> minusy;
+  std::unique_ptr<TyRegister> w;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TySize> sz;
+};
+
 struct TyAddMask{
 public : 
   TyAddMask(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
@@ -170,6 +185,35 @@ private:
   std::unique_ptr<TySize> sz;
 };
 
+struct TySubConstAdd{
+public : 
+  TySubConstAdd(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyConstInt> c1;
+  std::unique_ptr<TyConstInt> c2;
+  std::unique_ptr<TyConstInt> c3;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TySubConstNot{
+public : 
+  TySubConstNot(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyConstInt> c1;
+  std::unique_ptr<TyConstInt> c2;
+  std::unique_ptr<TySize> sz;
+};
+
 struct TySubMone{
 public : 
   TySubMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
@@ -190,6 +234,19 @@ private :
   std::unique_ptr<TyRegister> z;
   std::unique_ptr<TyValue> x;
   std::unique_ptr<TyValue> y;
+};
+
+struct TySubRemove2{
+public : 
+  TySubRemove2(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyValue> a;
+  std::unique_ptr<TyValue> b;
+  std::unique_ptr<TySize> sz;
 };
 
 struct TySubSdiv{
@@ -230,6 +287,17 @@ public:
 private:
   std::unique_ptr<TyConstInt> c1;
   std::unique_ptr<TyConstInt> c2;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TyMulMone{
+public : 
+  TyMulMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyValue> x;
   std::unique_ptr<TySize> sz;
 };
 
@@ -317,6 +385,16 @@ public :
 
 private : 
   std::unique_ptr<TyAddConstNot> add_const_not;
+};
+
+struct ConsAddDistSub : public TyInfrule{
+public : 
+  ConsAddDistSub(std::unique_ptr<TyAddDistSub> _add_dist_sub);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _minusx, std::unique_ptr<TyRegister> _minusy, std::unique_ptr<TyRegister> _w, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyAddDistSub> add_dist_sub;
 };
 
 struct ConsAddOnebit : public TyInfrule{
@@ -471,6 +549,26 @@ private :
   std::unique_ptr<TySubOnebit> sub_onebit;
 };
 
+struct ConsSubConstAdd : public TyInfrule{
+public : 
+  ConsSubConstAdd(std::unique_ptr<TySubConstAdd> _sub_const_add);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TySubConstAdd> sub_const_add;
+};
+
+struct ConsSubConstNot : public TyInfrule{
+public : 
+  ConsSubConstNot(std::unique_ptr<TySubConstNot> _sub_const_not);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TySubConstNot> sub_const_not;
+};
+
 struct ConsSubRemove : TyInfrule {
 public:
   ConsSubRemove(std::unique_ptr<TySubRemove> _sub_remove);
@@ -484,6 +582,16 @@ public:
 
 private:
   std::unique_ptr<TySubRemove> sub_remove;
+};
+
+struct ConsSubRemove2 : public TyInfrule{
+public : 
+  ConsSubRemove2(std::unique_ptr<TySubRemove2> _sub_remove2);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TySubRemove2> sub_remove2;
 };
 
 struct ConsSubSdiv : public TyInfrule{
@@ -506,21 +614,31 @@ private :
   std::unique_ptr<TySubShl> sub_shl;
 };
 
+struct ConsMulMone : public TyInfrule{
+public : 
+  ConsMulMone(std::unique_ptr<TyMulMone> _mul_mone);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyMulMone> mul_mone;
+};
+
 struct ConsMulNeg : TyInfrule {
 public:
-    ConsMulNeg(std::unique_ptr<TyMulNeg> _mul_neg);
-    void serialize(cereal::JSONOutputArchive &archive) const;
+  ConsMulNeg(std::unique_ptr<TyMulNeg> _mul_neg);
+  void serialize(cereal::JSONOutputArchive &archive) const;
 
-    static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
-                                           std::unique_ptr<TyValue> _mx,
-                                           std::unique_ptr<TyValue> _my,
-                                           std::unique_ptr<TyValue> _x,
-                                           std::unique_ptr<TyValue> _y,
-                                           std::unique_ptr<TySize> _sz);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
+                                         std::unique_ptr<TyValue> _mx,
+                                         std::unique_ptr<TyValue> _my,
+                                         std::unique_ptr<TyValue> _x,
+                                         std::unique_ptr<TyValue> _y,
+                                         std::unique_ptr<TySize> _sz);
 
 private:
     std::unique_ptr<TyMulNeg> mul_neg;
-  };
+};
 
 struct ConsMulBool : TyInfrule {
 public:
