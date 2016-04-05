@@ -94,6 +94,9 @@ public:
   static std::unique_ptr<TyPosition> make(enum TyScope _scope,
                                           std::string _block_name,
                                           std::string _prev_block_name);
+  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
+                                          const llvm::Instruction &I,
+                                          std::string _prev_block_name);
 
 private:
   enum TyScope scope;
