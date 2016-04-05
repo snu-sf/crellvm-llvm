@@ -33,7 +33,6 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
         llvm::SelectInst *Y, 
         bool needs_commutativity,
         bool is_leftform);
-
 /* position */
 
 struct TyPositionPhinode {

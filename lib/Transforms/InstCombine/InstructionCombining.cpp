@@ -2753,7 +2753,8 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
 
              insertSrcNopAtTgtI(hints,InsertPos);  //src nop
              insertTgtNopAtSrcI(hints, I);         //tgt nop
-             std::string reg0_name = llvmberry::getVariable(*I);  //original position
+
+             std::string reg0_name = llvmberry::getVariable(*I); 
 
              hints.addCommand
                     (llvmberry::ConsPropagate::make   //source propagate
@@ -2767,15 +2768,15 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                       (llvmberry::TyPosition::make
                                        (llvmberry::Source, *I), 
                                        llvmberry::TyPosition::make
-                                       (llvmberry::Target, *I)))
-                    );
+                                       (llvmberry::Target, *InsertPos))
+                             ));
 //prev maydiff propagate global -> issue 86
             hints.addCommand
                     (llvmberry::ConsPropagate::make
                              (llvmberry::ConsMaydiff::make
                                       (reg0_name, llvmberry::Previous),
                               llvmberry::ConsGlobal::make())
-                    );
+                            );
 
             hints.addCommand
                     (llvmberry::ConsPropagate::make //maydiff propagate
@@ -2785,14 +2786,12 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                       (llvmberry::TyPosition::make
                                        (llvmberry::Source, *I), 
                                        llvmberry::TyPosition::make
-                                       (llvmberry::Target, *I)))
-                    );
+                                       (llvmberry::Target, *InsertPos))
+                             ));
           }
           );
-
   I->moveBefore(InsertPos);
   ++NumSunkInst;
-  
   llvmberry::ValidationUnit::End();
   return true;
 }
@@ -2868,6 +2867,7 @@ bool InstCombiner::run() {
         if (UserIsSuccessor && UserParent->getSinglePredecessor()) {
           // Okay, the CFG is simple enough, try to sink this instruction.
           if (TryToSinkInstruction(I, UserParent)) {
+           // llvmberry::ValidationUnit::EndIfExists();
             MadeIRChange = true;
             // We'll add uses of the sunk instruction below, but since sinking
             // can expose opportunities for it's *operands* add them to the
