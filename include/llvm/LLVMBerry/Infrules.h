@@ -337,13 +337,12 @@ private:
 
 struct TyIntroGhost{
 public :
-  TyIntroGhost(std::unique_ptr<TyExpr> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z);
+  TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private :
-  std::unique_ptr<TyExpr> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyRegister> g;
 };
 
 
@@ -632,7 +631,7 @@ private:
 struct ConsIntroGhost : public TyInfrule{
 public :
   ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyExpr> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private :

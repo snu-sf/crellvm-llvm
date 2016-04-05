@@ -302,6 +302,7 @@ public :
   TyLoadInst(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::unique_ptr<TyLoadInst> make(const llvm::LoadInst &li);
+  static std::unique_ptr<TyLoadInst> make(const llvm::StoreInst &si);
 
 private : 
   std::unique_ptr<TyValueType> pointertype;

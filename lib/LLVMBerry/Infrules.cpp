@@ -686,19 +686,18 @@ std::unique_ptr<TyInfrule> ConsReplaceRhs::make
   return std::unique_ptr<TyInfrule>(new ConsReplaceRhs(std::move(_replace_rhs)));
 }
 
-TyIntroGhost::TyIntroGhost(std::unique_ptr<TyExpr> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z) : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)){
+TyIntroGhost::TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g) : x(std::move(_x)), g(std::move(_g)){
 }
 
 void TyIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(g));
 }
 
 ConsIntroGhost::ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost) : intro_ghost(std::move(_intro_ghost)){
 }
-std::unique_ptr<TyInfrule> ConsIntroGhost::make(std::unique_ptr<TyExpr> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z){
-  std::unique_ptr<TyIntroGhost> _val(new TyIntroGhost(std::move(_x), std::move(_y), std::move(_z)));
+std::unique_ptr<TyInfrule> ConsIntroGhost::make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g){
+  std::unique_ptr<TyIntroGhost> _val(new TyIntroGhost(std::move(_x), std::move(_g)));
   return std::unique_ptr<TyInfrule>(new ConsIntroGhost(std::move(_val)));
 }
 void ConsIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{

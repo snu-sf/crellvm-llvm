@@ -679,7 +679,7 @@ std::unique_ptr<TyValueType> TyValueType::make(const llvm::Type &type){
   }else if(type.isX86_FP80Ty()){
     vt = new ConsFloatValueType(X86_FP80Type);
   }else{
-    assert("TyValueType::make(const llvmType &) : unknown vlaue type" && false);
+    assert("TyValueType::make(const llvmType &) : unknown value type" && false);
     vt = nullptr;
   }
   return std::unique_ptr<TyValueType>(vt);
@@ -718,19 +718,25 @@ void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
   archive.writeName();
   archive.saveValue("PtrType");
+
+  archive.startNode();
+  archive.makeArray();
   archive(cereal::make_nvp("address_space", address_space));
   archive(CEREAL_NVP(valuetype));
+  archive.finishNode();
 }
 
 
 // instruction
 
 std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i){
-  if(const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)){
+  if (const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)) {
     return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(TyBinaryOperator::make(*bo))));
-  }else if(const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)){
+  } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
     return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
-  }else{
+  } else if (const llvm::StoreInst *si = llvm::dyn_cast<llvm::StoreInst>(&i)) {
+    return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*si))));
+  } else {
     assert("TyInstruction::make : unsupporting instruction type" && false);
     return std::unique_ptr<TyInstruction>(nullptr);
   }
@@ -783,12 +789,20 @@ std::unique_ptr<TyBinaryOperator> TyBinaryOperator::make(const llvm::BinaryOpera
         TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
 }
 
-std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li){
+std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
   return std::unique_ptr<TyLoadInst>(new TyLoadInst(
         TyValueType::make(*li.getPointerOperand()->getType()),
         TyValueType::make(*li.getType()),
         TyValue::make(*li.getPointerOperand()),
         li.getAlignment()));
+}
+
+std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
+  return std::unique_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*si.getOperand(1)->getType()),
+        TyValueType::make(*si.getOperand(0)->getType()),
+        TyValue::make(*si.getOperand(0)),
+        si.getAlignment()));
 }
 
 ConsBinaryOp::ConsBinaryOp(std::unique_ptr<TyBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
