@@ -59,6 +59,49 @@ std::string toString(llvmberry::TyFloatType float_type) {
   }
 }
 
+std::string toString(llvmberry::TyBop bop){
+  switch (bop) {
+    case llvmberry::BopAdd:
+      return std::string("BopAdd");
+    case llvmberry::BopSub:
+      return std::string("BopSub");
+    case llvmberry::BopMul:
+      return std::string("BopMul");
+    case llvmberry::BopUdiv:
+      return std::string("BopUdiv");
+    case llvmberry::BopSdiv:
+      return std::string("BopSdiv");
+    case llvmberry::BopUrem:
+      return std::string("BopUrem");
+    case llvmberry::BopSrem:
+      return std::string("BopSrem");
+    case llvmberry::BopShl:
+      return std::string("BopShl");
+    case llvmberry::BopLshr:
+      return std::string("BopLshr");
+    case llvmberry::BopAshr:
+      return std::string("BopAshr");
+    case llvmberry::BopAnd:
+      return std::string("BopAnd");
+    case llvmberry::BopOr:
+      return std::string("BopOr");
+    case llvmberry::BopXor:
+      return std::string("BopXor");
+    case llvmberry::BopFadd:
+      return std::string("BopFadd");
+    case llvmberry::BopFsub:
+      return std::string("BopFsub");
+    case llvmberry::BopFmul:
+      return std::string("BopFmul");
+    case llvmberry::BopFdiv:
+      return std::string("BopFdiv");
+    case llvmberry::BopFrem:
+      return std::string("BopFrem");
+  default:
+    assert(false && "Bop toString");
+  }
+}
+
 unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
   const llvm::BasicBlock *parent = instr.getParent();
   const llvm::BasicBlock::InstListType &instList = parent->getInstList();
@@ -612,6 +655,194 @@ std::unique_ptr<TySize> ConsSize::make(int _size) {
   return std::unique_ptr<TySize>(new ConsSize(_size));
 }
 
+
+// valuetype
+
+std::unique_ptr<TyValueType> TyValueType::make(const llvm::Type &type){
+  TyValueType *vt;
+  if(const llvm::IntegerType *itype = llvm::dyn_cast<llvm::IntegerType>(&type)){
+    vt = new ConsIntValueType(std::move(std::unique_ptr<TyIntType>(new ConsIntType(itype->getBitWidth()))));
+  }else if(const llvm::PointerType *ptype = llvm::dyn_cast<llvm::PointerType>(&type)){
+    vt = new ConsPtrType(ptype->getAddressSpace(), 
+        std::move(TyValueType::make(*ptype->getPointerElementType())));
+  }else if(const llvm::StructType *stype = llvm::dyn_cast<llvm::StructType>(&type)){
+    assert(stype->hasName());
+    vt = new ConsNamedType(stype->getName().str());
+  }else if(type.isHalfTy()){
+    vt = new ConsFloatValueType(HalfType);
+  }else if(type.isFloatTy()){
+    vt = new ConsFloatValueType(FloatType);
+  }else if(type.isDoubleTy()){
+    vt = new ConsFloatValueType(DoubleType);
+  }else if(type.isFP128Ty()){
+    vt = new ConsFloatValueType(FP128Type);
+  }else if(type.isPPC_FP128Ty()){
+    vt = new ConsFloatValueType(PPC_FP128Type);
+  }else if(type.isX86_FP80Ty()){
+    vt = new ConsFloatValueType(X86_FP80Type);
+  }else{
+    assert("TyValueType::make(const llvmType &) : unknown vlaue type" && false);
+    vt = nullptr;
+  }
+  return std::unique_ptr<TyValueType>(vt);
+}
+
+ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
+}
+void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IntValueType");
+  archive(CEREAL_NVP(int_type));
+}
+
+ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
+}
+void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("FloatValueType");
+  archive(cereal::make_nvp("float_type", toString(float_type)));
+}
+
+ConsNamedType::ConsNamedType(std::string _s) : s(std::move(_s)){
+}
+void ConsNamedType::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("NamedType");
+  archive(CEREAL_NVP(s));
+}
+
+ConsPtrType::ConsPtrType(int _address_space, std::unique_ptr<TyValueType> _valuetype) : address_space(_address_space), valuetype(std::move(_valuetype)){
+}
+void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("PtrType");
+  archive(cereal::make_nvp("address_space", address_space));
+  archive(CEREAL_NVP(valuetype));
+}
+
+
+// instruction
+
+std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i){
+  if(const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)){
+    return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(TyBinaryOperator::make(*bo))));
+  }else if(const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)){
+    return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
+  }else{
+    assert("TyInstruction::make : unsupporting instruction type" && false);
+    return std::unique_ptr<TyInstruction>(nullptr);
+  }
+}
+
+std::unique_ptr<TyBinaryOperator> TyBinaryOperator::make(const llvm::BinaryOperator &bopinst){
+  llvmberry::TyBop bop;
+
+  switch(bopinst.getOpcode()){
+  case llvm::Instruction::Add:
+    bop = llvmberry::BopAdd; break;
+  case llvm::Instruction::FAdd:
+    bop = llvmberry::BopFadd; break;
+  case llvm::Instruction::Sub:
+    bop = llvmberry::BopSub; break;
+  case llvm::Instruction::FSub:
+    bop = llvmberry::BopFsub; break;
+  case llvm::Instruction::Mul:
+    bop = llvmberry::BopMul; break;
+  case llvm::Instruction::FMul:
+    bop = llvmberry::BopFmul; break;
+  case llvm::Instruction::UDiv:
+    bop = llvmberry::BopUdiv; break;
+  case llvm::Instruction::SDiv:
+    bop = llvmberry::BopSdiv; break;
+  case llvm::Instruction::FDiv:
+    bop = llvmberry::BopFdiv; break;
+  case llvm::Instruction::URem:
+    bop = llvmberry::BopUrem; break;
+  case llvm::Instruction::SRem:
+    bop = llvmberry::BopSrem; break;
+  case llvm::Instruction::FRem:
+    bop = llvmberry::BopFrem; break;
+  case llvm::Instruction::Shl:
+    bop = llvmberry::BopShl; break;
+  case llvm::Instruction::LShr:
+    bop = llvmberry::BopLshr; break;
+  case llvm::Instruction::AShr:
+    bop = llvmberry::BopAshr; break;
+  case llvm::Instruction::And:
+    bop = llvmberry::BopAnd; break;
+  case llvm::Instruction::Or:
+    bop = llvmberry::BopOr; break;
+  case llvm::Instruction::Xor:
+    bop = llvmberry::BopXor; break;
+  default:
+    assert("llvmberry::TyBinaryOperator::make(const llvm::BinaryOperator &) : unknown opcode" && false);
+  }
+  return std::unique_ptr<TyBinaryOperator>(new TyBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
+        TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
+}
+
+std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li){
+  return std::unique_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*li.getPointerOperand()->getType()),
+        TyValueType::make(*li.getType()),
+        TyValue::make(*li.getPointerOperand()),
+        li.getAlignment()));
+}
+
+ConsBinaryOp::ConsBinaryOp(std::unique_ptr<TyBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
+}
+std::unique_ptr<TyInstruction> ConsBinaryOp::make(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2){
+  std::unique_ptr<TyBinaryOperator> _val(new TyBinaryOperator(_opcode, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
+  return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(_val)));
+}
+std::unique_ptr<TyInstruction> ConsBinaryOp::make(const llvm::BinaryOperator &bop){
+  return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(TyBinaryOperator::make(bop))));
+}
+void ConsBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("BinaryOp");
+  archive(CEREAL_NVP(binary_operator));
+}
+
+ConsLoadInst::ConsLoadInst(std::unique_ptr<TyLoadInst> _load_inst) : load_inst(std::move(_load_inst)){
+}
+std::unique_ptr<TyInstruction> ConsLoadInst::make(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align){
+  std::unique_ptr<TyLoadInst> _val(new TyLoadInst(std::move(_pointertype), std::move(_valtype), std::move(_ptrvalue), std::move(_align)));
+  return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(_val)));
+}
+std::unique_ptr<TyInstruction> ConsLoadInst::make(const llvm::LoadInst &li){
+  return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(li))));
+}
+void ConsLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("LoadInst");
+  archive(CEREAL_NVP(load_inst));
+}
+
+TyBinaryOperator::TyBinaryOperator(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2) : opcode(std::move(_opcode)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+}
+void TyBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(cereal::make_nvp("opcode", toString(opcode)));
+  archive(CEREAL_NVP(operandtype));
+  archive(CEREAL_NVP(operand1));
+  archive(CEREAL_NVP(operand2));
+}
+
+TyLoadInst::TyLoadInst(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align) : pointertype(std::move(_pointertype)), valtype(std::move(_valtype)), ptrvalue(std::move(_ptrvalue)), align(std::move(_align)){
+}
+void TyLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(pointertype));
+  archive(CEREAL_NVP(valtype));
+  archive(CEREAL_NVP(ptrvalue));
+  archive(CEREAL_NVP(align));
+}
+
 /* Propagate */
 
 // propagate expr
@@ -674,6 +905,18 @@ void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Const");
   archive(CEREAL_NVP(constant));
+}
+
+ConsInsn::ConsInsn(std::unique_ptr<TyInstruction> _instruction) : instruction(std::move(_instruction)){
+}
+std::unique_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i){
+  return std::unique_ptr<TyExpr>(new ConsInsn(std::move(TyInstruction::make(i))));
+}
+void ConsInsn::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("Insn");
+  archive(CEREAL_NVP(instruction));
 }
 
 // propagate object
