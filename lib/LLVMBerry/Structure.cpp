@@ -283,8 +283,8 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
         std::string reg0_name = llvmberry::getVariable(I); // z = x -my
 
         unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
-        int c1 = (int)C->getSExtValue();
-        int c2 = -c1;
+        int64_t c1 = C->getSExtValue();
+        int64_t c2 = -c1;
 
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, I),
@@ -514,17 +514,17 @@ void ConsIntType::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(value));
 }
 
-TyConstInt::TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type)
+TyConstInt::TyConstInt(int64_t _int_value, std::unique_ptr<TyIntType> _int_type)
     : int_value(_int_value), int_type(std::move(_int_type)) {}
 
-TyConstInt::TyConstInt(int _int_value, int _bitwidth)
+TyConstInt::TyConstInt(int64_t _int_value, int _bitwidth)
     : int_value(_int_value), int_type(new ConsIntType(_bitwidth)) {}
 
 void TyConstInt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(cereal::make_nvp("int_value", int_value), CEREAL_NVP(int_type));
 }
 
-std::unique_ptr<TyConstInt> TyConstInt::make(int _int_value, int _value) {
+std::unique_ptr<TyConstInt> TyConstInt::make(int64_t _int_value, int _value) {
   return std::unique_ptr<TyConstInt>(new TyConstInt(_int_value, _value));
 }
 
@@ -585,8 +585,8 @@ std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
 ConsConstInt::ConsConstInt(std::unique_ptr<TyConstInt> _const_int)
     : const_int(std::move(_const_int)) {}
 
-ConsConstInt::ConsConstInt(int _int_value, int _value)
-    : const_int(new TyConstInt(_int_value, _value)) {}
+ConsConstInt::ConsConstInt(int64_t _int_value, int _bitwidth)
+    : const_int(new TyConstInt(_int_value, _bitwidth)) {}
 
 void ConsConstInt::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
