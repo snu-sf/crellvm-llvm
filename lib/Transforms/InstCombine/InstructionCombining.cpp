@@ -240,9 +240,9 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
                 unsigned c_bw = C_const->getBitWidth();
                 unsigned v_bw = V_const->getBitWidth();
 
-                int b = (int)B_const->getSExtValue();
-                int c = (int)C_const->getSExtValue();
-                int v = (int)V_const->getSExtValue();
+                int64_t b = B_const->getSExtValue();
+                int64_t c = C_const->getSExtValue();
+                int64_t v = V_const->getSExtValue();
 
                 hints.addCommand
                   (llvmberry::ConsPropagate::make

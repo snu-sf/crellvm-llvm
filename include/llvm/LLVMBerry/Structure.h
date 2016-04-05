@@ -193,14 +193,14 @@ private :
 
 struct TyConstInt {
 public:
-  TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type);
-  TyConstInt(int _int_value, int _bitwidth);
+  TyConstInt(int64_t _int_value, std::unique_ptr<TyIntType> _int_type);
+  TyConstInt(int64_t _int_value, int _bitwidth);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyConstInt> make(int _int_value, int _bitwidth);
+  static std::unique_ptr<TyConstInt> make(int64_t _int_value, int _bitwidth);
 
 private:
-  int int_value;
+  int64_t int_value;
   std::unique_ptr<TyIntType> int_type;
 };
 
@@ -225,7 +225,7 @@ public:
 struct ConsConstInt : public TyConstant {
 public:
   ConsConstInt(std::unique_ptr<TyConstInt> _const_int);
-  ConsConstInt(int _int_value, int _value);
+  ConsConstInt(int64_t _int_value, int _bitwidth);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
