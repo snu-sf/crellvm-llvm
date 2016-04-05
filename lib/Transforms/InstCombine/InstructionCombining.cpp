@@ -2767,7 +2767,7 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                       (llvmberry::TyPosition::make
                                        (llvmberry::Source, *I), 
                                        llvmberry::TyPosition::make
-                                       (llvmberry::Target, *InsertPos->getParent(),llvmberry::getCommandIndex(*InsertPos)))
+                                       (llvmberry::Target, *InsertPos))
                              ));
 //prev maydiff propagate global -> issue 86
             hints.addCommand
@@ -2785,7 +2785,7 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                       (llvmberry::TyPosition::make
                                        (llvmberry::Source, *I), 
                                        llvmberry::TyPosition::make
-                                       (llvmberry::Target, *InsertPos->getParent(), llvmberry::getCommandIndex(*InsertPos)))
+                                       (llvmberry::Target, *InsertPos))
                              ));
           }
           );

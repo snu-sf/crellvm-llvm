@@ -23,7 +23,6 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
         llvm::SelectInst *Y, 
         bool needs_commutativity,
         bool is_leftform);
-int getCommandIndex(const llvm::Value &V);
 /* position */
 
 struct TyPositionPhinode {
@@ -79,9 +78,6 @@ public:
 
   static std::unique_ptr<TyPosition> make(enum TyScope _scope,
                                           const llvm::Instruction &I);
-  static std::unique_ptr<TyPosition> make(enum TyScope _scope, 
-                                          const llvm::BasicBlock &BB, 
-                                          int index);
   static std::unique_ptr<TyPosition>
   make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB);
   static std::unique_ptr<TyPosition> make(enum TyScope _scope,
