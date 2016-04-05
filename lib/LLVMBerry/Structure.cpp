@@ -1340,6 +1340,36 @@ std::unique_ptr<TyInfrule> ConsTransitivity::make
   return std::unique_ptr<TyInfrule>(new ConsTransitivity(std::move(_transitivity)));
 }
 
+TyTransitivityTgt::TyTransitivityTgt
+(std::unique_ptr<TyExpr> _e1,
+ std::unique_ptr<TyExpr> _e2,
+ std::unique_ptr<TyExpr> _e3)
+  : e1(std::move(_e1)), e2(std::move(_e2)), e3(std::move(_e3)) {}
+  
+void TyTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
+}
+
+ConsTransitivityTgt::ConsTransitivityTgt(std::unique_ptr<TyTransitivityTgt> _transitivity_tgt)
+  : transitivity_tgt(std::move(_transitivity_tgt)) {}
+
+void ConsTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("TransitivityTgt");
+  archive(CEREAL_NVP(transitivity_tgt));
+}
+
+std::unique_ptr<TyInfrule> ConsTransitivityTgt::make
+(std::unique_ptr<TyExpr> _e1,
+ std::unique_ptr<TyExpr> _e2,
+ std::unique_ptr<TyExpr> _e3) {
+  std::unique_ptr<TyTransitivityTgt> _transitivity_tgt
+    (new TyTransitivityTgt(std::move(_e1), std::move(_e2), std::move(_e3)));
+  return std::unique_ptr<TyInfrule>(new ConsTransitivityTgt(std::move(_transitivity_tgt)));
+}
+
 TyReplaceRhs::TyReplaceRhs
 (std::unique_ptr<TyRegister> _x,
  std::unique_ptr<TyValue> _y,
@@ -1378,7 +1408,7 @@ std::unique_ptr<TyInfrule> ConsReplaceRhs::make
   return std::unique_ptr<TyInfrule>(new ConsReplaceRhs(std::move(_replace_rhs)));
 }
 
-TyIntroGhost::TyIntroGhost(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z) : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)){
+TyIntroGhost::TyIntroGhost(std::unique_ptr<TyExpr> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z) : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)){
 }
 
 void TyIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
@@ -1389,7 +1419,7 @@ void TyIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
 
 ConsIntroGhost::ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost) : intro_ghost(std::move(_intro_ghost)){
 }
-std::unique_ptr<TyInfrule> ConsIntroGhost::make(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z){
+std::unique_ptr<TyInfrule> ConsIntroGhost::make(std::unique_ptr<TyExpr> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _z){
   std::unique_ptr<TyIntroGhost> _val(new TyIntroGhost(std::move(_x), std::move(_y), std::move(_z)));
   return std::unique_ptr<TyInfrule>(new ConsIntroGhost(std::move(_val)));
 }
