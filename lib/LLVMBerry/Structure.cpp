@@ -441,20 +441,54 @@ void TyPosition::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+                                             std::string _block_name,
+                                             std::string _prev_block_name) {
+  std::unique_ptr<TyPositionPhinode> _pos_phi(
+      new TyPositionPhinode(_prev_block_name));
+
+  std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
+
+  return std::unique_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_phi)));
+}
+
+std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
                                              const llvm::Instruction &I) {
+  std::string empty_str = "";
+  return std::move(TyPosition::make(_scope, I, empty_str));
+}
+
+std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+                                             const llvm::Instruction &I, std::string _prev_block_name) {
 
   std::string _block_name = getBasicBlockIndex(I.getParent());
   std::string _register_name = getVariable(I);
 
-  int _index = getCommandIndex(I);
+  std::unique_ptr<TyInstrIndex> _instr_index;
 
-  std::unique_ptr<TyPositionCommand> _pos_cmd(
-      new TyPositionCommand(_index, _register_name));
+  if (llvm::isa<llvm::PHINode>(I)) {
+    std::unique_ptr<TyPositionPhinode> _pos_phi(new TyPositionPhinode(_prev_block_name));
 
-  std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+    std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
+
+    _instr_index = std::move(_phi);
+  } else {
+    int _index;
+    if (llvm::isa<llvm::TerminatorInst>(I)) {
+      _index = getTerminatorIndex(llvm::dyn_cast<llvm::TerminatorInst>(&I));
+    } else {
+      _index = getCommandIndex(I);
+    }
+    std::unique_ptr<TyPositionCommand> _pos_cmd(
+        new TyPositionCommand(_index, _register_name));
+
+    std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+    _instr_index = std::move(_cmd);
+  }
 
   return std::unique_ptr<TyPosition>(
-      new TyPosition(_scope, _block_name, std::move(_cmd)));
+      new TyPosition(_scope, _block_name, std::move(_instr_index)));
 }
 
 std::unique_ptr<TyPosition>
@@ -477,17 +511,6 @@ TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
 }
 
-std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
-                                             std::string _block_name,
-                                             std::string _prev_block_name) {
-  std::unique_ptr<TyPositionPhinode> _pos_phi(
-      new TyPositionPhinode(_prev_block_name));
-
-  std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
-
-  return std::unique_ptr<TyPosition>(
-      new TyPosition(_scope, _block_name, std::move(_phi)));
-}
 
 /* value */
 
@@ -1067,7 +1090,6 @@ void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   }
 }
 
-/* inference rule */
 ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)
     : propagate(std::move(_propagate)) {}
 
