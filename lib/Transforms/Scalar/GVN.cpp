@@ -2371,9 +2371,15 @@ bool GVN::processInstruction(Instruction *I) {
             llvmberry::ConsBounds::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *I),
                 llvmberry::TyPosition::make(llvmberry::Source, *user_I, prev_block_name))));
-
-        if (!user.empty() && !isa<CallInst>(user_I)
-            && !isa<PHINode>(user_I)) {
+        if (isa<PHINode>(user_I)) {
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              llvmberry::TyPosition::make(llvmberry::Source, *user_I,
+                                          prev_block_name),
+              llvmberry::ConsTransitivity::make(
+                  llvmberry::ConsVar::make(user, llvmberry::Physical),
+                  llvmberry::ConsVar::make(to_rem, llvmberry::Previous),
+                  llvmberry::ConsVar::make(leader, llvmberry::Previous))));
+        } else if (!user.empty() && !isa<CallInst>(user_I)) {
           hints.addCommand(llvmberry::ConsInfrule::make(
               llvmberry::TyPosition::make(llvmberry::Source, *user_I,
                                           prev_block_name),
