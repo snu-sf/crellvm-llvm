@@ -1257,7 +1257,73 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   if (Value *LHSV = dyn_castNegVal(LHS)) {
     if (!isa<Constant>(RHS))
       if (Value *RHSV = dyn_castNegVal(RHS)) {
+        llvmberry::ValidationUnit::Begin("add_dist_sub",
+                                         I.getParent()->getParent());
+        
         Value *NewAdd = Builder->CreateAdd(LHSV, RHSV, "sum");
+        
+        llvmberry::ValidationUnit::GetInstance()->intrude([&LHS, &LHSV, &RHS, &RHSV, &I, &NewAdd](
+            llvmberry::ValidationUnit::Dictionary &data,
+            llvmberry::CoreHint &hints) {
+          //    <src>        <tgt>
+          // mx = 0 - x | mx = 0 - x
+          // my = 0 - y | my = 0 - y
+          //            |  w = x + y
+          //  z = x + y |  z = 0 - w
+          BinaryOperator *MX = dyn_cast<BinaryOperator>(LHS);
+          Value *MY = RHS;
+          Value *X = LHSV;
+          Value *Y = RHSV;
+          BinaryOperator *W = dyn_cast<BinaryOperator>(NewAdd);
+          BinaryOperator *Z = &I;
+          assert(W != nullptr);
+
+          // prepare variables
+          std::string reg_mx_name = llvmberry::getVariable(*MX);
+          std::string reg_z_name = llvmberry::getVariable(*Z);
+          std::string reg_w_name = llvmberry::getVariable(*W);
+
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+
+          // propagate "mx = 0 - x"
+          llvmberry::generateHintForNegValue(MX, *Z, llvmberry::Target);
+          
+          // propagate "my = 0 - y"
+          llvmberry::generateHintForNegValue(MY, *Z, llvmberry::Target);
+          
+          // add nop into source
+          llvmberry::insertSrcNopAtTgtI(hints, W);
+         
+          // propagate "w = x + y"
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                  llvmberry::ConsLessdef::make(
+                      llvmberry::ConsRhs::make(reg_w_name, llvmberry::Physical,
+                                               llvmberry::Target),
+                      llvmberry::ConsVar::make(reg_w_name, llvmberry::Physical),
+                      llvmberry::Target),
+                  llvmberry::ConsBounds::make(
+                      llvmberry::TyPosition::make(llvmberry::Target, *W),
+                      llvmberry::TyPosition::make(llvmberry::Target, *Z))));
+
+          // maydiff global w
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                  llvmberry::ConsMaydiff::make(reg_w_name, llvmberry::Physical),
+                  llvmberry::ConsGlobal::make()));
+ 
+          // create z = x + y in tgt
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              llvmberry::TyPosition::make(llvmberry::Target, *Z),
+              llvmberry::ConsAddDistSub::make(
+                  llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                  llvmberry::TyRegister::make(reg_mx_name, llvmberry::Physical),
+                  llvmberry::TyValue::make(*MY),
+                  llvmberry::TyRegister::make(reg_w_name, llvmberry::Physical),
+                  llvmberry::TyValue::make(*X),
+                  llvmberry::TyValue::make(*Y),
+                  llvmberry::ConsSize::make(bitwidth))));
+        });
+
+
         return BinaryOperator::CreateNeg(NewAdd);
       }
 
@@ -1918,8 +1984,50 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
   if (Constant *C = dyn_cast<Constant>(Op0)) {
     // C - ~X == X + (1+C)
     Value *X = nullptr;
-    if (match(Op1, m_Not(m_Value(X))))
+    if (match(Op1, m_Not(m_Value(X)))){
+      llvmberry::ValidationUnit::Begin("sub_const_not",
+                                       I.getParent()->getParent());
+    
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &C, &X](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        //     <src>     <tgt>
+        // Y = X  ^ -1 | Y = X ^ -1
+        // Z = C1 -  Y | Z = X + C2
+
+        BinaryOperator *Z = &I;
+        ConstantInt *C1 = dyn_cast<ConstantInt>(C);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(1));
+        std::string reg_z_name = llvmberry::getVariable(*Z);
+        std::string reg_y_name = llvmberry::getVariable(*Y);
+        
+        int64_t c1 = C1->getSExtValue();
+        int64_t c2 = c1 + 1;
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *Y),
+                llvmberry::TyPosition::make(llvmberry::Source, *Z))));
+ 
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, *Z),
+            llvmberry::ConsSubConstNot::make(
+                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*X),
+                llvmberry::TyConstInt::make(c1, bitwidth),
+                llvmberry::TyConstInt::make(c2, bitwidth),
+                llvmberry::ConsSize::make(bitwidth))));
+      });
+
+
       return BinaryOperator::CreateAdd(X, AddOne(C));
+    }
 
     // Try to fold constant sub into select arguments.
     if (SelectInst *SI = dyn_cast<SelectInst>(Op1))
@@ -1928,8 +2036,50 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
     // C-(X+C2) --> (C-C2)-X
     Constant *C2;
-    if (match(Op1, m_Add(m_Value(X), m_Constant(C2))))
+    if (match(Op1, m_Add(m_Value(X), m_Constant(C2)))){
+      llvmberry::ValidationUnit::Begin("sub_const_add",
+                                       I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &C2, &X, &C](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        //     <src>     <tgt>
+        // Y = X  + C1 | Y = X  + C1
+        // Z = C2 -  Y | Z = (C2 - C1) - X
+
+        BinaryOperator *Z = &I;
+        ConstantInt *C1 = dyn_cast<ConstantInt>(C2);
+        ConstantInt *C2 = dyn_cast<ConstantInt>(C);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(1));
+        std::string reg_z_name = llvmberry::getVariable(*Z);
+        std::string reg_y_name = llvmberry::getVariable(*Y);
+        
+        int64_t c1 = C1->getSExtValue();
+        int64_t c2 = C2->getSExtValue();
+        int64_t c3 = c2 - c1;
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *Y),
+                llvmberry::TyPosition::make(llvmberry::Source, *Z))));
+ 
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, *Z),
+            llvmberry::ConsSubConstAdd::make(
+                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*X),
+                llvmberry::TyConstInt::make(c1, bitwidth),
+                llvmberry::TyConstInt::make(c2, bitwidth),
+                llvmberry::TyConstInt::make(c3, bitwidth),
+                llvmberry::ConsSize::make(bitwidth))));
+      });
       return BinaryOperator::CreateSub(ConstantExpr::getSub(C, C2), X);
+    }
 
     if (SimplifyDemandedInstructionBits(I))
       return &I;

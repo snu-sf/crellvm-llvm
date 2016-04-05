@@ -248,11 +248,10 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
   }
 }
 
-void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
-
+void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope) {
   if (llvm::BinaryOperator::isNeg(V)) {
     if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([&V, &I](
+      llvmberry::ValidationUnit::GetInstance()->intrude([&V, &I, &scope](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
 
@@ -263,22 +262,28 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
 
         hints.addCommand(llvmberry::ConsPropagate::make(
             llvmberry::ConsLessdef::make(
-                llvmberry::ConsVar::make(reg1_name,
-                                         llvmberry::Physical), // my = -y
-                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical,
-                                         llvmberry::Source),
-                llvmberry::Source),
+                llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), // my = -y
+                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, scope),
+                scope),
             llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Source,
-                                            *Vins), // From my to z = x -my
-                llvmberry::TyPosition::make(llvmberry::Source, I))));
+                llvmberry::TyPosition::make(scope, *Vins), // From my to z = x -my
+                llvmberry::TyPosition::make(scope, I))));
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, scope),
+                llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), // my = -y
+                scope),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(scope, *Vins), // From my to z = x -my
+                llvmberry::TyPosition::make(scope, I))));
       });
     }
   }
   // Constants can be considered to be negated values if they can be folded.
   if (llvm::ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(V)) {
     if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V, &C](
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V, &C, &scope](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
 
@@ -289,7 +294,13 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
         int64_t c2 = -c1;
 
         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Source, I),
+            llvmberry::TyPosition::make(scope, I),
+            llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
+                                        llvmberry::TyConstInt::make(c2, sz_bw),
+                                        llvmberry::ConsSize::make(sz_bw))));
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(scope, I),
             llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
                                         llvmberry::TyConstInt::make(c2, sz_bw),
                                         llvmberry::ConsSize::make(sz_bw))));
