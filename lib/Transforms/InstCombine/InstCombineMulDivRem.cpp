@@ -422,15 +422,13 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       BO = BinaryOperator::CreateShl(Op1, Y);
       ShlNSW = cast<ShlOperator>(Op0)->hasNoSignedWrap();
       llvmberry::ValidationUnit::GetInstance()->intrude([](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-        boost::any flag = false;
-        data["needsTransitivity"] = flag;
+        data["needsTransitivity"] = false;
       });
     } else if (match(Op1, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op0, Y);
       ShlNSW = cast<ShlOperator>(Op1)->hasNoSignedWrap();
       llvmberry::ValidationUnit::GetInstance()->intrude([](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-        boost::any flag = true;
-        data["needsTransitivity"] = flag;
+        data["needsTransitivity"] = true;
       });
     }
 
