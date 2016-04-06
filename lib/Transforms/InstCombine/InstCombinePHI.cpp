@@ -192,7 +192,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
 
           if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
-
+            // x^ >= a^+b^ , z = x^ -> z >= a^+b^
             hints.addCommand(llvmberry::ConsInfrule::make(
                     llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
                     llvmberry::ConsTransitivity::make(
