@@ -158,7 +158,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
           hints.addCommand(llvmberry::ConsInfrule::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *I),
                 llvmberry::ConsIntroEq::make(
-                  llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Physical),
                   "G")));
 
           hints.addCommand(llvmberry::ConsPropagate::make(
