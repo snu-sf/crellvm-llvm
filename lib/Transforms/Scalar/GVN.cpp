@@ -2308,18 +2308,22 @@ bool GVN::processInstruction(Instruction *I) {
     return false;
   }
 
+  llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
+
   // Perform fast-path value-number based elimination of values inherited from
   // dominators.
   Value *repl = findLeader(I->getParent(), Num);
   if (!repl) {
     // Failure, just remember this instance for future use.
     addToLeaderTable(Num, I, I->getParent());
+    llvmberry::ValidationUnit::GetInstance()->setReturnCode(
+        llvmberry::ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::End();
+
     return false;
   }
 
   // Remove it!
-
-  llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
 
   llvmberry::ValidationUnit::GetInstance()->intrude([&I, &repl](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
