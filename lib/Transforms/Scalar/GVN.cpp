@@ -50,6 +50,10 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Infrules.h"
+
 #include <vector>
 using namespace llvm;
 using namespace PatternMatch;
@@ -2314,7 +2318,70 @@ bool GVN::processInstruction(Instruction *I) {
   }
 
   // Remove it!
+
+  llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
+
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I, &repl](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+    std::string leader = llvmberry::getVariable(*repl);
+    std::string to_rem = llvmberry::getVariable(*I);
+
+    Instruction *leader_I = dyn_cast<Instruction>(repl);
+
+    for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+      std::string user = llvmberry::getVariable(*UI->getUser());
+      Instruction *user_I = dyn_cast<Instruction>(UI->getUser());
+
+      hints.addCommand(llvmberry::ConsPropagate::make(
+          llvmberry::ConsLessdef::make(
+              llvmberry::ConsRhs::make(leader, llvmberry::Physical,
+                                       llvmberry::Source),
+              llvmberry::ConsVar::make(leader, llvmberry::Physical),
+              llvmberry::Source),
+          llvmberry::ConsBounds::make(
+              llvmberry::TyPosition::make(llvmberry::Source, *leader_I),
+              llvmberry::TyPosition::make(llvmberry::Source, *I))));
+
+      hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Source, *I),
+          llvmberry::ConsTransitivity::make(
+              llvmberry::ConsVar::make(to_rem, llvmberry::Physical),
+              llvmberry::ConsRhs::make(to_rem, llvmberry::Physical,
+                                       llvmberry::Source),
+              llvmberry::ConsVar::make(leader, llvmberry::Physical))));
+
+      hints.addCommand(llvmberry::ConsPropagate::make(
+          llvmberry::ConsLessdef::make(
+              llvmberry::ConsVar::make(to_rem, llvmberry::Physical),
+              llvmberry::ConsVar::make(leader, llvmberry::Physical),
+              llvmberry::Source),
+          llvmberry::ConsBounds::make(
+              llvmberry::TyPosition::make(llvmberry::Source, *I),
+              llvmberry::TyPosition::make(llvmberry::Source, *user_I))));
+
+      if (!user.empty()) {
+        dbgs() << "isnonempty: " << user << "\n";
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, *user_I),
+            llvmberry::ConsReplaceRhs::make(
+                llvmberry::TyRegister::make(to_rem, llvmberry::Physical),
+                llvmberry::ConsId::make(leader, llvmberry::Physical),
+                llvmberry::ConsVar::make(user, llvmberry::Physical),
+                llvmberry::ConsRhs::make(user, llvmberry::Physical,
+                                         llvmberry::Source),
+                llvmberry::ConsRhs::make(user, llvmberry::Physical,
+                                         llvmberry::Target))));
+      } else {
+        dbgs() << "isempty\n";
+      }
+    }
+  });
+
   patchAndReplaceAllUsesWith(I, repl);
+
+  llvmberry::ValidationUnit::End();
+  
   if (MD && repl->getType()->getScalarType()->isPointerTy())
     MD->invalidateCachedPointerInfo(repl);
   markInstructionForDeletion(I);

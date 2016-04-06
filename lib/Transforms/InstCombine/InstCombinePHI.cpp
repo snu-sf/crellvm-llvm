@@ -15,6 +15,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/InstructionSimplify.h"
+#include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/ValidationUnit.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "instcombine"
@@ -75,6 +77,9 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     return nullptr;
 
   // Otherwise, this is safe to transform!
+  
+  llvmberry::ValidationUnit::Begin("fold_phi_bin",
+                                   FirstInst->getParent()->getParent());
 
   Value *InLHS = FirstInst->getOperand(0);
   Value *InRHS = FirstInst->getOperand(1);
@@ -110,6 +115,115 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     }
   }
 
+  llvmberry::ValidationUnit::GetInstance()->intrude(
+      [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
+         llvmberry::CoreHint &hints) {
+        std::string oldphi = llvmberry::getVariable(PN);
+        std::string newphi;
+        Instruction *NewPHI = nullptr;
+        if(NewLHS) NewPHI = NewLHS;
+        if(NewRHS) NewPHI = NewRHS;
+        newphi = llvmberry::getVariable(*NewPHI);
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
+              llvmberry::ConsGlobal::make()));
+
+        BasicBlock::iterator InsertPos = NewPHI->getParent()->getFirstInsertionPt();
+        llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
+              llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), ""),
+                llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
+
+        for(unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+          Instruction *I = cast<Instruction>(PN.getIncomingValue(i));
+          std::string reg = llvmberry::getVariable(*I);
+          Value *CommonOperand = nullptr;
+          if(NewLHS) CommonOperand = I->getOperand(1);
+          else CommonOperand = I->getOperand(0);
+          std::string reg_common = llvmberry::getVariable(*CommonOperand);
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                llvmberry::ConsLessdef::make(
+                  llvmberry::ConsVar::make(reg, llvmberry::Physical),
+                  llvmberry::ConsRhs::make(reg, llvmberry::Physical, llvmberry::Source),
+                  llvmberry::Source),
+                llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, *I),
+                  llvmberry::TyPosition::make_end_of_block(llvmberry::Source, *(I->getParent())))));
+
+          hints.addCommand(llvmberry::ConsInfrule::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *I),
+                llvmberry::ConsIntroEq::make(
+                  llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                  "G")));
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                llvmberry::ConsLessdef::make(
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Physical),
+                  llvmberry::ConsVar::make("G", llvmberry::Ghost),
+                  llvmberry::Source),
+                llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, *I),
+                  llvmberry::TyPosition::make_end_of_block(llvmberry::Source, *(I->getParent())))));
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                llvmberry::ConsLessdef::make(
+                  llvmberry::ConsVar::make("G", llvmberry::Ghost),
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Physical),
+                  llvmberry::Source),
+                llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, *I),
+                  llvmberry::TyPosition::make_end_of_block(llvmberry::Source, *(I->getParent())))));
+
+          hints.addCommand(llvmberry::ConsInfrule::make(
+                llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                llvmberry::ConsTransitivity::make(
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Previous),
+                  llvmberry::ConsVar::make("G", llvmberry::Ghost),
+                  llvmberry::ConsVar::make(reg_common, llvmberry::Physical))));
+
+
+          if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
+          int size = I->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
+
+            if(NewRHS) {
+            // b >= c -> a + b >= a + c
+            // reg_common = a, reg_block_special = b, newphi = c
+            std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(1)));
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::ConsBopBoth::make(
+                    llvmberry::BopOf(BinOp),
+                    llvmberry::Target,
+                    llvmberry::Left,
+                    llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                    llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
+                    llvmberry::ConsId::make(newphi, llvmberry::Physical),
+                    llvmberry::ConsSize::make(size))));
+            } else {
+            std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(0)));
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::ConsBopBoth::make(
+                    llvmberry::BopOf(BinOp),
+                    llvmberry::Target,
+                    llvmberry::Right,
+                    llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                    llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
+                    llvmberry::ConsId::make(newphi, llvmberry::Physical),
+                    llvmberry::ConsSize::make(size))));
+            }
+          } else if(dyn_cast<CmpInst>(I)) {
+            // TODO . validate when folding Compare Instruction.
+            // currently validating only when folding Binary Operator Instruction.
+          }
+        }
+      });
+ 
   if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
     CmpInst *NewCI = CmpInst::Create(CIOp->getOpcode(), CIOp->getPredicate(),
                                      LHSVal, RHSVal);
