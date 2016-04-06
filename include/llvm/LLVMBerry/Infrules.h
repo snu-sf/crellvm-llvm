@@ -288,11 +288,11 @@ private:
 
 struct TyIntroEq {
 public:
-  TyIntroEq(std::unique_ptr<TyValue> _x, std::string ghost_name);
+  TyIntroEq(std::unique_ptr<TyExpr> _e, std::string ghost_name);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyExpr> e;
   std::unique_ptr<TyRegister> g;
 };
 
@@ -561,7 +561,7 @@ public:
   ConsIntroEq(std::unique_ptr<TyIntroEq> _intro_eq);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _x, std::string ghost_name);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyExpr> _e, std::string ghost_name);
 
 private:
   std::unique_ptr<TyIntroEq> intro_eq;
