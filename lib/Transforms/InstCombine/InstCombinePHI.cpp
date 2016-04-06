@@ -192,6 +192,21 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
 
           if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
+
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                    llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                    llvmberry::ConsTransitivity::make(
+                            llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
+                            llvmberry::ConsVar::make(reg, llvmberry::Previous),
+                            llvmberry::ConsInsn::make(
+                                    llvmberry::ConsBinaryOp::make(
+                                            llvmberry::BopOf(BinOp),
+                                            llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                                            llvmberry::ConsId::make(llvmberry::getVariable(*(BinOp->getOperand(0))), llvmberry::Previous),
+                                            llvmberry::ConsId::make(llvmberry::getVariable(*(BinOp->getOperand(1))), llvmberry::Previous)
+                                    ))
+                    )
+            ));
           int size = I->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
 
             if(NewRHS) {
