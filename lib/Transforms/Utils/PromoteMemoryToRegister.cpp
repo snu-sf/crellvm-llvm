@@ -40,6 +40,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include <algorithm>
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Infrules.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "mem2reg"
@@ -668,6 +669,7 @@ void PromoteMem2Reg::run() {
       // Remove the alloca from the Allocas list, since it has been processed
       RemoveFromAllocasList(AllocaNum);
       ++NumDeadAlloca;
+
       continue;
     }
 
@@ -683,7 +685,7 @@ void PromoteMem2Reg::run() {
         RemoveFromAllocasList(AllocaNum);
         ++NumSingleStore;
 
-        llvmberry::ValidationUnit::EndIfExists();
+        //llvmberry::ValidationUnit::EndIfExists(); // future work: after replaceAllUsesWith
         continue;
       }
     }
@@ -893,7 +895,6 @@ void PromoteMem2Reg::run() {
   }
 
   NewPhiNodes.clear();
-  llvmberry::ValidationUnit::EndIfExists();
 }
 
 /// \brief Determine which blocks the value is live in.

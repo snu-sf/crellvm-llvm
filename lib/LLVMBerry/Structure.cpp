@@ -7,6 +7,7 @@
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Infrules.h"
 
 namespace cereal {
  [[noreturn]] void throw_exception(std::exception const &e){ std::exit(1); }
