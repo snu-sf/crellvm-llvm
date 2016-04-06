@@ -27,7 +27,7 @@ enum TyScope { Source = 0, Target };
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
-void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I);
+void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope = Source);
 void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
         llvm::BinaryOperator *X, 
         llvm::SelectInst *Y, 
@@ -92,6 +92,9 @@ public:
   make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB);
   static std::unique_ptr<TyPosition> make(enum TyScope _scope,
                                           std::string _block_name,
+                                          std::string _prev_block_name);
+  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
+                                          const llvm::Instruction &I,
                                           std::string _prev_block_name);
 
 private:
@@ -192,14 +195,14 @@ private :
 
 struct TyConstInt {
 public:
-  TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type);
-  TyConstInt(int _int_value, int _bitwidth);
+  TyConstInt(int64_t _int_value, std::unique_ptr<TyIntType> _int_type);
+  TyConstInt(int64_t _int_value, int _bitwidth);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyConstInt> make(int _int_value, int _bitwidth);
+  static std::unique_ptr<TyConstInt> make(int64_t _int_value, int _bitwidth);
 
 private:
-  int int_value;
+  int64_t int_value;
   std::unique_ptr<TyIntType> int_type;
 };
 
@@ -224,7 +227,7 @@ public:
 struct ConsConstInt : public TyConstant {
 public:
   ConsConstInt(std::unique_ptr<TyConstInt> _const_int);
-  ConsConstInt(int _int_value, int _value);
+  ConsConstInt(int64_t _int_value, int _bitwidth);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -302,6 +305,7 @@ public :
   TyLoadInst(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::unique_ptr<TyLoadInst> make(const llvm::LoadInst &li);
+  static std::unique_ptr<TyLoadInst> make(const llvm::StoreInst &si);
 
 private : 
   std::unique_ptr<TyValueType> pointertype;

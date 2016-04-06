@@ -6,12 +6,18 @@
 #include <cereal/types/vector.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
-#include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
 namespace cereal {
  [[noreturn]] void throw_exception(std::exception const &e){ std::exit(1); }
+}
+namespace boost{
+  void throw_exception(std::exception const &e){ 
+    std::cerr << " boost::throw_exception(e) called." << std::endl; 
+    std::cerr << e.what() << std::endl; 
+    std::exit(1); 
+  }
 }
 
 namespace {
@@ -248,11 +254,10 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
   }
 }
 
-void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
-
+void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope) {
   if (llvm::BinaryOperator::isNeg(V)) {
     if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([&V, &I](
+      llvmberry::ValidationUnit::GetInstance()->intrude([&V, &I, &scope](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
 
@@ -263,33 +268,45 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I) {
 
         hints.addCommand(llvmberry::ConsPropagate::make(
             llvmberry::ConsLessdef::make(
-                llvmberry::ConsVar::make(reg1_name,
-                                         llvmberry::Physical), // my = -y
-                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical,
-                                         llvmberry::Source),
-                llvmberry::Source),
+                llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), // my = -y
+                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, scope),
+                scope),
             llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Source,
-                                            *Vins), // From my to z = x -my
-                llvmberry::TyPosition::make(llvmberry::Source, I))));
+                llvmberry::TyPosition::make(scope, *Vins), // From my to z = x -my
+                llvmberry::TyPosition::make(scope, I))));
+
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, scope),
+                llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), // my = -y
+                scope),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(scope, *Vins), // From my to z = x -my
+                llvmberry::TyPosition::make(scope, I))));
       });
     }
   }
   // Constants can be considered to be negated values if they can be folded.
   if (llvm::ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(V)) {
     if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V, &C](
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V, &C, &scope](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
 
         std::string reg0_name = llvmberry::getVariable(I); // z = x -my
 
         unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
-        int c1 = (int)C->getSExtValue();
-        int c2 = -c1;
+        int64_t c1 = C->getSExtValue();
+        int64_t c2 = -c1;
 
         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Source, I),
+            llvmberry::TyPosition::make(scope, I),
+            llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
+                                        llvmberry::TyConstInt::make(c2, sz_bw),
+                                        llvmberry::ConsSize::make(sz_bw))));
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(scope, I),
             llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
                                         llvmberry::TyConstInt::make(c2, sz_bw),
                                         llvmberry::ConsSize::make(sz_bw))));
@@ -441,20 +458,54 @@ void TyPosition::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+                                             std::string _block_name,
+                                             std::string _prev_block_name) {
+  std::unique_ptr<TyPositionPhinode> _pos_phi(
+      new TyPositionPhinode(_prev_block_name));
+
+  std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
+
+  return std::unique_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_phi)));
+}
+
+std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
                                              const llvm::Instruction &I) {
+  std::string empty_str = "";
+  return std::move(TyPosition::make(_scope, I, empty_str));
+}
+
+std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+                                             const llvm::Instruction &I, std::string _prev_block_name) {
 
   std::string _block_name = getBasicBlockIndex(I.getParent());
   std::string _register_name = getVariable(I);
 
-  int _index = getCommandIndex(I);
+  std::unique_ptr<TyInstrIndex> _instr_index;
 
-  std::unique_ptr<TyPositionCommand> _pos_cmd(
-      new TyPositionCommand(_index, _register_name));
+  if (llvm::isa<llvm::PHINode>(I)) {
+    std::unique_ptr<TyPositionPhinode> _pos_phi(new TyPositionPhinode(_prev_block_name));
 
-  std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+    std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
+
+    _instr_index = std::move(_phi);
+  } else {
+    int _index;
+    if (llvm::isa<llvm::TerminatorInst>(I)) {
+      _index = getTerminatorIndex(llvm::dyn_cast<llvm::TerminatorInst>(&I));
+    } else {
+      _index = getCommandIndex(I);
+    }
+    std::unique_ptr<TyPositionCommand> _pos_cmd(
+        new TyPositionCommand(_index, _register_name));
+
+    std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+    _instr_index = std::move(_cmd);
+  }
 
   return std::unique_ptr<TyPosition>(
-      new TyPosition(_scope, _block_name, std::move(_cmd)));
+      new TyPosition(_scope, _block_name, std::move(_instr_index)));
 }
 
 std::unique_ptr<TyPosition>
@@ -477,17 +528,6 @@ TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
 }
 
-std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
-                                             std::string _block_name,
-                                             std::string _prev_block_name) {
-  std::unique_ptr<TyPositionPhinode> _pos_phi(
-      new TyPositionPhinode(_prev_block_name));
-
-  std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
-
-  return std::unique_ptr<TyPosition>(
-      new TyPosition(_scope, _block_name, std::move(_phi)));
-}
 
 /* value */
 
@@ -516,17 +556,17 @@ void ConsIntType::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(value));
 }
 
-TyConstInt::TyConstInt(int _int_value, std::unique_ptr<TyIntType> _int_type)
+TyConstInt::TyConstInt(int64_t _int_value, std::unique_ptr<TyIntType> _int_type)
     : int_value(_int_value), int_type(std::move(_int_type)) {}
 
-TyConstInt::TyConstInt(int _int_value, int _bitwidth)
+TyConstInt::TyConstInt(int64_t _int_value, int _bitwidth)
     : int_value(_int_value), int_type(new ConsIntType(_bitwidth)) {}
 
 void TyConstInt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(cereal::make_nvp("int_value", int_value), CEREAL_NVP(int_type));
 }
 
-std::unique_ptr<TyConstInt> TyConstInt::make(int _int_value, int _value) {
+std::unique_ptr<TyConstInt> TyConstInt::make(int64_t _int_value, int _value) {
   return std::unique_ptr<TyConstInt>(new TyConstInt(_int_value, _value));
 }
 
@@ -587,8 +627,8 @@ std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
 ConsConstInt::ConsConstInt(std::unique_ptr<TyConstInt> _const_int)
     : const_int(std::move(_const_int)) {}
 
-ConsConstInt::ConsConstInt(int _int_value, int _value)
-    : const_int(new TyConstInt(_int_value, _value)) {}
+ConsConstInt::ConsConstInt(int64_t _int_value, int _bitwidth)
+    : const_int(new TyConstInt(_int_value, _bitwidth)) {}
 
 void ConsConstInt::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -681,28 +721,28 @@ std::unique_ptr<TyValueType> TyValueType::make(const llvm::Type &type){
   }else if(type.isX86_FP80Ty()){
     vt = new ConsFloatValueType(X86_FP80Type);
   }else{
-    assert("TyValueType::make(const llvmType &) : unknown vlaue type" && false);
+    assert("TyValueType::make(const llvmType &) : unknown value type" && false);
     vt = nullptr;
   }
-  return std::unique_ptr<TyValueType>(vt);
-}
+    return std::unique_ptr<TyValueType>(vt);
+  }
 
-ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
-}
-void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("IntValueType");
-  archive(CEREAL_NVP(int_type));
-}
+  ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
+  }
+  void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
+    archive.makeArray();
+    archive.writeName();
+    archive.saveValue("IntValueType");
+    archive(CEREAL_NVP(int_type));
+  }
 
-ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
-}
-void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("FloatValueType");
-  archive(cereal::make_nvp("float_type", toString(float_type)));
+  ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
+  }
+  void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
+    archive.makeArray();
+    archive.writeName();
+    archive.saveValue("FloatValueType");
+    archive(cereal::make_nvp("float_type", toString(float_type)));
 }
 
 ConsNamedType::ConsNamedType(std::string _s) : s(std::move(_s)){
@@ -720,19 +760,25 @@ void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
   archive.writeName();
   archive.saveValue("PtrType");
+
+  archive.startNode();
+  archive.makeArray();
   archive(cereal::make_nvp("address_space", address_space));
   archive(CEREAL_NVP(valuetype));
+  archive.finishNode();
 }
 
 
 // instruction
 
 std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i){
-  if(const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)){
+  if (const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)) {
     return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(TyBinaryOperator::make(*bo))));
-  }else if(const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)){
+  } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
     return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
-  }else{
+  } else if (const llvm::StoreInst *si = llvm::dyn_cast<llvm::StoreInst>(&i)) {
+    return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*si))));
+  } else {
     assert("TyInstruction::make : unsupporting instruction type" && false);
     return std::unique_ptr<TyInstruction>(nullptr);
   }
@@ -785,12 +831,20 @@ std::unique_ptr<TyBinaryOperator> TyBinaryOperator::make(const llvm::BinaryOpera
         TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
 }
 
-std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li){
+std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
   return std::unique_ptr<TyLoadInst>(new TyLoadInst(
         TyValueType::make(*li.getPointerOperand()->getType()),
         TyValueType::make(*li.getType()),
         TyValue::make(*li.getPointerOperand()),
         li.getAlignment()));
+}
+
+std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
+  return std::unique_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*si.getOperand(1)->getType()),
+        TyValueType::make(*si.getOperand(0)->getType()),
+        TyValue::make(*si.getOperand(1)),
+        si.getAlignment()));
 }
 
 ConsBinaryOp::ConsBinaryOp(std::unique_ptr<TyBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
