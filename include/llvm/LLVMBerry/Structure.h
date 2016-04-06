@@ -407,6 +407,7 @@ public :
   void serialize(cereal::JSONOutputArchive& archive) const;
   
   static std::unique_ptr<TyExpr> make(const llvm::Instruction &i);
+  static std::unique_ptr<TyExpr> make(std::unique_ptr<TyInstruction> _instruction);
 
 private : 
   std::unique_ptr<TyInstruction> instruction;

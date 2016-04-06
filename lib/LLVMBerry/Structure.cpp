@@ -912,6 +912,9 @@ ConsInsn::ConsInsn(std::unique_ptr<TyInstruction> _instruction) : instruction(st
 std::unique_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i){
   return std::unique_ptr<TyExpr>(new ConsInsn(std::move(TyInstruction::make(i))));
 }
+std::unique_ptr<TyExpr> ConsInsn::make(std::unique_ptr<TyInstruction> _instruction) {
+  return std::unique_ptr<TyExpr>(new ConsInsn(std::move(_instruction)));
+}
 void ConsInsn::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
   archive.writeName();
