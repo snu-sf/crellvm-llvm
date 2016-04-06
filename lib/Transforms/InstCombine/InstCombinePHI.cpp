@@ -276,7 +276,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             // infer z^ >= a + t in tgt
             hints.addCommand(llvmberry::ConsInfrule::make(
                   llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
-                  llvmberry::ConsTransitivity::make(
+                  llvmberry::ConsTransitivityTgt::make(
                     llvmberry::ConsVar::make(oldphi, llvmberry::Ghost),
                     llvmberry::ConsInsn::make(
                       llvmberry::ConsBinaryOp::make(
@@ -354,7 +354,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             // infer z^ >= t + a in tgt
             hints.addCommand(llvmberry::ConsInfrule::make(
                   llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
-                  llvmberry::ConsTransitivity::make(
+                  llvmberry::ConsTransitivityTgt::make(
                     llvmberry::ConsVar::make(oldphi, llvmberry::Ghost),
                     llvmberry::ConsInsn::make(
                       llvmberry::ConsBinaryOp::make(
