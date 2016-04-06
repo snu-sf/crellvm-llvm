@@ -213,6 +213,31 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             // b >= c -> a + b >= a + c
             // reg_common = a, reg_block_special = b, newphi = c
             std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(1)));
+
+              //replace_rhs z = a^ + b^ -> z = a + b^
+              hints.addCommand(llvmberry::ConsInfrule::make(
+                      llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                      llvmberry::ConsReplaceRhs::make(
+                              llvmberry::TyRegister::make(reg_common, llvmberry::Previous),
+                              llvmberry::TyValue::make(PN),
+                              llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
+                              llvmberry::ConsInsn::make(
+                                      llvmberry::ConsBinaryOp::make(
+                                              llvmberry::BopOf(BinOp),
+                                              llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                                              llvmberry::ConsId::make(reg_common, llvmberry::Previous),
+                                              llvmberry::ConsId::make(reg_block_special, llvmberry::Previous))),
+
+                              llvmberry::ConsInsn::make(
+                                      llvmberry::ConsBinaryOp::make(
+                                             llvmberry::BopOf(BinOp),
+                                             llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                                             llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                                             llvmberry::ConsId::make(reg_block_special, llvmberry::Previous)))
+
+              )
+              ));
+
             hints.addCommand(llvmberry::ConsInfrule::make(
                   llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
                   llvmberry::ConsBopBoth::make(
@@ -267,6 +292,31 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                         llvmberry::ConsId::make(newphi, llvmberry::Physical))))));
             } else {
             std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(0)));
+
+              //replace_rhs z = a^ + b^ -> z = a + b^
+              hints.addCommand(llvmberry::ConsInfrule::make(
+                      llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                      llvmberry::ConsReplaceRhs::make(
+                              llvmberry::TyRegister::make(reg_common, llvmberry::Previous),
+                              llvmberry::TyValue::make(PN),
+                              llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
+                              llvmberry::ConsInsn::make(
+                                      llvmberry::ConsBinaryOp::make(
+                                              llvmberry::BopOf(BinOp),
+                                              llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                                              llvmberry::ConsId::make(reg_common, llvmberry::Previous),
+                                              llvmberry::ConsId::make(reg_block_special, llvmberry::Previous))),
+
+                              llvmberry::ConsInsn::make(
+                                      llvmberry::ConsBinaryOp::make(
+                                             llvmberry::BopOf(BinOp),
+                                             llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                                             llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                                             llvmberry::ConsId::make(reg_block_special, llvmberry::Previous)))
+
+              )
+              ));
+
             hints.addCommand(llvmberry::ConsInfrule::make(
                   llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
                   llvmberry::ConsBopBoth::make(
