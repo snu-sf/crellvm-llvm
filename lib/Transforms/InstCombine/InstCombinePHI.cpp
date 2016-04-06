@@ -219,7 +219,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                       llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
                       llvmberry::ConsReplaceRhs::make(
                               llvmberry::TyRegister::make(reg_common, llvmberry::Previous),
-                              llvmberry::TyValue::make(PN),
+                              llvmberry::ConsId::make(reg_common, llvmberry::Physical),
                               llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
                               llvmberry::ConsInsn::make(
                                       llvmberry::ConsBinaryOp::make(
@@ -298,21 +298,20 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                       llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
                       llvmberry::ConsReplaceRhs::make(
                               llvmberry::TyRegister::make(reg_common, llvmberry::Previous),
-                              llvmberry::TyValue::make(PN),
+                              llvmberry::ConsId::make(reg_common, llvmberry::Physical),
                               llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
                               llvmberry::ConsInsn::make(
                                       llvmberry::ConsBinaryOp::make(
                                               llvmberry::BopOf(BinOp),
                                               llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                              llvmberry::ConsId::make(reg_common, llvmberry::Previous),
-                                              llvmberry::ConsId::make(reg_block_special, llvmberry::Previous))),
-
+                                              llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
+                                              llvmberry::ConsId::make(reg_common, llvmberry::Previous))),
                               llvmberry::ConsInsn::make(
                                       llvmberry::ConsBinaryOp::make(
                                              llvmberry::BopOf(BinOp),
                                              llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                             llvmberry::ConsId::make(reg_common, llvmberry::Physical),
-                                             llvmberry::ConsId::make(reg_block_special, llvmberry::Previous)))
+                                             llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
+                                             llvmberry::ConsId::make(reg_common, llvmberry::Physical)))
 
               )
               ));
