@@ -13,6 +13,13 @@
 namespace cereal {
  [[noreturn]] void throw_exception(std::exception const &e){ std::exit(1); }
 }
+namespace boost{
+  void throw_exception(std::exception const &e){ 
+    std::cerr << " boost::throw_exception(e) called." << std::endl; 
+    std::cerr << e.what() << std::endl; 
+    std::exit(1); 
+  }
+}
 
 namespace {
 

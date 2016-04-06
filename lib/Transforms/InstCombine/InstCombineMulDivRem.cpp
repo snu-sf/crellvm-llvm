@@ -418,18 +418,23 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
     Value *Y;
     BinaryOperator *BO = nullptr;
     bool ShlNSW = false;
-    bool llvmberry_needsTransitivity = false;
     if (match(Op0, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op1, Y);
       ShlNSW = cast<ShlOperator>(Op0)->hasNoSignedWrap();
-      llvmberry_needsTransitivity = false;
+      llvmberry::ValidationUnit::GetInstance()->intrude([](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+        boost::any flag = false;
+        data["needsTransitivity"] = flag;
+      });
     } else if (match(Op1, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op0, Y);
       ShlNSW = cast<ShlOperator>(Op1)->hasNoSignedWrap();
-      llvmberry_needsTransitivity = true;
+      llvmberry::ValidationUnit::GetInstance()->intrude([](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+        boost::any flag = true;
+        data["needsTransitivity"] = flag;
+      });
     }
 
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &Y, &llvmberry_needsTransitivity](
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &Y](
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
       //    <src>   |    <tgt>
@@ -438,7 +443,9 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       Value *A = Y;
       BinaryOperator *Y = nullptr;
       Value *X = nullptr;
-      if(llvmberry_needsTransitivity){
+      assert(data.find("needsTransitivity") != data.end());
+      bool needsTransitivity = boost::any_cast<bool>(data["needsTransitivity"]);
+      if(needsTransitivity){
         X = Op0;
         Y = dyn_cast<BinaryOperator>(Op1);
       }else{
@@ -463,7 +470,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
               llvmberry::TyPosition::make(llvmberry::Source, *Y),
               llvmberry::TyPosition::make(llvmberry::Source, *Z))));
       
-      if(llvmberry_needsTransitivity){
+      if(needsTransitivity){
         // replace Z = X * Y to Z = Y * X
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, *Z),
