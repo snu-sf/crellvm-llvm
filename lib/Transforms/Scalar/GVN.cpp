@@ -2395,9 +2395,8 @@ bool GVN::processInstruction(Instruction *I) {
       }
 
     } else {
-      // TODO: repl not an instruction
-      llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-          llvmberry::ValidationUnit::ABORT);
+      // TODO: repl not an instruction (ex. icmp)
+      // For now we just don't print anything as a hint
     }
 
   });
