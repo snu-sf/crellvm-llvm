@@ -219,6 +219,37 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                       llvmberry::ConsId::make(reg_common, llvmberry::Physical),
                       llvmberry::ConsId::make(reg_block_special, llvmberry::Previous))),
                    oldphi))); 
+
+            // infer z >= z^ in src
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::ConsTransitivity::make(
+                    llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
+                    llvmberry::ConsInsn::make(
+                      llvmberry::ConsBinaryOp::make(
+                        llvmberry::BopOf(BinOp),
+                        llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                        llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                        llvmberry::ConsId::make(reg_block_special, llvmberry::Previous))),
+                    llvmberry::ConsVar::make(oldphi, llvmberry::Ghost))));
+
+            // infer z^ >= a + t in tgt
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::ConsTransitivity::make(
+                    llvmberry::ConsVar::make(oldphi, llvmberry::Ghost),
+                    llvmberry::ConsInsn::make(
+                      llvmberry::ConsBinaryOp::make(
+                        llvmberry::BopOf(BinOp),
+                        llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                        llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                        llvmberry::ConsId::make(reg_block_special, llvmberry::Previous))),
+                    llvmberry::ConsInsn::make(
+                      llvmberry::ConsBinaryOp::make(
+                        llvmberry::BopOf(BinOp),
+                        llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                        llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                        llvmberry::ConsId::make(newphi, llvmberry::Physical))))));
             } else {
             std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(0)));
             hints.addCommand(llvmberry::ConsInfrule::make(
@@ -242,6 +273,37 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                       llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
                       llvmberry::ConsId::make(reg_common, llvmberry::Physical))),
                    oldphi))); 
+
+            // infer z >= z^ in src
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::ConsTransitivity::make(
+                    llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
+                    llvmberry::ConsInsn::make(
+                      llvmberry::ConsBinaryOp::make(
+                        llvmberry::BopOf(BinOp),
+                        llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                        llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
+                        llvmberry::ConsId::make(reg_common, llvmberry::Physical))),
+                    llvmberry::ConsVar::make(oldphi, llvmberry::Ghost))));
+
+            // infer z^ >= t + a in tgt
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::ConsTransitivity::make(
+                    llvmberry::ConsVar::make(oldphi, llvmberry::Ghost),
+                    llvmberry::ConsInsn::make(
+                      llvmberry::ConsBinaryOp::make(
+                        llvmberry::BopOf(BinOp),
+                        llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                        llvmberry::ConsId::make(reg_block_special, llvmberry::Previous),
+                        llvmberry::ConsId::make(reg_common, llvmberry::Physical))),
+                    llvmberry::ConsInsn::make(
+                      llvmberry::ConsBinaryOp::make(
+                        llvmberry::BopOf(BinOp),
+                        llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
+                        llvmberry::ConsId::make(newphi, llvmberry::Physical),
+                        llvmberry::ConsId::make(reg_common, llvmberry::Physical))))));
             }
           } else if(dyn_cast<CmpInst>(I)) {
             // TODO . validate when folding Compare Instruction.
