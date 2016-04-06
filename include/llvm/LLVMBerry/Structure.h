@@ -27,7 +27,7 @@ enum TyScope { Source = 0, Target };
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
-void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I);
+void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope = Source);
 void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
         llvm::BinaryOperator *X, 
         llvm::SelectInst *Y, 
