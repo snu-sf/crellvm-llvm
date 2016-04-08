@@ -17,6 +17,9 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Transforms/Utils/CmpInstAnalysis.h"
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Infrules.h"
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1334,8 +1337,77 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
   if (Value *Op0NotVal = dyn_castNotVal(Op0))
     if (Value *Op1NotVal = dyn_castNotVal(Op1))
       if (Op0->hasOneUse() && Op1->hasOneUse()) {
+        llvmberry::ValidationUnit::Begin("and_de_morgan", I.getParent()->getParent());
+
         Value *Or = Builder->CreateOr(Op0NotVal, Op1NotVal,
                                       I.getName()+".demorgan");
+        
+        llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &Op0NotVal, &Op1NotVal, &Or](
+            llvmberry::ValidationUnit::Dictionary &data,
+            llvmberry::CoreHint &hints) {
+          //    <src>   |     <tgt>
+          // X = A ^ -1 | X =  A  ^ -1
+          // Y = B ^ -1 | Y =  B  ^ -1
+          // nop        | Z' = A  | B
+          // Z = X & Y  | Z =  Z' ^ -1
+          BinaryOperator *Z = &I;
+          BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
+          BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+          BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Or);
+          Value *A = Op0NotVal;
+          Value *B = Op1NotVal;
+
+          std::string reg_x_name = llvmberry::getVariable(*X);
+          std::string reg_y_name = llvmberry::getVariable(*Y);
+          std::string reg_z_name = llvmberry::getVariable(*Z);
+          std::string reg_zprime_name = llvmberry::getVariable(*Zprime);
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsLessdef::make(
+                  llvmberry::ConsRhs::make(reg_x_name, llvmberry::Physical, llvmberry::Target),
+                  llvmberry::ConsVar::make(reg_x_name, llvmberry::Physical),
+                  llvmberry::Target),
+              llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, *X),
+                  llvmberry::TyPosition::make(llvmberry::Target, *Z))));
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsLessdef::make(
+                  llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Target),
+                  llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
+                  llvmberry::Target),
+              llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, *Y),
+                  llvmberry::TyPosition::make(llvmberry::Target, *Z))));
+
+          llvmberry::insertSrcNopAtTgtI(hints, Zprime);
+          
+          hints.addCommand(llvmberry::ConsPropagate::make(
+                  llvmberry::ConsMaydiff::make(reg_zprime_name, llvmberry::Physical),
+                  llvmberry::ConsGlobal::make()));
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsLessdef::make(
+                  llvmberry::ConsRhs::make(reg_zprime_name, llvmberry::Physical, llvmberry::Target),
+                  llvmberry::ConsVar::make(reg_zprime_name, llvmberry::Physical),
+                  llvmberry::Target),
+              llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, *Zprime),
+                  llvmberry::TyPosition::make(llvmberry::Target, *Z))));
+
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              llvmberry::TyPosition::make(llvmberry::Target, I),
+              llvmberry::ConsAndDeMorgan::make(
+                  llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                  llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
+                  llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                  llvmberry::TyRegister::make(reg_zprime_name, llvmberry::Physical),
+                  llvmberry::TyValue::make(*A),
+                  llvmberry::TyValue::make(*B),
+                  llvmberry::ConsSize::make(bitwidth))));
+        });
+
         return BinaryOperator::CreateNot(Or);
       }
 

@@ -432,70 +432,72 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       });
     }
 
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &Y](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
-      //    <src>   |    <tgt>
-      // Y = 1 << A | Y = 1 << A
-      // Z = Y *  X | Z = X << A
-      Value *A = Y;
-      BinaryOperator *Y = nullptr;
-      Value *X = nullptr;
-      assert(data.find("needsTransitivity") != data.end());
-      bool needsTransitivity = boost::any_cast<bool>(data["needsTransitivity"]);
-      if(needsTransitivity){
-        X = Op0;
-        Y = dyn_cast<BinaryOperator>(Op1);
-      }else{
-        X = Op1;
-        Y = dyn_cast<BinaryOperator>(Op0);
-      }
-      BinaryOperator *Z = &I;
+    if (BO) {
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &Y](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        //    <src>   |    <tgt>
+        // Y = 1 << A | Y = 1 << A
+        // Z = Y *  X | Z = X << A
+        Value *A = Y;
+        BinaryOperator *Y = nullptr;
+        Value *X = nullptr;
+        assert(data.find("needsTransitivity") != data.end());
+        bool needsTransitivity = boost::any_cast<bool>(data["needsTransitivity"]);
+        if(needsTransitivity){
+          X = Op0;
+          Y = dyn_cast<BinaryOperator>(Op1);
+        }else{
+          X = Op1;
+          Y = dyn_cast<BinaryOperator>(Op0);
+        }
+        BinaryOperator *Z = &I;
 
-      // prepare variables
-      std::string reg_y_name = llvmberry::getVariable(*Y);
-      std::string reg_z_name = llvmberry::getVariable(*Z);
-      
-      int bitwidth = Z->getType()->getIntegerBitWidth();
+        // prepare variables
+        std::string reg_y_name = llvmberry::getVariable(*Y);
+        std::string reg_z_name = llvmberry::getVariable(*Z);
+        
+        int bitwidth = Z->getType()->getIntegerBitWidth();
 
-      // propagate Y = 1 << A
-      hints.addCommand(llvmberry::ConsPropagate::make(
-          llvmberry::ConsLessdef::make(
-              llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-              llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
-              llvmberry::Source),
-          llvmberry::ConsBounds::make(
-              llvmberry::TyPosition::make(llvmberry::Source, *Y),
-              llvmberry::TyPosition::make(llvmberry::Source, *Z))));
-      
-      if(needsTransitivity){
-        // replace Z = X * Y to Z = Y * X
+        // propagate Y = 1 << A
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *Y),
+                llvmberry::TyPosition::make(llvmberry::Source, *Z))));
+        
+        if(needsTransitivity){
+          // replace Z = X * Y to Z = Y * X
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              llvmberry::TyPosition::make(llvmberry::Source, *Z),
+              llvmberry::ConsMulCommutative::make(
+                  llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                  llvmberry::TyValue::make(*X),
+                  llvmberry::TyValue::make(*Y),
+                  llvmberry::ConsSize::make(bitwidth))));
+        }
+
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, *Z),
-            llvmberry::ConsMulCommutative::make(
+            llvmberry::ConsMulShl::make(
                 llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
                 llvmberry::TyValue::make(*X),
-                llvmberry::TyValue::make(*Y),
+                llvmberry::TyValue::make(*A),
                 llvmberry::ConsSize::make(bitwidth))));
-      }
-
-      hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::TyPosition::make(llvmberry::Source, *Z),
-          llvmberry::ConsMulShl::make(
-              llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-              llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-              llvmberry::TyValue::make(*X),
-              llvmberry::TyValue::make(*A),
-              llvmberry::ConsSize::make(bitwidth))));
-    });
+      });
  
-    if (BO) {
       if (I.hasNoUnsignedWrap())
         BO->setHasNoUnsignedWrap();
       if (I.hasNoSignedWrap() && ShlNSW)
         BO->setHasNoSignedWrap();
       return BO;
     }
+    llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::End();
   }
 
   // If one of the operands of the multiply is a cast from a boolean value, then
@@ -1321,8 +1323,29 @@ Instruction *InstCombiner::visitSDiv(BinaryOperator &I) {
     return Common;
 
   // sdiv X, -1 == -X
-  if (match(Op1, m_AllOnes()))
+  if (match(Op1, m_AllOnes())){
+    llvmberry::ValidationUnit::Begin("sdiv_mone", I.getParent()->getParent());
+
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
+      //    <src>  |    <tgt>
+      // z = x % c | z = x % (-c)
+      BinaryOperator *Z = &I;
+      Value *X = Z->getOperand(0);
+      std::string reg_z_name = llvmberry::getVariable(*Z);
+      int bitwidth = Z->getType()->getIntegerBitWidth();
+
+      hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Source, *Z),
+          llvmberry::ConsSdivMone::make(
+              llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+              llvmberry::TyValue::make(*X), 
+              llvmberry::ConsSize::make(bitwidth))));
+    });
+ 
     return BinaryOperator::CreateNeg(Op0);
+  }
 
   if (ConstantInt *RHS = dyn_cast<ConstantInt>(Op1)) {
     // sdiv X, C  -->  ashr exact X, log2(C)
@@ -1623,8 +1646,35 @@ Instruction *InstCombiner::visitSRem(BinaryOperator &I) {
     const APInt *Y;
     // X % -Y -> X % Y
     if (match(Op1, m_APInt(Y)) && Y->isNegative() && !Y->isMinSignedValue()) {
+      llvmberry::ValidationUnit::Begin("rem_neg", I.getParent()->getParent());
+
+      llvmberry::generateHintForNegValue(Op1, I);
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &Y](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        //    <src>  |    <tgt>
+        // z = x % c | z = x % (-c)
+        BinaryOperator *Z = &I;
+        Value *X = Z->getOperand(0);
+        Value *C = Op1;
+        std::string reg_z_name = llvmberry::getVariable(*Z);
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, *Z),
+            llvmberry::ConsRemNeg::make(
+                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*C), 
+                llvmberry::TyValue::make(*X),
+                llvmberry::TyValue::make(*ConstantInt::get(C->getType(), -*Y)),
+                llvmberry::ConsSize::make(bitwidth))));
+      });
+
       Worklist.AddValue(I.getOperand(1));
       I.setOperand(1, ConstantInt::get(I.getType(), -*Y));
+      
+      llvmberry::ValidationUnit::End();
+      
       return &I;
     }
   }
