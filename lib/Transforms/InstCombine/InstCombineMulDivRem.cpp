@@ -1329,8 +1329,8 @@ Instruction *InstCombiner::visitSDiv(BinaryOperator &I) {
     llvmberry::ValidationUnit::GetInstance()->intrude([&I](
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
-      //    <src>  |    <tgt>
-      // z = x % c | z = x % (-c)
+      //    <src>     |    <tgt>
+      // z = x / (-1) | z = 0 - x
       BinaryOperator *Z = &I;
       Value *X = Z->getOperand(0);
       std::string reg_z_name = llvmberry::getVariable(*Z);
