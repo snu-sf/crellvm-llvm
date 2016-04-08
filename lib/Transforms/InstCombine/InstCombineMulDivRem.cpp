@@ -1652,8 +1652,8 @@ Instruction *InstCombiner::visitSRem(BinaryOperator &I) {
       llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &Y](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
-        //    <src>  |    <tgt>
-        // z = x % c | z = x % (-c)
+        //    <src>     |    <tgt>
+        // z = x % (-c) | z = x % c
         BinaryOperator *Z = &I;
         Value *X = Z->getOperand(0);
         Value *C = Op1;
