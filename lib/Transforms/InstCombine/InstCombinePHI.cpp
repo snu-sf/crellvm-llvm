@@ -182,7 +182,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             // reg_common = a, reg_block_special = b, newphi = c
             std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(1)));
 
-              //replace_rhs z = a^ + b^ -> z = a + b^
+              //replace_rhs z >= a^ + b^ -> z >= a + b^
               hints.addCommand(llvmberry::ConsInfrule::make(
                       llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
                       llvmberry::ConsReplaceRhs::make(
@@ -206,20 +206,33 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
               )
               ));
 
-            // t = b^ -> b^ = k
+            // introduce k >= b^ && b^ >= k in src and tgt
             hints.addCommand(llvmberry::ConsInfrule::make( // t should be value
                   llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
                   llvmberry::ConsIntroEq::make(llvmberry::ConsVar::make(reg_block_special, llvmberry::Previous), "K" ))); 
 
-            // infer t = b^ = b^ >= k in tgt
+            // infer k >= b^ && b^ >= t -> k >= t in tgt
             hints.addCommand(llvmberry::ConsInfrule::make(
-                  llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
                   llvmberry::ConsTransitivityTgt::make(
-                    llvmberry::ConsVar::make(newphi, llvmberry::Physical),  //t should be value which is newphi
+                    llvmberry::ConsVar::make("K", llvmberry::Ghost),  //t should be value which is newphi
                     llvmberry::ConsVar::make(reg_block_special, llvmberry::Previous), //b should be value too
-                    llvmberry::ConsVar::make("K", llvmberry::Ghost))));
+                    llvmberry::ConsVar::make(newphi, llvmberry::Physical))));
 
-            // infer z = a + b^ -> z >= a + K in src
+            // infer k >= t -> a+k >= a+t in tgt
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()), 
+                  llvmberry::ConsBopBoth::make(
+                    llvmberry::BopOf(BinOp),
+                    llvmberry::Target,
+                    llvmberry::Left,
+                    llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                    llvmberry::ConsId::make("K", llvmberry::Ghost),
+                    llvmberry::ConsId::make(newphi, llvmberry::Physical),
+                    llvmberry::ConsSize::make(size))));
+
+
+            // infer z >= a + b^ -> z >= a + K in src
             hints.addCommand(llvmberry::ConsInfrule::make(
                   llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
                   llvmberry::ConsReplaceRhs::make(
@@ -244,7 +257,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
            } else {
             std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(0)));
 
-              //replace_rhs z = a^ + b^ -> z = a^ + b     //a is special b is common
+              //replace_rhs z >= a^ + b^ -> z >= a^ + b     //a is special b is common
               hints.addCommand(llvmberry::ConsInfrule::make(
                       llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
                       llvmberry::ConsReplaceRhs::make(
@@ -267,25 +280,30 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
               )
               ));
 
-              // t = a^ -> a^ = k
+              // introduce a^ >= k && k >= a^
               hints.addCommand(llvmberry::ConsInfrule::make( //reg_block_special should be value
                       llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
                       llvmberry::ConsIntroEq::make(llvmberry::ConsVar::make(reg_block_special, llvmberry::Previous), "K" )));
 
-              // infer t = a^  a^ >= k in tgt
+              // infer k >= a^ && a^ >= t -> k >= t in tgt
               hints.addCommand(llvmberry::ConsInfrule::make(
-                      llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                      llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
                       llvmberry::ConsTransitivityTgt::make(
-                              llvmberry::ConsVar::make(newphi, llvmberry::Physical),
+                              llvmberry::ConsVar::make("K", llvmberry::Ghost),
                               llvmberry::ConsVar::make(reg_block_special, llvmberry::Previous), //value
-                              llvmberry::ConsVar::make("K", llvmberry::Ghost))));
-              // infer t = a^  a^ >= k in tgt
+                              llvmberry::ConsVar::make(newphi, llvmberry::Physical))));
+
+              // infer k >= t -> k+a >= t+a in tgt
               hints.addCommand(llvmberry::ConsInfrule::make(
-                      llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
-                      llvmberry::ConsTransitivityTgt::make(
-                              llvmberry::ConsVar::make(newphi, llvmberry::Physical),
-                              llvmberry::ConsVar::make(reg_block_special, llvmberry::Previous), //value
-                              llvmberry::ConsVar::make("K", llvmberry::Ghost))));
+                      llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()), 
+                      llvmberry::ConsBopBoth::make(
+                              llvmberry::BopOf(BinOp),
+                              llvmberry::Target,
+                              llvmberry::Right,
+                              llvmberry::ConsId::make(reg_common, llvmberry::Physical),
+                              llvmberry::ConsId::make("K", llvmberry::Ghost),
+                              llvmberry::ConsId::make(newphi, llvmberry::Physical),
+                              llvmberry::ConsSize::make(size))));
 
               // infer z = a^ + b -> z >= K + b in src
               hints.addCommand(llvmberry::ConsInfrule::make(
