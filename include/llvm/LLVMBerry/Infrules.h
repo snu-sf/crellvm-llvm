@@ -472,6 +472,23 @@ private:
   std::unique_ptr<TyExpr> e2_p;
 };
 
+struct TyReplaceRhsOpt {
+public:
+  TyReplaceRhsOpt(std::unique_ptr<TyRegister> _x,
+                  std::unique_ptr<TyValue> _y,
+                  std::unique_ptr<TyExpr> _e1,
+                  std::unique_ptr<TyExpr> _e2,
+                  std::unique_ptr<TyExpr> _e2_p);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TyExpr> e1;
+  std::unique_ptr<TyExpr> e2;
+  std::unique_ptr<TyExpr> e2_p;
+};
+
 struct TyIntroGhost{
 public :
   TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g);
@@ -868,6 +885,22 @@ public:
 
 private:
   std::unique_ptr<TyReplaceRhs> replace_rhs;
+};
+
+
+struct ConsReplaceRhsOpt : TyInfrule {
+public:
+  ConsReplaceRhsOpt(std::unique_ptr<TyReplaceRhsOpt> _replace_rhs_opt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x,
+                                         std::unique_ptr<TyValue> _y,
+                                         std::unique_ptr<TyExpr> _e1,
+                                         std::unique_ptr<TyExpr> _e2,
+                                         std::unique_ptr<TyExpr> _e2_p);
+
+private:
+  std::unique_ptr<TyReplaceRhsOpt> replace_rhs_opt;
 };
 
 struct ConsIntroGhost : public TyInfrule{

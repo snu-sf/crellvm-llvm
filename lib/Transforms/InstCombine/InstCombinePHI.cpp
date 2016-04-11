@@ -354,7 +354,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             // infer z = a + t  t = K -> z >= a + K in tgt
             hints.addCommand(llvmberry::ConsInfrule::make(
                     llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
-                    llvmberry::ConsReplaceRhsTgt::make(
+                    llvmberry::ConsReplaceRhsOpt::make(
                             llvmberry::TyRegister::make(newphi, llvmberry::Physical), //this should be value
                             llvmberry::ConsId::make("K", llvmberry::Ghost),     // this should be value
                             llvmberry::ConsVar::make(oldphi, llvmberry::Physical),  //this can't be constant
@@ -392,7 +392,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             // infer z = t + a  t = K -> z >= K + a in tgt
             hints.addCommand(llvmberry::ConsInfrule::make(
                     llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
-                    llvmberry::ConsReplaceRhsTgt::make(
+                    llvmberry::ConsReplaceRhsOpt::make(
                             llvmberry::TyRegister::make(newphi, llvmberry::Physical), //this should be value
                             llvmberry::ConsId::make("K", llvmberry::Ghost),     // this should be value
                             llvmberry::ConsVar::make(oldphi, llvmberry::Physical),  //this can't be constant

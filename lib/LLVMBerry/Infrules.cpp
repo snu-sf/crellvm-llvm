@@ -1023,6 +1023,41 @@ std::unique_ptr<TyInfrule> ConsReplaceRhs::make(std::unique_ptr<TyRegister> _x,
       new ConsReplaceRhs(std::move(_replace_rhs)));
 }
 
+TyReplaceRhsOpt::TyReplaceRhsOpt(std::unique_ptr<TyRegister> _x,
+                                 std::unique_ptr<TyValue> _y,
+                                 std::unique_ptr<TyExpr> _e1,
+                                 std::unique_ptr<TyExpr> _e2,
+                                 std::unique_ptr<TyExpr> _e2_p)
+        : x(std::move(_x)), y(std::move(_y)), e1(std::move(_e1)),
+          e2(std::move(_e2)), e2_p(std::move(_e2_p)) {}
+
+void TyReplaceRhsOpt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(e1), CEREAL_NVP(e2),
+          cereal::make_nvp("e2\'", e2_p));
+}
+
+ConsReplaceRhsOpt::ConsReplaceRhsOpt(std::unique_ptr<TyReplaceRhsOpt> _replace_rhs_opt)
+    : replace_rhs_opt(std::move(_replace_rhs_opt)) {}
+
+void ConsReplaceRhsOpt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("ReplaceRhsOpt");
+  archive(CEREAL_NVP(replace_rhs_opt));
+}
+std::unique_ptr<TyInfrule> ConsReplaceRhsOpt::make(std::unique_ptr<TyRegister> _x,
+                                                   std::unique_ptr<TyValue> _y,
+                                                   std::unique_ptr<TyExpr> _e1,
+                                                   std::unique_ptr<TyExpr> _e2,
+                                                   std::unique_ptr<TyExpr> _e2_p) {
+  std::unique_ptr<TyReplaceRhsOpt> _replace_rhs_opt(
+          new TyReplaceRhsOpt(std::move(_x), std::move(_y), std::move(_e1),
+                              std::move(_e2), std::move(_e2_p)));
+  return std::unique_ptr<TyInfrule>(
+          new ConsReplaceRhsOpt(std::move(_replace_rhs_opt)));
+}
+
 TyIntroGhost::TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g) : x(std::move(_x)), g(std::move(_g)){
 }
 
