@@ -380,9 +380,9 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                       llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), ""),
                       llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
 
-            // infer z = a + t  t = K -> z >= a + K in tgt
+            // infer a+K >= a+t >= z in tgt
             hints.addCommand(llvmberry::ConsInfrule::make(
-                    llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                    llvmberry::TyPosition::make(llvmberry::Target, *InsertPos),
                     llvmberry::ConsTransitivityTgt::make(
                             llvmberry::ConsInsn::make(
                                     llvmberry::ConsBinaryOp::make(
@@ -436,9 +436,9 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                       llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), ""),
                       llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
         
-            // infer z = t + a  t = K -> z >= K + a in tgt
+            // infer K+a >= t+a >= z  in tgt
             hints.addCommand(llvmberry::ConsInfrule::make(
-                    llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                    llvmberry::TyPosition::make(llvmberry::Target, *InsertPos),
                     llvmberry::ConsTransitivityTgt::make(
                             llvmberry::ConsInsn::make(
                                     llvmberry::ConsBinaryOp::make(
