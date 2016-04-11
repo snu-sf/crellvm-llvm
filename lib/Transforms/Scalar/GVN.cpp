@@ -2401,6 +2401,8 @@ bool GVN::processInstruction(Instruction *I) {
             llvmberry::ConsBounds::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *I),
                 llvmberry::TyPosition::make(llvmberry::Source, *user_I, prev_block_name))));
+        if (isa<TerminatorInst>(user_I)) {
+        }
         if (isa<PHINode>(user_I)) {
           hints.addCommand(llvmberry::ConsInfrule::make(
               llvmberry::TyPosition::make(llvmberry::Source, *user_I,
