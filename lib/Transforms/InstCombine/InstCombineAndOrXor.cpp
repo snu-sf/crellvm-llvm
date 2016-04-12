@@ -2332,7 +2332,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       //    <src>    |   <tgt>
       // X = A & B   | X = A & B
       // Y = A ^ -1  | Y = A ^ -1
-      // <nop>       | Y'= A ^ -1 (yes, this is correct. -_-;)
+      // <nop>       | Y'= A ^ -1 (yes, this is strange. -_-;)
       // Z = X | Y   | Z = Y' | B
       BinaryOperator *Z = &I;
       BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
