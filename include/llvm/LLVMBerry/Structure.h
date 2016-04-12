@@ -251,6 +251,7 @@ public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 
   static std::unique_ptr<TyValue> make(const llvm::Value &value);
+  static std::unique_ptr<TyValue> make(const llvm::Value &value, enum TyTag _tag);
 };
 
 struct ConsId : public TyValue {
