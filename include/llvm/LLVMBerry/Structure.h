@@ -24,15 +24,64 @@ namespace llvmberry {
 
 enum TyScope { Source = 0, Target };
 
+enum TyFloatType {
+  HalfType = 0,
+  FloatType,
+  DoubleType,
+  FP128Type,
+  PPC_FP128Type,
+  X86_FP80Type
+};
+
+enum TyTag { Physical = 0, Previous, Ghost };
+
+enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl, BopLshr, BopAshr,
+        BopAnd, BopOr, BopXor,  };
+
+enum TyFbop { BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
+
+
+class CoreHint;
+
+
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
+/* applyCommutativity(I, (A bop B), scope) : 
+ *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the position I
+ */
+void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expression, TyScope scope);
+/* propagateLessdef(I1, I2, scope) : 
+ *   Propagates I1 >= rhs(I1) from I1 to I2 if scope == Source, or
+ *   Propagates rhs(I1) >= I1 from I1 to I2 if scope == Target
+ */
+void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, TyScope scope);
 void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope = Source);
 void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
         llvm::BinaryOperator *X, 
         llvm::SelectInst *Y, 
         bool needs_commutativity,
         bool is_leftform);
+void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, 
+        llvm::Value *op1, bool needsCommutativity);
+void generateHintForOrXor2(llvm::BinaryOperator &I, 
+        llvm::Value *X1_val, llvm::Value *X2_val,
+        llvm::Value *A, llvm::Value *B,
+        bool needsY1Commutativity, bool needsY2Commutativity);
+
+// inserting nop
+void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
+void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
+
+std::string toString(llvmberry::TyBop bop);
+std::string toString(llvmberry::TyFbop bop);
+std::string toString(llvmberry::TyFloatType bop);
+
+bool isFloatOpcode(llvm::Instruction::BinaryOps ops);
+TyFloatType getFloatType(llvm::Type *typ);
+TyFbop getFbop(llvm::Instruction::BinaryOps ops);
+TyBop getBop(llvm::Instruction::BinaryOps ops);
+
 
 /* position */
 
@@ -108,8 +157,6 @@ private:
 
 // register
 
-enum TyTag { Physical = 0, Previous, Ghost };
-
 struct TyRegister {
 public:
   TyRegister(std::string _name, enum TyTag _tag);
@@ -136,15 +183,6 @@ public:
 
 private:
   int value;
-};
-
-enum TyFloatType {
-  HalfType = 0,
-  FloatType,
-  DoubleType,
-  FP128Type,
-  PPC_FP128Type,
-  X86_FP80Type
 };
 
 struct TyValueType{
@@ -282,11 +320,6 @@ public:
   static std::unique_ptr<TyInstruction> make(const llvm::Instruction &inst);
 };
 
-enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl, BopLshr, BopAshr,
-        BopAnd, BopOr, BopXor,  };
-
-enum TyFbop { FbopAdd, FbopSub, FbopMul, FbopDiv, FbopFrem };
-
 struct TyBinaryOperator{
 public : 
   TyBinaryOperator(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
@@ -304,7 +337,7 @@ struct TyFloatBinaryOperator{
 public : 
   TyFloatBinaryOperator(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
   void serialize(cereal::JSONOutputArchive& archive) const;
-  static std::unique_ptr<TyBinaryOperator> make(const llvm::BinaryOperator &bop);
+  static std::unique_ptr<TyFloatBinaryOperator> make(const llvm::BinaryOperator &bop);
 
 private : 
   TyFbop opcode;
@@ -645,9 +678,7 @@ private:
   std::vector<std::unique_ptr<TyCommand>> commands;
 };
 
-// inserting nop
-void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
-void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
+
 
 } // llvmberry
 

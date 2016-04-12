@@ -6,6 +6,7 @@
 #include <cereal/types/vector.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
+#include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
@@ -46,67 +47,6 @@ std::string toString(llvmberry::TyTag tag) {
   }
 }
 
-std::string toString(llvmberry::TyFloatType float_type) {
-  switch (float_type) {
-  case llvmberry::HalfType:
-    return std::string("HalfType");
-  case llvmberry::FloatType:
-    return std::string("FloatType");
-  case llvmberry::DoubleType:
-    return std::string("DoubleType");
-  case llvmberry::FP128Type:
-    return std::string("FP128Type");
-  case llvmberry::PPC_FP128Type:
-    return std::string("PPC_FP128Type");
-  case llvmberry::X86_FP80Type:
-    return std::string("X86_FP80Type");
-  default:
-    assert(false && "FloatType toString");
-  }
-}
-
-std::string toString(llvmberry::TyBop bop){
-  switch (bop) {
-    case llvmberry::BopAdd:
-      return std::string("BopAdd");
-    case llvmberry::BopSub:
-      return std::string("BopSub");
-    case llvmberry::BopMul:
-      return std::string("BopMul");
-    case llvmberry::BopUdiv:
-      return std::string("BopUdiv");
-    case llvmberry::BopSdiv:
-      return std::string("BopSdiv");
-    case llvmberry::BopUrem:
-      return std::string("BopUrem");
-    case llvmberry::BopSrem:
-      return std::string("BopSrem");
-    case llvmberry::BopShl:
-      return std::string("BopShl");
-    case llvmberry::BopLshr:
-      return std::string("BopLshr");
-    case llvmberry::BopAshr:
-      return std::string("BopAshr");
-    case llvmberry::BopAnd:
-      return std::string("BopAnd");
-    case llvmberry::BopOr:
-      return std::string("BopOr");
-    case llvmberry::BopXor:
-      return std::string("BopXor");
-    case llvmberry::BopFadd:
-      return std::string("BopFadd");
-    case llvmberry::BopFsub:
-      return std::string("BopFsub");
-    case llvmberry::BopFmul:
-      return std::string("BopFmul");
-    case llvmberry::BopFdiv:
-      return std::string("BopFdiv");
-    case llvmberry::BopFrem:
-      return std::string("BopFrem");
-  default:
-    assert(false && "Bop toString");
-  }
-}
 
 unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
   const llvm::BasicBlock *parent = instr.getParent();
@@ -177,6 +117,162 @@ std::string getVariable(const llvm::Value &value) {
   if (val == "%") val = "";
 
   return val;
+}
+
+std::string toString(llvmberry::TyFbop bop){
+  switch (bop) {
+    case llvmberry::BopFadd:
+      return std::string("BopFadd");
+    case llvmberry::BopFsub:
+      return std::string("BopFsub");
+    case llvmberry::BopFmul:
+      return std::string("BopFmul");
+    case llvmberry::BopFdiv:
+      return std::string("BopFdiv");
+    case llvmberry::BopFrem:
+      return std::string("BopFrem");
+  default:
+    assert(false && "Fbop toString");
+  }
+}
+
+std::string toString(llvmberry::TyBop bop){
+  switch (bop) {
+    case llvmberry::BopAdd:
+      return std::string("BopAdd");
+    case llvmberry::BopSub:
+      return std::string("BopSub");
+    case llvmberry::BopMul:
+      return std::string("BopMul");
+    case llvmberry::BopUdiv:
+      return std::string("BopUdiv");
+    case llvmberry::BopSdiv:
+      return std::string("BopSdiv");
+    case llvmberry::BopUrem:
+      return std::string("BopUrem");
+    case llvmberry::BopSrem:
+      return std::string("BopSrem");
+    case llvmberry::BopShl:
+      return std::string("BopShl");
+    case llvmberry::BopLshr:
+      return std::string("BopLshr");
+    case llvmberry::BopAshr:
+      return std::string("BopAshr");
+    case llvmberry::BopAnd:
+      return std::string("BopAnd");
+    case llvmberry::BopOr:
+      return std::string("BopOr");
+    case llvmberry::BopXor:
+      return std::string("BopXor");
+  default:
+    assert(false && "Bop toString");
+  }
+}
+
+std::string toString(llvmberry::TyFloatType float_type) {
+  switch (float_type) {
+  case llvmberry::HalfType:
+    return std::string("HalfType");
+  case llvmberry::FloatType:
+    return std::string("FloatType");
+  case llvmberry::DoubleType:
+    return std::string("DoubleType");
+  case llvmberry::FP128Type:
+    return std::string("FP128Type");
+  case llvmberry::PPC_FP128Type:
+    return std::string("PPC_FP128Type");
+  case llvmberry::X86_FP80Type:
+    return std::string("X86_FP80Type");
+  default:
+    assert(false && "FloatType toString");
+  }
+}
+
+llvmberry::TyFloatType getFloatType(llvm::Type *typ){
+  llvmberry::TyFloatType fty;
+  if (typ->isHalfTy())
+    fty = llvmberry::HalfType;
+  else if (typ->isFloatTy())
+    fty = llvmberry::FloatType;
+  else if (typ->isDoubleTy())
+    fty = llvmberry::DoubleType;
+  else if (typ->isX86_FP80Ty())
+    fty = llvmberry::X86_FP80Type;
+  else if (typ->isFP128Ty())
+    fty = llvmberry::FP128Type;
+  else if (typ->isPPC_FP128Ty())
+    fty = llvmberry::PPC_FP128Type;
+  else
+    assert("Unknown floating point type" && false);
+  return fty;
+}
+
+
+bool isFloatOpcode(llvm::Instruction::BinaryOps ops){
+  switch(ops){
+  case llvm::Instruction::FAdd:
+  case llvm::Instruction::FSub:
+  case llvm::Instruction::FMul:
+  case llvm::Instruction::FDiv:
+  case llvm::Instruction::FRem:
+    return true;
+  default:
+    return false;
+  }
+}
+
+TyFbop getFbop(llvm::Instruction::BinaryOps ops){
+  TyFbop tyfbop;
+  switch(ops){
+  case llvm::Instruction::FAdd:
+    tyfbop = llvmberry::BopFadd; break;
+  case llvm::Instruction::FSub:
+    tyfbop = llvmberry::BopFsub; break;
+  case llvm::Instruction::FMul:
+    tyfbop = llvmberry::BopFmul; break;
+  case llvm::Instruction::FDiv:
+    tyfbop = llvmberry::BopFdiv; break;
+  case llvm::Instruction::FRem:
+    tyfbop = llvmberry::BopFrem; break;
+  default:
+    assert("llvmberry::getFbop(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+  }
+  return tyfbop;
+}
+
+TyBop getBop(llvm::Instruction::BinaryOps ops){
+  TyBop bop;
+  switch(ops){
+  case llvm::Instruction::Add:
+    bop = llvmberry::BopAdd; break;
+  case llvm::Instruction::Sub:
+    bop = llvmberry::BopSub; break;
+  case llvm::Instruction::Mul:
+    bop = llvmberry::BopMul; break;
+  case llvm::Instruction::UDiv:
+    bop = llvmberry::BopUdiv; break;
+  case llvm::Instruction::SDiv:
+    bop = llvmberry::BopSdiv; break;
+  case llvm::Instruction::URem:
+    bop = llvmberry::BopUrem; break;
+  case llvm::Instruction::SRem:
+    bop = llvmberry::BopSrem; break;
+  case llvm::Instruction::Shl:
+    bop = llvmberry::BopShl; break;
+  case llvm::Instruction::LShr:
+    bop = llvmberry::BopLshr; break;
+  case llvm::Instruction::AShr:
+    bop = llvmberry::BopAshr; break;
+  case llvm::Instruction::And:
+    bop = llvmberry::BopAnd; break;
+  case llvm::Instruction::Or:
+    bop = llvmberry::BopOr; break;
+  case llvm::Instruction::Xor:
+    bop = llvmberry::BopXor; break;
+  default:
+    assert("llvmberry::getBop(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+  }
+  return bop;
 }
 
 bool name_instructions(llvm::Function &F) {
@@ -252,6 +348,133 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
     prevI--;
     hints.addNopPosition(TyPosition::make(TyScope::Source, *prevI));
   }
+}
+
+void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, TyScope scope) {
+  if (llvmberry::ValidationUnit::Exists()) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&from, &to, &scope](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
+      std::string reg_name = llvmberry::getVariable(*from);
+
+      if(scope == llvmberry::Source){
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsVar::make(reg_name, llvmberry::Physical),
+                llvmberry::ConsRhs::make(reg_name, llvmberry::Physical, scope),
+                scope),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(scope, *from),
+                llvmberry::TyPosition::make(scope, *to))));
+      }else if(scope == llvmberry::Target){
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsRhs::make(reg_name, llvmberry::Physical, scope),
+                llvmberry::ConsVar::make(reg_name, llvmberry::Physical),
+                scope),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(scope, *from),
+                llvmberry::TyPosition::make(scope, *to))));
+      }else{
+        assert("propagateLessdef() : scope is neither llvmberry::Source nor llvmberry::Target" && false);
+      }
+    });
+  }
+}
+
+void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expression, TyScope scope){
+  if (!llvmberry::ValidationUnit::Exists()){
+    return;
+  }
+  llvmberry::ValidationUnit::GetInstance()->intrude([&position, &expression, &scope](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+    int bitwidth = llvmberry::isFloatOpcode(expression->getOpcode()) ? -1 : expression->getType()->getIntegerBitWidth();
+    std::string regname = llvmberry::getVariable(*expression);
+    if(scope == llvmberry::Source){
+      switch(expression->getOpcode()){
+      case llvm::Instruction::Add :
+        hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Source, *position),
+          llvmberry::ConsAddCommutative::make(
+            llvmberry::TyRegister::make(regname, llvmberry::Physical),
+            llvmberry::TyValue::make(*expression->getOperand(0)),
+            llvmberry::TyValue::make(*expression->getOperand(1)),
+            llvmberry::ConsSize::make(bitwidth))));
+        break;
+      case llvm::Instruction::And :
+        hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Source, *position),
+          llvmberry::ConsAndCommutative::make(
+            llvmberry::TyRegister::make(regname, llvmberry::Physical),
+            llvmberry::TyValue::make(*expression->getOperand(0)),
+            llvmberry::TyValue::make(*expression->getOperand(1)),
+            llvmberry::ConsSize::make(bitwidth))));
+        break;
+      case llvm::Instruction::Mul : 
+        hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Source, *position),
+          llvmberry::ConsMulCommutative::make(
+            llvmberry::TyRegister::make(regname, llvmberry::Physical),
+            llvmberry::TyValue::make(*expression->getOperand(0)),
+            llvmberry::TyValue::make(*expression->getOperand(1)),
+            llvmberry::ConsSize::make(bitwidth))));
+        break;
+      case llvm::Instruction::Or : 
+        hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Source, *position),
+          llvmberry::ConsOrCommutative::make(
+            llvmberry::TyRegister::make(regname, llvmberry::Physical),
+            llvmberry::TyValue::make(*expression->getOperand(0)),
+            llvmberry::TyValue::make(*expression->getOperand(1)),
+            llvmberry::ConsSize::make(bitwidth))));
+        break;
+      case llvm::Instruction::Xor :
+        hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Source, *position),
+          llvmberry::ConsXorCommutative::make(
+            llvmberry::TyRegister::make(regname, llvmberry::Physical),
+            llvmberry::TyValue::make(*expression->getOperand(0)),
+            llvmberry::TyValue::make(*expression->getOperand(1)),
+            llvmberry::ConsSize::make(bitwidth))));
+        break;
+      default:
+        assert("applyCommutativity() : we don't support commutativity rule for this binary operator");
+      }
+    }else if(scope == llvmberry::Target){
+      switch(expression->getOpcode()){
+      case llvm::Instruction::Add :
+        hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Target, *position),
+          llvmberry::ConsAddCommutativeTgt::make(
+            llvmberry::TyRegister::make(regname, llvmberry::Physical),
+            llvmberry::TyValue::make(*expression->getOperand(0)),
+            llvmberry::TyValue::make(*expression->getOperand(1)),
+            llvmberry::ConsSize::make(bitwidth))));
+        break;
+       case llvm::Instruction::Xor :
+        hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Target, *position),
+          llvmberry::ConsXorCommutativeTgt::make(
+            llvmberry::TyRegister::make(regname, llvmberry::Physical),
+            llvmberry::TyValue::make(*expression->getOperand(0)),
+            llvmberry::TyValue::make(*expression->getOperand(1)),
+            llvmberry::ConsSize::make(bitwidth))));
+        break;
+      case llvm::Instruction::FAdd :
+        hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(llvmberry::Target, *position),
+          llvmberry::ConsFaddCommutativeTgt::make(
+            llvmberry::TyRegister::make(regname, llvmberry::Physical),
+            llvmberry::TyValue::make(*expression->getOperand(0)),
+            llvmberry::TyValue::make(*expression->getOperand(1)),
+            llvmberry::getFloatType(expression->getType()))));
+      default:
+        assert("applyCommutativity() : we don't support commutativity rule for this binary operator");
+      }
+    }else{
+      assert("applyCommutativity() : scope is neither llvmberry::Source nor llvmberry::Target" && false);
+    }
+  }); 
 }
 
 void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope) {
@@ -410,6 +633,106 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
   });
 }
 
+void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, llvm::Value *op1, bool needsCommutativity){
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I, &op0, &op1, &needsCommutativity](
+      llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    //    <src>    |   <tgt>
+    // X = B ^ -1  | X = B ^ -1
+    // Y = A & X   | Y = A & X
+    // Z = A ^ B   | Z = A ^ B
+    // W = Y | Z   | W = A ^ B
+    llvm::BinaryOperator *W = &I;
+    llvm::BinaryOperator *Z = llvm::dyn_cast<llvm::BinaryOperator>(op1);
+    llvm::BinaryOperator *Y = llvm::dyn_cast<llvm::BinaryOperator>(op0);
+    llvm::BinaryOperator *X = llvm::dyn_cast<llvm::BinaryOperator>(Y->getOperand(1));
+    assert(X);
+    assert(Y);
+    assert(Z);
+    assert(W);
+    llvm::Value *A = Z->getOperand(0);
+    llvm::Value *B = Z->getOperand(1);
+    int bitwidth = W->getType()->getIntegerBitWidth();
+
+    llvmberry::propagateLessdef(X, W, llvmberry::Source);
+    llvmberry::propagateLessdef(Y, W, llvmberry::Source);
+    llvmberry::propagateLessdef(Z, W, llvmberry::Source);
+    if(X->getOperand(1) == B){
+      llvmberry::applyCommutativity(W, X, llvmberry::Source);
+    }
+
+    if(needsCommutativity){
+      llvmberry::applyCommutativity(W, W, llvmberry::Source);
+    }
+   
+    hints.addCommand(llvmberry::ConsInfrule::make(
+        llvmberry::TyPosition::make(llvmberry::Source, *W),
+        llvmberry::ConsOrXor::make(
+            llvmberry::TyValue::make(*W), 
+            llvmberry::TyValue::make(*Z), 
+            llvmberry::TyValue::make(*X), 
+            llvmberry::TyValue::make(*Y), 
+            llvmberry::TyValue::make(*A), 
+            llvmberry::TyValue::make(*B), 
+            llvmberry::ConsSize::make(bitwidth))));
+
+  });
+}
+
+void generateHintForOrXor2(llvm::BinaryOperator &I, 
+        llvm::Value *X1_val, llvm::Value *X2_val,
+        llvm::Value *A, llvm::Value *B,
+        bool needsY1Commutativity, bool needsY2Commutativity){
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I, &X1_val, &X2_val, &A, &B,
+      &needsY1Commutativity,
+      &needsY2Commutativity](llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    //     <src>           <tgt>
+    // X1 = B  ^ -1  | X1 =  B ^ -1
+    // Y1 = A  & X1  | Y1 =  A & X1
+    // X2 = A  ^ -1  | X2 =  A ^ -1
+    // Y2 = X2 & B   | Y2 = X2 & B
+    // Z =  Y1 | Y2  | Z =   A ^ B
+    llvm::BinaryOperator *Z = &I;
+    llvm::BinaryOperator *Y1 = llvm::dyn_cast<llvm::BinaryOperator>(Z->getOperand(0));
+    llvm::BinaryOperator *Y2 = llvm::dyn_cast<llvm::BinaryOperator>(Z->getOperand(1));
+    llvm::BinaryOperator *X1 = llvm::dyn_cast<llvm::BinaryOperator>(X1_val);
+    llvm::BinaryOperator *X2 = llvm::dyn_cast<llvm::BinaryOperator>(X2_val);
+    assert(Y1);
+    assert(Y2);
+    assert(X1);
+    assert(X2);
+    int bitwidth = Z->getType()->getIntegerBitWidth();
+  
+    llvmberry::propagateLessdef(X1, Z, llvmberry::Source);
+    llvmberry::propagateLessdef(X2, Z, llvmberry::Source);
+    llvmberry::propagateLessdef(Y1, Z, llvmberry::Source);
+    llvmberry::propagateLessdef(Y2, Z, llvmberry::Source);
+    if(X1->getOperand(1) == B)
+      llvmberry::applyCommutativity(Z, X1, llvmberry::Source);
+    if(X2->getOperand(1) == A)
+      llvmberry::applyCommutativity(Z, X2, llvmberry::Source);
+    if(needsY1Commutativity)
+      llvmberry::applyCommutativity(Z, Y1, llvmberry::Source);
+    if(needsY2Commutativity)
+      llvmberry::applyCommutativity(Z, Y2, llvmberry::Source);
+   
+    hints.addCommand(llvmberry::ConsInfrule::make(
+      llvmberry::TyPosition::make(llvmberry::Target, *Z),
+      llvmberry::ConsOrXor2::make(
+          llvmberry::TyValue::make(*Z), 
+          llvmberry::TyValue::make(*X1), 
+          llvmberry::TyValue::make(*Y1), 
+          llvmberry::TyValue::make(*X2), 
+          llvmberry::TyValue::make(*Y2), 
+          llvmberry::TyValue::make(*A), 
+          llvmberry::TyValue::make(*B), 
+          llvmberry::ConsSize::make(bitwidth))));
+   
+  });
+
+}
+
 std::unique_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si) {
   llvm::Value* Val = si->getOperand(0);
 
@@ -470,7 +793,7 @@ TyPosition::TyPosition(enum TyScope _scope, std::string _block_name,
       instr_index(std::move(_instr_index)) {}
 
 void TyPosition::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("scope", toString(scope)), CEREAL_NVP(block_name), CEREAL_NVP(instr_index));
+  archive(cereal::make_nvp("scope", ::toString(scope)), CEREAL_NVP(block_name), CEREAL_NVP(instr_index));
 }
 
 std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
@@ -553,7 +876,7 @@ TyRegister::TyRegister(std::string _name, enum TyTag _tag)
     : name(_name), tag(_tag) {}
 
 void TyRegister::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(name), cereal::make_nvp("tag", toString(tag)));
+  archive(CEREAL_NVP(name), cereal::make_nvp("tag", ::toString(tag)));
 }
 
 std::unique_ptr<TyRegister> TyRegister::make(std::string _name,
@@ -789,7 +1112,12 @@ void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
 
 std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i){
   if (const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)) {
-    return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(TyBinaryOperator::make(*bo))));
+    if(isFloatOpcode(bo->getOpcode()))
+      return std::unique_ptr<TyInstruction>(new ConsFloatBinaryOp(
+        std::move(TyFloatBinaryOperator::make(*bo))));
+    else
+      return std::unique_ptr<TyInstruction>(new ConsBinaryOp(
+        std::move(TyBinaryOperator::make(*bo))));
   } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
     return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
   } else if (const llvm::StoreInst *si = llvm::dyn_cast<llvm::StoreInst>(&i)) {
@@ -801,49 +1129,14 @@ std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i){
 }
 
 std::unique_ptr<TyBinaryOperator> TyBinaryOperator::make(const llvm::BinaryOperator &bopinst){
-  llvmberry::TyBop bop;
-
-  switch(bopinst.getOpcode()){
-  case llvm::Instruction::Add:
-    bop = llvmberry::BopAdd; break;
-  case llvm::Instruction::FAdd:
-    bop = llvmberry::BopFadd; break;
-  case llvm::Instruction::Sub:
-    bop = llvmberry::BopSub; break;
-  case llvm::Instruction::FSub:
-    bop = llvmberry::BopFsub; break;
-  case llvm::Instruction::Mul:
-    bop = llvmberry::BopMul; break;
-  case llvm::Instruction::FMul:
-    bop = llvmberry::BopFmul; break;
-  case llvm::Instruction::UDiv:
-    bop = llvmberry::BopUdiv; break;
-  case llvm::Instruction::SDiv:
-    bop = llvmberry::BopSdiv; break;
-  case llvm::Instruction::FDiv:
-    bop = llvmberry::BopFdiv; break;
-  case llvm::Instruction::URem:
-    bop = llvmberry::BopUrem; break;
-  case llvm::Instruction::SRem:
-    bop = llvmberry::BopSrem; break;
-  case llvm::Instruction::FRem:
-    bop = llvmberry::BopFrem; break;
-  case llvm::Instruction::Shl:
-    bop = llvmberry::BopShl; break;
-  case llvm::Instruction::LShr:
-    bop = llvmberry::BopLshr; break;
-  case llvm::Instruction::AShr:
-    bop = llvmberry::BopAshr; break;
-  case llvm::Instruction::And:
-    bop = llvmberry::BopAnd; break;
-  case llvm::Instruction::Or:
-    bop = llvmberry::BopOr; break;
-  case llvm::Instruction::Xor:
-    bop = llvmberry::BopXor; break;
-  default:
-    assert("llvmberry::TyBinaryOperator::make(const llvm::BinaryOperator &) : unknown opcode" && false);
-  }
+  llvmberry::TyBop bop = llvmberry::getBop(bopinst.getOpcode());
   return std::unique_ptr<TyBinaryOperator>(new TyBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
+        TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
+}
+
+std::unique_ptr<TyFloatBinaryOperator> TyFloatBinaryOperator::make(const llvm::BinaryOperator &bopinst){
+  llvmberry::TyFbop bop = llvmberry::getFbop(bopinst.getOpcode());
+  return std::unique_ptr<TyFloatBinaryOperator>(new TyFloatBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
         TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
 }
 
@@ -879,6 +1172,22 @@ void ConsBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(binary_operator));
 }
 
+ConsFloatBinaryOp::ConsFloatBinaryOp(std::unique_ptr<TyFloatBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
+}
+std::unique_ptr<TyInstruction> ConsFloatBinaryOp::make(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2){
+  std::unique_ptr<TyFloatBinaryOperator> _val(new TyFloatBinaryOperator(_opcode, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
+  return std::unique_ptr<TyInstruction>(new ConsFloatBinaryOp(std::move(_val)));
+}
+std::unique_ptr<TyInstruction> ConsFloatBinaryOp::make(const llvm::BinaryOperator &bop){
+  return std::unique_ptr<TyInstruction>(new ConsFloatBinaryOp(std::move(TyFloatBinaryOperator::make(bop))));
+}
+void ConsFloatBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("FloatBinaryOp");
+  archive(CEREAL_NVP(binary_operator));
+}
+
 ConsLoadInst::ConsLoadInst(std::unique_ptr<TyLoadInst> _load_inst) : load_inst(std::move(_load_inst)){
 }
 std::unique_ptr<TyInstruction> ConsLoadInst::make(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align){
@@ -898,6 +1207,15 @@ void ConsLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
 TyBinaryOperator::TyBinaryOperator(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2) : opcode(std::move(_opcode)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
 }
 void TyBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(cereal::make_nvp("opcode", toString(opcode)));
+  archive(CEREAL_NVP(operandtype));
+  archive(CEREAL_NVP(operand1));
+  archive(CEREAL_NVP(operand2));
+}
+
+TyFloatBinaryOperator::TyFloatBinaryOperator(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2) : opcode(_opcode), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+}
+void TyFloatBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("opcode", toString(opcode)));
   archive(CEREAL_NVP(operandtype));
   archive(CEREAL_NVP(operand1));
@@ -949,7 +1267,7 @@ void ConsRhs::serialize(cereal::JSONOutputArchive &archive) const {
   archive.saveValue("Rhs");
   archive.startNode();
   archive.makeArray();
-  archive(CEREAL_NVP(register_name), cereal::make_nvp("scope", toString(scope)));
+  archive(CEREAL_NVP(register_name), cereal::make_nvp("scope", ::toString(scope)));
   archive.finishNode();
 
 }
@@ -998,7 +1316,7 @@ TyPropagateLessdef::TyPropagateLessdef(std::unique_ptr<TyExpr> _lhs,
 
 void TyPropagateLessdef::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs),
-          cereal::make_nvp("scope", toString(scope)));
+          cereal::make_nvp("scope", ::toString(scope)));
 }
 
 std::unique_ptr<TyPropagateLessdef>
@@ -1023,7 +1341,7 @@ TyPropagateNoalias::TyPropagateNoalias(std::string _lhs_name,
 
 void TyPropagateNoalias::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs),
-          cereal::make_nvp("scope", toString(scope)));
+          cereal::make_nvp("scope", ::toString(scope)));
 }
 
 TyPropagateAlloca::TyPropagateAlloca(std::unique_ptr<TyRegister> _p, 
@@ -1033,7 +1351,7 @@ TyPropagateAlloca::TyPropagateAlloca(std::unique_ptr<TyRegister> _p,
 
 void TyPropagateAlloca::serialize(cereal::JSONOutputArchive& archive) const {
   archive(CEREAL_NVP(p));
-  archive(cereal::make_nvp("scope", toString(scope)));
+  archive(cereal::make_nvp("scope", ::toString(scope)));
 }
 
 ConsLessdef::ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef)
