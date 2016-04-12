@@ -2024,13 +2024,7 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
       llvmberry::ValidationUnit::GetInstance()->intrude([&Vals](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) { data["findLeader#BB"] = Vals.BB; });
-    if (isa<Constant>(Val)) {
-      if (llvmberry::ValidationUnit::Exists())
-        llvmberry::ValidationUnit::GetInstance()->intrude([&Vals](
-            llvmberry::ValidationUnit::Dictionary &data,
-            llvmberry::CoreHint &hints) { data["findLeader#BB"] = Vals.BB; });
-      return Val;
-    }
+    if (isa<Constant>(Val)) return Val;
   }
 
   LeaderTableEntry* Next = Vals.Next;
