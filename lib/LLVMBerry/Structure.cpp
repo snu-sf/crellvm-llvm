@@ -7,6 +7,7 @@
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Infrules.h"
 
 namespace cereal {
  [[noreturn]] void throw_exception(std::exception const &e){ std::exit(1); }
@@ -407,6 +408,22 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
             llvmberry::ConsSize::make(bitwidth))));
     }
   });
+}
+
+std::unique_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si) {
+  llvm::Value* Val = si->getOperand(0);
+
+  if (llvm::ConstantInt* C = llvm::dyn_cast<llvm::ConstantInt>(Val)) {
+    int storeval = C->getSExtValue();
+    int bitwidth = C->getBitWidth();
+
+    return std::unique_ptr<llvmberry::TyExpr>
+              (new ConsConst(storeval, bitwidth));
+  } else {
+    std::string reg_stored = getVariable(*Val);
+
+    return ConsVar::make(reg_stored, Physical);
+  }
 }
 
 /* position */
@@ -1009,6 +1026,16 @@ void TyPropagateNoalias::serialize(cereal::JSONOutputArchive &archive) const {
           cereal::make_nvp("scope", toString(scope)));
 }
 
+TyPropagateAlloca::TyPropagateAlloca(std::unique_ptr<TyRegister> _p, 
+                                     enum TyScope _scope) 
+    : p(std::move(_p)), scope(std::move(_scope)) {
+}
+
+void TyPropagateAlloca::serialize(cereal::JSONOutputArchive& archive) const {
+  archive(CEREAL_NVP(p));
+  archive(cereal::make_nvp("scope", toString(scope)));
+}
+
 ConsLessdef::ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef)
     : propagate_lessdef(std::move(_propagate_lessdef)) {}
 
@@ -1044,6 +1071,24 @@ void ConsNoalias::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Noalias");
   archive(CEREAL_NVP(propagate_noalias));
+}
+
+ConsAlloca::ConsAlloca(std::unique_ptr<TyPropagateAlloca> _propagate_alloca) 
+    : propagate_alloca(std::move(_propagate_alloca)) {}
+
+std::unique_ptr<TyPropagateObject> ConsAlloca::make(std::unique_ptr<TyRegister> _p, 
+                                                    enum TyScope _scope) {
+  std::unique_ptr<TyPropagateAlloca> _val
+                    (new TyPropagateAlloca(std::move(_p), _scope));
+
+  return std::unique_ptr<TyPropagateObject>(new ConsAlloca(std::move(_val)));
+}
+
+void ConsAlloca::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("Alloca");
+  archive(CEREAL_NVP(propagate_alloca));
 }
 
 ConsMaydiff::ConsMaydiff(std::unique_ptr<TyRegister> _register_name)

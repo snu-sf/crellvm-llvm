@@ -6,11 +6,6 @@
 #include <fstream>
 #include "llvm/LLVMBerry/ValidationUnit.h"
 
-void boost::throw_exception(std::exception const &e) {
-  // This function is called whenever exception is "expected" in the ValidationUnit library."
-  std::cout << "boost throw_exception" << std::endl;
-}
-
 namespace {
 
 static std::string makeFullFilename(std::string org_filename,

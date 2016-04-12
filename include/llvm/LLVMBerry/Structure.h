@@ -33,6 +33,7 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
         llvm::SelectInst *Y, 
         bool needs_commutativity,
         bool is_leftform);
+
 /* position */
 
 struct TyPositionPhinode {
@@ -120,7 +121,6 @@ private:
   std::string name;
   enum TyTag tag;
 };
-
 
 // type
 
@@ -274,7 +274,6 @@ private:
   std::unique_ptr<TyConstant> constant;
 };
 
-
 // instruction
 
 struct TyInstruction {
@@ -415,6 +414,8 @@ private :
   std::unique_ptr<TyInstruction> instruction;
 };
 
+std::unique_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si);
+
 // propagate object
 
 struct TyPropagateLessdef {
@@ -449,6 +450,17 @@ private:
   enum TyScope scope;
 };
 
+struct TyPropagateAlloca {
+public :
+  TyPropagateAlloca(std::unique_ptr<TyRegister> _p, 
+                    enum TyScope _scope);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyRegister> p;
+  enum TyScope scope;
+};
+
 struct TyPropagateObject {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
@@ -476,6 +488,17 @@ public:
 
 private:
   std::unique_ptr<TyPropagateNoalias> propagate_noalias;
+};
+
+struct ConsAlloca : public TyPropagateObject {
+public :
+  ConsAlloca(std::unique_ptr<TyPropagateAlloca> _propagate_alloca);
+  static std::unique_ptr<TyPropagateObject> make(std::unique_ptr<TyRegister> _p, 
+                                                 enum TyScope _scope);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyPropagateAlloca> propagate_alloca;
 };
 
 struct ConsMaydiff : public TyPropagateObject {
