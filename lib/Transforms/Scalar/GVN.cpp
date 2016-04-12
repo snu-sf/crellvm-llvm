@@ -2453,7 +2453,7 @@ bool GVN::processInstruction(Instruction *I) {
                     (C->getValue()).getSExtValue(), C->getBitWidth())),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(
+                llvmberry::TyPosition::make_start_of_block(
                     llvmberry::Source,
                     llvmberry::getBasicBlockIndex(leader_bb)),
                 llvmberry::TyPosition::make(llvmberry::Source, *I))));
@@ -2530,7 +2530,7 @@ bool GVN::processInstruction(Instruction *I) {
           }
         }
       } else if (SwitchInst *SI = llvm::dyn_cast<llvm::SwitchInst>(TI)) {
-        assert("Should not occur, as it is not formalized in vellvm yet.");
+        assert(false && "Cannot validate, as it is not formalized in vellvm yet.");
       } else
         assert(false && "Should not occur");
     }
