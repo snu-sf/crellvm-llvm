@@ -900,7 +900,44 @@ void TyLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
 /* Propagate */
 
 // propagate expr
+// ConsVar or ConsConst
+std::unique_ptr<TyExpr> TyExpr::make(const llvm::Value &value, enum TyTag _tag) {
+  if(llvm::isa<llvm::Instruction>(value) ||
+     llvm::isa<llvm::GlobalValue>(value) || llvm::isa<llvm::Argument>(value)){
+    return std::unique_ptr<TyExpr>(
+            new ConsVar(TyRegister::make(getVariable(value), _tag)));
+  }else if (llvm::isa<llvm::ConstantInt>(value)) {
+    const llvm::ConstantInt *v = llvm::dyn_cast<llvm::ConstantInt>(&value);
+    return std::unique_ptr<TyExpr>(
+            new ConsConst(std::unique_ptr<TyConstant>(new ConsConstInt(
+                    TyConstInt::make(v->getSExtValue(), v->getBitWidth())))));
+  }else if (llvm::isa<llvm::ConstantFP>(value)) {
 
+    const llvm::ConstantFP *v = llvm::dyn_cast<llvm::ConstantFP>(&value);
+    const llvm::APFloat &apf = v->getValueAPF();
+    const llvm::Type *typ;
+
+    llvmberry::TyFloatType fty;
+    if (typ->isHalfTy())
+      fty = llvmberry::HalfType;
+    else if (typ->isFloatTy())
+      fty = llvmberry::FloatType;
+    else if (typ->isDoubleTy())
+      fty = llvmberry::DoubleType;
+    else if (typ->isX86_FP80Ty())
+      fty = llvmberry::X86_FP80Type;
+    else if (typ->isFP128Ty())
+      fty = llvmberry::FP128Type;
+    else if (typ->isPPC_FP128Ty())
+      fty = llvmberry::PPC_FP128Type;
+    else
+      assert("Unknown floating point type" && false);
+
+    return std::unique_ptr<TyExpr>(
+            new ConsConst(std::unique_ptr<TyConstant>(new ConsConstFloat(
+                    TyConstFloat::make(apf.convertToDouble(), fty)))));
+  }
+}
 ConsVar::ConsVar(std::unique_ptr<TyRegister> _register_name)
     : register_name(std::move(_register_name)) {}
 

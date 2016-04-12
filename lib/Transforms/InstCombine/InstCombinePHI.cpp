@@ -141,7 +141,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
               llvmberry::ConsBounds::make(
                 llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), ""),
                 llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
-
         for(unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
           Instruction *I = cast<Instruction>(PN.getIncomingValue(i)); //when i = 0 then I = x = a + b when i = 1 then I = y = a + c
           std::string reg = llvmberry::getVariable(*I); //reg is x or y

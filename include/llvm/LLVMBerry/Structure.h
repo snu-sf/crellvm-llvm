@@ -362,6 +362,8 @@ private:
 struct TyExpr {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+
+  static std::unique_ptr<TyExpr> make(const llvm::Value &value, enum TyTag _tag);
 };
 
 struct ConsVar : public TyExpr {
