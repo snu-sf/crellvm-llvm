@@ -21,6 +21,26 @@ using namespace llvm;
 
 #define DEBUG_TYPE "instcombine"
 
+#define PHIPOS(SCOPE, PN, prevI) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), prevI->getParent()->getName()) 
+#define PHIPOSJustPhi(SCOPE, PN) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
+#define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *I)
+#define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
+#define PROPAGATE(what, where) hints.addCommand(llvmberry::ConsPropagate::make(what, where))
+#define VAR(name, tag) llvmberry::ConsVar::make(name, llvmberry::tag)
+#define RHS(name, tag, SCOPE) llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
+#define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
+#define LESSDEF(left, right, SCOPE) llvmberry::ConsLessdef::make(left, right, SCOPE)
+#define INSN(x) llvmberry::ConsInsn::make(x)
+#define VAL(I, tag) llvmberry::TyValue::make(*I, llvmberry::tag)
+#define EXPR(I, tag) llvmberry::TyExpr::make(*I, llvmberry::tag)
+#define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
+#define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
+#define BINOP(bop, type, val1, val2) llvmberry::ConsBinaryOp::make(bop, type, val1, val2)
+#define TYPEOF(I) llvmberry::TyValueType::make(*(I->getType()))
+
+#define SRC llvmberry::Source
+#define TGT llvmberry::Target
+
 /// If we have something like phi [add (a,b), add(a,c)] and if a/b/c and the
 /// adds all have a single use, turn this into a phi and a single binop.
 Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
@@ -128,222 +148,120 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
         if(NewRHS) NewPHI = NewRHS;   //oldphi z, NewPHI t
         newphi = llvmberry::getVariable(*NewPHI);
 
-        hints.addCommand(llvmberry::ConsPropagate::make(  //t maydiff global propagate
+        PROPAGATE(  //t maydiff global propagate
               llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
-              llvmberry::ConsGlobal::make()));
+              llvmberry::ConsGlobal::make());
 
         BasicBlock::iterator InsertPos = NewPHI->getParent()->getFirstInsertionPt();
         llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
         //insert nop in src where first nonPhi instruction begin. this position should be where a + t is located.
 
-        hints.addCommand(llvmberry::ConsPropagate::make(   //from PN to insertPos propagate z in maydiff
+        PROPAGATE(   //from PN to insertPos propagate z in maydiff
               llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
-              llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), ""),
-                llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
+              BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
+
         for(unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
           Instruction *I = cast<Instruction>(PN.getIncomingValue(i)); //when i = 0 then I = x = a + b when i = 1 then I = y = a + c
           std::string reg = llvmberry::getVariable(*I); //reg is x or y
           Value *CommonOperand = nullptr;
-          if(NewLHS) CommonOperand = I->getOperand(1);  //in this example this should be a
-          else CommonOperand = I->getOperand(0);
+          Value *SpecialOperand = nullptr;
+          if(NewLHS) {
+            CommonOperand = I->getOperand(1);  //in this example this should be a
+            SpecialOperand = I->getOperand(0);
+          }
+          else {
+            CommonOperand = I->getOperand(0);
+            SpecialOperand = I->getOperand(1);
+          }
           std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
           int size = I->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
 
-          hints.addCommand(llvmberry::ConsPropagate::make( //from I to endofblock propagate x or y depend on edge
-                llvmberry::ConsLessdef::make(
-                  llvmberry::ConsVar::make(reg, llvmberry::Physical),
-                  llvmberry::ConsRhs::make(reg, llvmberry::Physical, llvmberry::Source),
-                  llvmberry::Source),
-                llvmberry::ConsBounds::make(
-                  llvmberry::TyPosition::make(llvmberry::Source, *I),
-                  llvmberry::TyPosition::make_end_of_block(llvmberry::Source, *(I->getParent())))));
+          PROPAGATE( //from I to endofblock propagate x or y depend on edge
+                LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
+                BOUNDS(INSTPOS(SRC, I),
+                  llvmberry::TyPosition::make_end_of_block(SRC, *(I->getParent()))));
 
           if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
+            llvmberry::TyBop bop = llvmberry::BopOf(BinOp);
+
             // x^ >= a^+b^ , z = x^ -> z >= a^+b^
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                    llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+            INFRULE(PHIPOS(SRC, PN, I),
                     llvmberry::ConsTransitivity::make(
-                            llvmberry::ConsVar::make(oldphi, llvmberry::Physical), //this can't be constant
-                            llvmberry::ConsVar::make(reg, llvmberry::Previous),  //this can't be constant too
-                            llvmberry::ConsInsn::make(                           //this should be value + value
-                                    llvmberry::ConsBinaryOp::make(
-                                            llvmberry::BopOf(BinOp),
-                                            llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                            llvmberry::TyValue::make(*(BinOp->getOperand(0)), llvmberry::Previous),
-                                            llvmberry::TyValue::make(*(BinOp->getOperand(1)), llvmberry::Previous)
-                                    ))
-                    )
-            ));
+                            VAR(oldphi, Physical), VAR(reg, Previous),
+                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Previous), VAL(BinOp->getOperand(1), Previous)))));
 
             if(NewRHS) {
-            // b >= c -> a + b >= a + c
-            // reg_common = a, reg_block_special = b, newphi = c
-            std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(1)));
+              // b >= c -> a + b >= a + c
+              // reg_common = a, reg_block_special = b, newphi = c
 
-              //replace_rhs z >= a^ + b^ -> z >= a + b^
-              hints.addCommand(llvmberry::ConsInfrule::make(
-                      llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+                //replace_rhs z >= a^ + b^ -> z >= a + b^
+              INFRULE(PHIPOS(SRC, PN, I),
                       llvmberry::ConsReplaceRhs::make(
-                              llvmberry::TyRegister::make(reg_common, llvmberry::Previous), //this should be value
-                              llvmberry::ConsId::make(reg_common, llvmberry::Physical),     // this should be value
-                              llvmberry::ConsVar::make(oldphi, llvmberry::Physical),  //this can't be constant
-                              llvmberry::ConsInsn::make(               //this shoulbe be value + value
-                                      llvmberry::ConsBinaryOp::make(
-                                              llvmberry::BopOf(BinOp),
-                                              llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                              llvmberry::TyValue::make(*CommonOperand, llvmberry::Previous),
-                                              llvmberry::TyValue::make(*(I->getOperand(1)), llvmberry::Previous))),
+                              REGISTER(reg_common, Previous), ID(reg_common, Physical), VAR(oldphi, Physical),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Previous), VAL(SpecialOperand, Previous))),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), VAL(SpecialOperand, Previous)))));
 
-                              llvmberry::ConsInsn::make(              //this should be value + value
-                                      llvmberry::ConsBinaryOp::make(
-                                             llvmberry::BopOf(BinOp),
-                                             llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                             llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                                             llvmberry::TyValue::make(*(I->getOperand(1)), llvmberry::Previous)))
+              // introduce k >= b^ && b^ >= k in src and tgt
+              INFRULE(PHIPOS(SRC, PN, I), llvmberry::ConsIntroEq::make(EXPR(SpecialOperand, Previous), "K")); 
 
-              )
-              ));
+              // infer k >= b^ && b^ >= t -> k >= t in tgt
+              INFRULE(PHIPOS(TGT, PN, I),
+                    llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous), VAR(newphi, Physical)));
 
-            // introduce k >= b^ && b^ >= k in src and tgt
-            hints.addCommand(llvmberry::ConsInfrule::make( // t should be value
-                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
-                  llvmberry::ConsIntroEq::make(llvmberry::TyExpr::make(*(I->getOperand(1)), llvmberry::Previous), "K" ))); 
+              // infer k >= t -> a+k >= a+t in tgt
+              INFRULE(PHIPOS(TGT, PN, I),
+                    llvmberry::ConsBopBoth::make(
+                      bop, TGT, llvmberry::Left, VAL(CommonOperand, Physical), ID("K", Ghost), ID(newphi, Physical),
+                      llvmberry::ConsSize::make(size)));
 
-            // infer k >= b^ && b^ >= t -> k >= t in tgt
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
-                  llvmberry::ConsTransitivityTgt::make(
-                    llvmberry::ConsVar::make("K", llvmberry::Ghost),  //t should be value which is newphi
-                    llvmberry::TyExpr::make(*(I->getOperand(1)), llvmberry::Previous), //b should be value too
-                    llvmberry::ConsVar::make(newphi, llvmberry::Physical))));
+              //infer b^ >= k -> a + b^ >= a + k in src
+              INFRULE(PHIPOS(SRC, PN, I),
+                    llvmberry::ConsBopBoth::make(
+                      bop, SRC, llvmberry::Left, VAL(CommonOperand, Physical), VAL(SpecialOperand, Previous), ID("K", Ghost),
+                      llvmberry::ConsSize::make(size)));
 
-            // infer k >= t -> a+k >= a+t in tgt
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()), 
-                  llvmberry::ConsBopBoth::make(
-                    llvmberry::BopOf(BinOp),
-                    llvmberry::Target,
-                    llvmberry::Left,
-                    llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                    llvmberry::ConsId::make("K", llvmberry::Ghost),
-                    llvmberry::ConsId::make(newphi, llvmberry::Physical),
-                    llvmberry::ConsSize::make(size))));
+              // infer z >= a + b^ -> z >= a + K in src
+              INFRULE(PHIPOS(SRC, PN, I),
+                    llvmberry::ConsTransitivity::make(
+                            VAR(oldphi, Physical),  //this can't be constant
+                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), VAL(SpecialOperand, Previous))),
+                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost)))));
 
-            //infer b^ >= k -> a + b^ >= a + k in src
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
-                  llvmberry::ConsBopBoth::make(
-                    llvmberry::BopOf(BinOp),
-                    llvmberry::Source,
-                    llvmberry::Left,
-                    llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                    llvmberry::TyValue::make(*(I->getOperand(1)), llvmberry::Previous),
-                    llvmberry::ConsId::make("K", llvmberry::Ghost),
-                    llvmberry::ConsSize::make(size))));
-
-            // infer z >= a + b^ -> z >= a + K in src
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                  llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
-                  llvmberry::ConsTransitivity::make(
-                          llvmberry::ConsVar::make(oldphi, llvmberry::Physical),  //this can't be constant
-                          llvmberry::ConsInsn::make(               //this shoulbe be value + value
-                                  llvmberry::ConsBinaryOp::make(
-                                          llvmberry::BopOf(BinOp),
-                                          llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                          llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                                          llvmberry::TyValue::make(*(I->getOperand(1)), llvmberry::Previous))),
-
-                          llvmberry::ConsInsn::make(              //this should be value + value
-                                  llvmberry::ConsBinaryOp::make(
-                                          llvmberry::BopOf(BinOp),
-                                          llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                          llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                                          llvmberry::ConsId::make("K", llvmberry::Ghost)))
-                  )));
-
-           } else {
-            std::string reg_block_special = llvmberry::getVariable(*(I->getOperand(0)));
+            } else {
 
               //replace_rhs z >= a^ + b^ -> z >= a^ + b     //a is special b is common
-              hints.addCommand(llvmberry::ConsInfrule::make(
-                      llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+              INFRULE(PHIPOS(SRC, PN, I),
                       llvmberry::ConsReplaceRhs::make(
-                              llvmberry::TyRegister::make(reg_common, llvmberry::Previous), //value
-                              llvmberry::ConsId::make(reg_common, llvmberry::Physical), //value
-                              llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
-                              llvmberry::ConsInsn::make(            //value + value
-                                      llvmberry::ConsBinaryOp::make(
-                                              llvmberry::BopOf(BinOp),
-                                              llvmberry::TyValueType::make(*(BinOp->getOperand(1)->getType())),
-                                              llvmberry::TyValue::make(*(I->getOperand(0)), llvmberry::Previous),
-                                              llvmberry::TyValue::make(*CommonOperand, llvmberry::Previous))),
-                              llvmberry::ConsInsn::make(     //value + value
-                                      llvmberry::ConsBinaryOp::make(
-                                             llvmberry::BopOf(BinOp),
-                                             llvmberry::TyValueType::make(*(BinOp->getOperand(1)->getType())),
-                                             llvmberry::TyValue::make(*(I->getOperand(0)), llvmberry::Previous),
-                                             llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical)))
-
-              )
-              ));
+                              REGISTER(reg_common, Previous), ID(reg_common, Physical), VAR(oldphi, Physical),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous), VAL(CommonOperand, Previous))),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous), VAL(CommonOperand, Physical)))));
 
               // introduce a^ >= k && k >= a^
-              hints.addCommand(llvmberry::ConsInfrule::make( //reg_block_special should be value
-                      llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
-                      llvmberry::ConsIntroEq::make(llvmberry::TyExpr::make(*(I->getOperand(0)), llvmberry::Previous), "K" )));
+              INFRULE(PHIPOS(TGT, PN, I),
+                      llvmberry::ConsIntroEq::make(EXPR(SpecialOperand, Previous), "K" ));
 
               // infer k >= a^ && a^ >= t -> k >= t in tgt
-              hints.addCommand(llvmberry::ConsInfrule::make(
-                      llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
-                      llvmberry::ConsTransitivityTgt::make(
-                              llvmberry::ConsVar::make("K", llvmberry::Ghost),
-                              llvmberry::TyExpr::make(*(I->getOperand(0)), llvmberry::Previous), //value
-                              llvmberry::ConsVar::make(newphi, llvmberry::Physical))));
+              INFRULE(PHIPOS(TGT, PN, I),
+                    llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous), VAR(newphi, Physical)));
 
               // infer k >= t -> k+a >= t+a in tgt
-              hints.addCommand(llvmberry::ConsInfrule::make(
-                      llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()), 
-                      llvmberry::ConsBopBoth::make(
-                              llvmberry::BopOf(BinOp),
-                              llvmberry::Target,
-                              llvmberry::Right,
-                              llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                              llvmberry::ConsId::make("K", llvmberry::Ghost),
-                              llvmberry::ConsId::make(newphi, llvmberry::Physical),
-                              llvmberry::ConsSize::make(size))));
+              INFRULE(PHIPOS(TGT, PN, I),
+                    llvmberry::ConsBopBoth::make(
+                    bop, TGT, llvmberry::Right, VAL(CommonOperand, Physical), ID("K", Ghost), ID(newphi, Physical),
+                    llvmberry::ConsSize::make(size)));
 
-            //infer ^b >= k -> b^ = a >= k + a in src
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                  llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), I->getParent()->getName()),
-                  llvmberry::ConsBopBoth::make(
-                    llvmberry::BopOf(BinOp),
-                    llvmberry::Source,
-                    llvmberry::Right,
-                    llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                    llvmberry::TyValue::make(*(I->getOperand(0)), llvmberry::Physical),
-                    llvmberry::ConsId::make("K", llvmberry::Ghost),
-                    llvmberry::ConsSize::make(size))));
+              //infer ^b >= k -> b^ = a >= k + a in src
+              INFRULE(PHIPOS(SRC, PN, I),
+                    llvmberry::ConsBopBoth::make(
+                    bop, SRC, llvmberry::Right, VAL(CommonOperand, Physical), VAL(SpecialOperand, Physical), ID("K", Ghost),
+                    llvmberry::ConsSize::make(size)));
 
               // infer z = a^ + b -> z >= K + b in src
-              hints.addCommand(llvmberry::ConsInfrule::make(
-              llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), I->getParent()->getName()),
+              INFRULE(PHIPOS(SRC, PN, I),
                       llvmberry::ConsTransitivity::make(
-                              llvmberry::ConsVar::make(oldphi, llvmberry::Physical),  //this can't be constant
-                              llvmberry::ConsInsn::make(               //this shoulbe be value + value
-                                      llvmberry::ConsBinaryOp::make(
-                                              llvmberry::BopOf(BinOp),
-                                              llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                              llvmberry::TyValue::make(*(I->getOperand(0)), llvmberry::Previous),
-                                              llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical))),
-
-                              llvmberry::ConsInsn::make(              //this should be value + value
-                                      llvmberry::ConsBinaryOp::make(
-                                              llvmberry::BopOf(BinOp),
-                                              llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                              llvmberry::ConsId::make("K", llvmberry::Ghost),
-                                              llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical)))
-                      )));
+                              VAR(oldphi, Physical),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous), VAL(CommonOperand, Physical))),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Physical)))));
 
            }
           } else if(dyn_cast<CmpInst>(I)) {
@@ -358,120 +276,49 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
         Value *CommonOperand = nullptr;
         if(NewLHS) CommonOperand = I->getOperand(1);
         else CommonOperand = I->getOperand(0);
-        std::string reg_common = llvmberry::getVariable(*CommonOperand);
 
 
         if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
+          llvmberry::TyBop bop = llvmberry::BopOf(BinOp);
           if(NewRHS) {
             // { z >= a + K } at src after phinode
-            hints.addCommand(llvmberry::ConsPropagate::make(
-                  llvmberry::ConsLessdef::make(
-                      llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
-                      llvmberry::ConsInsn::make(
-                        llvmberry::ConsBinaryOp::make(
-                          llvmberry::BopOf(BinOp),
-                          llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                          llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical), //this should be value
-                          llvmberry::ConsId::make("K", llvmberry::Ghost))),
-                      llvmberry::Source),
-                  llvmberry::ConsBounds::make(
-                      llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), ""),
-                      llvmberry::TyPosition::make(llvmberry::Source, *InsertPos))));
+            PROPAGATE(LESSDEF(VAR(oldphi, Physical),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost))),
+                              SRC),
+                  BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
             // { a + K >= a + t } at tgt after phinode
-            hints.addCommand(llvmberry::ConsPropagate::make(
-                  llvmberry::ConsLessdef::make(
-                      llvmberry::ConsInsn::make(
-                        llvmberry::ConsBinaryOp::make(
-                          llvmberry::BopOf(BinOp),
-                          llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                          llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                          llvmberry::ConsId::make("K", llvmberry::Ghost))),
-                      llvmberry::ConsInsn::make(
-                        llvmberry::ConsBinaryOp::make(
-                          llvmberry::BopOf(BinOp),
-                          llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                          llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical), //this should be value
-                          llvmberry::ConsId::make(newphi, llvmberry::Physical))),
-                      llvmberry::Target),
-                  llvmberry::ConsBounds::make(
-                      llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), ""),
-                      llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
+            PROPAGATE(LESSDEF(INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost))),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID(newphi, Physical))),
+                              TGT),
+                  BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
 
             // infer a+K >= a+t >= z in tgt
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                    llvmberry::TyPosition::make(llvmberry::Target, *InsertPos),
+            INFRULE(INSTPOS(TGT, InsertPos),
                     llvmberry::ConsTransitivityTgt::make(
-                            llvmberry::ConsInsn::make(
-                                    llvmberry::ConsBinaryOp::make(
-                                            llvmberry::BopOf(BinOp),
-                                            llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                            llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                                            llvmberry::ConsId::make("K", llvmberry::Ghost))),
-                            llvmberry::ConsInsn::make(
-                                    llvmberry::ConsBinaryOp::make(
-                                            llvmberry::BopOf(BinOp),
-                                            llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                            llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical),
-                                            llvmberry::ConsId::make(newphi, llvmberry::Physical))),
-                            llvmberry::ConsVar::make(oldphi, llvmberry::Physical)
-                    )));
-
+                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost))),
+                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID(newphi, Physical))),
+                            VAR(oldphi, Physical)));
 
           } else {
             // { z^ >= K + b } at src after phinode
-            hints.addCommand(llvmberry::ConsPropagate::make(
-                 llvmberry::ConsLessdef::make(
-                     llvmberry::ConsVar::make(oldphi, llvmberry::Physical),
-                     llvmberry::ConsInsn::make(
-                       llvmberry::ConsBinaryOp::make(
-                         llvmberry::BopOf(BinOp),
-                         llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                         llvmberry::ConsId::make("K", llvmberry::Ghost),
-                         llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical))),  //this should be value
-                     llvmberry::Target),
-                 llvmberry::ConsBounds::make(
-                     llvmberry::TyPosition::make(llvmberry::Source, PN.getParent()->getName(), ""),
-                     llvmberry::TyPosition::make(llvmberry::Source, *InsertPos))));
+            PROPAGATE(LESSDEF(VAR(oldphi, Physical),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Physical))),
+                              TGT),
+                 BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
              // { K + a >= t + a } at tgt after phinode
-            hints.addCommand(llvmberry::ConsPropagate::make(
-                  llvmberry::ConsLessdef::make(
-                      llvmberry::ConsInsn::make(
-                        llvmberry::ConsBinaryOp::make(
-                          llvmberry::BopOf(BinOp),
-                          llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                          llvmberry::ConsId::make("K", llvmberry::Ghost),
-                          llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical))),
-                      llvmberry::ConsInsn::make(
-                        llvmberry::ConsBinaryOp::make(
-                          llvmberry::BopOf(BinOp),
-                          llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                          llvmberry::ConsId::make(newphi, llvmberry::Physical), //this should be value
-                          llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical))),
-                      llvmberry::Target),
-                  llvmberry::ConsBounds::make(
-                      llvmberry::TyPosition::make(llvmberry::Target, PN.getParent()->getName(), ""),
-                      llvmberry::TyPosition::make(llvmberry::Target, *InsertPos))));
+            PROPAGATE(LESSDEF(INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Physical))),
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), ID(newphi, Physical), VAL(CommonOperand, Physical))),
+                              TGT),
+                  BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
         
             // infer K+a >= t+a >= z  in tgt
-            hints.addCommand(llvmberry::ConsInfrule::make(
-                    llvmberry::TyPosition::make(llvmberry::Target, *InsertPos),
+            INFRULE(INSTPOS(TGT, InsertPos),
                     llvmberry::ConsTransitivityTgt::make(
-                            llvmberry::ConsInsn::make(
-                                    llvmberry::ConsBinaryOp::make(
-                                            llvmberry::BopOf(BinOp),
-                                            llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                            llvmberry::ConsId::make("K", llvmberry::Physical),
-                                            llvmberry::TyValue::make(*CommonOperand, llvmberry::Ghost))),
-                            llvmberry::ConsInsn::make(
-                                    llvmberry::ConsBinaryOp::make(
-                                            llvmberry::BopOf(BinOp),
-                                            llvmberry::TyValueType::make(*(BinOp->getOperand(0)->getType())),
-                                            llvmberry::ConsId::make(newphi, llvmberry::Physical),
-                                            llvmberry::TyValue::make(*CommonOperand, llvmberry::Physical))),
-                            llvmberry::ConsVar::make(oldphi, llvmberry::Physical)
-                    )));
+                            INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Ghost))),
+                            INSN(BINOP(bop, TYPEOF(CommonOperand), ID(newphi, Physical), VAL(CommonOperand, Physical))),
+                            VAR(oldphi, Physical)));
            }
         }  else if(dyn_cast<CmpInst>(I)) {
           // TODO. hint for when folding cmp instructions
