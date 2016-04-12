@@ -482,6 +482,38 @@ private:
   std::unique_ptr<TyAddAssociative> add_associative;
 };
 
+struct TyUdivZext{
+public : 
+  TyUdivZext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyRegister> k;
+  std::unique_ptr<TyValue> a;
+  std::unique_ptr<TyValue> b;
+  std::unique_ptr<TySize> sz1;
+  std::unique_ptr<TySize> sz2;
+};
+
+struct TyUremZext{
+public : 
+  TyUremZext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyRegister> k;
+  std::unique_ptr<TyValue> a;
+  std::unique_ptr<TyValue> b;
+  std::unique_ptr<TySize> sz1;
+  std::unique_ptr<TySize> sz2;
+};
+
 struct ConsAddConstNot : public TyInfrule{
 public : 
   ConsAddConstNot(std::unique_ptr<TyAddConstNot> _add_const_not);
@@ -844,6 +876,27 @@ public:
 private:
   std::unique_ptr<TyReplaceRhs> replace_rhs;
 };
+
+struct ConsUdivZext : public TyInfrule{
+public : 
+  ConsUdivZext(std::unique_ptr<TyUdivZext> _udiv_zext);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyUdivZext> udiv_zext;
+};
+
+struct ConsUremZext : public TyInfrule{
+public : 
+  ConsUremZext(std::unique_ptr<TyUremZext> _urem_zext);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyUremZext> urem_zext;
+};
+
 
 } // llvmberry
 

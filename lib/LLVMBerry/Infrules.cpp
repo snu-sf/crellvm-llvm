@@ -901,4 +901,60 @@ std::unique_ptr<TyInfrule> ConsReplaceRhs::make(std::unique_ptr<TyRegister> _x,
   return std::unique_ptr<TyInfrule>(
       new ConsReplaceRhs(std::move(_replace_rhs)));
 }
+
+TyUdivZext::TyUdivZext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), k(std::move(_k)), a(std::move(_a)), b(std::move(_b)), sz1(std::move(_sz1)), sz2(std::move(_sz2)){
+}
+void TyUdivZext::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(k));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(sz1));
+  archive(CEREAL_NVP(sz2));
+}
+
+ConsUdivZext::ConsUdivZext(std::unique_ptr<TyUdivZext> _udiv_zext) : udiv_zext(std::move(_udiv_zext)){
+}
+std::unique_ptr<TyInfrule> ConsUdivZext::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2){
+  std::unique_ptr<TyUdivZext> _val(new TyUdivZext(std::move(_z), std::move(_x), std::move(_y), std::move(_k), std::move(_a), std::move(_b), std::move(_sz1), std::move(_sz2)));
+  return std::unique_ptr<TyInfrule>(new ConsUdivZext(std::move(_val)));
+}
+void ConsUdivZext::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("UdivZext");
+  archive(CEREAL_NVP(udiv_zext));
+}
+
+TyUremZext::TyUremZext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), k(std::move(_k)), a(std::move(_a)), b(std::move(_b)), sz1(std::move(_sz1)), sz2(std::move(_sz2)){
+}
+void TyUremZext::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(k));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(sz1));
+  archive(CEREAL_NVP(sz2));
+}
+
+ConsUremZext::ConsUremZext(std::unique_ptr<TyUremZext> _urem_zext) : urem_zext(std::move(_urem_zext)){
+}
+std::unique_ptr<TyInfrule> ConsUremZext::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2){
+  std::unique_ptr<TyUremZext> _val(new TyUremZext(std::move(_z), std::move(_x), std::move(_y), std::move(_k), std::move(_a), std::move(_b), std::move(_sz1), std::move(_sz2)));
+  return std::unique_ptr<TyInfrule>(new ConsUremZext(std::move(_val)));
+}
+void ConsUremZext::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("UremZext");
+  archive(CEREAL_NVP(urem_zext));
+}
+
+
+
+
 }

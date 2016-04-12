@@ -284,7 +284,9 @@ public:
 };
 
 enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl, BopLshr, BopAshr,
-        BopAnd, BopOr, BopXor, BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
+        BopAnd, BopOr, BopXor,  };
+
+enum TyFbop { FbopAdd, FbopSub, FbopMul, FbopDiv, FbopFrem };
 
 struct TyBinaryOperator{
 public : 
@@ -294,6 +296,19 @@ public :
 
 private : 
   TyBop opcode;
+  std::unique_ptr<TyValueType> operandtype;
+  std::unique_ptr<TyValue> operand1;
+  std::unique_ptr<TyValue> operand2;
+};
+
+struct TyFloatBinaryOperator{
+public : 
+  TyFloatBinaryOperator(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::unique_ptr<TyBinaryOperator> make(const llvm::BinaryOperator &bop);
+
+private : 
+  TyFbop opcode;
   std::unique_ptr<TyValueType> operandtype;
   std::unique_ptr<TyValue> operand1;
   std::unique_ptr<TyValue> operand2;
@@ -321,6 +336,17 @@ public :
 
 private : 
   std::unique_ptr<TyBinaryOperator> binary_operator;
+};
+
+struct ConsFloatBinaryOp : public TyInstruction{
+public : 
+  ConsFloatBinaryOp(std::unique_ptr<TyFloatBinaryOperator> _binary_operator);
+  static std::unique_ptr<TyInstruction> make(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
+  static std::unique_ptr<TyInstruction> make(const llvm::BinaryOperator &bop);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyFloatBinaryOperator> binary_operator;
 };
 
 struct ConsLoadInst : public TyInstruction{
