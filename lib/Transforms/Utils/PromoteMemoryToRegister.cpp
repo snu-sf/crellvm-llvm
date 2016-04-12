@@ -785,7 +785,6 @@ void PromoteMem2Reg::run() {
       // Remove the alloca from the Allocas list, since it has been processed
       RemoveFromAllocasList(AllocaNum);
       ++NumDeadAlloca;
-
       continue;
     }
 
@@ -812,7 +811,6 @@ void PromoteMem2Reg::run() {
         // The alloca has been processed, move on.
         RemoveFromAllocasList(AllocaNum);
         ++NumSingleStore;
-
         continue;
       }
     }
@@ -1020,6 +1018,7 @@ void PromoteMem2Reg::run() {
         SomePHI->addIncoming(UndefVal, Preds[pred]);
     }
   }
+
   NewPhiNodes.clear();
 }
 
