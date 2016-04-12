@@ -347,6 +347,75 @@ void ConsAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(add_zext_bool));
 }
 
+TyAndDeMorgan::TyAndDeMorgan(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), zprime(std::move(_zprime)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
+}
+void TyAndDeMorgan::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(zprime));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAndDeMorgan::ConsAndDeMorgan(std::unique_ptr<TyAndDeMorgan> _and_de_morgan) : and_de_morgan(std::move(_and_de_morgan)){
+}
+std::unique_ptr<TyInfrule> ConsAndDeMorgan::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz){
+  std::unique_ptr<TyAndDeMorgan> _val(new TyAndDeMorgan(std::move(_z), std::move(_x), std::move(_y), std::move(_zprime), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::unique_ptr<TyInfrule>(new ConsAndDeMorgan(std::move(_val)));
+}
+void ConsAndDeMorgan::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndDeMorgan");
+  archive(CEREAL_NVP(and_de_morgan));
+}
+
+TySdivMone::TySdivMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
+}
+void TySdivMone::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsSdivMone::ConsSdivMone(std::unique_ptr<TySdivMone> _div_mone) : div_mone(std::move(_div_mone)){
+}
+std::unique_ptr<TyInfrule> ConsSdivMone::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz){
+  std::unique_ptr<TySdivMone> _val(new TySdivMone(std::move(_z), std::move(_x), std::move(_sz)));
+  return std::unique_ptr<TyInfrule>(new ConsSdivMone(std::move(_val)));
+}
+void ConsSdivMone::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SdivMone");
+  archive(CEREAL_NVP(div_mone));
+}
+
+TyRemNeg::TyRemNeg(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _my, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), my(std::move(_my)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+}
+void TyRemNeg::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(my));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsRemNeg::ConsRemNeg(std::unique_ptr<TyRemNeg> _rem_neg) : rem_neg(std::move(_rem_neg)){
+}
+std::unique_ptr<TyInfrule> ConsRemNeg::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _my, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
+  std::unique_ptr<TyRemNeg> _val(new TyRemNeg(std::move(_z), std::move(_my), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::unique_ptr<TyInfrule>(new ConsRemNeg(std::move(_val)));
+}
+void ConsRemNeg::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("RemNeg");
+  archive(CEREAL_NVP(rem_neg));
+}
+
 ConsSdivSubSrem::ConsSdivSubSrem(std::unique_ptr<TySdivSubSrem> _div_sub_srem) : div_sub_srem(std::move(_div_sub_srem)){
 }
 std::unique_ptr<TyInfrule> ConsSdivSubSrem::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){

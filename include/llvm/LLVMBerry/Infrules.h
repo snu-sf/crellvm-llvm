@@ -181,6 +181,32 @@ private :
   std::unique_ptr<TySize> sz;
 };
 
+struct TyAndDeMorgan{
+public : 
+  TyAndDeMorgan(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyRegister> y;
+  std::unique_ptr<TyRegister> zprime;
+  std::unique_ptr<TyValue> a;
+  std::unique_ptr<TyValue> b;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TySdivMone{
+public : 
+  TySdivMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TySize> sz;
+};
+
 struct TySdivSubSrem{
 public : 
   TySdivSubSrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
@@ -271,6 +297,19 @@ public:
 private:
   std::unique_ptr<TyRegister> z;
   std::unique_ptr<TyValue> mx;
+  std::unique_ptr<TyValue> my;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TyRemNeg{
+public : 
+  TyRemNeg(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _my, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
   std::unique_ptr<TyValue> my;
   std::unique_ptr<TyValue> x;
   std::unique_ptr<TyValue> y;
@@ -568,6 +607,16 @@ private:
   std::unique_ptr<TyAddShift> add_shift;
 };
 
+struct ConsAndDeMorgan : public TyInfrule{
+public : 
+  ConsAndDeMorgan(std::unique_ptr<TyAndDeMorgan> _and_de_morgan);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyAndDeMorgan> and_de_morgan;
+};
+
 struct ConsMulBool : TyInfrule {
 public:
   ConsMulBool(std::unique_ptr<TyMulBool> _mul_bool);
@@ -654,6 +703,16 @@ private :
   std::unique_ptr<TyAddZextBool> add_zext_bool;
 };
 
+struct ConsSdivMone : public TyInfrule{
+public : 
+  ConsSdivMone(std::unique_ptr<TySdivMone> _div_mone);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TySdivMone> div_mone;
+};
+
 struct ConsMulShl : public TyInfrule{
 public : 
   ConsMulShl(std::unique_ptr<TyMulShl> _mul_shl);
@@ -662,6 +721,16 @@ public :
 
 private : 
   std::unique_ptr<TyMulShl> mul_shl;
+};
+
+struct ConsRemNeg : public TyInfrule{
+public : 
+  ConsRemNeg(std::unique_ptr<TyRemNeg> _rem_neg);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _my, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRemNeg> rem_neg;
 };
 
 struct ConsSubAdd : TyInfrule {
