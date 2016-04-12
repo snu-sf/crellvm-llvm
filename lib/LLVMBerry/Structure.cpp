@@ -6,7 +6,6 @@
 #include <cereal/types/vector.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
-#include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
@@ -411,6 +410,22 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
   });
 }
 
+std::unique_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si) {
+  llvm::Value* Val = si->getOperand(0);
+
+  if (llvm::ConstantInt* C = llvm::dyn_cast<llvm::ConstantInt>(Val)) {
+    int storeval = C->getSExtValue();
+    int bitwidth = C->getBitWidth();
+
+    return std::unique_ptr<llvmberry::TyExpr>
+              (new ConsConst(storeval, bitwidth));
+  } else {
+    std::string reg_stored = getVariable(*Val);
+
+    return ConsVar::make(reg_stored, Physical);
+  }
+}
+
 /* position */
 
 TyPositionPhinode::TyPositionPhinode(std::string _prev_block_name)
@@ -722,28 +737,28 @@ std::unique_ptr<TyValueType> TyValueType::make(const llvm::Type &type){
   }else if(type.isX86_FP80Ty()){
     vt = new ConsFloatValueType(X86_FP80Type);
   }else{
-    assert("TyValueType::make(const llvmType &) : unknown vlaue type" && false);
+    assert("TyValueType::make(const llvmType &) : unknown value type" && false);
     vt = nullptr;
   }
-  return std::unique_ptr<TyValueType>(vt);
-}
+    return std::unique_ptr<TyValueType>(vt);
+  }
 
-ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
-}
-void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("IntValueType");
-  archive(CEREAL_NVP(int_type));
-}
+  ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
+  }
+  void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
+    archive.makeArray();
+    archive.writeName();
+    archive.saveValue("IntValueType");
+    archive(CEREAL_NVP(int_type));
+  }
 
-ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
-}
-void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("FloatValueType");
-  archive(cereal::make_nvp("float_type", toString(float_type)));
+  ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
+  }
+  void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
+    archive.makeArray();
+    archive.writeName();
+    archive.saveValue("FloatValueType");
+    archive(cereal::make_nvp("float_type", toString(float_type)));
 }
 
 ConsNamedType::ConsNamedType(std::string _s) : s(std::move(_s)){
@@ -761,19 +776,25 @@ void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
   archive.writeName();
   archive.saveValue("PtrType");
+
+  archive.startNode();
+  archive.makeArray();
   archive(cereal::make_nvp("address_space", address_space));
   archive(CEREAL_NVP(valuetype));
+  archive.finishNode();
 }
 
 
 // instruction
 
 std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i){
-  if(const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)){
+  if (const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)) {
     return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(TyBinaryOperator::make(*bo))));
-  }else if(const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)){
+  } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
     return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
-  }else{
+  } else if (const llvm::StoreInst *si = llvm::dyn_cast<llvm::StoreInst>(&i)) {
+    return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*si))));
+  } else {
     assert("TyInstruction::make : unsupporting instruction type" && false);
     return std::unique_ptr<TyInstruction>(nullptr);
   }
@@ -826,12 +847,20 @@ std::unique_ptr<TyBinaryOperator> TyBinaryOperator::make(const llvm::BinaryOpera
         TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
 }
 
-std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li){
+std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
   return std::unique_ptr<TyLoadInst>(new TyLoadInst(
         TyValueType::make(*li.getPointerOperand()->getType()),
         TyValueType::make(*li.getType()),
         TyValue::make(*li.getPointerOperand()),
         li.getAlignment()));
+}
+
+std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
+  return std::unique_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*si.getOperand(1)->getType()),
+        TyValueType::make(*si.getOperand(0)->getType()),
+        TyValue::make(*si.getOperand(1)),
+        si.getAlignment()));
 }
 
 ConsBinaryOp::ConsBinaryOp(std::unique_ptr<TyBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
@@ -997,6 +1026,16 @@ void TyPropagateNoalias::serialize(cereal::JSONOutputArchive &archive) const {
           cereal::make_nvp("scope", toString(scope)));
 }
 
+TyPropagateAlloca::TyPropagateAlloca(std::unique_ptr<TyRegister> _p, 
+                                     enum TyScope _scope) 
+    : p(std::move(_p)), scope(std::move(_scope)) {
+}
+
+void TyPropagateAlloca::serialize(cereal::JSONOutputArchive& archive) const {
+  archive(CEREAL_NVP(p));
+  archive(cereal::make_nvp("scope", toString(scope)));
+}
+
 ConsLessdef::ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef)
     : propagate_lessdef(std::move(_propagate_lessdef)) {}
 
@@ -1032,6 +1071,24 @@ void ConsNoalias::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Noalias");
   archive(CEREAL_NVP(propagate_noalias));
+}
+
+ConsAlloca::ConsAlloca(std::unique_ptr<TyPropagateAlloca> _propagate_alloca) 
+    : propagate_alloca(std::move(_propagate_alloca)) {}
+
+std::unique_ptr<TyPropagateObject> ConsAlloca::make(std::unique_ptr<TyRegister> _p, 
+                                                    enum TyScope _scope) {
+  std::unique_ptr<TyPropagateAlloca> _val
+                    (new TyPropagateAlloca(std::move(_p), _scope));
+
+  return std::unique_ptr<TyPropagateObject>(new ConsAlloca(std::move(_val)));
+}
+
+void ConsAlloca::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("Alloca");
+  archive(CEREAL_NVP(propagate_alloca));
 }
 
 ConsMaydiff::ConsMaydiff(std::unique_ptr<TyRegister> _register_name)

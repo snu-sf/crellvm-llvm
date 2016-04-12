@@ -452,10 +452,25 @@ private:
   std::unique_ptr<TyExpr> e3;
 };
 
+struct TyTransitivityTgt {
+public:
+  TyTransitivityTgt(std::unique_ptr<TyExpr> _e1,
+                    std::unique_ptr<TyExpr> _e2,
+                    std::unique_ptr<TyExpr> _e3);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::unique_ptr<TyExpr> e1;
+  std::unique_ptr<TyExpr> e2;
+  std::unique_ptr<TyExpr> e3;
+};
+
 struct TyReplaceRhs {
 public:
-  TyReplaceRhs(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyValue> _y,
-               std::unique_ptr<TyExpr> _e1, std::unique_ptr<TyExpr> _e2,
+  TyReplaceRhs(std::unique_ptr<TyRegister> _x,
+               std::unique_ptr<TyValue> _y,
+               std::unique_ptr<TyExpr> _e1,
+               std::unique_ptr<TyExpr> _e2,
                std::unique_ptr<TyExpr> _e2_p);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
@@ -465,6 +480,16 @@ private:
   std::unique_ptr<TyExpr> e1;
   std::unique_ptr<TyExpr> e2;
   std::unique_ptr<TyExpr> e2_p;
+};
+
+struct TyIntroGhost{
+public :
+  TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyRegister> g;
 };
 
 struct ConsAddAssociative : TyInfrule {
@@ -862,6 +887,19 @@ private:
   std::unique_ptr<TyTransitivity> transitivity;
 };
 
+struct ConsTransitivityTgt : TyInfrule {
+public:
+  ConsTransitivityTgt(std::unique_ptr<TyTransitivityTgt> _transitivity_tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyExpr> _e1,
+                                         std::unique_ptr<TyExpr> _e2,
+                                         std::unique_ptr<TyExpr> _e3);
+
+private:
+  std::unique_ptr<TyTransitivityTgt> transitivity_tgt;
+};
+
 struct ConsReplaceRhs : TyInfrule {
 public:
   ConsReplaceRhs(std::unique_ptr<TyReplaceRhs> _replace_rhs);
@@ -898,6 +936,15 @@ private :
 };
 
 
+struct ConsIntroGhost : public TyInfrule{
+public :
+  ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyIntroGhost> intro_ghost;
+};
 } // llvmberry
 
 #endif
