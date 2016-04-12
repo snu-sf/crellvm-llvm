@@ -470,8 +470,8 @@ std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
       new TyPosition(_scope, _block_name, std::move(_phi)));
 }
 
-std::unique_ptr<TyPosition> TyPosition::make_start_of_block(enum TyScope _scope,
-                                             std::string _block_name) {
+std::unique_ptr<TyPosition>
+TyPosition::make_start_of_block(enum TyScope _scope, std::string _block_name) {
   return TyPosition::make(_scope, _block_name, "");
 }
 

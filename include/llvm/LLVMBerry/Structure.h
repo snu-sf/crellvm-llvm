@@ -90,8 +90,8 @@ public:
                                           const llvm::Instruction &I);
   static std::unique_ptr<TyPosition>
   make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB);
-  static std::unique_ptr<TyPosition> make_start_of_block(enum TyScope _scope,
-                                          std::string _block_name);
+  static std::unique_ptr<TyPosition>
+  make_start_of_block(enum TyScope _scope, std::string _block_name);
   static std::unique_ptr<TyPosition> make(enum TyScope _scope,
                                           std::string _block_name,
                                           std::string _prev_block_name);

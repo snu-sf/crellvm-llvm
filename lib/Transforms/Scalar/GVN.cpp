@@ -2357,7 +2357,7 @@ bool GVN::processInstruction(Instruction *I) {
       for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
         if (!isa<Instruction>(UI->getUser())) {
           // let the validation fail when the user is not an instruction
-          return;
+          assert(false && "User is not an instruction");
         }
         std::string user = llvmberry::getVariable(*UI->getUser());
         Instruction *user_I = dyn_cast<Instruction>(UI->getUser());
@@ -2481,7 +2481,7 @@ bool GVN::processInstruction(Instruction *I) {
         for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
           if (!isa<Instruction>(UI->getUser())) {
             // let the validation fail when the user is not an instruction
-            return;
+            assert(false && "User is not an instruction");
           }
 
           std::string user = llvmberry::getVariable(*UI->getUser());
@@ -2530,7 +2530,8 @@ bool GVN::processInstruction(Instruction *I) {
           }
         }
       } else if (SwitchInst *SI = llvm::dyn_cast<llvm::SwitchInst>(TI)) {
-        assert(false && "Cannot validate, as it is not formalized in vellvm yet.");
+        assert(false &&
+               "Cannot validate, as it is not formalized in vellvm yet.");
       } else
         assert(false && "Should not occur");
     }
