@@ -137,6 +137,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     }
   }
 
+  if(NewLHS || NewRHS) {
   llvmberry::ValidationUnit::GetInstance()->intrude(
           //PN z = (x, y) NewLHs = null, NewRHs t = (b, c) NewRHS position is ahead PN
       [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
@@ -325,6 +326,15 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
         }
 
       });
+  } else {
+    // intrude for x = a + b, y = a + b, z = phi(x, y) -> z = a + b.
+    // b is not constant.
+   llvmberry::ValidationUnit::GetInstance()->intrude(
+          //PN z = (x, y) NewLHs = null, NewRHs t = (b, c) NewRHS position is ahead PN
+      [&PN](llvmberry::ValidationUnit::Dictionary &data,
+         llvmberry::CoreHint &hints) {
+      });
+  }
  
   if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
     CmpInst *NewCI = CmpInst::Create(CIOp->getOpcode(), CIOp->getPredicate(),
