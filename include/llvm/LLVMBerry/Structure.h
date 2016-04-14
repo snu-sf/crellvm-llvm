@@ -461,6 +461,17 @@ private :
   enum TyScope scope;
 };
 
+struct TyPropagatePrivate {
+public :
+  TyPropagatePrivate(std::unique_ptr<TyRegister> _p, 
+                     enum TyScope _scope);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyRegister> p;
+  enum TyScope scope;
+};
+
 struct TyPropagateObject {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
@@ -493,9 +504,10 @@ private:
 struct ConsAlloca : public TyPropagateObject {
 public :
   ConsAlloca(std::unique_ptr<TyPropagateAlloca> _propagate_alloca);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
   static std::unique_ptr<TyPropagateObject> make(std::unique_ptr<TyRegister> _p, 
                                                  enum TyScope _scope);
-  void serialize(cereal::JSONOutputArchive& archive) const;
 
 private :
   std::unique_ptr<TyPropagateAlloca> propagate_alloca;
@@ -512,6 +524,18 @@ public:
 
 private:
   std::unique_ptr<TyRegister> register_name;
+};
+
+struct ConsPrivate : public TyPropagateObject {
+public :
+  ConsPrivate(std::unique_ptr<TyPropagatePrivate> _propagate_private);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+  static std::unique_ptr<TyPropagateObject> make(std::unique_ptr<TyRegister> _p, 
+                                                 enum TyScope _scope);
+
+private :
+  std::unique_ptr<TyPropagatePrivate> propagate_private;
 };
 
 // propagate range
