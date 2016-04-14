@@ -16,6 +16,11 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/PatternMatch.h"
+
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Infrules.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -142,6 +147,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
   if (!isa<BinaryOperator>(TI))
     return nullptr;
 
+  llvmberry::ValidationUnit::Begin("select_bop_fold", SI.getParent()->getParent());
   // Figure out if the operations have any operands in common.
   Value *MatchOp, *OtherOpT, *OtherOpF;
   bool MatchIsOpZero;
@@ -150,24 +156,52 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(1);
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints){
+      data["case"] = std::string("XY/XZ");
+    });
   } else if (TI->getOperand(1) == FI->getOperand(1)) {
     MatchOp  = TI->getOperand(1);
     OtherOpT = TI->getOperand(0);
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = false;
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints){
+      data["case"] = std::string("YX/ZX");
+    });
   } else if (!TI->isCommutative()) {
+    llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::
+                ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::End();
+
     return nullptr;
   } else if (TI->getOperand(0) == FI->getOperand(1)) {
     MatchOp  = TI->getOperand(0);
     OtherOpT = TI->getOperand(1);
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = true;
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints){
+      data["case"] = std::string("XY/ZX");
+    });
   } else if (TI->getOperand(1) == FI->getOperand(0)) {
     MatchOp  = TI->getOperand(1);
     OtherOpT = TI->getOperand(0);
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints){
+      data["case"] = std::string("YX/XZ");
+    });
   } else {
+    llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::
+                ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::End();
+
     return nullptr;
   }
 
@@ -175,6 +209,141 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
   Value *NewSI = Builder->CreateSelect(SI.getCondition(), OtherOpT,
                                        OtherOpF, SI.getName()+".v");
 
+  llvmberry::ValidationUnit::GetInstance()->intrude([&SI, &TI, &FI, &MatchOp, 
+        &NewSI, &OtherOpT, &OtherOpF](
+      llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    assert(data.find("case") != data.end());
+    std::string case_string = boost::any_cast<std::string>(data["case"]);
+    // case == "XY/XZ" : 
+    //        <src>          |         <tgt>
+    // R  = X bop Y          | R = X bop Y
+    // S  = X bop Z          | S = X bop Z
+    //  <nop>                | T' = select C ? Y : Z
+    // T0 = select C ? R : S | T0 = X bop T'
+    //   or,
+    // case == "YX/ZX" : 
+    //        <src>          |         <tgt>
+    // R  = Y bop X          | R = Y bop X
+    // S  = Z bop X          | S = Z bop X
+    //  <nop>                | T' = select C ? Y : Z
+    // T0 = select C ? R : S | T0 = T' bop X
+    //   or,
+    // case == "XY/ZX" : 
+    //        <src>          |         <tgt>
+    // R  = X bop Y          | R = X bop Y
+    // S  = Z bop X          | S = Z bop X
+    //  <nop>                | T' = select C ? Y : Z
+    // T0 = select C ? R : S | T0 = X bop T'
+    //   or,
+    // case == "YX/XZ" : 
+    //        <src>          |         <tgt>
+    // R  = Y bop X          | R = Y bop X
+    // S  = X bop Z          | S = X bop Z
+    //  <nop>                | T' = select C ? Y : Z
+    // T0 = select C ? R : S | T0 = X bop T'
+
+    SelectInst *T0 = &SI;
+    BinaryOperator *R = dyn_cast<BinaryOperator>(TI);
+    BinaryOperator *S = dyn_cast<BinaryOperator>(FI);
+    SelectInst *Tprime = dyn_cast<SelectInst>(NewSI);
+    assert(R);
+    assert(S);
+    assert(Tprime);
+    Value *X = MatchOp;
+    Value *Y = OtherOpT;
+    Value *Z = OtherOpF;
+    Value *C = SI.getCondition();
+    Instruction::BinaryOps bop = R->getOpcode();
+
+    std::string reg_r_name = llvmberry::getVariable(*R);
+    std::string reg_s_name = llvmberry::getVariable(*S);
+    std::string reg_tprime_name = llvmberry::getVariable(*Tprime);
+    std::string reg_t0_name = llvmberry::getVariable(*T0);
+    
+    llvmberry::insertSrcNopAtTgtI(hints, Tprime);
+    hints.addCommand(llvmberry::ConsPropagate::make(
+          llvmberry::ConsMaydiff::make(reg_tprime_name, llvmberry::Physical),
+          llvmberry::ConsGlobal::make()));
+
+    llvmberry::propagateLessdef(R, T0, llvmberry::Target);
+    llvmberry::propagateLessdef(S, T0, llvmberry::Target);
+    llvmberry::propagateLessdef(Tprime, T0, llvmberry::Target);
+    
+    if(case_string == "XY/ZX"){
+      llvmberry::applyCommutativity(T0, S, llvmberry::Target);
+    }else if(case_string == "YX/XZ"){
+      llvmberry::applyCommutativity(T0, R, llvmberry::Target);
+    }
+
+    if(case_string == "YX/ZX"){
+      if(llvmberry::isFloatOpcode(bop)){
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Target, *T0),
+            llvmberry::ConsFbopDistributiveOverSelectinst2::make(
+                llvmberry::getFbop(bop),
+                llvmberry::TyRegister::make(reg_r_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_s_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_tprime_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_t0_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*X),
+                llvmberry::TyValue::make(*Y),
+                llvmberry::TyValue::make(*Z),
+                llvmberry::TyValue::make(*C),
+                llvmberry::getFloatType(R->getType()),
+                llvmberry::TyValueType::make(*C->getType()))));
+      }else{
+         hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Target, *T0),
+            llvmberry::ConsBopDistributiveOverSelectinst2::make(
+                llvmberry::getBop(bop),
+                llvmberry::TyRegister::make(reg_r_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_s_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_tprime_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_t0_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*X),
+                llvmberry::TyValue::make(*Y),
+                llvmberry::TyValue::make(*Z),
+                llvmberry::TyValue::make(*C),
+                llvmberry::ConsSize::make(R->getType()->getIntegerBitWidth()),
+                llvmberry::TyValueType::make(*C->getType()))));
+      }
+    }else{
+      if(llvmberry::isFloatOpcode(bop)){
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Target, *T0),
+            llvmberry::ConsFbopDistributiveOverSelectinst::make(
+                llvmberry::getFbop(bop),
+                llvmberry::TyRegister::make(reg_r_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_s_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_tprime_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_t0_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*X),
+                llvmberry::TyValue::make(*Y),
+                llvmberry::TyValue::make(*Z),
+                llvmberry::TyValue::make(*C),
+                llvmberry::getFloatType(R->getType()),
+                llvmberry::TyValueType::make(*C->getType()))));
+      }else{
+         hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Target, *T0),
+            llvmberry::ConsBopDistributiveOverSelectinst::make(
+                llvmberry::getBop(bop),
+                llvmberry::TyRegister::make(reg_r_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_s_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_tprime_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_t0_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*X),
+                llvmberry::TyValue::make(*Y),
+                llvmberry::TyValue::make(*Z),
+                llvmberry::TyValue::make(*C),
+                llvmberry::ConsSize::make(R->getType()->getIntegerBitWidth()),
+                llvmberry::TyValueType::make(*C->getType()))));
+      }
+    }
+  });
+
+ 
   if (BinaryOperator *BO = dyn_cast<BinaryOperator>(TI)) {
     if (MatchIsOpZero)
       return BinaryOperator::Create(BO->getOpcode(), MatchOp, NewSI);
