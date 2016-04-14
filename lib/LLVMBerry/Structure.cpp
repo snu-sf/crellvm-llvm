@@ -1361,7 +1361,7 @@ TyPropagatePrivate::TyPropagatePrivate(std::unique_ptr<TyRegister> _p,
 
 void TyPropagatePrivate::serialize(cereal::JSONOutputArchive& archive) const {
   archive(CEREAL_NVP(p));
-  archive(cereal::make_nvp("scope", toString(scope)));
+  archive(cereal::make_nvp("scope", ::toString(scope)));
 }
 
 ConsLessdef::ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef)
