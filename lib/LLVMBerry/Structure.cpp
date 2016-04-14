@@ -1354,6 +1354,16 @@ void TyPropagateAlloca::serialize(cereal::JSONOutputArchive& archive) const {
   archive(cereal::make_nvp("scope", ::toString(scope)));
 }
 
+TyPropagatePrivate::TyPropagatePrivate(std::unique_ptr<TyRegister> _p, 
+                                       enum TyScope _scope) 
+    : p(std::move(_p)), scope(std::move(_scope)) {
+}
+
+void TyPropagatePrivate::serialize(cereal::JSONOutputArchive& archive) const {
+  archive(CEREAL_NVP(p));
+  archive(cereal::make_nvp("scope", toString(scope)));
+}
+
 ConsLessdef::ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef)
     : propagate_lessdef(std::move(_propagate_lessdef)) {}
 
@@ -1417,8 +1427,8 @@ ConsMaydiff::ConsMaydiff(std::string _name, enum TyTag _tag)
 
 std::unique_ptr<TyPropagateObject> ConsMaydiff::make(std::string _name,
                                                      enum TyTag _tag) {
-  return std::unique_ptr<TyPropagateObject>(
-      new ConsMaydiff(TyRegister::make(_name, _tag)));
+  return std::unique_ptr<TyPropagateObject>
+          (new ConsMaydiff(TyRegister::make(_name, _tag)));
 }
 
 void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1427,6 +1437,24 @@ void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Maydiff");
   archive(CEREAL_NVP(register_name));
+}
+
+ConsPrivate::ConsPrivate(std::unique_ptr<TyPropagatePrivate> _propagate_private) 
+    : propagate_private(std::move(_propagate_private)) {}
+
+std::unique_ptr<TyPropagateObject> ConsPrivate::make(std::unique_ptr<TyRegister> _p, 
+                                                     enum TyScope _scope) {
+  std::unique_ptr<TyPropagatePrivate> _val
+                    (new TyPropagatePrivate(std::move(_p), _scope));
+
+  return std::unique_ptr<TyPropagateObject>(new ConsPrivate(std::move(_val)));
+}
+
+void ConsPrivate::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("Private");
+  archive(CEREAL_NVP(propagate_private));
 }
 
 // propagate range
