@@ -51,11 +51,11 @@ bool name_instructions(llvm::Function &F);
  *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the position I
  */
 void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expression, TyScope scope);
-/* propagateLessdef(I1, I2, scope) : 
+/* propagateInstruction(I1, I2, scope) : 
  *   Propagates I1 >= rhs(I1) from I1 to I2 if scope == Source, or
  *   Propagates rhs(I1) >= I1 from I1 to I2 if scope == Target
  */
-void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, TyScope scope);
+void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope);
 void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope = Source);
 void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
         llvm::BinaryOperator *X, 

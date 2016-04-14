@@ -350,7 +350,7 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
   }
 }
 
-void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, TyScope scope) {
+void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope) {
   if (llvmberry::ValidationUnit::Exists()) {
     llvmberry::ValidationUnit::GetInstance()->intrude([&from, &to, &scope](
         llvmberry::ValidationUnit::Dictionary &data,
@@ -376,7 +376,7 @@ void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, TyScope sc
                 llvmberry::TyPosition::make(scope, *from),
                 llvmberry::TyPosition::make(scope, *to))));
       }else{
-        assert("propagateLessdef() : scope is neither llvmberry::Source nor llvmberry::Target" && false);
+        assert("propagateInstruction() : scope is neither llvmberry::Source nor llvmberry::Target" && false);
       }
     });
   }
@@ -654,9 +654,9 @@ void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, llvm::Value
     llvm::Value *B = Z->getOperand(1);
     int bitwidth = W->getType()->getIntegerBitWidth();
 
-    llvmberry::propagateLessdef(X, W, llvmberry::Source);
-    llvmberry::propagateLessdef(Y, W, llvmberry::Source);
-    llvmberry::propagateLessdef(Z, W, llvmberry::Source);
+    llvmberry::propagateInstruction(X, W, llvmberry::Source);
+    llvmberry::propagateInstruction(Y, W, llvmberry::Source);
+    llvmberry::propagateInstruction(Z, W, llvmberry::Source);
     if(X->getOperand(1) == B){
       llvmberry::applyCommutativity(W, X, llvmberry::Source);
     }
@@ -704,10 +704,10 @@ void generateHintForOrXor2(llvm::BinaryOperator &I,
     assert(X2);
     int bitwidth = Z->getType()->getIntegerBitWidth();
   
-    llvmberry::propagateLessdef(X1, Z, llvmberry::Source);
-    llvmberry::propagateLessdef(X2, Z, llvmberry::Source);
-    llvmberry::propagateLessdef(Y1, Z, llvmberry::Source);
-    llvmberry::propagateLessdef(Y2, Z, llvmberry::Source);
+    llvmberry::propagateInstruction(X1, Z, llvmberry::Source);
+    llvmberry::propagateInstruction(X2, Z, llvmberry::Source);
+    llvmberry::propagateInstruction(Y1, Z, llvmberry::Source);
+    llvmberry::propagateInstruction(Y2, Z, llvmberry::Source);
     if(X1->getOperand(1) == B)
       llvmberry::applyCommutativity(Z, X1, llvmberry::Source);
     if(X2->getOperand(1) == A)
