@@ -266,9 +266,9 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
           llvmberry::ConsMaydiff::make(reg_tprime_name, llvmberry::Physical),
           llvmberry::ConsGlobal::make()));
 
-    llvmberry::propagateLessdef(R, T0, llvmberry::Target);
-    llvmberry::propagateLessdef(S, T0, llvmberry::Target);
-    llvmberry::propagateLessdef(Tprime, T0, llvmberry::Target);
+    llvmberry::propagateInstruction(R, T0, llvmberry::Target);
+    llvmberry::propagateInstruction(S, T0, llvmberry::Target);
+    llvmberry::propagateInstruction(Tprime, T0, llvmberry::Target);
     
     if(case_string == "XY/ZX"){
       llvmberry::applyCommutativity(T0, S, llvmberry::Target);

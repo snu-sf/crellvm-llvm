@@ -1363,8 +1363,8 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
           std::string reg_zprime_name = llvmberry::getVariable(*Zprime);
           int bitwidth = Z->getType()->getIntegerBitWidth();
 
-          llvmberry::propagateLessdef(X, Z, llvmberry::Target);
-          llvmberry::propagateLessdef(Y, Z, llvmberry::Target);
+          llvmberry::propagateInstruction(X, Z, llvmberry::Target);
+          llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
 
           llvmberry::insertSrcNopAtTgtI(hints, Zprime);
           
@@ -1372,7 +1372,7 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
                   llvmberry::ConsMaydiff::make(reg_zprime_name, llvmberry::Physical),
                   llvmberry::ConsGlobal::make()));
           
-          llvmberry::propagateLessdef(Zprime, Z, llvmberry::Target);
+          llvmberry::propagateInstruction(Zprime, Z, llvmberry::Target);
 
           hints.addCommand(llvmberry::ConsInfrule::make(
               llvmberry::TyPosition::make(llvmberry::Target, I),
@@ -2297,8 +2297,8 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       Value *B = Y->getOperand(1);
       int bitwidth = Z->getType()->getIntegerBitWidth();
 
-      llvmberry::propagateLessdef(X, Z, llvmberry::Source);
-      llvmberry::propagateLessdef(Y, Z, llvmberry::Source);
+      llvmberry::propagateInstruction(X, Z, llvmberry::Source);
+      llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
       if(X->getOperand(1) == A){
         // commutativity.
         llvmberry::applyCommutativity(Z, X, llvmberry::Source);
@@ -2351,9 +2351,9 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
              llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Yprime), llvmberry::Physical),
              llvmberry::ConsGlobal::make()));
  
-      llvmberry::propagateLessdef(X, Z, llvmberry::Target);
-      llvmberry::propagateLessdef(Y, Z, llvmberry::Target);
-      llvmberry::propagateLessdef(Yprime, Z, llvmberry::Target);
+      llvmberry::propagateInstruction(X, Z, llvmberry::Target);
+      llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
+      llvmberry::propagateInstruction(Yprime, Z, llvmberry::Target);
       if(Y->getOperand(1) == A){
         llvmberry::applyCommutativity(Z, Y, llvmberry::Target);
       }
