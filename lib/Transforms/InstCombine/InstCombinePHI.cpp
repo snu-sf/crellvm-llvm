@@ -183,7 +183,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   llvmberry::TyPosition::make_end_of_block(SRC, *(I->getParent()))));
 
           if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
-            llvmberry::TyBop bop = llvmberry::BopOf(BinOp);
+            llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
 
             // x^ >= a^+b^ , z = x^ -> z >= a^+b^
             INFRULE(PHIPOS(SRC, PN, I),
@@ -280,7 +280,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
 
         if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
-          llvmberry::TyBop bop = llvmberry::BopOf(BinOp);
+          llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
           if(NewRHS) {
             // { z >= a + K } at src after phinode
             PROPAGATE(LESSDEF(VAR(oldphi, Physical),
