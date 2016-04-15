@@ -288,8 +288,7 @@ struct TyValue {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 
-  static std::unique_ptr<TyValue> make(const llvm::Value &value);
-  static std::unique_ptr<TyValue> make(const llvm::Value &value, enum TyTag _tag);
+  static std::unique_ptr<TyValue> make(const llvm::Value &value, enum TyTag _tag = llvmberry::Physical);
 };
 
 struct ConsId : public TyValue {
@@ -300,7 +299,6 @@ public:
   static std::unique_ptr<TyValue> make(std::string _name,
                                        enum TyTag _tag);
 
-private:
   std::unique_ptr<TyRegister> reg;
 };
 
@@ -309,7 +307,6 @@ public:
   ConsConstVal(std::unique_ptr<TyConstant> _constant);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-private:
   std::unique_ptr<TyConstant> constant;
 };
 
