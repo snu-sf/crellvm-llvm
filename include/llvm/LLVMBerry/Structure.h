@@ -46,6 +46,7 @@ class CoreHint;
 
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
+int getCommandIndex(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
 /* applyCommutativity(I, (A bop B), scope) : 
  *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the position I
