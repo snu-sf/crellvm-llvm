@@ -108,15 +108,11 @@ std::string getVariable(const llvm::Value &value) {
   } else if (llvm::isa<llvm::Instruction>(value) ||
              llvm::isa<llvm::Argument>(value)) {
     val = std::string("%");
-  } else if (llvm::isa<llvm::UndefValue>(value)) {
-    val = std::string("undef");
   } else {
     assert("value must be a global value or an instruction" && false);
   }
 
-  if (!llvm::isa<llvm::UndefValue>(value)) {
-    val += std::string(value.getName().data());
-  }
+  val += std::string(value.getName().data());
 
   if (val == "%") val = "";
 
@@ -968,8 +964,10 @@ std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
         new ConsConstVal(std::unique_ptr<TyConstant>(new ConsConstFloat(
             TyConstFloat::make(apf.convertToDouble(), fty)))));
   } else if (llvm::isa<llvm::UndefValue>(value)) {
-    return std::unique_ptr<TyValue>(
-        new ConsId(TyRegister::make("undef", llvmberry::Physical)));
+      return std::unique_ptr<TyValue>(
+        new ConsConstVal(std::unique_ptr<TyConstant>
+                          (new ConsConstUndef
+                            (TyValueType::make(*value.getType())))));
   } else {
     assert("Unknown value type" && false);
   }
