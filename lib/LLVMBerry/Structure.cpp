@@ -812,6 +812,11 @@ std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
       new TyPosition(_scope, _block_name, std::move(_phi)));
 }
 
+std::unique_ptr<TyPosition>
+TyPosition::make_start_of_block(enum TyScope _scope, std::string _block_name) {
+  return TyPosition::make(_scope, _block_name, "");
+}
+
 std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
                                              const llvm::Instruction &I) {
   std::string empty_str = "";
@@ -1299,8 +1304,8 @@ std::unique_ptr<TyExpr> ConsRhs::make(std::string _name,
 ConsConst::ConsConst(std::unique_ptr<TyConstant> _constant)
     : constant(std::move(_constant)) {}
 
-ConsConst::ConsConst(int _int_value, int _value)
-    : constant(new ConsConstInt(_int_value, _value)) {}
+ConsConst::ConsConst(int _int_value, int _bitwidth)
+    : constant(new ConsConstInt(_int_value, _bitwidth)) {}
 
 ConsConst::ConsConst(float _float_value, enum TyFloatType _float_type)
     : constant(new ConsConstFloat(_float_value, _float_type)) {}
