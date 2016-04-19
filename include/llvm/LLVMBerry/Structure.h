@@ -283,6 +283,15 @@ private:
   std::unique_ptr<TyConstFloat> const_float;
 };
 
+struct ConsConstUndef : public TyConstant {
+public:
+  ConsConstUndef(std::unique_ptr<TyValueType> _value_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private:
+  std::unique_ptr<TyValueType> value_type;
+};
+
 // value
 
 struct TyValue {

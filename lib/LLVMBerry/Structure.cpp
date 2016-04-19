@@ -998,6 +998,17 @@ void ConsConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(const_float));
 }
 
+ConsConstUndef::ConsConstUndef(std::unique_ptr<TyValueType> _value_type)
+    : value_type(std::move(_value_type)) {}
+
+void ConsConstUndef::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("ConstUndef");
+  archive(CEREAL_NVP(value_type));
+}
+
 ConsId::ConsId(std::unique_ptr<TyRegister> _register)
     : reg(std::move(_register)) {}
 
