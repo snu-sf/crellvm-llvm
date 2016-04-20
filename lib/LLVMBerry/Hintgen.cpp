@@ -503,15 +503,4 @@ void generateHintForOrXor2(llvm::BinaryOperator &I,
 
 }
 
-
-
-FindAvailableLoadedValueArgs::FindAvailableLoadedValueArgs(){
-  this->orthogonalStores = std::make_shared<TyOrthogonalStoresObj>(TyOrthogonalStoresObj());
-  this->ptr1EquivalentValues = std::make_shared<TyPtrEqValuesObj>(TyPtrEqValuesObj());
-  this->ptr2EquivalentValues = std::make_shared<TyPtrEqValuesObj>(TyPtrEqValuesObj());
-  this->isLoadStore = false;
-}
-StripPointerCastsArgs::StripPointerCastsArgs(){
-  this->strippedValues = std::make_shared<TyStrippedValuesObj>(TyStrippedValuesObj());
-}
 }

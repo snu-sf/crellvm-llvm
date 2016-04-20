@@ -678,6 +678,8 @@ public:
   CoreHint(std::string _module_id, std::string _function_id,
            std::string _opt_name);
   void addCommand(std::unique_ptr<TyCommand> c);
+  const std::string &getDescription() const;
+  void setDescription(const std::string &desc);
   void addNopPosition(std::unique_ptr<TyPosition> position);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
@@ -685,6 +687,7 @@ private:
   std::string module_id;
   std::string function_id;
   std::string opt_name;
+  std::string description;
   std::vector<std::unique_ptr<TyPosition>> nop_positions;
   std::vector<std::unique_ptr<TyCommand>> commands;
 };

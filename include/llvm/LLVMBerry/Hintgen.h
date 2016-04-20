@@ -36,6 +36,6 @@ namespace llvmberry{
   // inserting nop
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
   void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
-};
+}
 
 #endif

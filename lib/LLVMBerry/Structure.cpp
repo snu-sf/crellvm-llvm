@@ -1195,8 +1195,17 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(module_id));
   archive(CEREAL_NVP(function_id));
   archive(CEREAL_NVP(opt_name));
+  archive(CEREAL_NVP(description));
   archive(CEREAL_NVP(commands));
   archive(CEREAL_NVP(nop_positions));
+}
+
+const std::string &CoreHint::getDescription() const {
+  return description;
+}
+
+void CoreHint::setDescription(const std::string &desc){
+  this->description = desc;
 }
 
 } // llvmberry
