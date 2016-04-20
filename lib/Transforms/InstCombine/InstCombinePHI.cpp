@@ -173,8 +173,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 else       { CommonOperand = InInst->getOperand(0); SpecialOperand = InInst->getOperand(1); }
                 BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
                 llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
-                //if (BinaryOperator *BinOp = cast<BinaryOperator>(InInst)){
-                // llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
 
                 PROPAGATE( //from I to endofblock propagate x or y depend on edge
                         LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
@@ -233,16 +231,12 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                                     VAR(newphi, Physical), TGT),
                             BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
 
-
-
-
                 }
                 if (NewRHS) {
 
                   std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
                   std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
                   int size = InInst->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
-
 
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsReplaceRhs::make(
@@ -259,7 +253,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   INFRULE(PHIPOS(TGT, PN, InInst),
                           llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous),
                                                                VAR(newphi, Physical)));
-
 
                   // infer z >= a + b^ -> z >= a + K in src
                   INFRULE(PHIPOS(SRC, PN, InInst),
@@ -281,14 +274,11 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   PROPAGATE(LESSDEF(VAR("K", Ghost),
                                     VAR(newphi, Physical), TGT),
                             BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
-
-
                 }
 
               }//end of for
-
-            //}
             }
+            
             else {
               //x =a + b y = a + b
 
@@ -296,41 +286,50 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
               // b is not constant.
               // PN z = (x, y) NewLHs = null, NewRHs t = (b, c) NewRHS position is ahead PN
               // TODO.
-             /* for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
-                Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
-                std::string reg = llvmberry::getVariable(*InInst); //reg is x or y
-
-              BasicBlock::iterator InsertPos = PN->getParent()->getFirstInsertionPt();
+printf("check1\n");
+              BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
               llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
+printf("check2\n");
+              PROPAGATE(   //from PN to insertPos propagate z in maydiff
+                        llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
+                        BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
 
-              //z = x^ -> z = x
+              for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+                Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
+
+                std::string reg = llvmberry::getVariable(*InInst);
+
+                PROPAGATE( //from I to endofblock propagate x or y depend on edge
+                        LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
+                        BOUNDS(INSTPOS(SRC, InInst),
+                               llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
+
+                if(BinaryOperator *BinOp = cast<BinaryOperator>(InInst)){
+                  llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
+                  //z = x^ -> z = x
               INFRULE(PHIPOS(SRC, PN, InInst),
                       llvmberry::ConsTransitivity::make(
                               VAR(oldphi, Physical), VAR(reg, Previous),
                               VAR(reg, Physical)));
 
-
               // z = x -> z = a + b
-              // x^ >= a^+b^ , z = x^ -> z >= a^+b^
               INFRULE(PHIPOS(SRC, PN, InInst),
                       llvmberry::ConsTransitivity::make(
-                              VAR(oldphi, Physical), VAR(reg, Physical,
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Physical),
-                                         VAL(BinOp->getOperand(1), Physical))))));
-
-
+                              VAR(oldphi, Physical), VAR(reg, Physical),
+                              INSN(BINOP(bop, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
+                                         VAL(BinOp->getOperand(1), Physical)))));
 
               // { z >= a + b } at src after phinode
-
               PROPAGATE( //from I to endofblock propagate x or y depend on edge
                       LESSDEF(VAR(oldphi, Physical),
                               RHS(reg, Physical, SRC), SRC),
-                      BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPOS)));
+                      BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
-            }*/
-                      }
-          });
-
+          }
+        }
+      }
+      }
+  );
 
 
    if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
