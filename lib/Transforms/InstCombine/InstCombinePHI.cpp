@@ -235,14 +235,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
 
 
-                  // infer K+b >= t+b >= z  in tgt
-                  INFRULE(INSTPOS(TGT, InsertPos),
-                          llvmberry::ConsTransitivityTgt::make(
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Ghost))),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), ID(newphi, Physical),
-                                             VAL(CommonOperand, Physical))),
-                                  VAR(oldphi, Physical)));
-
 
                 }
                 if (NewRHS) {
@@ -290,13 +282,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                                     VAR(newphi, Physical), TGT),
                             BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
 
-                  // infer a+K >= a+t >= z in tgt
-                  INFRULE(INSTPOS(TGT, InsertPos),
-                          llvmberry::ConsTransitivityTgt::make(
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost))),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
-                                             ID(newphi, Physical))),
-                                  VAR(oldphi, Physical)));
 
                 }
 
