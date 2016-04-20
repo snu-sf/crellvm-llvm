@@ -1146,30 +1146,6 @@ std::unique_ptr<TyInfrule> ConsBopBoth::make(TyBop _bop, TyScope _scope, TyBopSi
   return std::unique_ptr<TyInfrule>(new ConsBopBoth(std::move(_bop_both)));
 }
 
-TyIntroEq::TyIntroEq(std::unique_ptr<TyExpr> _e, std::string ghost_name)
-  : e(std::move(_e)), g(TyRegister::make(ghost_name, Ghost)) {}
-
-void TyIntroEq::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), CEREAL_NVP(g));
-}
-
-ConsIntroEq::ConsIntroEq(std::unique_ptr<TyIntroEq> _intro_eq)
-  : intro_eq(std::move(_intro_eq)) {}
-
-void ConsIntroEq::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("IntroEq");
-  archive(CEREAL_NVP(intro_eq));
-}
-
-std::unique_ptr<TyInfrule> ConsIntroEq::make(std::unique_ptr<TyExpr> _e, std::string ghost_name) {
-  std::unique_ptr<TyIntroEq> intro_eq(
-      new TyIntroEq(std::move(_e), ghost_name));
-
-  return std::unique_ptr<TyInfrule>(new ConsIntroEq(std::move(intro_eq)));
-}
 
 TyMulBool::TyMulBool(std::unique_ptr<TyRegister> _z,
                      std::unique_ptr<TyRegister> _x,

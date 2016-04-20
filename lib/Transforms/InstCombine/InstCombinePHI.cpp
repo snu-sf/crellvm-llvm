@@ -205,7 +205,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                   // introduce a^ >= k && k >= a^
                   INFRULE(PHIPOS(TGT, PN, InInst),
-                          llvmberry::ConsIntroEq::make(EXPR(SpecialOperand, Previous), "K"));
+                          llvmberry::ConsIntroGhost::make(VAL(SpecialOperand, Previous), REGISTER("K", Ghost)));
 
                   // infer k >= a^ && a^ >= t -> k >= t in tgt
                   INFRULE(PHIPOS(TGT, PN, InInst),
@@ -261,7 +261,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                                              VAL(SpecialOperand, Previous)))));
 
                   // introduce k >= b^ && b^ >= k in src and tgt
-                  INFRULE(PHIPOS(SRC, PN, InInst), llvmberry::ConsIntroEq::make(EXPR(SpecialOperand, Previous), "K"));
+                  INFRULE(PHIPOS(SRC, PN, InInst), llvmberry::ConsIntroGhost::make(VAL(SpecialOperand, Previous), REGISTER("K", Ghost)));
 
                   // infer k >= b^ && b^ >= t -> k >= t in tgt
                   INFRULE(PHIPOS(TGT, PN, InInst),
