@@ -122,218 +122,221 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     RHSVal = NewRHS;
   }
 
-  // Add all operands to the new PHIs.
-  if (NewLHS || NewRHS) {
-    for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
-      Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
-      if (NewLHS) {
-        Value *NewInLHS = InInst->getOperand(0);
-        NewLHS->addIncoming(NewInLHS, PN.getIncomingBlock(i));
-      }
-      if (NewRHS) {
-        Value *NewInRHS = InInst->getOperand(1);
-        NewRHS->addIncoming(NewInRHS, PN.getIncomingBlock(i));  //NewRhs = (b, c)
-      }
-    }
-  }
-
-  if(NewLHS || NewRHS) {
   llvmberry::ValidationUnit::GetInstance()->intrude(
-          //PN z = (x, y) NewLHs = null, NewRHs t = (b, c) NewRHS position is ahead PN
-      [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
-         llvmberry::CoreHint &hints) {
-        std::string oldphi = llvmberry::getVariable(PN);
-        std::string newphi;
-        Instruction *NewPHI = nullptr;
-        if(NewLHS) NewPHI = NewLHS;
-        if(NewRHS) NewPHI = NewRHS;   //oldphi z, NewPHI t
-        newphi = llvmberry::getVariable(*NewPHI);
+          [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
+                                  llvmberry::CoreHint &hints) {
 
-        PROPAGATE(  //t maydiff global propagate
-              llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
-              llvmberry::ConsGlobal::make());
+            std::string oldphi = llvmberry::getVariable(PN);
+            std::string newphi;
+            Instruction *NewPHI = nullptr;
+            if (NewLHS) NewPHI = NewLHS;
+            if (NewRHS) NewPHI = NewRHS;   //oldphi z, NewPHI t
+            newphi = llvmberry::getVariable(*NewPHI);
 
-        BasicBlock::iterator InsertPos = NewPHI->getParent()->getFirstInsertionPt();
-        llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
-        //insert nop in src where first nonPhi instruction begin. this position should be where a + t is located.
+            PROPAGATE(  //t maydiff global propagate
+                    llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
+                    llvmberry::ConsGlobal::make());
 
-        PROPAGATE(   //from PN to insertPos propagate z in maydiff
-              llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
-              BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
+            BasicBlock::iterator InsertPos = NewPHI->getParent()->getFirstInsertionPt();
+            llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
+            //insert nop in src where first nonPhi instruction begin. this position should be where a + t is located.
 
-        for(unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
-          Instruction *I = cast<Instruction>(PN.getIncomingValue(i)); //when i = 0 then I = x = a + b when i = 1 then I = y = a + c
-          std::string reg = llvmberry::getVariable(*I); //reg is x or y
-          Value *CommonOperand = nullptr;
-          Value *SpecialOperand = nullptr;
-          if(NewLHS) {
-            CommonOperand = I->getOperand(1);  //in this example this should be a
-            SpecialOperand = I->getOperand(0);
-          }
-          else {
-            CommonOperand = I->getOperand(0);
-            SpecialOperand = I->getOperand(1);
-          }
-          std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
-          int size = I->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
+            PROPAGATE(   //from PN to insertPos propagate z in maydiff
+                    llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
+                    BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
 
-          PROPAGATE( //from I to endofblock propagate x or y depend on edge
-                LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
-                BOUNDS(INSTPOS(SRC, I),
-                  llvmberry::TyPosition::make_end_of_block(SRC, *(I->getParent()))));
+            if (NewLHS || NewRHS) {
+              for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
+                Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
+                std::string reg = llvmberry::getVariable(*InInst); //reg is x or y
+                Value *CommonOperand = nullptr;
+                Value *SpecialOperand = nullptr;
+                BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
+                llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
+                //if (BinaryOperator *BinOp = cast<BinaryOperator>(InInst)){
+                // llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
 
-          if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
-            llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
+                PROPAGATE( //from I to endofblock propagate x or y depend on edge
+                        LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
+                        BOUNDS(INSTPOS(SRC, InInst),
+                               llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
 
-            // x^ >= a^+b^ , z = x^ -> z >= a^+b^
-            INFRULE(PHIPOS(SRC, PN, I),
-                    llvmberry::ConsTransitivity::make(
-                            VAR(oldphi, Physical), VAR(reg, Previous),
-                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Previous), VAL(BinOp->getOperand(1), Previous)))));
+                // x^ >= a^+b^ , z = x^ -> z >= a^+b^
+                INFRULE(PHIPOS(SRC, PN, InInst),
+                        llvmberry::ConsTransitivity::make(
+                                VAR(oldphi, Physical), VAR(reg, Previous),
+                                INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Previous),
+                                           VAL(BinOp->getOperand(1), Previous)))));
 
-            if(NewRHS) {
-              // b >= c -> a + b >= a + c
-              // reg_common = a, reg_block_special = b, newphi = c
+                if (NewLHS) {
+                  Value *NewInLHS = InInst->getOperand(0);
+                  NewLHS->addIncoming(NewInLHS, PN.getIncomingBlock(i));
 
-                //replace_rhs z >= a^ + b^ -> z >= a + b^
-              INFRULE(PHIPOS(SRC, PN, I),
-                      llvmberry::ConsReplaceRhs::make(
-                              REGISTER(reg_common, Previous), ID(reg_common, Physical), VAR(oldphi, Physical),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Previous), VAL(SpecialOperand, Previous))),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), VAL(SpecialOperand, Previous)))));
+                  CommonOperand = InInst->getOperand(1);  //in this example this should be a
+                  SpecialOperand = InInst->getOperand(0);
+                  std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
+                  std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
+                  int size = InInst->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
 
-              // introduce k >= b^ && b^ >= k in src and tgt
-              INFRULE(PHIPOS(SRC, PN, I), llvmberry::ConsIntroEq::make(EXPR(SpecialOperand, Previous), "K")); 
+                  //replace_rhs z >= a^ + b^ -> z >= a^ + b     //a is special b is common
+                  INFRULE(PHIPOS(SRC, PN, InInst),
+                          llvmberry::ConsReplaceRhs::make(
+                                  REGISTER(reg_common, Previous), ID(reg_common, Physical), VAR(oldphi, Physical),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
+                                             VAL(CommonOperand, Previous))),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
+                                             VAL(CommonOperand, Physical)))));
 
-              // infer k >= b^ && b^ >= t -> k >= t in tgt
-              INFRULE(PHIPOS(TGT, PN, I),
-                    llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous), VAR(newphi, Physical)));
+                  // introduce a^ >= k && k >= a^
+                  INFRULE(PHIPOS(TGT, PN, InInst),
+                          llvmberry::ConsIntroEq::make(EXPR(SpecialOperand, Previous), "K"));
 
-              // infer k >= t -> a+k >= a+t in tgt
-              INFRULE(PHIPOS(TGT, PN, I),
-                    llvmberry::ConsBopBoth::make(
-                      bop, TGT, llvmberry::Left, VAL(CommonOperand, Physical), ID("K", Ghost), ID(newphi, Physical),
-                      llvmberry::ConsSize::make(size)));
+                  // infer k >= a^ && a^ >= t -> k >= t in tgt
+                  INFRULE(PHIPOS(TGT, PN, InInst),
+                          llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous),
+                                                               VAR(newphi, Physical)));
 
-              //infer b^ >= k -> a + b^ >= a + k in src
-              INFRULE(PHIPOS(SRC, PN, I),
-                    llvmberry::ConsBopBoth::make(
-                      bop, SRC, llvmberry::Left, VAL(CommonOperand, Physical), VAL(SpecialOperand, Previous), ID("K", Ghost),
-                      llvmberry::ConsSize::make(size)));
+                  // infer z = a^ + b -> z >= K + b in src
+                  INFRULE(PHIPOS(SRC, PN, InInst),
+                          llvmberry::ConsReplaceRhs::make(
+                                  REGISTER(reg_block_special, Previous), ID("K", Ghost), VAR(oldphi, Physical),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
+                                             VAL(CommonOperand, Physical))),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost),
+                                             VAL(CommonOperand, Physical)))));
 
-              // infer z >= a + b^ -> z >= a + K in src
-              INFRULE(PHIPOS(SRC, PN, I),
-                    llvmberry::ConsTransitivity::make(
-                            VAR(oldphi, Physical),  //this can't be constant
-                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), VAL(SpecialOperand, Previous))),
-                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost)))));
+                  // { z >= K + b } at src after phinode
+                  PROPAGATE(LESSDEF(VAR(oldphi, Physical),
+                                    INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost),
+                                               VAL(CommonOperand, Physical))),
+                                    TGT),
+                            BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
-            } else {
+                  // { K  >= t } at tgt after phinode
+                  PROPAGATE(LESSDEF(VAR("K", Ghost),
+                                    VAR(newphi, Physical), TGT),
+                            BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
 
-              //replace_rhs z >= a^ + b^ -> z >= a^ + b     //a is special b is common
-              INFRULE(PHIPOS(SRC, PN, I),
-                      llvmberry::ConsReplaceRhs::make(
-                              REGISTER(reg_common, Previous), ID(reg_common, Physical), VAR(oldphi, Physical),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous), VAL(CommonOperand, Previous))),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous), VAL(CommonOperand, Physical)))));
 
-              // introduce a^ >= k && k >= a^
-              INFRULE(PHIPOS(TGT, PN, I),
-                      llvmberry::ConsIntroEq::make(EXPR(SpecialOperand, Previous), "K" ));
 
-              // infer k >= a^ && a^ >= t -> k >= t in tgt
-              INFRULE(PHIPOS(TGT, PN, I),
-                    llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous), VAR(newphi, Physical)));
+                  // infer K+b >= t+b >= z  in tgt
+                  INFRULE(INSTPOS(TGT, InsertPos),
+                          llvmberry::ConsTransitivityTgt::make(
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Ghost))),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), ID(newphi, Physical),
+                                             VAL(CommonOperand, Physical))),
+                                  VAR(oldphi, Physical)));
 
-              // infer k >= t -> k+a >= t+a in tgt
-              INFRULE(PHIPOS(TGT, PN, I),
-                    llvmberry::ConsBopBoth::make(
-                    bop, TGT, llvmberry::Right, VAL(CommonOperand, Physical), ID("K", Ghost), ID(newphi, Physical),
-                    llvmberry::ConsSize::make(size)));
 
-              //infer ^b >= k -> b^ = a >= k + a in src
-              INFRULE(PHIPOS(SRC, PN, I),
-                    llvmberry::ConsBopBoth::make(
-                    bop, SRC, llvmberry::Right, VAL(CommonOperand, Physical), VAL(SpecialOperand, Physical), ID("K", Ghost),
-                    llvmberry::ConsSize::make(size)));
+                }
+                if (NewRHS) {
+                  Value *NewInRHS = InInst->getOperand(1);
+                  NewRHS->addIncoming(NewInRHS, PN.getIncomingBlock(i));  //NewRhs = (b, c)
 
-              // infer z = a^ + b -> z >= K + b in src
-              INFRULE(PHIPOS(SRC, PN, I),
+                  CommonOperand = InInst->getOperand(0);
+                  SpecialOperand = InInst->getOperand(1);
+                  std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
+                  std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
+                  int size = InInst->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
+
+
+                  INFRULE(PHIPOS(SRC, PN, InInst),
+                          llvmberry::ConsReplaceRhs::make(
+                                  REGISTER(reg_common, Previous), ID(reg_common, Physical), VAR(oldphi, Physical),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Previous),
+                                             VAL(SpecialOperand, Previous))),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                             VAL(SpecialOperand, Previous)))));
+
+                  // introduce k >= b^ && b^ >= k in src and tgt
+                  INFRULE(PHIPOS(SRC, PN, InInst), llvmberry::ConsIntroEq::make(EXPR(SpecialOperand, Previous), "K"));
+
+                  // infer k >= b^ && b^ >= t -> k >= t in tgt
+                  INFRULE(PHIPOS(TGT, PN, InInst),
+                          llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous),
+                                                               VAR(newphi, Physical)));
+
+
+                  // infer z >= a + b^ -> z >= a + K in src
+                  INFRULE(PHIPOS(SRC, PN, InInst),
+                          llvmberry::ConsReplaceRhs::make(
+                                  REGISTER(reg_block_special, Previous), ID("K", Ghost), VAR(oldphi, Physical),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                             VAL(SpecialOperand, Previous))),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                             ID("K", Ghost)))));
+
+                  // { z >= a + K } at src after phinode
+                  PROPAGATE(LESSDEF(VAR(oldphi, Physical),
+                                    INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                               ID("K", Ghost))),
+                                    SRC),
+                            BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+
+                  // { K  >= t } at tgt after phinode
+                  PROPAGATE(LESSDEF(VAR("K", Ghost),
+                                    VAR(newphi, Physical), TGT),
+                            BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
+
+                  // infer a+K >= a+t >= z in tgt
+                  INFRULE(INSTPOS(TGT, InsertPos),
+                          llvmberry::ConsTransitivityTgt::make(
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost))),
+                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                             ID(newphi, Physical))),
+                                  VAR(oldphi, Physical)));
+
+                }
+
+              }//end of for
+
+            //}
+            }
+            else {
+              //x =a + b y = a + b
+
+              // intrude for x = a + b, y = a + b, z = phi(x, y) -> z = a + b.
+              // b is not constant.
+              // PN z = (x, y) NewLHs = null, NewRHs t = (b, c) NewRHS position is ahead PN
+              // TODO.
+             /* for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
+                Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
+                std::string reg = llvmberry::getVariable(*InInst); //reg is x or y
+
+              BasicBlock::iterator InsertPos = PN->getParent()->getFirstInsertionPt();
+              llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
+
+              //z = x^ -> z = x
+              INFRULE(PHIPOS(SRC, PN, InInst),
                       llvmberry::ConsTransitivity::make(
-                              VAR(oldphi, Physical),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous), VAL(CommonOperand, Physical))),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Physical)))));
-
-           }
-          } else if(dyn_cast<CmpInst>(I)) {
-            // TODO . validate when folding Compare Instruction.
-            // currently validating only when folding Binary Operator Instruction.
-          }
-        } // end of for statement that iterates through all previous blocks.
-
-        /////////////////// after phinode infrules ///////////////////////
-
-        Instruction *I = cast<Instruction>(PN.getIncomingValue(0)); // representative for all incoming instructions
-        Value *CommonOperand = nullptr;
-        if(NewLHS) CommonOperand = I->getOperand(1);
-        else CommonOperand = I->getOperand(0);
+                              VAR(oldphi, Physical), VAR(reg, Previous),
+                              VAR(reg, Physical)));
 
 
-        if(BinaryOperator *BinOp = cast<BinaryOperator>(I)) {
-          llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
-          if(NewRHS) {
-            // { z >= a + K } at src after phinode
-            PROPAGATE(LESSDEF(VAR(oldphi, Physical),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost))),
-                              SRC),
-                  BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+              // z = x -> z = a + b
+              // x^ >= a^+b^ , z = x^ -> z >= a^+b^
+              INFRULE(PHIPOS(SRC, PN, InInst),
+                      llvmberry::ConsTransitivity::make(
+                              VAR(oldphi, Physical), VAR(reg, Physical,
+                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Physical),
+                                         VAL(BinOp->getOperand(1), Physical))))));
 
-            // { a + K >= a + t } at tgt after phinode
-            PROPAGATE(LESSDEF(INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost))),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID(newphi, Physical))),
-                              TGT),
-                  BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
 
-            // infer a+K >= a+t >= z in tgt
-            INFRULE(INSTPOS(TGT, InsertPos),
-                    llvmberry::ConsTransitivityTgt::make(
-                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID("K", Ghost))),
-                            INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical), ID(newphi, Physical))),
-                            VAR(oldphi, Physical)));
 
-          } else {
-            // { z^ >= K + b } at src after phinode
-            PROPAGATE(LESSDEF(VAR(oldphi, Physical),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Physical))),
-                              TGT),
-                 BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+              // { z >= a + b } at src after phinode
 
-             // { K + a >= t + a } at tgt after phinode
-            PROPAGATE(LESSDEF(INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Physical))),
-                              INSN(BINOP(bop, TYPEOF(CommonOperand), ID(newphi, Physical), VAL(CommonOperand, Physical))),
-                              TGT),
-                  BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
-        
-            // infer K+a >= t+a >= z  in tgt
-            INFRULE(INSTPOS(TGT, InsertPos),
-                    llvmberry::ConsTransitivityTgt::make(
-                            INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost), VAL(CommonOperand, Ghost))),
-                            INSN(BINOP(bop, TYPEOF(CommonOperand), ID(newphi, Physical), VAL(CommonOperand, Physical))),
-                            VAR(oldphi, Physical)));
-           }
-        }  else if(dyn_cast<CmpInst>(I)) {
-          // TODO. hint for when folding cmp instructions
-        }
+              PROPAGATE( //from I to endofblock propagate x or y depend on edge
+                      LESSDEF(VAR(oldphi, Physical),
+                              RHS(reg, Physical, SRC), SRC),
+                      BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPOS)));
 
-      });
-  } else {
-    // intrude for x = a + b, y = a + b, z = phi(x, y) -> z = a + b.
-    // b is not constant.
-    // PN z = (x, y) NewLHs = null, NewRHs t = (b, c) NewRHS position is ahead PN
-    // TODO.
-  }
- 
-  if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
+            }*/
+                      }
+          });
+
+
+
+   if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
     CmpInst *NewCI = CmpInst::Create(CIOp->getOpcode(), CIOp->getPredicate(),
                                      LHSVal, RHSVal);
     NewCI->setDebugLoc(FirstInst->getDebugLoc());
