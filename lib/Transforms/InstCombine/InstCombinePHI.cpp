@@ -131,26 +131,31 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             Instruction *NewPHI = nullptr;
             if (NewLHS) NewPHI = NewLHS;
             if (NewRHS) NewPHI = NewRHS;   //oldphi z, NewPHI t
-            newphi = llvmberry::getVariable(*NewPHI);
+            if (NewPHI) {
+              newphi = llvmberry::getVariable(*NewPHI);
 
-            PROPAGATE(  //t maydiff global propagate
-                    llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
-                    llvmberry::ConsGlobal::make());
+              PROPAGATE(  //t maydiff global propagate
+                      llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
+                      llvmberry::ConsGlobal::make());
+            }
 
             BasicBlock::iterator InsertPos = NewPHI->getParent()->getFirstInsertionPt();
             llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
-            //insert nop in src where first nonPhi instruction begin. this position should be where a + t is located.
+            //insert nop in src where first nonPhi instruction begin. this position should be where z = a + t is located.
+            // (or where z = a+b is located)
 
             PROPAGATE(   //from PN to insertPos propagate z in maydiff
                     llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
                     BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
 
             if (NewLHS || NewRHS) {
-              for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
+              for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
                 Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
                 std::string reg = llvmberry::getVariable(*InInst); //reg is x or y
                 Value *CommonOperand = nullptr;
                 Value *SpecialOperand = nullptr;
+                if(NewLHS) { CommonOperand = InInst->getOperand(1); SpecialOperand = InInst->getOperand(0); }
+                else       { CommonOperand = InInst->getOperand(0); SpecialOperand = InInst->getOperand(1); }
                 BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
                 llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
                 //if (BinaryOperator *BinOp = cast<BinaryOperator>(InInst)){
@@ -169,11 +174,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                                            VAL(BinOp->getOperand(1), Previous)))));
 
                 if (NewLHS) {
-                  Value *NewInLHS = InInst->getOperand(0);
-                  NewLHS->addIncoming(NewInLHS, PN.getIncomingBlock(i));
 
-                  CommonOperand = InInst->getOperand(1);  //in this example this should be a
-                  SpecialOperand = InInst->getOperand(0);
                   std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
                   std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
                   int size = InInst->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
@@ -230,11 +231,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                 }
                 if (NewRHS) {
-                  Value *NewInRHS = InInst->getOperand(1);
-                  NewRHS->addIncoming(NewInRHS, PN.getIncomingBlock(i));  //NewRhs = (b, c)
 
-                  CommonOperand = InInst->getOperand(0);
-                  SpecialOperand = InInst->getOperand(1);
                   std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
                   std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
                   int size = InInst->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
