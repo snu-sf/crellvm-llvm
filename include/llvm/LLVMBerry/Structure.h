@@ -47,31 +47,6 @@ class CoreHint;
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
-/* applyCommutativity(I, (A bop B), scope) : 
- *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the position I
- */
-void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expression, TyScope scope);
-/* propagateInstruction(I1, I2, scope) : 
- *   Propagates I1 >= rhs(I1) from I1 to I2 if scope == Source, or
- *   Propagates rhs(I1) >= I1 from I1 to I2 if scope == Target
- */
-void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope);
-void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope = Source);
-void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
-        llvm::BinaryOperator *X, 
-        llvm::SelectInst *Y, 
-        bool needs_commutativity,
-        bool is_leftform);
-void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, 
-        llvm::Value *op1, bool needsCommutativity);
-void generateHintForOrXor2(llvm::BinaryOperator &I, 
-        llvm::Value *X1_val, llvm::Value *X2_val,
-        llvm::Value *A, llvm::Value *B,
-        bool needsY1Commutativity, bool needsY2Commutativity);
-
-// inserting nop
-void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
-void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
 std::string toString(llvmberry::TyBop bop);
 std::string toString(llvmberry::TyFbop bop);
