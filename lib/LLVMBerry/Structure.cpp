@@ -106,7 +106,8 @@ std::string getVariable(const llvm::Value &value) {
   if (llvm::isa<llvm::GlobalValue>(value)) {
     val = std::string("@");
   } else if (llvm::isa<llvm::Instruction>(value) ||
-             llvm::isa<llvm::Argument>(value)) {
+             llvm::isa<llvm::Argument>(value) ||
+             llvm::isa<llvm::ConstantExpr>(value)) {
     val = std::string("%");
   } else {
     assert("value must be a global value or an instruction" && false);
@@ -930,7 +931,7 @@ std::unique_ptr<TyConstFloat> TyConstFloat::make(double _float_value,
 
 // value
 std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
-  if (llvm::isa<llvm::Instruction>(value) ||
+  if (llvm::isa<llvm::Instruction>(value) || llvm::isa<llvm::ConstantExpr>(value) ||
       llvm::isa<llvm::GlobalValue>(value) || llvm::isa<llvm::Argument>(value)) {
     return std::unique_ptr<TyValue>(
         new ConsId(TyRegister::make(getVariable(value), llvmberry::Physical)));
@@ -963,6 +964,11 @@ std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
     return std::unique_ptr<TyValue>(
         new ConsConstVal(std::unique_ptr<TyConstant>(new ConsConstFloat(
             TyConstFloat::make(apf.convertToDouble(), fty)))));
+  } else if (llvm::isa<llvm::UndefValue>(value)) {
+      return std::unique_ptr<TyValue>(
+        new ConsConstVal(std::unique_ptr<TyConstant>
+                          (new ConsConstUndef
+                            (TyValueType::make(*value.getType())))));
   } else {
     assert("Unknown value type" && false);
   }
@@ -994,6 +1000,17 @@ void ConsConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("ConstFloat");
   archive(CEREAL_NVP(const_float));
+}
+
+ConsConstUndef::ConsConstUndef(std::unique_ptr<TyValueType> _value_type)
+    : value_type(std::move(_value_type)) {}
+
+void ConsConstUndef::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("ConstUndef");
+  archive(CEREAL_NVP(value_type));
 }
 
 ConsId::ConsId(std::unique_ptr<TyRegister> _register)
@@ -1039,68 +1056,70 @@ std::unique_ptr<TySize> ConsSize::make(int _size) {
   return std::unique_ptr<TySize>(new ConsSize(_size));
 }
 
-
 // valuetype
 
-std::unique_ptr<TyValueType> TyValueType::make(const llvm::Type &type){
+std::unique_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
   TyValueType *vt;
-  if(const llvm::IntegerType *itype = llvm::dyn_cast<llvm::IntegerType>(&type)){
-    vt = new ConsIntValueType(std::move(std::unique_ptr<TyIntType>(new ConsIntType(itype->getBitWidth()))));
-  }else if(const llvm::PointerType *ptype = llvm::dyn_cast<llvm::PointerType>(&type)){
+  if (const llvm::IntegerType *itype = llvm::dyn_cast<llvm::IntegerType>(&type)) {
+    vt = new ConsIntValueType(std::move(std::unique_ptr<TyIntType>
+              (new ConsIntType(itype->getBitWidth()))));
+  } else if (const llvm::PointerType *ptype = llvm::dyn_cast<llvm::PointerType>(&type)) {
     vt = new ConsPtrType(ptype->getAddressSpace(), 
         std::move(TyValueType::make(*ptype->getPointerElementType())));
-  }else if(const llvm::StructType *stype = llvm::dyn_cast<llvm::StructType>(&type)){
+  } else if (const llvm::StructType *stype = llvm::dyn_cast<llvm::StructType>(&type)) {
     assert(stype->hasName());
     vt = new ConsNamedType(stype->getName().str());
-  }else if(type.isHalfTy()){
+  } else if (type.isHalfTy()) {
     vt = new ConsFloatValueType(HalfType);
-  }else if(type.isFloatTy()){
+  } else if (type.isFloatTy()) {
     vt = new ConsFloatValueType(FloatType);
-  }else if(type.isDoubleTy()){
+  } else if (type.isDoubleTy()) {
     vt = new ConsFloatValueType(DoubleType);
-  }else if(type.isFP128Ty()){
+  } else if (type.isFP128Ty()) {
     vt = new ConsFloatValueType(FP128Type);
-  }else if(type.isPPC_FP128Ty()){
+  } else if (type.isPPC_FP128Ty()) {
     vt = new ConsFloatValueType(PPC_FP128Type);
-  }else if(type.isX86_FP80Ty()){
+  } else if (type.isX86_FP80Ty()) {
     vt = new ConsFloatValueType(X86_FP80Type);
-  }else{
+  } else {
     assert("TyValueType::make(const llvmType &) : unknown value type" && false);
     vt = nullptr;
   }
-    return std::unique_ptr<TyValueType>(vt);
-  }
-
-  ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
-  }
-  void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
-    archive.makeArray();
-    archive.writeName();
-    archive.saveValue("IntValueType");
-    archive(CEREAL_NVP(int_type));
-  }
-
-  ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
-  }
-  void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
-    archive.makeArray();
-    archive.writeName();
-    archive.saveValue("FloatValueType");
-    archive(cereal::make_nvp("float_type", toString(float_type)));
+    
+  return std::unique_ptr<TyValueType>(vt);
 }
 
-ConsNamedType::ConsNamedType(std::string _s) : s(std::move(_s)){
+ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)) {}
+
+void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IntValueType");
+  archive(CEREAL_NVP(int_type));
 }
-void ConsNamedType::serialize(cereal::JSONOutputArchive& archive) const{
+
+ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type) {}
+
+void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("FloatValueType");
+  archive(cereal::make_nvp("float_type", toString(float_type)));
+}
+
+ConsNamedType::ConsNamedType(std::string _s) : s(std::move(_s)) {}
+
+void ConsNamedType::serialize(cereal::JSONOutputArchive& archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("NamedType");
   archive(CEREAL_NVP(s));
 }
 
-ConsPtrType::ConsPtrType(int _address_space, std::unique_ptr<TyValueType> _valuetype) : address_space(_address_space), valuetype(std::move(_valuetype)){
-}
-void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
+ConsPtrType::ConsPtrType(int _address_space, std::unique_ptr<TyValueType> _valuetype) 
+    : address_space(_address_space), valuetype(std::move(_valuetype)) {}
+
+void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("PtrType");
@@ -1112,10 +1131,9 @@ void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
   archive.finishNode();
 }
 
-
 // instruction
 
-std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i){
+std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
   if (const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)) {
     if(isFloatOpcode(bo->getOpcode()))
       return std::unique_ptr<TyInstruction>(new ConsFloatBinaryOp(
