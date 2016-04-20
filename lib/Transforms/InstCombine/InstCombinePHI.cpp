@@ -122,6 +122,21 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     RHSVal = NewRHS;
   }
 
+  // Add all operands to the new PHIs.
+  if (NewLHS || NewRHS) {
+    for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
+      Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
+      if (NewLHS) {
+        Value *NewInLHS = InInst->getOperand(0);
+        NewLHS->addIncoming(NewInLHS, PN.getIncomingBlock(i));
+      }
+      if (NewRHS) {
+        Value *NewInRHS = InInst->getOperand(1);
+        NewRHS->addIncoming(NewInRHS, PN.getIncomingBlock(i));
+      }
+    }
+  }
+
   llvmberry::ValidationUnit::GetInstance()->intrude(
           [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
                                   llvmberry::CoreHint &hints) {
