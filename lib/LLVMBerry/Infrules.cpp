@@ -1102,51 +1102,6 @@ std::unique_ptr<TyInfrule> ConsSubRemove::make(std::unique_ptr<TyRegister> _z, s
   return std::unique_ptr<TyInfrule>(new ConsSubRemove(std::move(_val)));
 }
 
-TyBopBoth::TyBopBoth(TyBop _bop, TyScope _scope, TyBopSide _bop_side,
-                       std::unique_ptr<TyValue> _x,
-                       std::unique_ptr<TyValue> _y,
-                       std::unique_ptr<TyValue> _z,
-                       std::unique_ptr<TySize> _sz)
-  : bop(_bop), scope(_scope), bop_side(_bop_side), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), sz(std::move(_sz)) 
-{ }
-
-void TyBopBoth::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("b", toString(bop)), CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(z), CEREAL_NVP(sz));
-}
-
-std::string TyBopBoth::getInfruleName() const {
-  if(scope == llvmberry::Source) {
-    if(bop_side == llvmberry::Left) return "BopBothSrcLeft";
-    else return "BopBothSrcRight";
-  } else {
-    if(bop_side == llvmberry::Left) return "BopBothTgtLeft";
-    else return "BopBothTgtRight";
-  }
-}
-
-ConsBopBoth::ConsBopBoth(std::unique_ptr<TyBopBoth> _bop_both)
-  : bop_both(std::move(_bop_both)) {}
-
-void ConsBopBoth::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue(bop_both->getInfruleName());
-  archive(CEREAL_NVP(bop_both));
-}
-
-std::unique_ptr<TyInfrule> ConsBopBoth::make(TyBop _bop, TyScope _scope, TyBopSide _bop_side,
-                                             std::unique_ptr<TyValue> _x,
-                                             std::unique_ptr<TyValue> _y,
-                                             std::unique_ptr<TyValue> _z,
-                                             std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyBopBoth> _bop_both(
-      new TyBopBoth(_bop, _scope, _bop_side, std::move(_x), std::move(_y), std::move(_z), std::move(_sz)));
-
-  return std::unique_ptr<TyInfrule>(new ConsBopBoth(std::move(_bop_both)));
-}
-
-
 TyMulBool::TyMulBool(std::unique_ptr<TyRegister> _z,
                      std::unique_ptr<TyRegister> _x,
                      std::unique_ptr<TyRegister> _y)

@@ -613,23 +613,6 @@ private:
   std::unique_ptr<TySize> sz;
 };
 
-struct TyBopBoth {
-public:
-  TyBopBoth(enum TyBop _bop, enum TyScope _scope, enum TyBopSide _bop_side, std::unique_ptr<TyValue> _x,
-            std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TySize> _sz);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-  std::string getInfruleName() const;
-
-private:
-  enum TyBop bop;
-  enum TyScope scope;
-  enum TyBopSide bop_side;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TySize> sz;
-};
-
 struct TyMulBool {
 public:
   TyMulBool(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x,
@@ -1202,23 +1185,6 @@ public:
 private:
   std::unique_ptr<TySubRemove> sub_remove;
 };
-
-struct ConsBopBoth : TyInfrule {
-public:
-  ConsBopBoth(std::unique_ptr<TyBopBoth> _bop_both);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-  static std::unique_ptr<TyInfrule> make(enum TyBop _bop,
-                                         enum TyScope _scope,
-                                         enum TyBopSide _bop_side,
-                                         std::unique_ptr<TyValue> _x,
-                                         std::unique_ptr<TyValue> _y,
-                                         std::unique_ptr<TyValue> _z,
-                                         std::unique_ptr<TySize> _sz);
-private:
-  std::unique_ptr<TyBopBoth> bop_both;
-};
-
 
 struct ConsSubSdiv : public TyInfrule{
 public : 

@@ -330,8 +330,6 @@ public:
   static std::unique_ptr<TyInstruction> make(const llvm::Instruction &inst);
 };
 
-enum TyBopSide { Left, Right };
-
 struct TyBinaryOperator{
 public : 
   TyBinaryOperator(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
