@@ -1157,6 +1157,7 @@ std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::BinaryOperator &b
   } else {
     return ConsBinaryOp::make(getBop(binop.getOpcode()), std::move(_operandtype), std::move(_operand1), std::move(_operand2));
   }
+  assert(false && "This function only handles bop and fbop yet");
 }
 
 std::unique_ptr<TyBinaryOperator> TyBinaryOperator::make(const llvm::BinaryOperator &bopinst){
