@@ -221,8 +221,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   // { z >= K + b } at src after phinode
                   PROPAGATE(LESSDEF(VAR(oldphi, Physical),
                                     INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost),
-                                               VAL(CommonOperand, Physical))),
-                                    SRC),
+                                               VAL(CommonOperand, Physical))), SRC),
                             BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
                   // { K  >= t } at tgt after phinode
@@ -262,10 +261,10 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                                              ID("K", Ghost)))));
 
                   // { z >= a + K } at src after phinode
-                  PROPAGATE(LESSDEF(VAR(oldphi, Physical),
+                  PROPAGATE(
+                            LESSDEF(VAR(oldphi, Physical), 
                                     INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
-                                               ID("K", Ghost))),
-                                    SRC),
+                                               ID("K", Ghost))), SRC),
                             BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
                   // { K  >= t } at tgt after phinode
@@ -291,30 +290,31 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 std::string reg = llvmberry::getVariable(*InInst);
 
                 PROPAGATE( //from I to endofblock propagate x or y depend on edge
-                        LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
-                        BOUNDS(INSTPOS(SRC, InInst),
-                               llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
+                          LESSDEF(VAR(reg, Physical), 
+                                  RHS(reg, Physical, SRC), SRC),
+                          BOUNDS(INSTPOS(SRC, InInst),
+                                 llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
 
                 if(BinaryOperator *BinOp = cast<BinaryOperator>(InInst)){
                   llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
                   //z = x^ -> z = x
-              INFRULE(PHIPOS(SRC, PN, InInst),
-                      llvmberry::ConsTransitivity::make(
-                              VAR(oldphi, Physical), VAR(reg, Previous),
-                              VAR(reg, Physical)));
+                  INFRULE(PHIPOS(SRC, PN, InInst),
+                          llvmberry::ConsTransitivity::make(
+                                  VAR(oldphi, Physical), VAR(reg, Previous),
+                                  VAR(reg, Physical)));
 
-              // z = x -> z = a + b
-              INFRULE(PHIPOS(SRC, PN, InInst),
-                      llvmberry::ConsTransitivity::make(
-                              VAR(oldphi, Physical), VAR(reg, Physical),
-                              INSN(BINOP(bop, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
-                                         VAL(BinOp->getOperand(1), Physical)))));
+                  // z = x -> z = a + b
+                  INFRULE(PHIPOS(SRC, PN, InInst),
+                          llvmberry::ConsTransitivity::make(
+                                  VAR(oldphi, Physical), VAR(reg, Physical),
+                                  INSN(BINOP(bop, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
+                                             VAL(BinOp->getOperand(1), Physical)))));
 
-              // { z >= a + b } at src after phinode
-              PROPAGATE( //from I to endofblock propagate x or y depend on edge
-                      LESSDEF(VAR(oldphi, Physical),
-                              RHS(reg, Physical, SRC), SRC),
-                      BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+                  // { z >= a + b } at src after phinode
+                  PROPAGATE( //from I to endofblock propagate x or y depend on edge
+                            LESSDEF(VAR(oldphi, Physical),
+                                    RHS(reg, Physical, SRC), SRC),
+                            BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
                 }
               }
