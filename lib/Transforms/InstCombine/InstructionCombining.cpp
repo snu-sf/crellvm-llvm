@@ -65,6 +65,7 @@
 
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
 
 #include <sstream>
 #include <fstream>

@@ -21,6 +21,7 @@
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
 
 using namespace llvm;
 using namespace llvm::PatternMatch;
