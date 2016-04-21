@@ -930,11 +930,11 @@ std::unique_ptr<TyConstFloat> TyConstFloat::make(double _float_value,
 }
 
 // value
-std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
-  if (llvm::isa<llvm::Instruction>(value) || llvm::isa<llvm::ConstantExpr>(value) ||
+std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value, enum TyTag _tag) {
+  if (llvm::isa<llvm::Instruction>(value) ||
       llvm::isa<llvm::GlobalValue>(value) || llvm::isa<llvm::Argument>(value)) {
     return std::unique_ptr<TyValue>(
-        new ConsId(TyRegister::make(getVariable(value), llvmberry::Physical)));
+        new ConsId(TyRegister::make(getVariable(value), _tag)));
   } else if (llvm::isa<llvm::ConstantInt>(value)) {
     const llvm::ConstantInt *v = llvm::dyn_cast<llvm::ConstantInt>(&value);
     return std::unique_ptr<TyValue>(
@@ -1257,6 +1257,18 @@ void TyLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
 /* Propagate */
 
 // propagate expr
+// ConsVar or ConsConst
+std::unique_ptr<TyExpr> TyExpr::make(const llvm::Value &value, enum TyTag _tag) {
+  std::unique_ptr<TyValue> vptr = TyValue::make(value, _tag);
+  TyValue *v = vptr.get();
+  if(ConsId *cid = dynamic_cast<ConsId *>(v)){
+    return std::unique_ptr<TyExpr>(new ConsVar(std::unique_ptr<TyRegister>(cid->reg.release())));
+  }else if(ConsConstVal *ccv = dynamic_cast<ConsConstVal *>(v)){
+    return std::unique_ptr<TyExpr>(new ConsConst(std::unique_ptr<TyConstant>(ccv->constant.release())));
+  }else{
+    assert("Unknown value type" && false);
+  }
+}
 
 ConsVar::ConsVar(std::unique_ptr<TyRegister> _register_name)
     : register_name(std::move(_register_name)) {}
@@ -1322,6 +1334,9 @@ ConsInsn::ConsInsn(std::unique_ptr<TyInstruction> _instruction) : instruction(st
 }
 std::unique_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i){
   return std::unique_ptr<TyExpr>(new ConsInsn(std::move(TyInstruction::make(i))));
+}
+std::unique_ptr<TyExpr> ConsInsn::make(std::unique_ptr<TyInstruction> _instruction) {
+  return std::unique_ptr<TyExpr>(new ConsInsn(std::move(_instruction)));
 }
 void ConsInsn::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
