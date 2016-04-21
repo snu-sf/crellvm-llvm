@@ -190,8 +190,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                   std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
                   std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
-                  int size = InInst->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
-
+                  
                   //replace_rhs z >= a^ + b^ -> z >= a^ + b     //a is special b is common
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsReplaceRhs::make(
@@ -223,7 +222,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   PROPAGATE(LESSDEF(VAR(oldphi, Physical),
                                     INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost),
                                                VAL(CommonOperand, Physical))),
-                                    TGT),
+                                    SRC),
                             BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
                   // { K  >= t } at tgt after phinode
@@ -236,7 +235,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                   std::string reg_common = llvmberry::getVariable(*CommonOperand);  //reg_common is a
                   std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
-                  int size = InInst->getType()->getPrimitiveSizeInBits(); // assume I is instruction. it seems to make sense...
 
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsReplaceRhs::make(
