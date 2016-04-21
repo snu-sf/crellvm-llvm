@@ -679,8 +679,10 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
 
   Value *PhiVal;
 
+  llvmberry::ValidationUnit::Begin("fold_phi_bin",
+                                   FirstInst->getParent()->getParent());
   llvmberry::ValidationUnit::GetInstance()->intrude(
-          [&PN, &InVal, &NewPN, &ConstantOp, &PhiVal](llvmberry::ValidationUnit::Dictionary &data,
+          [&PN, &InVal, &NewPN, &ConstantOp, &PhiVal, this](llvmberry::ValidationUnit::Dictionary &data,
                                              llvmberry::CoreHint &hints) {
             std::string oldphi = llvmberry::getVariable(PN);
             BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
@@ -693,6 +695,12 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
   if (InVal) {
     // The new PHI unions all of the same values together.  This is really
     // common, so we handle it intelligently here for compile-time speed.
+          std::string newphi = llvmberry::getVariable(*NewPN);
+
+      PROPAGATE(  //t maydiff global propagate
+                llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
+                llvmberry::ConsGlobal::make());
+
     for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
       Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
       std::string reg = llvmberry::getVariable(*InInst);
@@ -702,7 +710,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
 
       Value *SpecialOperand = InInst->getOperand(0);
       std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
-      std::string newphi = llvmberry::getVariable(*NewPN);
+
 
 
       PROPAGATE( //from I to endofblock propagate x or y depend on edge
