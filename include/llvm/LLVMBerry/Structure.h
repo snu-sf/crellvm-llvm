@@ -328,6 +328,7 @@ struct TyInstruction {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
   static std::unique_ptr<TyInstruction> make(const llvm::Instruction &inst);
+  static std::unique_ptr<TyInstruction> make(const llvm::BinaryOperator &binop, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
 };
 
 struct TyBinaryOperator{
