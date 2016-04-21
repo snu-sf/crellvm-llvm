@@ -321,7 +321,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             }
       });
 
-   if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
+    if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
     CmpInst *NewCI = CmpInst::Create(CIOp->getOpcode(), CIOp->getPredicate(),
                                      LHSVal, RHSVal);
     NewCI->setDebugLoc(FirstInst->getDebugLoc());

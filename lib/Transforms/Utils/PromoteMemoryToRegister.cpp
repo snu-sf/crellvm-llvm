@@ -785,7 +785,6 @@ void PromoteMem2Reg::run() {
       // Remove the alloca from the Allocas list, since it has been processed
       RemoveFromAllocasList(AllocaNum);
       ++NumDeadAlloca;
-
       continue;
     }
 
