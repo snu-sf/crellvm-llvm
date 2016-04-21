@@ -154,7 +154,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                       llvmberry::ConsGlobal::make());
             }
 
-            BasicBlock::iterator InsertPos = NewPHI->getParent()->getFirstInsertionPt();
+            BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
             llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
             //insert nop in src where first nonPhi instruction begin. this position should be where z = a + t is located.
             // (or where z = a+b is located)
@@ -286,13 +286,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
               // b is not constant.
               // PN z = (x, y) NewLHs = null, NewRHs t = (b, c) NewRHS position is ahead PN
               // TODO.
-printf("check1\n");
-              BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
-              llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
-printf("check2\n");
-              PROPAGATE(   //from PN to insertPos propagate z in maydiff
-                        llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
-                        BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
 
               for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
                 Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
@@ -325,12 +318,10 @@ printf("check2\n");
                               RHS(reg, Physical, SRC), SRC),
                       BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
-          }
-        }
-      }
-      }
-  );
-
+                }
+              }
+            }
+      });
 
    if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
     CmpInst *NewCI = CmpInst::Create(CIOp->getOpcode(), CIOp->getPredicate(),
