@@ -36,8 +36,9 @@ using namespace llvm;
 #define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
 #define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
 #define BINOP(bop, type, val1, val2) llvmberry::ConsBinaryOp::make(bop, type, val1, val2)
+#define FBINOP(fbop, type, val1, val2) llvmberry::ConsFloatBinaryOp::make(fbop, type, val1, val2)
 #define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
-#define BINARYINSN(binop, type, val, val2) llvmberry::TyInstruction::make(binop, type, val, val2)
+#define BINARYINSN(binop, type, val1, val2) llvmberry::isFloatOpcode((binop).getOpcode()) ? FBINOP(llvmberry::getFbop((binop).getOpcode()), type, val1, val2) : BINOP(llvmberry::getBop((binop).getOpcode()), type, val1, val2)
 
 #define SRC llvmberry::Source
 #define TGT llvmberry::Target
