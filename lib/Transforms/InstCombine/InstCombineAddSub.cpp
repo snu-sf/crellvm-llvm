@@ -1122,15 +1122,8 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           int c_bitwidth = C->getBitWidth();
           int64_t cprime = c + 1;
           int cprime_bitwidth = c_bitwidth;
-   
-          hints.addCommand(llvmberry::ConsPropagate::make(
-                llvmberry::ConsLessdef::make(
-                    llvmberry::ConsVar::make(reg_x_name, llvmberry::Physical),
-                    llvmberry::ConsRhs::make(reg_x_name, llvmberry::Physical, llvmberry::Source),
-                    llvmberry::Source),
-                llvmberry::ConsBounds::make(
-                    llvmberry::TyPosition::make(llvmberry::Source, *X),
-                    llvmberry::TyPosition::make(llvmberry::Source, Y))));
+        
+          llvmberry::propagateInstruction(X, &Y, llvmberry::Source);
 
           hints.addCommand(llvmberry::ConsInfrule::make(
               llvmberry::TyPosition::make(llvmberry::Source, Y),
@@ -2144,16 +2137,9 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         Instruction *reg_y_instr = dyn_cast<Instruction>(Op1);
 
         int bitwith = Op1->getType()->getIntegerBitWidth();
+        
+        llvmberry::propagateInstruction(reg_y_instr, &I, llvmberry::Scope);
 
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical,
-                                         llvmberry::Source),
-                llvmberry::Source),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Source, *reg_y_instr),
-                llvmberry::TyPosition::make(llvmberry::Source, I))));
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, *reg_y_instr),
             llvmberry::ConsAddCommutative::make(
