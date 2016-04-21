@@ -291,9 +291,10 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 std::string reg = llvmberry::getVariable(*InInst);
 
                 PROPAGATE( //from I to endofblock propagate x or y depend on edge
-                        LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
-                        BOUNDS(INSTPOS(SRC, InInst),
-                               llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
+                          LESSDEF(VAR(reg, Physical), 
+                                  RHS(reg, Physical, SRC), SRC),
+                          BOUNDS(INSTPOS(SRC, InInst),
+                                 llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
 
                 if(BinaryOperator *BinOp = cast<BinaryOperator>(InInst)){
                   llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
