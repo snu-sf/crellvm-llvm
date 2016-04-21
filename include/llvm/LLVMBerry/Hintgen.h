@@ -3,6 +3,28 @@
 
 #include "llvm/LLVMBerry/Structure.h"
 
+
+#define PHIPOS(SCOPE, PN, prevI) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), prevI->getParent()->getName()) 
+#define PHIPOSJustPhi(SCOPE, PN) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
+#define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
+#define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
+#define PROPAGATE(what, where) hints.addCommand(llvmberry::ConsPropagate::make(what, where))
+#define VAR(name, tag) llvmberry::ConsVar::make(name, llvmberry::tag)
+#define RHS(name, tag, SCOPE) llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
+#define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
+#define LESSDEF(left, right, SCOPE) llvmberry::ConsLessdef::make(left, right, SCOPE)
+#define INSN(x) llvmberry::ConsInsn::make(x)
+#define VAL(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
+#define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
+#define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
+#define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
+#define BINOP(bop, type, val1, val2) llvmberry::ConsBinaryOp::make(bop, type, val1, val2)
+#define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
+
+#define SRC llvmberry::Source
+#define TGT llvmberry::Target
+
+
 namespace llvmberry{
   /* applyCommutativity(I, (A bop B), scope) : 
    *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the position I
