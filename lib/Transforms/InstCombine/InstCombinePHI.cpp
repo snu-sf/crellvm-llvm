@@ -299,23 +299,23 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 if(BinaryOperator *BinOp = cast<BinaryOperator>(InInst)){
                   llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
                   //z = x^ -> z = x
-              INFRULE(PHIPOS(SRC, PN, InInst),
-                      llvmberry::ConsTransitivity::make(
-                              VAR(oldphi, Physical), VAR(reg, Previous),
-                              VAR(reg, Physical)));
+                  INFRULE(PHIPOS(SRC, PN, InInst),
+                          llvmberry::ConsTransitivity::make(
+                                  VAR(oldphi, Physical), VAR(reg, Previous),
+                                  VAR(reg, Physical)));
 
-              // z = x -> z = a + b
-              INFRULE(PHIPOS(SRC, PN, InInst),
-                      llvmberry::ConsTransitivity::make(
-                              VAR(oldphi, Physical), VAR(reg, Physical),
-                              INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
-                                         VAL(BinOp->getOperand(1), Physical)))));
+                  // z = x -> z = a + b
+                  INFRULE(PHIPOS(SRC, PN, InInst),
+                          llvmberry::ConsTransitivity::make(
+                                  VAR(oldphi, Physical), VAR(reg, Physical),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
+                                             VAL(BinOp->getOperand(1), Physical)))));
 
-              // { z >= a + b } at src after phinode
-              PROPAGATE( //from I to endofblock propagate x or y depend on edge
-                      LESSDEF(VAR(oldphi, Physical),
-                              RHS(reg, Physical, SRC), SRC),
-                      BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+                  // { z >= a + b } at src after phinode
+                  PROPAGATE( //from I to endofblock propagate x or y depend on edge
+                          LESSDEF(VAR(oldphi, Physical),
+                                  RHS(reg, Physical, SRC), SRC),
+                          BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
                 }
               }
