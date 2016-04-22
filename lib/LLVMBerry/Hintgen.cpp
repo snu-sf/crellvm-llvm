@@ -500,7 +500,83 @@ void generateHintForOrXor2(llvm::BinaryOperator &I,
           llvmberry::ConsSize::make(bitwidth))));
    
   });
-
 }
 
+void generateHintForAddXorAnd(llvm::BinaryOperator &I, 
+        llvm::BinaryOperator *X,
+        llvm::BinaryOperator *Y,
+        llvm::Value *A, llvm::Value *B,
+        bool needsYCommutativity, bool needsZCommutativity){
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I, &X, &Y,
+      &needsYCommutativity,
+      &needsZCommutativity]
+      (llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    //    <src>       <tgt>
+    // X = A ^ B  | X = A ^ B
+    // Y = A & B  | Y = A & B
+    // Z = X + Y  | Z = A | B
+    llvm::BinaryOperator *Z = &I;
+    llvm::Value *A = X->getOperand(0);
+    llvm::Value *B = X->getOperand(1);
+    int bitwidth = Z->getType()->getIntegerBitWidth();
+  
+    llvmberry::propagateInstruction(X, Z, llvmberry::Source);
+    llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+   
+    if(needsYCommutativity)
+      llvmberry::applyCommutativity(&I, Y, llvmberry::Source);
+    if(needsZCommutativity)
+      llvmberry::applyCommutativity(&I, &I, llvmberry::Source);
+
+    hints.addCommand(llvmberry::ConsInfrule::make(
+      llvmberry::TyPosition::make(llvmberry::Source, *Z),
+      llvmberry::ConsAddXorAnd::make(
+          llvmberry::TyRegister::make(llvmberry::getVariable(*Z), llvmberry::Physical),
+          llvmberry::TyValue::make(*A), 
+          llvmberry::TyValue::make(*B), 
+          llvmberry::TyRegister::make(llvmberry::getVariable(*X), llvmberry::Physical),
+          llvmberry::TyRegister::make(llvmberry::getVariable(*Y), llvmberry::Physical),
+          llvmberry::ConsSize::make(bitwidth))));
+  });
+}
+
+void generateHintForAddOrAnd(llvm::BinaryOperator &I, 
+        llvm::BinaryOperator *X,
+        llvm::BinaryOperator *Y,
+        llvm::Value *A, llvm::Value *B,
+        bool needsYCommutativity, bool needsZCommutativity){
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I, &X, &Y,
+      &needsYCommutativity,
+      &needsZCommutativity]
+      (llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    //    <src>       <tgt>
+    // X = A ^ B  | X = A ^ B
+    // Y = A & B  | Y = A & B
+    // Z = X + Y  | Z = A | B
+    llvm::BinaryOperator *Z = &I;
+    llvm::Value *A = X->getOperand(0);
+    llvm::Value *B = X->getOperand(1);
+    int bitwidth = Z->getType()->getIntegerBitWidth();
+  
+    llvmberry::propagateInstruction(X, Z, llvmberry::Source);
+    llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+   
+    if(needsYCommutativity)
+      llvmberry::applyCommutativity(&I, Y, llvmberry::Source);
+    if(needsZCommutativity)
+      llvmberry::applyCommutativity(&I, &I, llvmberry::Source);
+
+    hints.addCommand(llvmberry::ConsInfrule::make(
+      llvmberry::TyPosition::make(llvmberry::Source, *Z),
+      llvmberry::ConsAddOrAnd::make(
+          llvmberry::TyRegister::make(llvmberry::getVariable(*Z), llvmberry::Physical),
+          llvmberry::TyValue::make(*A), 
+          llvmberry::TyValue::make(*B), 
+          llvmberry::TyRegister::make(llvmberry::getVariable(*X), llvmberry::Physical),
+          llvmberry::TyRegister::make(llvmberry::getVariable(*Y), llvmberry::Physical),
+          llvmberry::ConsSize::make(bitwidth))));
+  });
+}
 }

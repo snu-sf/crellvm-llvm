@@ -1123,15 +1123,8 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           int c_bitwidth = C->getBitWidth();
           int64_t cprime = c + 1;
           int cprime_bitwidth = c_bitwidth;
-   
-          hints.addCommand(llvmberry::ConsPropagate::make(
-                llvmberry::ConsLessdef::make(
-                    llvmberry::ConsVar::make(reg_x_name, llvmberry::Physical),
-                    llvmberry::ConsRhs::make(reg_x_name, llvmberry::Physical, llvmberry::Source),
-                    llvmberry::Source),
-                llvmberry::ConsBounds::make(
-                    llvmberry::TyPosition::make(llvmberry::Source, *X),
-                    llvmberry::TyPosition::make(llvmberry::Source, Y))));
+        
+          llvmberry::propagateInstruction(X, &Y, llvmberry::Source);
 
           hints.addCommand(llvmberry::ConsInfrule::make(
               llvmberry::TyPosition::make(llvmberry::Source, Y),
@@ -1645,13 +1638,29 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     Value *A = nullptr, *B = nullptr;
     if (match(RHS, m_Xor(m_Value(A), m_Value(B))) &&
         (match(LHS, m_And(m_Specific(A), m_Specific(B))) ||
-         match(LHS, m_And(m_Specific(B), m_Specific(A)))))
+         match(LHS, m_And(m_Specific(B), m_Specific(A))))){
+      llvmberry::ValidationUnit::Begin("add_xor_and", I.getParent()->getParent());
+      llvmberry::generateHintForAddXorAnd(I, 
+          dyn_cast<BinaryOperator>(RHS), 
+          dyn_cast<BinaryOperator>(LHS), 
+          A, B, 
+          match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true,
+          true);
       return BinaryOperator::CreateOr(A, B);
+    }
 
     if (match(LHS, m_Xor(m_Value(A), m_Value(B))) &&
         (match(RHS, m_And(m_Specific(A), m_Specific(B))) ||
-         match(RHS, m_And(m_Specific(B), m_Specific(A)))))
+         match(RHS, m_And(m_Specific(B), m_Specific(A))))){
+      llvmberry::ValidationUnit::Begin("add_xor_and", I.getParent()->getParent());
+      llvmberry::generateHintForAddXorAnd(I, 
+          dyn_cast<BinaryOperator>(LHS), 
+          dyn_cast<BinaryOperator>(RHS), 
+          A, B, 
+          match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true,
+          false);
       return BinaryOperator::CreateOr(A, B);
+    }
   }
 
   // (add (or A, B) (and A, B)) --> (add A, B)
@@ -1660,18 +1669,32 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     if (match(RHS, m_Or(m_Value(A), m_Value(B))) &&
         (match(LHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(LHS, m_And(m_Specific(B), m_Specific(A))))) {
+      llvmberry::ValidationUnit::Begin("add_or_and", I.getParent()->getParent());
       auto *New = BinaryOperator::CreateAdd(A, B);
       New->setHasNoSignedWrap(I.hasNoSignedWrap());
       New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
+      llvmberry::generateHintForAddOrAnd(I, 
+          dyn_cast<BinaryOperator>(RHS), 
+          dyn_cast<BinaryOperator>(LHS), 
+          A, B, 
+          match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true,
+          true);
       return New;
     }
 
     if (match(LHS, m_Or(m_Value(A), m_Value(B))) &&
         (match(RHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(RHS, m_And(m_Specific(B), m_Specific(A))))) {
+      llvmberry::ValidationUnit::Begin("add_or_and", I.getParent()->getParent());
       auto *New = BinaryOperator::CreateAdd(A, B);
       New->setHasNoSignedWrap(I.hasNoSignedWrap());
       New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
+      llvmberry::generateHintForAddOrAnd(I, 
+          dyn_cast<BinaryOperator>(LHS), 
+          dyn_cast<BinaryOperator>(RHS), 
+          A, B, 
+          match(RHS, m_And(m_Specific(A), m_Specific(B))) ? false : true,
+          false);
       return New;
     }
   }
@@ -2145,16 +2168,9 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         Instruction *reg_y_instr = dyn_cast<Instruction>(Op1);
 
         int bitwith = Op1->getType()->getIntegerBitWidth();
+        
+        llvmberry::propagateInstruction(reg_y_instr, &I, llvmberry::Source);
 
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical,
-                                         llvmberry::Source),
-                llvmberry::Source),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Source, *reg_y_instr),
-                llvmberry::TyPosition::make(llvmberry::Source, I))));
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, *reg_y_instr),
             llvmberry::ConsAddCommutative::make(
@@ -2175,8 +2191,31 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     }
 
     // (X-Y)-X == -Y
-    if (match(Op0, m_Sub(m_Specific(Op1), m_Value(Y))))
+    if (match(Op0, m_Sub(m_Specific(Op1), m_Value(Y)))){
+      llvmberry::ValidationUnit::Begin("sub_sub", I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &Op0, &Y](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        //    <src>      <tgt>
+        // W = X - Y | W = X - Y
+        // Z = W - X | Z = 0 - Y
+        BinaryOperator *W = dyn_cast<BinaryOperator>(Op0);
+        assert(W);
+        int bitwith = Op1->getType()->getIntegerBitWidth();
+        
+        llvmberry::propagateInstruction(W, &I, llvmberry::Source);
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, I),
+            llvmberry::ConsSubSub::make(
+                llvmberry::TyRegister::make(llvmberry::getVariable(I), llvmberry::Physical),
+                llvmberry::TyValue::make(*Op1), 
+                llvmberry::TyValue::make(*Y), 
+                llvmberry::TyValue::make(*Op0),
+                llvmberry::ConsSize::make(bitwith))));
+      });
       return BinaryOperator::CreateNeg(Y);
+    }
   }
 
   // (sub (or A, B) (xor A, B)) --> (and A, B)
@@ -2184,8 +2223,39 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     Value *A = nullptr, *B = nullptr;
     if (match(Op1, m_Xor(m_Value(A), m_Value(B))) &&
         (match(Op0, m_Or(m_Specific(A), m_Specific(B))) ||
-         match(Op0, m_Or(m_Specific(B), m_Specific(A)))))
+         match(Op0, m_Or(m_Specific(B), m_Specific(A))))){
+      llvmberry::ValidationUnit::Begin("sub_or_xor", I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &Op0, &A, &B](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        //    <src>      <tgt>
+        // X = A | B | X = A | B
+        // Y = A ^ B | Y = A ^ B
+        // Z = X - Y | Z = A & B
+        BinaryOperator *Z = &I;
+        BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+        assert(X);
+        assert(Y);
+        int bitwith = Z->getType()->getIntegerBitWidth();
+        
+        llvmberry::propagateInstruction(X, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+        if(match(X, m_Or(m_Specific(B), m_Specific(A))))
+          llvmberry::applyCommutativity(Z, X, llvmberry::Source);
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, I),
+            llvmberry::ConsSubOrXor::make(
+                llvmberry::TyRegister::make(llvmberry::getVariable(*Z), llvmberry::Physical),
+                llvmberry::TyValue::make(*A), 
+                llvmberry::TyValue::make(*B), 
+                llvmberry::TyRegister::make(llvmberry::getVariable(*X), llvmberry::Physical),
+                llvmberry::TyRegister::make(llvmberry::getVariable(*Y), llvmberry::Physical),
+                llvmberry::ConsSize::make(bitwith))));
+      });
       return BinaryOperator::CreateAnd(A, B);
+    }
   }
 
   // (sub (select (a, c, b)), (select (a, d, b))) -> (select (a, (sub c, d), 0))

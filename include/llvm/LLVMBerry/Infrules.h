@@ -140,6 +140,20 @@ private :
   std::shared_ptr<TyValue> y;
 };
 
+struct TyAddOrAnd{
+public : 
+  TyAddOrAnd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyAddSub {
 public:
   TyAddSub(std::shared_ptr<TyRegister> _minusy, std::shared_ptr<TyRegister> _z,
@@ -191,6 +205,36 @@ private :
   std::shared_ptr<TyValue> b;
   std::shared_ptr<TyConstInt> c;
   std::shared_ptr<TyConstInt> cprime;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyAddSextSext{
+public : 
+  TyAddSextSext(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _xprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TySize> _from_sz, std::shared_ptr<TySize> _to_sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> xprime;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyRegister> yprime;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyRegister> zprime;
+  std::shared_ptr<TySize> from_sz;
+  std::shared_ptr<TySize> to_sz;
+};
+
+struct TyAddXorAnd{
+public : 
+  TyAddXorAnd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
   std::shared_ptr<TySize> sz;
 };
 
@@ -569,6 +613,20 @@ private :
   std::shared_ptr<TyValue> y;
 };
 
+struct TySubOrXor{
+public : 
+  TySubOrXor(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TySubSdiv{
 public : 
   TySubSdiv(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz);
@@ -597,6 +655,18 @@ private :
   std::shared_ptr<TySize> sz;
 };
 
+struct TySubSub{
+public : 
+  TySubSub(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> w;
+  std::shared_ptr<TySize> sz;
+};
 
 struct TySubRemove {
 public:
@@ -827,6 +897,16 @@ private :
   std::shared_ptr<TyAddSelectZero2> add_select_zero2;
 };
 
+struct ConsAddSextSext : public TyInfrule{
+public : 
+  ConsAddSextSext(std::shared_ptr<TyAddSextSext> _add_sext_sext);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _xprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TySize> _from_sz, std::shared_ptr<TySize> _to_sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyAddSextSext> add_sext_sext;
+};
+
 struct ConsAddSub : TyInfrule {
 public:
   ConsAddSub(std::shared_ptr<TyAddSub> _add_sub);
@@ -868,6 +948,16 @@ private:
   std::shared_ptr<TyAddCommutativeTgt> add_commutative_tgt;
 };
 
+struct ConsAddOrAnd : public TyInfrule{
+public : 
+  ConsAddOrAnd(std::shared_ptr<TyAddOrAnd> _add_or_and);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyAddOrAnd> add_or_and;
+};
+
 struct ConsAddShift : TyInfrule {
 public:
   ConsAddShift(std::shared_ptr<TyAddShift> _add_shift);
@@ -878,6 +968,16 @@ public:
 
 private:
   std::shared_ptr<TyAddShift> add_shift;
+};
+
+struct ConsAddXorAnd : public TyInfrule{
+public : 
+  ConsAddXorAnd(std::shared_ptr<TyAddXorAnd> _add_xor_and);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyAddXorAnd> add_xor_and;
 };
 
 struct ConsAndCommutative : public TyInfrule{
@@ -1171,6 +1271,16 @@ private :
   std::shared_ptr<TySubConstNot> sub_const_not;
 };
 
+struct ConsSubOrXor : public TyInfrule{
+public : 
+  ConsSubOrXor(std::shared_ptr<TySubOrXor> _sub_or_xor);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TySubOrXor> sub_or_xor;
+};
+
 struct ConsSubRemove : TyInfrule {
 public:
   ConsSubRemove(std::shared_ptr<TySubRemove> _sub_remove);
@@ -1194,6 +1304,16 @@ public :
 
 private : 
   std::shared_ptr<TySubSdiv> sub_sdiv;
+};
+
+struct ConsSubSub : public TyInfrule{
+public : 
+  ConsSubSub(std::shared_ptr<TySubSub> _sub_sub);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TySubSub> sub_sub;
 };
 
 struct ConsSubShl : public TyInfrule{
