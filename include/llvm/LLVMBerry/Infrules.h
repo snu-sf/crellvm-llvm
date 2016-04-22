@@ -10,1447 +10,1447 @@ namespace llvmberry{
 
 struct TyAddAssociative {
 public:
-  TyAddAssociative(std::unique_ptr<TyRegister> _x,
-                   std::unique_ptr<TyRegister> _y,
-                   std::unique_ptr<TyRegister> _z,
-                   std::unique_ptr<TyConstInt> _c1,
-                   std::unique_ptr<TyConstInt> _c2,
-                   std::unique_ptr<TyConstInt> _c3,
-                   std::unique_ptr<TySize> _sz);
+  TyAddAssociative(std::shared_ptr<TyRegister> _x,
+                   std::shared_ptr<TyRegister> _y,
+                   std::shared_ptr<TyRegister> _z,
+                   std::shared_ptr<TyConstInt> _c1,
+                   std::shared_ptr<TyConstInt> _c2,
+                   std::shared_ptr<TyConstInt> _c3,
+                   std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyConstInt> c1;
-  std::unique_ptr<TyConstInt> c2;
-  std::unique_ptr<TyConstInt> c3;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TyConstInt> c3;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddCommutative {
 public:
-  TyAddCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x,
-                   std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyAddCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
+                   std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddCommutativeTgt {
 public:
-  TyAddCommutativeTgt(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x,
-                   std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyAddCommutativeTgt(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
+                   std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddConstNot{
 public : 
-  TyAddConstNot(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  TyAddConstNot(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyConstInt> c1;
-  std::unique_ptr<TyConstInt> c2;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddDistSub{
 public : 
-  TyAddDistSub(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _minusx, std::unique_ptr<TyValue> _minusy, std::unique_ptr<TyRegister> _w, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyAddDistSub(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _minusx, std::shared_ptr<TyValue> _minusy, std::shared_ptr<TyRegister> _w, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> minusx;
-  std::unique_ptr<TyValue> minusy;
-  std::unique_ptr<TyRegister> w;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> minusx;
+  std::shared_ptr<TyValue> minusy;
+  std::shared_ptr<TyRegister> w;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddMask{
 public : 
-  TyAddMask(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  TyAddMask(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyRegister> yprime;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyConstInt> c1;
-  std::unique_ptr<TyConstInt> c2;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> yprime;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddSelectZero{
 public : 
-  TyAddSelectZero(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  TyAddSelectZero(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c, std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> c;
-  std::unique_ptr<TyValue> n;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> c;
+  std::shared_ptr<TyValue> n;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddSelectZero2{
 public : 
-  TyAddSelectZero2(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  TyAddSelectZero2(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c, std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> c;
-  std::unique_ptr<TyValue> n;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> c;
+  std::shared_ptr<TyValue> n;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddOnebit{
 public : 
-  TyAddOnebit(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y);
+  TyAddOnebit(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
 };
 
 struct TyAddOrAnd{
 public : 
-  TyAddOrAnd(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TySize> _sz);
+  TyAddOrAnd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddSub {
 public:
-  TyAddSub(std::unique_ptr<TyRegister> _minusy, std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y,
-           std::unique_ptr<TySize> _sz);
+  TyAddSub(std::shared_ptr<TyRegister> _minusy, std::shared_ptr<TyRegister> _z,
+           std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+           std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> minusy;
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> minusy;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddShift {
 public:
-  TyAddShift(std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> v,
-             std::unique_ptr<TySize> _sz);
+  TyAddShift(std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> v,
+             std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> v;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddSignbit {
 public:
-  TyAddSignbit(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyValue> _e1,
-               std::unique_ptr<TyValue> _e2, std::unique_ptr<TySize> _sz);
+  TyAddSignbit(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyValue> _e1,
+               std::shared_ptr<TyValue> _e2, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyValue> e1;
-  std::unique_ptr<TyValue> e2;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyValue> e1;
+  std::shared_ptr<TyValue> e2;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddZextBool{
 public : 
-  TyAddZextBool(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _b, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz);
+  TyAddZextBool(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _b, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TyConstInt> c;
-  std::unique_ptr<TyConstInt> cprime;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyConstInt> c;
+  std::shared_ptr<TyConstInt> cprime;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAddSextSext{
 public : 
-  TyAddSextSext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _xprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TySize> _from_sz, std::unique_ptr<TySize> _to_sz);
+  TyAddSextSext(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _xprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TySize> _from_sz, std::shared_ptr<TySize> _to_sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> xprime;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyRegister> yprime;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyRegister> zprime;
-  std::unique_ptr<TySize> from_sz;
-  std::unique_ptr<TySize> to_sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> xprime;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyRegister> yprime;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyRegister> zprime;
+  std::shared_ptr<TySize> from_sz;
+  std::shared_ptr<TySize> to_sz;
 };
 
 struct TyAddXorAnd{
 public : 
-  TyAddXorAnd(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TySize> _sz);
+  TyAddXorAnd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAndCommutative{
 public : 
-  TyAndCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyAndCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyAndDeMorgan{
 public : 
-  TyAndDeMorgan(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  TyAndDeMorgan(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyRegister> zprime;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> zprime;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyBopDistributiveOverSelectinst{
 public : 
-  TyBopDistributiveOverSelectinst(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty);
+  TyBopDistributiveOverSelectinst(TyBop _opcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, std::shared_ptr<TySize> _bopsz, std::shared_ptr<TyValueType> _selty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
   TyBop opcode;
-  std::unique_ptr<TyRegister> r;
-  std::unique_ptr<TyRegister> s;
-  std::unique_ptr<TyRegister> tprime;
-  std::unique_ptr<TyRegister> t0;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TyValue> c;
-  std::unique_ptr<TySize> bopsz;
-  std::unique_ptr<TyValueType> selty;
+  std::shared_ptr<TyRegister> r;
+  std::shared_ptr<TyRegister> s;
+  std::shared_ptr<TyRegister> tprime;
+  std::shared_ptr<TyRegister> t0;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> c;
+  std::shared_ptr<TySize> bopsz;
+  std::shared_ptr<TyValueType> selty;
 };
 
 struct TyBopDistributiveOverSelectinst2{
 public : 
-  TyBopDistributiveOverSelectinst2(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty);
+  TyBopDistributiveOverSelectinst2(TyBop _opcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, std::shared_ptr<TySize> _bopsz, std::shared_ptr<TyValueType> _selty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
   TyBop opcode;
-  std::unique_ptr<TyRegister> r;
-  std::unique_ptr<TyRegister> s;
-  std::unique_ptr<TyRegister> tprime;
-  std::unique_ptr<TyRegister> t0;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TyValue> c;
-  std::unique_ptr<TySize> bopsz;
-  std::unique_ptr<TyValueType> selty;
+  std::shared_ptr<TyRegister> r;
+  std::shared_ptr<TyRegister> s;
+  std::shared_ptr<TyRegister> tprime;
+  std::shared_ptr<TyRegister> t0;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> c;
+  std::shared_ptr<TySize> bopsz;
+  std::shared_ptr<TyValueType> selty;
 };
 
 struct TyFaddCommutativeTgt{
 public : 
-  TyFaddCommutativeTgt(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, TyFloatType _fty);
+  TyFaddCommutativeTgt(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, TyFloatType _fty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
   TyFloatType fty;
 };
 
 struct TyFbopDistributiveOverSelectinst{
 public : 
-  TyFbopDistributiveOverSelectinst(TyFbop _fopcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, TyFloatType _fbopty, std::unique_ptr<TyValueType> _selty);
+  TyFbopDistributiveOverSelectinst(TyFbop _fopcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, TyFloatType _fbopty, std::shared_ptr<TyValueType> _selty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
   TyFbop fopcode;
-  std::unique_ptr<TyRegister> r;
-  std::unique_ptr<TyRegister> s;
-  std::unique_ptr<TyRegister> tprime;
-  std::unique_ptr<TyRegister> t0;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TyValue> c;
+  std::shared_ptr<TyRegister> r;
+  std::shared_ptr<TyRegister> s;
+  std::shared_ptr<TyRegister> tprime;
+  std::shared_ptr<TyRegister> t0;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> c;
   TyFloatType fbopty;
-  std::unique_ptr<TyValueType> selty;
+  std::shared_ptr<TyValueType> selty;
 };
 
 struct TyFbopDistributiveOverSelectinst2{
 public : 
-  TyFbopDistributiveOverSelectinst2(TyFbop _fopcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, TyFloatType _fbopty, std::unique_ptr<TyValueType> _selty);
+  TyFbopDistributiveOverSelectinst2(TyFbop _fopcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, TyFloatType _fbopty, std::shared_ptr<TyValueType> _selty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
   TyFbop fopcode;
-  std::unique_ptr<TyRegister> r;
-  std::unique_ptr<TyRegister> s;
-  std::unique_ptr<TyRegister> tprime;
-  std::unique_ptr<TyRegister> t0;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TyValue> c;
+  std::shared_ptr<TyRegister> r;
+  std::shared_ptr<TyRegister> s;
+  std::shared_ptr<TyRegister> tprime;
+  std::shared_ptr<TyRegister> t0;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> c;
   TyFloatType fbopty;
-  std::unique_ptr<TyValueType> selty;
+  std::shared_ptr<TyValueType> selty;
 };
 
 struct TySdivMone{
 public : 
-  TySdivMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  TySdivMone(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySdivSubSrem{
 public : 
-  TySdivSubSrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TySdivSubSrem(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _b, std::shared_ptr<TyRegister> _a, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> b;
-  std::unique_ptr<TyRegister> a;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> b;
+  std::shared_ptr<TyRegister> a;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyUdivSubUrem{
 public : 
-  TyUdivSubUrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyUdivSubUrem(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _b, std::shared_ptr<TyRegister> _a, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> b;
-  std::unique_ptr<TyRegister> a;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> b;
+  std::shared_ptr<TyRegister> a;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyMulShl{
 public : 
-  TyMulShl(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  TyMulShl(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyNegVal {
 public:
-  TyNegVal(std::unique_ptr<TyConstInt> _c1,
-           std::unique_ptr<TyConstInt> _c2,
-           std::unique_ptr<TySize> _sz);
+  TyNegVal(std::shared_ptr<TyConstInt> _c1,
+           std::shared_ptr<TyConstInt> _c2,
+           std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyConstInt> c1;
-  std::unique_ptr<TyConstInt> c2;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyMulCommutative{
 public : 
-  TyMulCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyMulCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyMulMone{
 public : 
-  TyMulMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  TyMulMone(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyMulNeg {
 public:
-  TyMulNeg(std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyValue> _mx,
-           std::unique_ptr<TyValue> _my,
-           std::unique_ptr<TyValue> _x,
-           std::unique_ptr<TyValue> _y,
-           std::unique_ptr<TySize> _sz);
+  TyMulNeg(std::shared_ptr<TyRegister> _z,
+           std::shared_ptr<TyValue> _mx,
+           std::shared_ptr<TyValue> _my,
+           std::shared_ptr<TyValue> _x,
+           std::shared_ptr<TyValue> _y,
+           std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> mx;
-  std::unique_ptr<TyValue> my;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> mx;
+  std::shared_ptr<TyValue> my;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyOrCommutative{
 public : 
-  TyOrCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyOrCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyOrOr{
 public : 
-  TyOrOr(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  TyOrOr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyOrOr2{
 public : 
-  TyOrOr2(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _yprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  TyOrOr2(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> yprime;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> yprime;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyOrXor{
 public : 
-  TyOrXor(std::unique_ptr<TyValue> _w, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  TyOrXor(std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyValue> w;
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyValue> w;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyOrXor2{
 public : 
-  TyOrXor2(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x1, std::unique_ptr<TyValue> _y1, std::unique_ptr<TyValue> _x2, std::unique_ptr<TyValue> _y2, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  TyOrXor2(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x1, std::shared_ptr<TyValue> _y1, std::shared_ptr<TyValue> _x2, std::shared_ptr<TyValue> _y2, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyValue> z;
-  std::unique_ptr<TyValue> x1;
-  std::unique_ptr<TyValue> y1;
-  std::unique_ptr<TyValue> x2;
-  std::unique_ptr<TyValue> y2;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x1;
+  std::shared_ptr<TyValue> y1;
+  std::shared_ptr<TyValue> x2;
+  std::shared_ptr<TyValue> y2;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyRemNeg{
 public : 
-  TyRemNeg(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _my, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyRemNeg(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _my, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> my;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> my;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubAdd {
 public:
-  TySubAdd(std::unique_ptr<TyRegister> _z,
-           std::unique_ptr<TyValue> _my,
-           std::unique_ptr<TyRegister> _x,
-           std::unique_ptr<TyValue> _y,
-           std::unique_ptr<TySize> _sz);
+  TySubAdd(std::shared_ptr<TyRegister> _z,
+           std::shared_ptr<TyValue> _my,
+           std::shared_ptr<TyRegister> _x,
+           std::shared_ptr<TyValue> _y,
+           std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> my;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> my;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubConstAdd{
 public : 
-  TySubConstAdd(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3, std::unique_ptr<TySize> _sz);
+  TySubConstAdd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyConstInt> c1;
-  std::unique_ptr<TyConstInt> c2;
-  std::unique_ptr<TyConstInt> c3;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TyConstInt> c3;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubConstNot{
 public : 
-  TySubConstNot(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  TySubConstNot(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyConstInt> c1;
-  std::unique_ptr<TyConstInt> c2;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubMone{
 public : 
-  TySubMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  TySubMone(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubOnebit{
 public : 
-  TySubOnebit(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y);
+  TySubOnebit(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
 };
 
 struct TySubOrXor{
 public : 
-  TySubOrXor(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TySize> _sz);
+  TySubOrXor(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubSdiv{
 public : 
-  TySubSdiv(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz);
+  TySubSdiv(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyConstInt> c;
-  std::unique_ptr<TyConstInt> cprime;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyConstInt> c;
+  std::shared_ptr<TyConstInt> cprime;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubShl{
 public : 
-  TySubShl(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _mx, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  TySubShl(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _mx, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> mx;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> mx;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubSub{
 public : 
-  TySubSub(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _w, std::unique_ptr<TySize> _sz);
+  TySubSub(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyValue> w;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> w;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TySubRemove {
 public:
-  TySubRemove(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y,
-              std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b,
-              std::unique_ptr<TySize> _sz);
+  TySubRemove(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+              std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b,
+              std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyMulBool {
 public:
-  TyMulBool(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x,
-            std::unique_ptr<TyRegister> _y);
+  TyMulBool(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
+            std::shared_ptr<TyRegister> _y);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
 };
 
 struct TyTransitivity {
 public:
-  TyTransitivity(std::unique_ptr<TyExpr> _e1, std::unique_ptr<TyExpr> _e2,
-                 std::unique_ptr<TyExpr> _e3);
+  TyTransitivity(std::shared_ptr<TyExpr> _e1, std::shared_ptr<TyExpr> _e2,
+                 std::shared_ptr<TyExpr> _e3);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyExpr> e1;
-  std::unique_ptr<TyExpr> e2;
-  std::unique_ptr<TyExpr> e3;
+  std::shared_ptr<TyExpr> e1;
+  std::shared_ptr<TyExpr> e2;
+  std::shared_ptr<TyExpr> e3;
 };
 
 struct TyTransitivityTgt {
 public:
-  TyTransitivityTgt(std::unique_ptr<TyExpr> _e1,
-                    std::unique_ptr<TyExpr> _e2,
-                    std::unique_ptr<TyExpr> _e3);
+  TyTransitivityTgt(std::shared_ptr<TyExpr> _e1,
+                    std::shared_ptr<TyExpr> _e2,
+                    std::shared_ptr<TyExpr> _e3);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyExpr> e1;
-  std::unique_ptr<TyExpr> e2;
-  std::unique_ptr<TyExpr> e3;
+  std::shared_ptr<TyExpr> e1;
+  std::shared_ptr<TyExpr> e2;
+  std::shared_ptr<TyExpr> e3;
 };
 
 struct TyReplaceRhs {
 public:
-  TyReplaceRhs(std::unique_ptr<TyRegister> _x,
-               std::unique_ptr<TyValue> _y,
-               std::unique_ptr<TyExpr> _e1,
-               std::unique_ptr<TyExpr> _e2,
-               std::unique_ptr<TyExpr> _e2_p);
+  TyReplaceRhs(std::shared_ptr<TyRegister> _x,
+               std::shared_ptr<TyValue> _y,
+               std::shared_ptr<TyExpr> _e1,
+               std::shared_ptr<TyExpr> _e2,
+               std::shared_ptr<TyExpr> _e2_p);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyExpr> e1;
-  std::unique_ptr<TyExpr> e2;
-  std::unique_ptr<TyExpr> e2_p;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e1;
+  std::shared_ptr<TyExpr> e2;
+  std::shared_ptr<TyExpr> e2_p;
 };
 
 struct TyReplaceRhsOpt {
 public:
-  TyReplaceRhsOpt(std::unique_ptr<TyRegister> _x,
-                  std::unique_ptr<TyValue> _y,
-                  std::unique_ptr<TyExpr> _e1,
-                  std::unique_ptr<TyExpr> _e2,
-                  std::unique_ptr<TyExpr> _e2_p);
+  TyReplaceRhsOpt(std::shared_ptr<TyRegister> _x,
+                  std::shared_ptr<TyValue> _y,
+                  std::shared_ptr<TyExpr> _e1,
+                  std::shared_ptr<TyExpr> _e2,
+                  std::shared_ptr<TyExpr> _e2_p);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TyExpr> e1;
-  std::unique_ptr<TyExpr> e2;
-  std::unique_ptr<TyExpr> e2_p;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e1;
+  std::shared_ptr<TyExpr> e2;
+  std::shared_ptr<TyExpr> e2_p;
 };
 
 struct TyIntroGhost{
 public :
-  TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g);
+  TyIntroGhost(std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _g);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private :
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyRegister> g;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyRegister> g;
 };
 
 struct ConsAddAssociative : TyInfrule {
 public:
-  ConsAddAssociative(std::unique_ptr<TyAddAssociative> _add_associative);
+  ConsAddAssociative(std::shared_ptr<TyAddAssociative> _add_associative);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule>
-  make(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y,
-       std::unique_ptr<TyRegister> _z, std::unique_ptr<TyConstInt> _c1,
-       std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3,
-       std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y,
+       std::shared_ptr<TyRegister> _z, std::shared_ptr<TyConstInt> _c1,
+       std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TyConstInt> _c3,
+       std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TyAddAssociative> add_associative;
+  std::shared_ptr<TyAddAssociative> add_associative;
 };
 
 struct TyUdivZext{
 public : 
-  TyUdivZext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2);
+  TyUdivZext(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyRegister> k;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TySize> sz1;
-  std::unique_ptr<TySize> sz2;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> k;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz1;
+  std::shared_ptr<TySize> sz2;
 };
 
 struct TyUremZext{
 public : 
-  TyUremZext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2);
+  TyUremZext(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> x;
-  std::unique_ptr<TyRegister> y;
-  std::unique_ptr<TyRegister> k;
-  std::unique_ptr<TyValue> a;
-  std::unique_ptr<TyValue> b;
-  std::unique_ptr<TySize> sz1;
-  std::unique_ptr<TySize> sz2;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> k;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz1;
+  std::shared_ptr<TySize> sz2;
 };
 
 struct TyXorCommutative{
 public : 
-  TyXorCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyXorCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 struct TyXorCommutativeTgt{
 public : 
-  TyXorCommutativeTgt(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  TyXorCommutativeTgt(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
 };
 
 
 
 struct ConsAddConstNot : public TyInfrule{
 public : 
-  ConsAddConstNot(std::unique_ptr<TyAddConstNot> _add_const_not);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  ConsAddConstNot(std::shared_ptr<TyAddConstNot> _add_const_not);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddConstNot> add_const_not;
+  std::shared_ptr<TyAddConstNot> add_const_not;
 };
 
 struct ConsAddDistSub : public TyInfrule{
 public : 
-  ConsAddDistSub(std::unique_ptr<TyAddDistSub> _add_dist_sub);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _minusx, std::unique_ptr<TyValue> _minusy, std::unique_ptr<TyRegister> _w, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsAddDistSub(std::shared_ptr<TyAddDistSub> _add_dist_sub);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _minusx, std::shared_ptr<TyValue> _minusy, std::shared_ptr<TyRegister> _w, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddDistSub> add_dist_sub;
+  std::shared_ptr<TyAddDistSub> add_dist_sub;
 };
 
 struct ConsAddOnebit : public TyInfrule{
 public : 
-  ConsAddOnebit(std::unique_ptr<TyAddOnebit> _add_onebit);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y);
+  ConsAddOnebit(std::shared_ptr<TyAddOnebit> _add_onebit);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddOnebit> add_onebit;
+  std::shared_ptr<TyAddOnebit> add_onebit;
 };
 
 struct ConsAddMask : public TyInfrule{
 public : 
-  ConsAddMask(std::unique_ptr<TyAddMask> _add_mask);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  ConsAddMask(std::shared_ptr<TyAddMask> _add_mask);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddMask> add_mask;
+  std::shared_ptr<TyAddMask> add_mask;
 };
 
 struct ConsAddSelectZero : public TyInfrule{
 public : 
-  ConsAddSelectZero(std::unique_ptr<TyAddSelectZero> _add_select_zero);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  ConsAddSelectZero(std::shared_ptr<TyAddSelectZero> _add_select_zero);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c, std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddSelectZero> add_select_zero;
+  std::shared_ptr<TyAddSelectZero> add_select_zero;
 };
 
 struct ConsAddSelectZero2 : public TyInfrule{
 public : 
-  ConsAddSelectZero2(std::unique_ptr<TyAddSelectZero2> _add_select_zero2);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  ConsAddSelectZero2(std::shared_ptr<TyAddSelectZero2> _add_select_zero2);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c, std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddSelectZero2> add_select_zero2;
+  std::shared_ptr<TyAddSelectZero2> add_select_zero2;
 };
 
 struct ConsAddSextSext : public TyInfrule{
 public : 
-  ConsAddSextSext(std::unique_ptr<TyAddSextSext> _add_sext_sext);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _xprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TySize> _from_sz, std::unique_ptr<TySize> _to_sz);
+  ConsAddSextSext(std::shared_ptr<TyAddSextSext> _add_sext_sext);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _xprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TySize> _from_sz, std::shared_ptr<TySize> _to_sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddSextSext> add_sext_sext;
+  std::shared_ptr<TyAddSextSext> add_sext_sext;
 };
 
 struct ConsAddSub : TyInfrule {
 public:
-  ConsAddSub(std::unique_ptr<TyAddSub> _add_sub);
+  ConsAddSub(std::shared_ptr<TyAddSub> _add_sub);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _minusy,
-                                         std::unique_ptr<TyRegister> _z,
-                                         std::unique_ptr<TyValue> _x,
-                                         std::unique_ptr<TyValue> _y,
-                                         std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _minusy,
+                                         std::shared_ptr<TyRegister> _z,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TyAddSub> add_sub;
+  std::shared_ptr<TyAddSub> add_sub;
 };
 
 struct ConsAddCommutative : TyInfrule {
 public:
-  ConsAddCommutative(std::unique_ptr<TyAddCommutative> _add_comm);
+  ConsAddCommutative(std::shared_ptr<TyAddCommutative> _add_comm);
   void serialize(cereal::JSONOutputArchive &archive) const;
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
-                                         std::unique_ptr<TyValue> _x,
-                                         std::unique_ptr<TyValue> _y,
-                                         std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TyAddCommutative> add_commutative;
+  std::shared_ptr<TyAddCommutative> add_commutative;
 };
 
 struct ConsAddCommutativeTgt : TyInfrule {
 public:
-  ConsAddCommutativeTgt(std::unique_ptr<TyAddCommutativeTgt> _add_comm);
+  ConsAddCommutativeTgt(std::shared_ptr<TyAddCommutativeTgt> _add_comm);
   void serialize(cereal::JSONOutputArchive &archive) const;
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
-                                         std::unique_ptr<TyValue> _x,
-                                         std::unique_ptr<TyValue> _y,
-                                         std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TyAddCommutativeTgt> add_commutative_tgt;
+  std::shared_ptr<TyAddCommutativeTgt> add_commutative_tgt;
 };
 
 struct ConsAddOrAnd : public TyInfrule{
 public : 
-  ConsAddOrAnd(std::unique_ptr<TyAddOrAnd> _add_or_and);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TySize> _sz);
+  ConsAddOrAnd(std::shared_ptr<TyAddOrAnd> _add_or_and);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddOrAnd> add_or_and;
+  std::shared_ptr<TyAddOrAnd> add_or_and;
 };
 
 struct ConsAddShift : TyInfrule {
 public:
-  ConsAddShift(std::unique_ptr<TyAddShift> _add_shift);
+  ConsAddShift(std::shared_ptr<TyAddShift> _add_shift);
   void serialize(cereal::JSONOutputArchive &archive) const;
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _y,
-                                         std::unique_ptr<TyValue> _v,
-                                         std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _y,
+                                         std::shared_ptr<TyValue> _v,
+                                         std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TyAddShift> add_shift;
+  std::shared_ptr<TyAddShift> add_shift;
 };
 
 struct ConsAddXorAnd : public TyInfrule{
 public : 
-  ConsAddXorAnd(std::unique_ptr<TyAddXorAnd> _add_xor_and);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TySize> _sz);
+  ConsAddXorAnd(std::shared_ptr<TyAddXorAnd> _add_xor_and);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddXorAnd> add_xor_and;
+  std::shared_ptr<TyAddXorAnd> add_xor_and;
 };
 
 struct ConsAndCommutative : public TyInfrule{
 public : 
-  ConsAndCommutative(std::unique_ptr<TyAndCommutative> _and_commutative);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsAndCommutative(std::shared_ptr<TyAndCommutative> _and_commutative);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAndCommutative> and_commutative;
+  std::shared_ptr<TyAndCommutative> and_commutative;
 };
 
 struct ConsAndDeMorgan : public TyInfrule{
 public : 
-  ConsAndDeMorgan(std::unique_ptr<TyAndDeMorgan> _and_de_morgan);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  ConsAndDeMorgan(std::shared_ptr<TyAndDeMorgan> _and_de_morgan);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAndDeMorgan> and_de_morgan;
+  std::shared_ptr<TyAndDeMorgan> and_de_morgan;
 };
 
 struct ConsBopDistributiveOverSelectinst : public TyInfrule{
 public : 
-  ConsBopDistributiveOverSelectinst(std::unique_ptr<TyBopDistributiveOverSelectinst> _bop_distributive_over_selectinst);
-  static std::unique_ptr<TyInfrule> make(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty);
+  ConsBopDistributiveOverSelectinst(std::shared_ptr<TyBopDistributiveOverSelectinst> _bop_distributive_over_selectinst);
+  static std::shared_ptr<TyInfrule> make(TyBop _opcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, std::shared_ptr<TySize> _bopsz, std::shared_ptr<TyValueType> _selty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyBopDistributiveOverSelectinst> bop_distributive_over_selectinst;
+  std::shared_ptr<TyBopDistributiveOverSelectinst> bop_distributive_over_selectinst;
 };
 
 struct ConsBopDistributiveOverSelectinst2 : public TyInfrule{
 public : 
-  ConsBopDistributiveOverSelectinst2(std::unique_ptr<TyBopDistributiveOverSelectinst2> _bop_distributive_over_selectinst2);
-  static std::unique_ptr<TyInfrule> make(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty);
+  ConsBopDistributiveOverSelectinst2(std::shared_ptr<TyBopDistributiveOverSelectinst2> _bop_distributive_over_selectinst2);
+  static std::shared_ptr<TyInfrule> make(TyBop _opcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, std::shared_ptr<TySize> _bopsz, std::shared_ptr<TyValueType> _selty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyBopDistributiveOverSelectinst2> bop_distributive_over_selectinst2;
+  std::shared_ptr<TyBopDistributiveOverSelectinst2> bop_distributive_over_selectinst2;
 };
 
 struct ConsFaddCommutativeTgt : public TyInfrule{
 public : 
-  ConsFaddCommutativeTgt(std::unique_ptr<TyFaddCommutativeTgt> _fadd_commutative_tgt);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, TyFloatType _fty);
+  ConsFaddCommutativeTgt(std::shared_ptr<TyFaddCommutativeTgt> _fadd_commutative_tgt);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, TyFloatType _fty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyFaddCommutativeTgt> fadd_commutative_tgt;
+  std::shared_ptr<TyFaddCommutativeTgt> fadd_commutative_tgt;
 };
 
 struct ConsFbopDistributiveOverSelectinst : public TyInfrule{
 public : 
-  ConsFbopDistributiveOverSelectinst(std::unique_ptr<TyFbopDistributiveOverSelectinst> _fbop_distributive_over_selectinst);
-  static std::unique_ptr<TyInfrule> make(TyFbop _fopcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, TyFloatType _fbopty, std::unique_ptr<TyValueType> _selty);
+  ConsFbopDistributiveOverSelectinst(std::shared_ptr<TyFbopDistributiveOverSelectinst> _fbop_distributive_over_selectinst);
+  static std::shared_ptr<TyInfrule> make(TyFbop _fopcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, TyFloatType _fbopty, std::shared_ptr<TyValueType> _selty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyFbopDistributiveOverSelectinst> fbop_distributive_over_selectinst;
+  std::shared_ptr<TyFbopDistributiveOverSelectinst> fbop_distributive_over_selectinst;
 };
 
 struct ConsFbopDistributiveOverSelectinst2 : public TyInfrule{
 public : 
-  ConsFbopDistributiveOverSelectinst2(std::unique_ptr<TyFbopDistributiveOverSelectinst2> _fbop_distributive_over_selectinst2);
-  static std::unique_ptr<TyInfrule> make(TyFbop _fopcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, TyFloatType _fbopty, std::unique_ptr<TyValueType> _selty);
+  ConsFbopDistributiveOverSelectinst2(std::shared_ptr<TyFbopDistributiveOverSelectinst2> _fbop_distributive_over_selectinst2);
+  static std::shared_ptr<TyInfrule> make(TyFbop _fopcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, TyFloatType _fbopty, std::shared_ptr<TyValueType> _selty);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyFbopDistributiveOverSelectinst2> fbop_distributive_over_selectinst2;
+  std::shared_ptr<TyFbopDistributiveOverSelectinst2> fbop_distributive_over_selectinst2;
 };
 
 struct ConsMulBool : TyInfrule {
 public:
-  ConsMulBool(std::unique_ptr<TyMulBool> _mul_bool);
+  ConsMulBool(std::shared_ptr<TyMulBool> _mul_bool);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
-                                         std::unique_ptr<TyRegister> _x,
-                                         std::unique_ptr<TyRegister> _y);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z,
+                                         std::shared_ptr<TyRegister> _x,
+                                         std::shared_ptr<TyRegister> _y);
 
 private:
-  std::unique_ptr<TyMulBool> mul_bool;
+  std::shared_ptr<TyMulBool> mul_bool;
 };
 
 struct ConsMulCommutative : public TyInfrule{
 public : 
-  ConsMulCommutative(std::unique_ptr<TyMulCommutative> _mul_commutative);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsMulCommutative(std::shared_ptr<TyMulCommutative> _mul_commutative);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyMulCommutative> mul_commutative;
+  std::shared_ptr<TyMulCommutative> mul_commutative;
 };
 
 struct ConsMulMone : public TyInfrule{
 public : 
-  ConsMulMone(std::unique_ptr<TyMulMone> _mul_mone);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  ConsMulMone(std::shared_ptr<TyMulMone> _mul_mone);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyMulMone> mul_mone;
+  std::shared_ptr<TyMulMone> mul_mone;
 };
 
 struct ConsMulNeg : TyInfrule {
 public:
-  ConsMulNeg(std::unique_ptr<TyMulNeg> _mul_neg);
+  ConsMulNeg(std::shared_ptr<TyMulNeg> _mul_neg);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
-                                         std::unique_ptr<TyValue> _mx,
-                                         std::unique_ptr<TyValue> _my,
-                                         std::unique_ptr<TyValue> _x,
-                                         std::unique_ptr<TyValue> _y,
-                                         std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z,
+                                         std::shared_ptr<TyValue> _mx,
+                                         std::shared_ptr<TyValue> _my,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
 
 private:
-    std::unique_ptr<TyMulNeg> mul_neg;
+    std::shared_ptr<TyMulNeg> mul_neg;
 };
 
 struct ConsNegVal : TyInfrule {
 public:
-  ConsNegVal(std::unique_ptr<TyNegVal> _neg_val);
+  ConsNegVal(std::shared_ptr<TyNegVal> _neg_val);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make
-          (std::unique_ptr<TyConstInt> _c1,
-           std::unique_ptr<TyConstInt> _c2,
-           std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make
+          (std::shared_ptr<TyConstInt> _c1,
+           std::shared_ptr<TyConstInt> _c2,
+           std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TyNegVal> neg_val;
+  std::shared_ptr<TyNegVal> neg_val;
 };
 
 struct ConsAddSignbit : TyInfrule {
 public:
-  ConsAddSignbit(std::unique_ptr<TyAddSignbit> _add_signbit);
+  ConsAddSignbit(std::shared_ptr<TyAddSignbit> _add_signbit);
   void serialize(cereal::JSONOutputArchive &archive) const;
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x,
-                                         std::unique_ptr<TyValue> _e1,
-                                         std::unique_ptr<TyValue> _e2,
-                                         std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x,
+                                         std::shared_ptr<TyValue> _e1,
+                                         std::shared_ptr<TyValue> _e2,
+                                         std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TyAddSignbit> add_signbit;
+  std::shared_ptr<TyAddSignbit> add_signbit;
 };
 
 struct ConsAddZextBool : public TyInfrule{
 public : 
-  ConsAddZextBool(std::unique_ptr<TyAddZextBool> _add_zext_bool);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _b, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz);
+  ConsAddZextBool(std::shared_ptr<TyAddZextBool> _add_zext_bool);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _b, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyAddZextBool> add_zext_bool;
+  std::shared_ptr<TyAddZextBool> add_zext_bool;
 };
 
 struct ConsSdivMone : public TyInfrule{
 public : 
-  ConsSdivMone(std::unique_ptr<TySdivMone> _div_mone);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  ConsSdivMone(std::shared_ptr<TySdivMone> _div_mone);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySdivMone> div_mone;
+  std::shared_ptr<TySdivMone> div_mone;
 };
 
 struct ConsMulShl : public TyInfrule{
 public : 
-  ConsMulShl(std::unique_ptr<TyMulShl> _mul_shl);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  ConsMulShl(std::shared_ptr<TyMulShl> _mul_shl);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyMulShl> mul_shl;
+  std::shared_ptr<TyMulShl> mul_shl;
 };
 
 struct ConsOrCommutative : public TyInfrule{
 public : 
-  ConsOrCommutative(std::unique_ptr<TyOrCommutative> _or_commutative);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsOrCommutative(std::shared_ptr<TyOrCommutative> _or_commutative);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyOrCommutative> or_commutative;
+  std::shared_ptr<TyOrCommutative> or_commutative;
 };
 
 struct ConsOrOr : public TyInfrule{
 public : 
-  ConsOrOr(std::unique_ptr<TyOrOr> _or_or);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  ConsOrOr(std::shared_ptr<TyOrOr> _or_or);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyOrOr> or_or;
+  std::shared_ptr<TyOrOr> or_or;
 };
 
 struct ConsOrOr2 : public TyInfrule{
 public : 
-  ConsOrOr2(std::unique_ptr<TyOrOr2> _or_or2);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _yprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  ConsOrOr2(std::shared_ptr<TyOrOr2> _or_or2);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyOrOr2> or_or2;
+  std::shared_ptr<TyOrOr2> or_or2;
 };
 
 struct ConsOrXor : public TyInfrule{
 public : 
-  ConsOrXor(std::unique_ptr<TyOrXor> _or_xor);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _w, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  ConsOrXor(std::shared_ptr<TyOrXor> _or_xor);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyOrXor> or_xor;
+  std::shared_ptr<TyOrXor> or_xor;
 };
 
 struct ConsOrXor2 : public TyInfrule{
 public : 
-  ConsOrXor2(std::unique_ptr<TyOrXor2> _or_xor2);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x1, std::unique_ptr<TyValue> _y1, std::unique_ptr<TyValue> _x2, std::unique_ptr<TyValue> _y2, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz);
+  ConsOrXor2(std::shared_ptr<TyOrXor2> _or_xor2);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x1, std::shared_ptr<TyValue> _y1, std::shared_ptr<TyValue> _x2, std::shared_ptr<TyValue> _y2, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyOrXor2> or_xor2;
+  std::shared_ptr<TyOrXor2> or_xor2;
 };
 
 struct ConsRemNeg : public TyInfrule{
 public : 
-  ConsRemNeg(std::unique_ptr<TyRemNeg> _rem_neg);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _my, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsRemNeg(std::shared_ptr<TyRemNeg> _rem_neg);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _my, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRemNeg> rem_neg;
+  std::shared_ptr<TyRemNeg> rem_neg;
 };
 
 struct ConsSubAdd : TyInfrule {
 public:
-  ConsSubAdd(std::unique_ptr<TySubAdd> _sub_add);
+  ConsSubAdd(std::shared_ptr<TySubAdd> _sub_add);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
-                                         std::unique_ptr<TyValue> _my,
-                                         std::unique_ptr<TyRegister> _x,
-                                         std::unique_ptr<TyValue> _y,
-                                         std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z,
+                                         std::shared_ptr<TyValue> _my,
+                                         std::shared_ptr<TyRegister> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TySubAdd> sub_add;
+  std::shared_ptr<TySubAdd> sub_add;
 };
 
 struct ConsSubMone : public TyInfrule{
 public : 
-  ConsSubMone(std::unique_ptr<TySubMone> _sub_mone);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  ConsSubMone(std::shared_ptr<TySubMone> _sub_mone);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySubMone> sub_mone;
+  std::shared_ptr<TySubMone> sub_mone;
 };
 
 struct ConsSubOnebit : public TyInfrule{
 public : 
-  ConsSubOnebit(std::unique_ptr<TySubOnebit> _sub_onebit);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y);
+  ConsSubOnebit(std::shared_ptr<TySubOnebit> _sub_onebit);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySubOnebit> sub_onebit;
+  std::shared_ptr<TySubOnebit> sub_onebit;
 };
 
 struct ConsSubConstAdd : public TyInfrule{
 public : 
-  ConsSubConstAdd(std::unique_ptr<TySubConstAdd> _sub_const_add);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3, std::unique_ptr<TySize> _sz);
+  ConsSubConstAdd(std::shared_ptr<TySubConstAdd> _sub_const_add);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySubConstAdd> sub_const_add;
+  std::shared_ptr<TySubConstAdd> sub_const_add;
 };
 
 struct ConsSubConstNot : public TyInfrule{
 public : 
-  ConsSubConstNot(std::unique_ptr<TySubConstNot> _sub_const_not);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz);
+  ConsSubConstNot(std::shared_ptr<TySubConstNot> _sub_const_not);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySubConstNot> sub_const_not;
+  std::shared_ptr<TySubConstNot> sub_const_not;
 };
 
 struct ConsSubOrXor : public TyInfrule{
 public : 
-  ConsSubOrXor(std::unique_ptr<TySubOrXor> _sub_or_xor);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TySize> _sz);
+  ConsSubOrXor(std::shared_ptr<TySubOrXor> _sub_or_xor);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySubOrXor> sub_or_xor;
+  std::shared_ptr<TySubOrXor> sub_or_xor;
 };
 
 struct ConsSubRemove : TyInfrule {
 public:
-  ConsSubRemove(std::unique_ptr<TySubRemove> _sub_remove);
+  ConsSubRemove(std::shared_ptr<TySubRemove> _sub_remove);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z,
-                                         std::unique_ptr<TyRegister> _y,
-                                         std::unique_ptr<TyValue> _a,
-                                         std::unique_ptr<TyValue> _b,
-                                         std::unique_ptr<TySize> _sz);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z,
+                                         std::shared_ptr<TyRegister> _y,
+                                         std::shared_ptr<TyValue> _a,
+                                         std::shared_ptr<TyValue> _b,
+                                         std::shared_ptr<TySize> _sz);
 
 private:
-  std::unique_ptr<TySubRemove> sub_remove;
+  std::shared_ptr<TySubRemove> sub_remove;
 };
 
 struct ConsSubSdiv : public TyInfrule{
 public : 
-  ConsSubSdiv(std::unique_ptr<TySubSdiv> _sub_sdiv);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz);
+  ConsSubSdiv(std::shared_ptr<TySubSdiv> _sub_sdiv);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySubSdiv> sub_sdiv;
+  std::shared_ptr<TySubSdiv> sub_sdiv;
 };
 
 struct ConsSubSub : public TyInfrule{
 public : 
-  ConsSubSub(std::unique_ptr<TySubSub> _sub_sub);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _w, std::unique_ptr<TySize> _sz);
+  ConsSubSub(std::shared_ptr<TySubSub> _sub_sub);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySubSub> sub_sub;
+  std::shared_ptr<TySubSub> sub_sub;
 };
 
 struct ConsSubShl : public TyInfrule{
 public : 
-  ConsSubShl(std::unique_ptr<TySubShl> _sub_shl);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _mx, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz);
+  ConsSubShl(std::shared_ptr<TySubShl> _sub_shl);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _mx, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySubShl> sub_shl;
+  std::shared_ptr<TySubShl> sub_shl;
 };
 
 struct ConsSdivSubSrem : public TyInfrule{
 public : 
-  ConsSdivSubSrem(std::unique_ptr<TySdivSubSrem> _div_sub_srem);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsSdivSubSrem(std::shared_ptr<TySdivSubSrem> _div_sub_srem);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _b, std::shared_ptr<TyRegister> _a, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TySdivSubSrem> div_sub_srem;
+  std::shared_ptr<TySdivSubSrem> div_sub_srem;
 };
 struct ConsUdivSubUrem : public TyInfrule{
 public : 
-  ConsUdivSubUrem(std::unique_ptr<TyUdivSubUrem> _div_sub_urem);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsUdivSubUrem(std::shared_ptr<TyUdivSubUrem> _div_sub_urem);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _b, std::shared_ptr<TyRegister> _a, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyUdivSubUrem> div_sub_urem;
+  std::shared_ptr<TyUdivSubUrem> div_sub_urem;
 };
 
 struct ConsTransitivity : TyInfrule {
 public:
-  ConsTransitivity(std::unique_ptr<TyTransitivity> _transitivity);
+  ConsTransitivity(std::shared_ptr<TyTransitivity> _transitivity);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyExpr> _e1,
-                                         std::unique_ptr<TyExpr> _e2,
-                                         std::unique_ptr<TyExpr> _e3);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e1,
+                                         std::shared_ptr<TyExpr> _e2,
+                                         std::shared_ptr<TyExpr> _e3);
 
 private:
-  std::unique_ptr<TyTransitivity> transitivity;
+  std::shared_ptr<TyTransitivity> transitivity;
 };
 
 struct ConsTransitivityTgt : TyInfrule {
 public:
-  ConsTransitivityTgt(std::unique_ptr<TyTransitivityTgt> _transitivity_tgt);
+  ConsTransitivityTgt(std::shared_ptr<TyTransitivityTgt> _transitivity_tgt);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyExpr> _e1,
-                                         std::unique_ptr<TyExpr> _e2,
-                                         std::unique_ptr<TyExpr> _e3);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e1,
+                                         std::shared_ptr<TyExpr> _e2,
+                                         std::shared_ptr<TyExpr> _e3);
 
 private:
-  std::unique_ptr<TyTransitivityTgt> transitivity_tgt;
+  std::shared_ptr<TyTransitivityTgt> transitivity_tgt;
 };
 
 struct ConsReplaceRhs : TyInfrule {
 public:
-  ConsReplaceRhs(std::unique_ptr<TyReplaceRhs> _replace_rhs);
+  ConsReplaceRhs(std::shared_ptr<TyReplaceRhs> _replace_rhs);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x,
-                                         std::unique_ptr<TyValue> _y,
-                                         std::unique_ptr<TyExpr> _e1,
-                                         std::unique_ptr<TyExpr> _e2,
-                                         std::unique_ptr<TyExpr> _e2_p);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TyExpr> _e1,
+                                         std::shared_ptr<TyExpr> _e2,
+                                         std::shared_ptr<TyExpr> _e2_p);
 
 private:
-  std::unique_ptr<TyReplaceRhs> replace_rhs;
+  std::shared_ptr<TyReplaceRhs> replace_rhs;
 };
 
 
 struct ConsReplaceRhsOpt : TyInfrule {
 public:
-  ConsReplaceRhsOpt(std::unique_ptr<TyReplaceRhsOpt> _replace_rhs_opt);
+  ConsReplaceRhsOpt(std::shared_ptr<TyReplaceRhsOpt> _replace_rhs_opt);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x,
-                                         std::unique_ptr<TyValue> _y,
-                                         std::unique_ptr<TyExpr> _e1,
-                                         std::unique_ptr<TyExpr> _e2,
-                                         std::unique_ptr<TyExpr> _e2_p);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TyExpr> _e1,
+                                         std::shared_ptr<TyExpr> _e2,
+                                         std::shared_ptr<TyExpr> _e2_p);
 
 private:
-  std::unique_ptr<TyReplaceRhsOpt> replace_rhs_opt;
+  std::shared_ptr<TyReplaceRhsOpt> replace_rhs_opt;
 };
 
 struct ConsUdivZext : public TyInfrule{
 public : 
-  ConsUdivZext(std::unique_ptr<TyUdivZext> _udiv_zext);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2);
+  ConsUdivZext(std::shared_ptr<TyUdivZext> _udiv_zext);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyUdivZext> udiv_zext;
+  std::shared_ptr<TyUdivZext> udiv_zext;
 };
 
 struct ConsUremZext : public TyInfrule{
 public : 
-  ConsUremZext(std::unique_ptr<TyUremZext> _urem_zext);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2);
+  ConsUremZext(std::shared_ptr<TyUremZext> _urem_zext);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyUremZext> urem_zext;
+  std::shared_ptr<TyUremZext> urem_zext;
 };
 
 
 struct ConsIntroGhost : public TyInfrule{
 public :
-  ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g);
+  ConsIntroGhost(std::shared_ptr<TyIntroGhost> _intro_ghost);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _g);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private :
-  std::unique_ptr<TyIntroGhost> intro_ghost;
+  std::shared_ptr<TyIntroGhost> intro_ghost;
 };
 
 struct ConsXorCommutative : public TyInfrule{
 public : 
-  ConsXorCommutative(std::unique_ptr<TyXorCommutative> _xor_commutative);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsXorCommutative(std::shared_ptr<TyXorCommutative> _xor_commutative);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyXorCommutative> xor_commutative;
+  std::shared_ptr<TyXorCommutative> xor_commutative;
 };
 
 struct ConsXorCommutativeTgt : public TyInfrule{
 public : 
-  ConsXorCommutativeTgt(std::unique_ptr<TyXorCommutativeTgt> _xor_commutative_tgt);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  ConsXorCommutativeTgt(std::shared_ptr<TyXorCommutativeTgt> _xor_commutative_tgt);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyXorCommutativeTgt> xor_commutative_tgt;
+  std::shared_ptr<TyXorCommutativeTgt> xor_commutative_tgt;
 };
 
 

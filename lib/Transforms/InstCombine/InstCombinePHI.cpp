@@ -78,11 +78,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     return nullptr;
 
   // Otherwise, this is safe to transform!
-  
-  llvmberry::ValidationUnit::Begin("fold_phi_bin",
-                                   FirstInst->getParent()->getParent());
-
-  // ex) FirstInst x = a + b  I = a + c
 
   Value *InLHS = FirstInst->getOperand(0);    //a
   Value *InRHS = FirstInst->getOperand(1);    //b
@@ -117,6 +112,10 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
       }
     }
   }
+
+  // ex) FirstInst x = a + b  I = a + c
+  llvmberry::ValidationUnit::Begin("fold_phi_bin",
+                                   FirstInst->getParent()->getParent());
 
   llvmberry::ValidationUnit::GetInstance()->intrude(
           [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
@@ -260,11 +259,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
             else {
               //x =a + b y = a + b
 
-              // intrude for x = a + b, y = a + b, z = phi(x, y) -> z = a + b.
-              // b is not constant.
-              // PN z = (x, y) NewLHs = null, NewRHs t = (b, c) NewRHS position is ahead PN
-              // TODO.
-
               for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
                 Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
 
@@ -277,7 +271,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                                  llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
 
                 if(BinaryOperator *BinOp = cast<BinaryOperator>(InInst)){
-                  llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
                   //z = x^ -> z = x
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsTransitivity::make(
@@ -659,12 +652,131 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
   }
 
   Value *PhiVal;
+
+  llvmberry::ValidationUnit::Begin("fold_phi_bin",
+                                   FirstInst->getParent()->getParent());
+  
+  llvmberry::ValidationUnit::GetInstance()->intrude(
+          [&PN](llvmberry::ValidationUnit::Dictionary &data,
+                                             llvmberry::CoreHint &hints) {
+            std::string oldphi = llvmberry::getVariable(PN);
+            BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
+            llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
+
+            PROPAGATE(   //from PN to insertPos propagate z in maydiff
+                    llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
+                    BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
+            });
   if (InVal) {
     // The new PHI unions all of the same values together.  This is really
     // common, so we handle it intelligently here for compile-time speed.
+    llvmberry::ValidationUnit::GetInstance()->intrude(
+          [&PN, &ConstantOp](llvmberry::ValidationUnit::Dictionary &data, 
+                                                          llvmberry::CoreHint &hints){      
+      std::string oldphi = llvmberry::getVariable(PN);
+      BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
+
+      for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+        Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
+        std::string reg = llvmberry::getVariable(*InInst);
+
+        BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
+
+        Value *SpecialOperand = InInst->getOperand(0);
+        std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
+
+        PROPAGATE( //from I to endofblock propagate x or y depend on edge
+                LESSDEF(VAR(reg, Physical),
+                        RHS(reg, Physical, SRC), SRC),
+                BOUNDS(INSTPOS(SRC, InInst),
+                       llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
+
+        //z = x^ -> z = x
+        INFRULE(PHIPOS(SRC, PN, InInst),
+                llvmberry::ConsTransitivity::make(
+                        VAR(oldphi, Physical), VAR(reg, Previous),
+                        VAR(reg, Physical)));
+
+        // z = x -> z = a + b
+        INFRULE(PHIPOS(SRC, PN, InInst),
+                llvmberry::ConsTransitivity::make(
+                        VAR(oldphi, Physical), VAR(reg, Physical),
+                        INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
+                                   VAL(BinOp->getOperand(1), Physical)))));
+
+        // { z >= a + b } at src after phinode
+        PROPAGATE(
+                LESSDEF(VAR(oldphi, Physical),
+                        RHS(reg, Physical, SRC), SRC),
+                BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+      }
+  });
     PhiVal = InVal;
     delete NewPN;
   } else {
+
+    llvmberry::ValidationUnit::GetInstance()->intrude(
+          [&PN, &NewPN, &ConstantOp](llvmberry::ValidationUnit::Dictionary &data,
+                                                          llvmberry::CoreHint &hints){ 
+
+      std::string oldphi = llvmberry::getVariable(PN);
+      BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
+
+     for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+        Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
+        std::string reg = llvmberry::getVariable(*InInst);
+        BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
+
+        Value *SpecialOperand = InInst->getOperand(0);
+        std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
+        std::string newphi = llvmberry::getVariable(*NewPN);
+
+        PROPAGATE(  //t maydiff global propagate
+                  llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
+                  llvmberry::ConsGlobal::make());
+
+        PROPAGATE( //from I to endofblock propagate x or y depend on edge
+                LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
+                BOUNDS(INSTPOS(SRC, InInst),
+                       llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
+
+        // x^ >= a^+ const , z = x^ -> z >= a^ + const
+        INFRULE(PHIPOS(SRC, PN, InInst),
+                llvmberry::ConsTransitivity::make(
+                        VAR(oldphi, Physical), VAR(reg, Previous),
+                        INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), VAL(SpecialOperand, Previous),
+                                   VAL(ConstantOp, Physical)))));
+
+        // introduce a^ >= k && k >= a^
+        INFRULE(PHIPOS(TGT, PN, InInst),
+                llvmberry::ConsIntroGhost::make(VAL(SpecialOperand, Previous), REGISTER("K", Ghost)));
+
+        // infer k >= a^ && a^ >= t -> k >= t in tgt
+        INFRULE(PHIPOS(TGT, PN, InInst),
+                llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous),
+                                                     VAR(newphi, Physical)));
+
+        // infer z = a^ + const -> z >= K + const in src
+        INFRULE(PHIPOS(SRC, PN, InInst),
+                llvmberry::ConsReplaceRhs::make(
+                        REGISTER(reg_block_special, Previous), ID("K", Ghost), VAR(oldphi, Physical),
+                        INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), VAL(SpecialOperand, Previous),
+                                   VAL(ConstantOp, Physical))),
+                        INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), ID("K", Ghost),
+                                   VAL(ConstantOp, Physical)))));
+
+        // { z >= K + const } at src after phinode
+        PROPAGATE(LESSDEF(VAR(oldphi, Physical),
+                          INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), ID("K", Ghost),
+                                     VAL(ConstantOp, Physical))), SRC),
+                  BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+
+        // { K  >= t } at tgt after phinode
+        PROPAGATE(LESSDEF(VAR("K", Ghost),
+                          VAR(newphi, Physical), TGT),
+                  BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
+      }
+  });
     InsertNewInstBefore(NewPN, PN);
     PhiVal = NewPN;
   }
