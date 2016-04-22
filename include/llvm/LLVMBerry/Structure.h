@@ -15,7 +15,7 @@ namespace cereal {
 [[noreturn]] void throw_exception(std::exception const &e);
 
 template <class T>
-void save(cereal::JSONOutputArchive &archive, std::unique_ptr<T> const &ptr) {
+void save(cereal::JSONOutputArchive &archive, std::shared_ptr<T> const &ptr) {
   ptr->serialize(archive);
 }
 } // cereal
@@ -87,48 +87,48 @@ public:
 
 struct ConsPhinode : public TyInstrIndex {
 public:
-  ConsPhinode(std::unique_ptr<TyPositionPhinode> _position_phinode);
+  ConsPhinode(std::shared_ptr<TyPositionPhinode> _position_phinode);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyPositionPhinode> position_phinode;
+  std::shared_ptr<TyPositionPhinode> position_phinode;
 };
 
 struct ConsCommand : public TyInstrIndex {
 public:
-  ConsCommand(std::unique_ptr<TyPositionCommand> _position_command);
+  ConsCommand(std::shared_ptr<TyPositionCommand> _position_command);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  /* static std::unique_ptr<TyPosition> make(const llvm::Instruction &I, */
+  /* static std::shared_ptr<TyPosition> make(const llvm::Instruction &I, */
   /*                                         enum TyScope _scope); */
 
 private:
-  std::unique_ptr<TyPositionCommand> position_command;
+  std::shared_ptr<TyPositionCommand> position_command;
 };
 
 struct TyPosition {
 public:
   TyPosition(enum TyScope _scope, std::string _block_name,
-             std::unique_ptr<TyInstrIndex> _instr_index);
+             std::shared_ptr<TyInstrIndex> _instr_index);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
+  static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           const llvm::Instruction &I);
-  static std::unique_ptr<TyPosition>
+  static std::shared_ptr<TyPosition>
   make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB);
-  static std::unique_ptr<TyPosition>
+  static std::shared_ptr<TyPosition>
   make_start_of_block(enum TyScope _scope, std::string _block_name);
-  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
+  static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           std::string _block_name,
                                           std::string _prev_block_name);
-  static std::unique_ptr<TyPosition> make(enum TyScope _scope,
+  static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           const llvm::Instruction &I,
                                           std::string _prev_block_name);
 
 private:
   enum TyScope scope;
   std::string block_name;
-  std::unique_ptr<TyInstrIndex> instr_index;
+  std::shared_ptr<TyInstrIndex> instr_index;
 };
 
 /* value */
@@ -140,7 +140,7 @@ public:
   TyRegister(std::string _name, enum TyTag _tag);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyRegister> make(std::string _name, enum TyTag _tag);
+  static std::shared_ptr<TyRegister> make(std::string _name, enum TyTag _tag);
 
 private:
   std::string name;
@@ -166,16 +166,16 @@ private:
 struct TyValueType{
 public : 
   virtual void serialize(cereal::JSONOutputArchive& archive) const = 0;
-  static std::unique_ptr<TyValueType> make(const llvm::Type &type);
+  static std::shared_ptr<TyValueType> make(const llvm::Type &type);
 };
 
 struct ConsIntValueType : public TyValueType{
 public : 
-  ConsIntValueType(std::unique_ptr<TyIntType> _int_type);
+  ConsIntValueType(std::shared_ptr<TyIntType> _int_type);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyIntType> int_type;
+  std::shared_ptr<TyIntType> int_type;
 };
 
 struct ConsFloatValueType : public TyValueType{
@@ -198,12 +198,12 @@ private :
 
 struct ConsPtrType : public TyValueType{
 public : 
-  ConsPtrType(int _address_space, std::unique_ptr<TyValueType> _valuetype);
+  ConsPtrType(int _address_space, std::shared_ptr<TyValueType> _valuetype);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
   int address_space;
-  std::unique_ptr<TyValueType> valuetype;
+  std::shared_ptr<TyValueType> valuetype;
 };
 
 
@@ -211,15 +211,15 @@ private :
 
 struct TyConstInt {
 public:
-  TyConstInt(int64_t _int_value, std::unique_ptr<TyIntType> _int_type);
+  TyConstInt(int64_t _int_value, std::shared_ptr<TyIntType> _int_type);
   TyConstInt(int64_t _int_value, int _bitwidth);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyConstInt> make(int64_t _int_value, int _bitwidth);
+  static std::shared_ptr<TyConstInt> make(int64_t _int_value, int _bitwidth);
 
 private:
   int64_t int_value;
-  std::unique_ptr<TyIntType> int_type;
+  std::shared_ptr<TyIntType> int_type;
 };
 
 struct TyConstFloat {
@@ -227,7 +227,7 @@ public:
   TyConstFloat(double _float_value, enum TyFloatType _float_type);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyConstFloat> make(double _float_value,
+  static std::shared_ptr<TyConstFloat> make(double _float_value,
                                             enum TyFloatType _float_type);
 
 private:
@@ -242,31 +242,31 @@ public:
 
 struct ConsConstInt : public TyConstant {
 public:
-  ConsConstInt(std::unique_ptr<TyConstInt> _const_int);
+  ConsConstInt(std::shared_ptr<TyConstInt> _const_int);
   ConsConstInt(int64_t _int_value, int _bitwidth);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyConstInt> const_int;
+  std::shared_ptr<TyConstInt> const_int;
 };
 
 struct ConsConstFloat : public TyConstant {
 public:
-  ConsConstFloat(std::unique_ptr<TyConstFloat> _const_float);
+  ConsConstFloat(std::shared_ptr<TyConstFloat> _const_float);
   ConsConstFloat(float _float_value, enum TyFloatType _float_type);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyConstFloat> const_float;
+  std::shared_ptr<TyConstFloat> const_float;
 };
 
 struct ConsConstUndef : public TyConstant {
 public:
-  ConsConstUndef(std::unique_ptr<TyValueType> _value_type);
+  ConsConstUndef(std::shared_ptr<TyValueType> _value_type);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private:
-  std::unique_ptr<TyValueType> value_type;
+  std::shared_ptr<TyValueType> value_type;
 };
 
 // value
@@ -275,26 +275,26 @@ struct TyValue {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 
-  static std::unique_ptr<TyValue> make(const llvm::Value &value, enum TyTag _tag = llvmberry::Physical);
+  static std::shared_ptr<TyValue> make(const llvm::Value &value, enum TyTag _tag = llvmberry::Physical);
 };
 
 struct ConsId : public TyValue {
 public:
-  ConsId(std::unique_ptr<TyRegister> _register);
+  ConsId(std::shared_ptr<TyRegister> _register);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyValue> make(std::string _name,
+  static std::shared_ptr<TyValue> make(std::string _name,
                                        enum TyTag _tag);
 
-  std::unique_ptr<TyRegister> reg;
+  std::shared_ptr<TyRegister> reg;
 };
 
 struct ConsConstVal : public TyValue {
 public:
-  ConsConstVal(std::unique_ptr<TyConstant> _constant);
+  ConsConstVal(std::shared_ptr<TyConstant> _constant);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  std::unique_ptr<TyConstant> constant;
+  std::shared_ptr<TyConstant> constant;
 };
 
 // instruction
@@ -302,80 +302,80 @@ public:
 struct TyInstruction {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
-  static std::unique_ptr<TyInstruction> make(const llvm::Instruction &inst);
+  static std::shared_ptr<TyInstruction> make(const llvm::Instruction &inst);
 };
 
 struct TyBinaryOperator{
 public : 
-  TyBinaryOperator(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
+  TyBinaryOperator(TyBop _opcode, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   void serialize(cereal::JSONOutputArchive& archive) const;
-  static std::unique_ptr<TyBinaryOperator> make(const llvm::BinaryOperator &bop);
+  static std::shared_ptr<TyBinaryOperator> make(const llvm::BinaryOperator &bop);
 
 private : 
   TyBop opcode;
-  std::unique_ptr<TyValueType> operandtype;
-  std::unique_ptr<TyValue> operand1;
-  std::unique_ptr<TyValue> operand2;
+  std::shared_ptr<TyValueType> operandtype;
+  std::shared_ptr<TyValue> operand1;
+  std::shared_ptr<TyValue> operand2;
 };
 
 struct TyFloatBinaryOperator{
 public : 
-  TyFloatBinaryOperator(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
+  TyFloatBinaryOperator(TyFbop _opcode, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   void serialize(cereal::JSONOutputArchive& archive) const;
-  static std::unique_ptr<TyFloatBinaryOperator> make(const llvm::BinaryOperator &bop);
+  static std::shared_ptr<TyFloatBinaryOperator> make(const llvm::BinaryOperator &bop);
 
 private : 
   TyFbop opcode;
-  std::unique_ptr<TyValueType> operandtype;
-  std::unique_ptr<TyValue> operand1;
-  std::unique_ptr<TyValue> operand2;
+  std::shared_ptr<TyValueType> operandtype;
+  std::shared_ptr<TyValue> operand1;
+  std::shared_ptr<TyValue> operand2;
 };
 
 struct TyLoadInst{
 public : 
-  TyLoadInst(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align);
+  TyLoadInst(std::shared_ptr<TyValueType> _pointertype, std::shared_ptr<TyValueType> _valtype, std::shared_ptr<TyValue> _ptrvalue, int _align);
   void serialize(cereal::JSONOutputArchive& archive) const;
-  static std::unique_ptr<TyLoadInst> make(const llvm::LoadInst &li);
-  static std::unique_ptr<TyLoadInst> make(const llvm::StoreInst &si);
+  static std::shared_ptr<TyLoadInst> make(const llvm::LoadInst &li);
+  static std::shared_ptr<TyLoadInst> make(const llvm::StoreInst &si);
 
 private : 
-  std::unique_ptr<TyValueType> pointertype;
-  std::unique_ptr<TyValueType> valtype;
-  std::unique_ptr<TyValue> ptrvalue;
+  std::shared_ptr<TyValueType> pointertype;
+  std::shared_ptr<TyValueType> valtype;
+  std::shared_ptr<TyValue> ptrvalue;
   int align;
 };
 
 struct ConsBinaryOp : public TyInstruction{
 public : 
-  ConsBinaryOp(std::unique_ptr<TyBinaryOperator> _binary_operator);
-  static std::unique_ptr<TyInstruction> make(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
-  static std::unique_ptr<TyInstruction> make(const llvm::BinaryOperator &bop);
+  ConsBinaryOp(std::shared_ptr<TyBinaryOperator> _binary_operator);
+  static std::shared_ptr<TyInstruction> make(TyBop _opcode, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
+  static std::shared_ptr<TyInstruction> make(const llvm::BinaryOperator &bop);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyBinaryOperator> binary_operator;
+  std::shared_ptr<TyBinaryOperator> binary_operator;
 };
 
 struct ConsFloatBinaryOp : public TyInstruction{
 public : 
-  ConsFloatBinaryOp(std::unique_ptr<TyFloatBinaryOperator> _binary_operator);
-  static std::unique_ptr<TyInstruction> make(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2);
-  static std::unique_ptr<TyInstruction> make(const llvm::BinaryOperator &bop);
+  ConsFloatBinaryOp(std::shared_ptr<TyFloatBinaryOperator> _binary_operator);
+  static std::shared_ptr<TyInstruction> make(TyFbop _opcode, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
+  static std::shared_ptr<TyInstruction> make(const llvm::BinaryOperator &bop);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyFloatBinaryOperator> binary_operator;
+  std::shared_ptr<TyFloatBinaryOperator> binary_operator;
 };
 
 struct ConsLoadInst : public TyInstruction{
 public : 
-  ConsLoadInst(std::unique_ptr<TyLoadInst> _load_inst);
-  static std::unique_ptr<TyInstruction> make(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align);
-  static std::unique_ptr<TyInstruction> make(const llvm::LoadInst &li);
+  ConsLoadInst(std::shared_ptr<TyLoadInst> _load_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _pointertype, std::shared_ptr<TyValueType> _valtype, std::shared_ptr<TyValue> _ptrvalue, int _align);
+  static std::shared_ptr<TyInstruction> make(const llvm::LoadInst &li);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyLoadInst> load_inst;
+  std::shared_ptr<TyLoadInst> load_inst;
 };
 
 
@@ -391,7 +391,7 @@ public:
   ConsSize(int _size);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TySize> make(int _size);
+  static std::shared_ptr<TySize> make(int _size);
 
 private:
   int size;
@@ -405,40 +405,40 @@ struct TyExpr {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 
-  static std::unique_ptr<TyExpr> make(const llvm::Value &value, enum TyTag _tag);
+  static std::shared_ptr<TyExpr> make(const llvm::Value &value, enum TyTag _tag);
 };
 
 struct ConsVar : public TyExpr {
 public:
-  ConsVar(std::unique_ptr<TyRegister> _register_name);
+  ConsVar(std::shared_ptr<TyRegister> _register_name);
   ConsVar(std::string _name, enum TyTag _tag);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyExpr> make(std::string _name,
+  static std::shared_ptr<TyExpr> make(std::string _name,
                                       enum TyTag _tag);
 
 private:
-  std::unique_ptr<TyRegister> register_name;
+  std::shared_ptr<TyRegister> register_name;
 };
 
 struct ConsRhs : public TyExpr {
 public:
-  ConsRhs(std::unique_ptr<TyRegister> _register_name, enum TyScope _scope);
+  ConsRhs(std::shared_ptr<TyRegister> _register_name, enum TyScope _scope);
   ConsRhs(std::string _name, enum TyTag _tag, enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyExpr> make(std::string _name,
+  static std::shared_ptr<TyExpr> make(std::string _name,
                                       enum TyTag _tag,
                                       enum TyScope _scope);
 
 private:
-  std::unique_ptr<TyRegister> register_name;
+  std::shared_ptr<TyRegister> register_name;
   enum TyScope scope;
 };
 
 struct ConsConst : public TyExpr {
 public:
-  ConsConst(std::unique_ptr<TyConstant> _constant);
+  ConsConst(std::shared_ptr<TyConstant> _constant);
 
   ConsConst(int _int_value, int _value);
   ConsConst(float _float_value, enum TyFloatType _float_type);
@@ -446,76 +446,76 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyConstant> constant;
+  std::shared_ptr<TyConstant> constant;
 };
 
 struct ConsInsn : public TyExpr{
 public : 
-  ConsInsn(std::unique_ptr<TyInstruction> _instruction);
+  ConsInsn(std::shared_ptr<TyInstruction> _instruction);
   void serialize(cereal::JSONOutputArchive& archive) const;
   
-  static std::unique_ptr<TyExpr> make(const llvm::Instruction &i);
-  static std::unique_ptr<TyExpr> make(std::unique_ptr<TyInstruction> _instruction);
+  static std::shared_ptr<TyExpr> make(const llvm::Instruction &i);
+  static std::shared_ptr<TyExpr> make(std::shared_ptr<TyInstruction> _instruction);
 
 private : 
-  std::unique_ptr<TyInstruction> instruction;
+  std::shared_ptr<TyInstruction> instruction;
 };
 
-std::unique_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si);
+std::shared_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si);
 
 // propagate object
 
 struct TyPropagateLessdef {
 public:
-  TyPropagateLessdef(std::unique_ptr<TyExpr> _lhs,
-                     std::unique_ptr<TyExpr> _rhs,
+  TyPropagateLessdef(std::shared_ptr<TyExpr> _lhs,
+                     std::shared_ptr<TyExpr> _rhs,
                      enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPropagateLessdef>
-  make(std::unique_ptr<TyExpr> _lhs,
-       std::unique_ptr<TyExpr> _rhs, enum TyScope _scope);
+  static std::shared_ptr<TyPropagateLessdef>
+  make(std::shared_ptr<TyExpr> _lhs,
+       std::shared_ptr<TyExpr> _rhs, enum TyScope _scope);
 
 private:
-  std::unique_ptr<TyExpr> lhs;
-  std::unique_ptr<TyExpr> rhs;
+  std::shared_ptr<TyExpr> lhs;
+  std::shared_ptr<TyExpr> rhs;
   enum TyScope scope;
 };
 
 struct TyPropagateNoalias {
 public:
-  TyPropagateNoalias(std::unique_ptr<TyRegister> _lhs,
-                     std::unique_ptr<TyRegister> _rhs, enum TyScope _scope);
+  TyPropagateNoalias(std::shared_ptr<TyRegister> _lhs,
+                     std::shared_ptr<TyRegister> _rhs, enum TyScope _scope);
   TyPropagateNoalias(std::string _lhs_name, enum TyTag _lhs_tag,
                      std::string _rhs_name, enum TyTag _rhs_tag,
                      enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> lhs;
-  std::unique_ptr<TyRegister> rhs;
+  std::shared_ptr<TyRegister> lhs;
+  std::shared_ptr<TyRegister> rhs;
   enum TyScope scope;
 };
 
 struct TyPropagateAlloca {
 public :
-  TyPropagateAlloca(std::unique_ptr<TyRegister> _p, 
+  TyPropagateAlloca(std::shared_ptr<TyRegister> _p, 
                     enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private :
-  std::unique_ptr<TyRegister> p;
+  std::shared_ptr<TyRegister> p;
   enum TyScope scope;
 };
 
 struct TyPropagatePrivate {
 public :
-  TyPropagatePrivate(std::unique_ptr<TyRegister> _p, 
+  TyPropagatePrivate(std::shared_ptr<TyRegister> _p, 
                      enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private :
-  std::unique_ptr<TyRegister> p;
+  std::shared_ptr<TyRegister> p;
   enum TyScope scope;
 };
 
@@ -526,63 +526,63 @@ public:
 
 struct ConsLessdef : public TyPropagateObject {
 public:
-  ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef);
+  ConsLessdef(std::shared_ptr<TyPropagateLessdef> _propagate_lessdef);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPropagateObject>
-  make(std::unique_ptr<TyExpr> _lhs,
-       std::unique_ptr<TyExpr> _rhs, enum TyScope _scope);
+  static std::shared_ptr<TyPropagateObject>
+  make(std::shared_ptr<TyExpr> _lhs,
+       std::shared_ptr<TyExpr> _rhs, enum TyScope _scope);
 
 private:
-  std::unique_ptr<TyPropagateLessdef> propagate_lessdef;
+  std::shared_ptr<TyPropagateLessdef> propagate_lessdef;
 };
 
 struct ConsNoalias : public TyPropagateObject {
 public:
-  ConsNoalias(std::unique_ptr<TyPropagateNoalias> _propagate_noalias);
+  ConsNoalias(std::shared_ptr<TyPropagateNoalias> _propagate_noalias);
   ConsNoalias(std::string _lhs_name, enum TyTag _lhs_tag, std::string _rhs_name,
               enum TyTag _rhs_tag, enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyPropagateNoalias> propagate_noalias;
+  std::shared_ptr<TyPropagateNoalias> propagate_noalias;
 };
 
 struct ConsAlloca : public TyPropagateObject {
 public :
-  ConsAlloca(std::unique_ptr<TyPropagateAlloca> _propagate_alloca);
+  ConsAlloca(std::shared_ptr<TyPropagateAlloca> _propagate_alloca);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
-  static std::unique_ptr<TyPropagateObject> make(std::unique_ptr<TyRegister> _p, 
+  static std::shared_ptr<TyPropagateObject> make(std::shared_ptr<TyRegister> _p, 
                                                  enum TyScope _scope);
 
 private :
-  std::unique_ptr<TyPropagateAlloca> propagate_alloca;
+  std::shared_ptr<TyPropagateAlloca> propagate_alloca;
 };
 
 struct ConsMaydiff : public TyPropagateObject {
 public:
-  ConsMaydiff(std::unique_ptr<TyRegister> _register_name);
+  ConsMaydiff(std::shared_ptr<TyRegister> _register_name);
   ConsMaydiff(std::string _name, enum TyTag _tag);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPropagateObject> make(std::string _name,
+  static std::shared_ptr<TyPropagateObject> make(std::string _name,
                                                  enum TyTag _tag);
 
 private:
-  std::unique_ptr<TyRegister> register_name;
+  std::shared_ptr<TyRegister> register_name;
 };
 
 struct ConsPrivate : public TyPropagateObject {
 public :
-  ConsPrivate(std::unique_ptr<TyPropagatePrivate> _propagate_private);
+  ConsPrivate(std::shared_ptr<TyPropagatePrivate> _propagate_private);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
-  static std::unique_ptr<TyPropagateObject> make(std::unique_ptr<TyRegister> _p, 
+  static std::shared_ptr<TyPropagateObject> make(std::shared_ptr<TyRegister> _p, 
                                                  enum TyScope _scope);
 
 private :
-  std::unique_ptr<TyPropagatePrivate> propagate_private;
+  std::shared_ptr<TyPropagatePrivate> propagate_private;
 };
 
 // propagate range
@@ -595,16 +595,16 @@ public:
 
 struct ConsBounds : public TyPropagateRange {
 public:
-  ConsBounds(std::unique_ptr<TyPosition> _from,
-             std::unique_ptr<TyPosition> _to);
+  ConsBounds(std::shared_ptr<TyPosition> _from,
+             std::shared_ptr<TyPosition> _to);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyPropagateRange>
-  make(std::unique_ptr<TyPosition> _from, std::unique_ptr<TyPosition> _to);
+  static std::shared_ptr<TyPropagateRange>
+  make(std::shared_ptr<TyPosition> _from, std::shared_ptr<TyPosition> _to);
 
 private:
-  std::unique_ptr<TyPosition> from;
-  std::unique_ptr<TyPosition> to;
+  std::shared_ptr<TyPosition> from;
+  std::shared_ptr<TyPosition> to;
 };
 
 struct ConsGlobal : public TyPropagateRange {
@@ -613,18 +613,18 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
   virtual bool isGlobal(void) const { return true; }
 
-  static std::unique_ptr<TyPropagateRange> make();
+  static std::shared_ptr<TyPropagateRange> make();
 };
 
 struct TyPropagate {
 public:
-  TyPropagate(std::unique_ptr<TyPropagateObject> _propagate,
-              std::unique_ptr<TyPropagateRange> _propagate_range);
+  TyPropagate(std::shared_ptr<TyPropagateObject> _propagate,
+              std::shared_ptr<TyPropagateRange> _propagate_range);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyPropagateObject> propagate;
-  std::unique_ptr<TyPropagateRange> propagate_range;
+  std::shared_ptr<TyPropagateObject> propagate;
+  std::shared_ptr<TyPropagateRange> propagate_range;
 };
 
 /* hint command */
@@ -643,31 +643,31 @@ public:
 
 struct ConsPropagate : public TyCommand {
 public:
-  ConsPropagate(std::unique_ptr<TyPropagate> _propagate);
+  ConsPropagate(std::shared_ptr<TyPropagate> _propagate);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyCommand>
-  make(std::unique_ptr<TyPropagate> _propagate);
-  static std::unique_ptr<TyCommand>
-  make(std::unique_ptr<TyPropagateObject> _obj,
-       std::unique_ptr<TyPropagateRange> _range);
+  static std::shared_ptr<TyCommand>
+  make(std::shared_ptr<TyPropagate> _propagate);
+  static std::shared_ptr<TyCommand>
+  make(std::shared_ptr<TyPropagateObject> _obj,
+       std::shared_ptr<TyPropagateRange> _range);
 
 private:
-  std::unique_ptr<TyPropagate> propagate;
+  std::shared_ptr<TyPropagate> propagate;
 };
 
 struct ConsInfrule : public TyCommand {
 public:
-  ConsInfrule(std::unique_ptr<TyPosition> _position,
-              std::unique_ptr<TyInfrule> _infrule);
+  ConsInfrule(std::shared_ptr<TyPosition> _position,
+              std::shared_ptr<TyInfrule> _infrule);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TyCommand> make(std::unique_ptr<TyPosition> _position,
-                                         std::unique_ptr<TyInfrule> _infrule);
+  static std::shared_ptr<TyCommand> make(std::shared_ptr<TyPosition> _position,
+                                         std::shared_ptr<TyInfrule> _infrule);
 
 private:
-  std::unique_ptr<TyPosition> position;
-  std::unique_ptr<TyInfrule> infrule;
+  std::shared_ptr<TyPosition> position;
+  std::shared_ptr<TyInfrule> infrule;
 };
 
 
@@ -678,10 +678,10 @@ public:
   CoreHint();
   CoreHint(std::string _module_id, std::string _function_id,
            std::string _opt_name);
-  void addCommand(std::unique_ptr<TyCommand> c);
+  void addCommand(std::shared_ptr<TyCommand> c);
   const std::string &getDescription() const;
   void setDescription(const std::string &desc);
-  void addNopPosition(std::unique_ptr<TyPosition> position);
+  void addNopPosition(std::shared_ptr<TyPosition> position);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -689,8 +689,8 @@ private:
   std::string function_id;
   std::string opt_name;
   std::string description;
-  std::vector<std::unique_ptr<TyPosition>> nop_positions;
-  std::vector<std::unique_ptr<TyCommand>> commands;
+  std::vector<std::shared_ptr<TyPosition>> nop_positions;
+  std::vector<std::shared_ptr<TyCommand>> commands;
 };
 
 
