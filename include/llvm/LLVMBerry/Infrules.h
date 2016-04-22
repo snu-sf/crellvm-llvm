@@ -221,6 +221,17 @@ private :
   std::unique_ptr<TySize> sz;
 };
 
+struct TyBitcastptr{
+public : 
+  TyBitcastptr(std::unique_ptr<TyValue> _v, std::unique_ptr<TyValue> _vprime, std::unique_ptr<TyExpr> _bitcastinst);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyValue> v;
+  std::unique_ptr<TyValue> vprime;
+  std::unique_ptr<TyExpr> bitcastinst;
+};
+
 struct TyBopDistributiveOverSelectinst{
 public : 
   TyBopDistributiveOverSelectinst(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty);
@@ -309,43 +320,15 @@ private :
   std::unique_ptr<TyValueType> selty;
 };
 
-struct TySdivMone{
+struct TyGepzero{
 public : 
-  TySdivMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  TyGepzero(std::unique_ptr<TyValue> _v, std::unique_ptr<TyValue> _vprime, std::unique_ptr<TyExpr> _gepinst);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TySize> sz;
-};
-
-struct TySdivSubSrem{
-public : 
-  TySdivSubSrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> b;
-  std::unique_ptr<TyRegister> a;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
-};
-
-struct TyUdivSubUrem{
-public : 
-  TyUdivSubUrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::unique_ptr<TyRegister> z;
-  std::unique_ptr<TyRegister> b;
-  std::unique_ptr<TyRegister> a;
-  std::unique_ptr<TyValue> x;
-  std::unique_ptr<TyValue> y;
-  std::unique_ptr<TySize> sz;
+  std::unique_ptr<TyValue> v;
+  std::unique_ptr<TyValue> vprime;
+  std::unique_ptr<TyExpr> gepinst;
 };
 
 struct TyMulShl{
@@ -501,6 +484,31 @@ private :
   std::unique_ptr<TySize> sz;
 };
 
+struct TySdivMone{
+public : 
+  TySdivMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TySize> sz;
+};
+
+struct TySdivSubSrem{
+public : 
+  TySdivSubSrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> b;
+  std::unique_ptr<TyRegister> a;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TySize> sz;
+};
+
 struct TySubAdd {
 public:
   TySubAdd(std::unique_ptr<TyRegister> _z,
@@ -625,6 +633,38 @@ private:
   std::unique_ptr<TyRegister> y;
 };
 
+struct TyNoaliasGlobalAlloca{
+public : 
+  TyNoaliasGlobalAlloca(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyRegister> y;
+};
+
+struct TyNoaliasGlobalGlobal{
+public : 
+  TyNoaliasGlobalGlobal(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> x;
+  std::unique_ptr<TyRegister> y;
+
+};
+struct TyNoaliasLessthan{
+public : 
+  TyNoaliasLessthan(std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _xprime, std::unique_ptr<TyValue> _yprime);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TyValue> xprime;
+  std::unique_ptr<TyValue> yprime;
+};
+
 struct TyTransitivity {
 public:
   TyTransitivity(std::unique_ptr<TyExpr> _e1, std::unique_ptr<TyExpr> _e2,
@@ -635,6 +675,30 @@ private:
   std::unique_ptr<TyExpr> e1;
   std::unique_ptr<TyExpr> e2;
   std::unique_ptr<TyExpr> e3;
+};
+
+struct TyTransitivityPointerLhs{
+public : 
+  TyTransitivityPointerLhs(std::unique_ptr<TyValue> _p, std::unique_ptr<TyValue> _q, std::unique_ptr<TyValue> _v, std::unique_ptr<TyExpr> _loadq);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyValue> p;
+  std::unique_ptr<TyValue> q;
+  std::unique_ptr<TyValue> v;
+  std::unique_ptr<TyExpr> loadq;
+};
+
+struct TyTransitivityPointerRhs{
+public : 
+  TyTransitivityPointerRhs(std::unique_ptr<TyValue> _p, std::unique_ptr<TyValue> _q, std::unique_ptr<TyValue> _v, std::unique_ptr<TyExpr> _loadp);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyValue> p;
+  std::unique_ptr<TyValue> q;
+  std::unique_ptr<TyValue> v;
+  std::unique_ptr<TyExpr> loadp;
 };
 
 struct TyTransitivityTgt {
@@ -667,6 +731,20 @@ private:
   std::unique_ptr<TyExpr> e2_p;
 };
 
+struct TyUdivSubUrem{
+public : 
+  TyUdivSubUrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyRegister> z;
+  std::unique_ptr<TyRegister> b;
+  std::unique_ptr<TyRegister> a;
+  std::unique_ptr<TyValue> x;
+  std::unique_ptr<TyValue> y;
+  std::unique_ptr<TySize> sz;
+};
+
 struct TyIntroGhost{
 public :
   TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g);
@@ -676,6 +754,19 @@ private :
   std::unique_ptr<TyValue> x;
   std::unique_ptr<TyRegister> g;
 };
+
+struct TyIntroEq{
+public :
+  TyIntroEq(std::unique_ptr<TyValue> _x);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyValue> x;
+};
+
+
+
+// constructor classes
 
 struct ConsAddAssociative : TyInfrule {
 public:
@@ -883,6 +974,16 @@ private :
   std::unique_ptr<TyAndDeMorgan> and_de_morgan;
 };
 
+struct ConsBitcastptr : public TyInfrule{
+public : 
+  ConsBitcastptr(std::unique_ptr<TyBitcastptr> _bitcastptr);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _v, std::unique_ptr<TyValue> _vprime, std::unique_ptr<TyExpr> _bitcastinst);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyBitcastptr> bitcastptr;
+};
+
 struct ConsBopDistributiveOverSelectinst : public TyInfrule{
 public : 
   ConsBopDistributiveOverSelectinst(std::unique_ptr<TyBopDistributiveOverSelectinst> _bop_distributive_over_selectinst);
@@ -931,6 +1032,16 @@ public :
 
 private : 
   std::unique_ptr<TyFbopDistributiveOverSelectinst2> fbop_distributive_over_selectinst2;
+};
+
+struct ConsGepzero : public TyInfrule{
+public : 
+  ConsGepzero(std::unique_ptr<TyGepzero> _gepzero);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _v, std::unique_ptr<TyValue> _vprime, std::unique_ptr<TyExpr> _gepinst);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyGepzero> gepzero;
 };
 
 struct ConsMulBool : TyInfrule {
@@ -1037,6 +1148,37 @@ public :
 
 private : 
   std::unique_ptr<TyMulShl> mul_shl;
+};
+
+struct ConsNoaliasGlobalAlloca : public TyInfrule{
+public : 
+  ConsNoaliasGlobalAlloca(std::unique_ptr<TyNoaliasGlobalAlloca> _noalias_global_alloca);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyNoaliasGlobalAlloca> noalias_global_alloca;
+};
+
+struct ConsNoaliasGlobalGlobal : public TyInfrule{
+public : 
+  ConsNoaliasGlobalGlobal(std::unique_ptr<TyNoaliasGlobalGlobal> _noalias_global_global);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _x, 
+        std::unique_ptr<TyRegister> _y);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyNoaliasGlobalGlobal> noalias_global_global;
+};
+
+struct ConsNoaliasLessthan : public TyInfrule{
+public : 
+  ConsNoaliasLessthan(std::unique_ptr<TyNoaliasLessthan> _noalias_lessthan);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _xprime, std::unique_ptr<TyValue> _yprime);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyNoaliasLessthan> noalias_lessthan;
 };
 
 struct ConsOrCommutative : public TyInfrule{
@@ -1198,15 +1340,6 @@ public :
 private : 
   std::unique_ptr<TySdivSubSrem> div_sub_srem;
 };
-struct ConsUdivSubUrem : public TyInfrule{
-public : 
-  ConsUdivSubUrem(std::unique_ptr<TyUdivSubUrem> _div_sub_urem);
-  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::unique_ptr<TyUdivSubUrem> div_sub_urem;
-};
 
 struct ConsTransitivity : TyInfrule {
 public:
@@ -1219,6 +1352,27 @@ public:
 
 private:
   std::unique_ptr<TyTransitivity> transitivity;
+};
+
+
+struct ConsTransitivityPointerLhs : public TyInfrule{
+public : 
+  ConsTransitivityPointerLhs(std::unique_ptr<TyTransitivityPointerLhs> _transitivity_pointer_lhs);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _p, std::unique_ptr<TyValue> _q, std::unique_ptr<TyValue> _v, std::unique_ptr<TyExpr> _loadq);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyTransitivityPointerLhs> transitivity_pointer_lhs;
+};
+
+struct ConsTransitivityPointerRhs : public TyInfrule{
+public : 
+  ConsTransitivityPointerRhs(std::unique_ptr<TyTransitivityPointerRhs> _transitivity_pointer_rhs);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _p, std::unique_ptr<TyValue> _q, std::unique_ptr<TyValue> _v, std::unique_ptr<TyExpr> _loadp);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyTransitivityPointerRhs> transitivity_pointer_rhs;
 };
 
 struct ConsTransitivityTgt : TyInfrule {
@@ -1247,6 +1401,16 @@ public:
 
 private:
   std::unique_ptr<TyReplaceRhs> replace_rhs;
+};
+
+struct ConsUdivSubUrem : public TyInfrule{
+public : 
+  ConsUdivSubUrem(std::unique_ptr<TyUdivSubUrem> _div_sub_urem);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyUdivSubUrem> div_sub_urem;
 };
 
 struct ConsUdivZext : public TyInfrule{
@@ -1279,6 +1443,17 @@ public :
 private :
   std::unique_ptr<TyIntroGhost> intro_ghost;
 };
+
+struct ConsIntroEq : public TyInfrule{
+public :
+  ConsIntroEq(std::unique_ptr<TyIntroEq> _intro_eq);
+  static std::unique_ptr<TyInfrule> make(std::unique_ptr<TyValue> _x);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::unique_ptr<TyIntroEq> intro_eq;
+};
+
 
 struct ConsXorCommutative : public TyInfrule{
 public : 

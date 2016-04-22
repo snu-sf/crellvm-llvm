@@ -18,6 +18,18 @@ template <class T>
 void save(cereal::JSONOutputArchive &archive, std::unique_ptr<T> const &ptr) {
   ptr->serialize(archive);
 }
+
+template <class T1, class T2>
+void save(cereal::JSONOutputArchive &archive, std::pair<T1, T2> const &p) {
+  archive.startNode();
+  archive.makeArray();
+  archive.writeName();
+
+  archive(p.first);
+  archive(p.second);
+
+  archive.finishNode();
+}
 } // cereal
 
 namespace llvmberry {
@@ -40,39 +52,9 @@ enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl,
 
 enum TyFbop { BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
 
-
-class CoreHint;
-
-
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 bool name_instructions(llvm::Function &F);
-/* applyCommutativity(I, (A bop B), scope) : 
- *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the position I
- */
-void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expression, TyScope scope);
-/* propagateInstruction(I1, I2, scope) : 
- *   Propagates I1 >= rhs(I1) from I1 to I2 if scope == Source, or
- *   Propagates rhs(I1) >= I1 from I1 to I2 if scope == Target
- */
-void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope);
-void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope = Source);
-void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
-        llvm::BinaryOperator *X, 
-        llvm::SelectInst *Y, 
-        bool needs_commutativity,
-        bool is_leftform);
-void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, 
-        llvm::Value *op1, bool needsCommutativity);
-void generateHintForOrXor2(llvm::BinaryOperator &I, 
-        llvm::Value *X1_val, llvm::Value *X2_val,
-        llvm::Value *A, llvm::Value *B,
-        bool needsY1Commutativity, bool needsY2Commutativity);
-
-// inserting nop
-void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
-void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
-
 std::string toString(llvmberry::TyBop bop);
 std::string toString(llvmberry::TyFbop bop);
 std::string toString(llvmberry::TyFloatType bop);
@@ -228,6 +210,24 @@ private :
   std::unique_ptr<TyValueType> valuetype;
 };
 
+// size
+
+struct TySize {
+public:
+  virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+};
+
+struct ConsSize : public TySize {
+public:
+  ConsSize(int _size);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::unique_ptr<TySize> make(int _size);
+
+private:
+  int size;
+};
+
 
 // constants
 
@@ -257,6 +257,17 @@ private:
   enum TyFloatType float_type;
 };
 
+struct TyConstGlobalVarAddr{
+public : 
+  TyConstGlobalVarAddr(std::string _var_id, std::unique_ptr<TyValueType> _var_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  
+  static std::unique_ptr<TyConstGlobalVarAddr> make(const llvm::GlobalVariable &gv);
+private : 
+  std::string var_id;
+  std::unique_ptr<TyValueType> var_type;
+};
+
 struct TyConstant {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
@@ -282,6 +293,16 @@ private:
   std::unique_ptr<TyConstFloat> const_float;
 };
 
+struct ConsConstGlobalVarAddr : public TyConstant{
+public : 
+  ConsConstGlobalVarAddr(std::unique_ptr<TyConstGlobalVarAddr> _const_global_var_addr);
+  static std::unique_ptr<TyConstant> make(std::string _var_id, std::unique_ptr<TyValueType> _var_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::unique_ptr<TyConstGlobalVarAddr> const_global_var_addr;
+};
+
 // value
 
 struct TyValue {
@@ -299,7 +320,6 @@ public:
   static std::unique_ptr<TyValue> make(std::string _name,
                                        enum TyTag _tag);
 
-private:
   std::unique_ptr<TyRegister> reg;
 };
 
@@ -308,7 +328,6 @@ public:
   ConsConstVal(std::unique_ptr<TyConstant> _constant);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-private:
   std::unique_ptr<TyConstant> constant;
 };
 
@@ -360,6 +379,37 @@ private :
   int align;
 };
 
+struct TyBitCastInst{
+public : 
+  TyBitCastInst(std::unique_ptr<TyValueType> _fromty, std::unique_ptr<TyValue> _v, std::unique_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::unique_ptr<TyBitCastInst> make(const llvm::BitCastInst &li);
+
+private : 
+  std::unique_ptr<TyValueType> fromty;
+  std::unique_ptr<TyValue> v;
+  std::unique_ptr<TyValueType> toty;
+};
+
+struct TyGetElementPtrInst{
+public : 
+  TyGetElementPtrInst(std::unique_ptr<TyValueType> _ty, 
+                std::unique_ptr<TyValueType> _ptrty,
+                std::unique_ptr<TyValue> _ptr,
+                std::vector<std::pair<std::unique_ptr<TySize>, std::unique_ptr<TyValue> > > &_indexes,
+                bool is_inbounds);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::unique_ptr<TyGetElementPtrInst> make(const llvm::GetElementPtrInst &li);
+
+private : 
+  std::unique_ptr<TyValueType> ty;
+  std::unique_ptr<TyValueType> ptrty;
+  std::unique_ptr<TyValue> ptr;
+  std::vector<std::pair<std::unique_ptr<TySize>, std::unique_ptr<TyValue> > > indexes;
+  bool is_inbounds;
+};
+
+
 struct ConsBinaryOp : public TyInstruction{
 public : 
   ConsBinaryOp(std::unique_ptr<TyBinaryOperator> _binary_operator);
@@ -393,23 +443,30 @@ private :
   std::unique_ptr<TyLoadInst> load_inst;
 };
 
-
-// size
-
-struct TySize {
+struct ConsBitCastInst : public TyInstruction{
 public:
-  virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
-};
-
-struct ConsSize : public TySize {
-public:
-  ConsSize(int _size);
+  ConsBitCastInst(std::unique_ptr<TyBitCastInst> _bit_cast_inst);
+  static std::unique_ptr<TyInstruction> make(std::unique_ptr<TyValueType> _fromty, std::unique_ptr<TyValue> _v, std::unique_ptr<TyValueType> _toty);
+  static std::unique_ptr<TyInstruction> make(const llvm::BitCastInst &bci);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::unique_ptr<TySize> make(int _size);
+private :
+  std::unique_ptr<TyBitCastInst> bit_cast_inst;
+};
 
-private:
-  int size;
+struct ConsGetElementPtrInst : public TyInstruction{
+public:
+  ConsGetElementPtrInst(std::unique_ptr<TyGetElementPtrInst> _get_element_ptr_inst);
+  static std::unique_ptr<TyInstruction> make(std::unique_ptr<TyValueType> _ty, 
+                std::unique_ptr<TyValueType> _ptrty,
+                std::unique_ptr<TyValue> _ptr,
+                std::vector<std::pair<std::unique_ptr<TySize>, std::unique_ptr<TyValue> > > &_indexes,
+                bool is_inbounds);
+  static std::unique_ptr<TyInstruction> make(const llvm::GetElementPtrInst &gepi);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private :
+  std::unique_ptr<TyGetElementPtrInst> get_element_ptr_inst;
 };
 
 /* propagate */
@@ -419,6 +476,7 @@ private:
 struct TyExpr {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+  static std::unique_ptr<TyExpr> make(std::unique_ptr<TyValue> &&tyv);
 };
 
 struct ConsVar : public TyExpr {
@@ -496,16 +554,16 @@ private:
 
 struct TyPropagateNoalias {
 public:
-  TyPropagateNoalias(std::unique_ptr<TyRegister> _lhs,
-                     std::unique_ptr<TyRegister> _rhs, enum TyScope _scope);
-  TyPropagateNoalias(std::string _lhs_name, enum TyTag _lhs_tag,
+  TyPropagateNoalias(std::unique_ptr<TyValue> _lhs,
+                     std::unique_ptr<TyValue> _rhs, enum TyScope _scope);
+/*TyPropagateNoalias(std::string _lhs_name, enum TyTag _lhs_tag,
                      std::string _rhs_name, enum TyTag _rhs_tag,
-                     enum TyScope _scope);
+                     enum TyScope _scope);*/
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  std::unique_ptr<TyRegister> lhs;
-  std::unique_ptr<TyRegister> rhs;
+  std::unique_ptr<TyValue> lhs;
+  std::unique_ptr<TyValue> rhs;
   enum TyScope scope;
 };
 
@@ -552,9 +610,14 @@ private:
 struct ConsNoalias : public TyPropagateObject {
 public:
   ConsNoalias(std::unique_ptr<TyPropagateNoalias> _propagate_noalias);
-  ConsNoalias(std::string _lhs_name, enum TyTag _lhs_tag, std::string _rhs_name,
-              enum TyTag _rhs_tag, enum TyScope _scope);
+  ConsNoalias(std::string _lhs_name, enum TyTag _lhs_tag,
+                     std::string _rhs_name, enum TyTag _rhs_tag,
+                     enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::unique_ptr<TyPropagateObject>
+  make(std::unique_ptr<TyValue> _lhs,
+       std::unique_ptr<TyValue> _rhs, enum TyScope _scope);
 
 private:
   std::unique_ptr<TyPropagateNoalias> propagate_noalias;
@@ -689,7 +752,9 @@ struct CoreHint {
 public:
   CoreHint();
   CoreHint(std::string _module_id, std::string _function_id,
-           std::string _opt_name);
+           std::string _opt_name, std::string _description = "");
+  const std::string &getDescription() const;
+  void setDescription(const std::string &desc);
   void addCommand(std::unique_ptr<TyCommand> c);
   void addNopPosition(std::unique_ptr<TyPosition> position);
   void serialize(cereal::JSONOutputArchive &archive) const;
@@ -698,6 +763,7 @@ private:
   std::string module_id;
   std::string function_id;
   std::string opt_name;
+  std::string description;
   std::vector<std::unique_ptr<TyPosition>> nop_positions;
   std::vector<std::unique_ptr<TyCommand>> commands;
 };
