@@ -697,21 +697,14 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
     // common, so we handle it intelligently here for compile-time speed.
           std::string newphi = llvmberry::getVariable(*NewPN);
 
-      PROPAGATE(  //t maydiff global propagate
-                llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
-                llvmberry::ConsGlobal::make());
-
-    for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+      for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
       Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
       std::string reg = llvmberry::getVariable(*InInst);
 
       BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
-      llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
 
       Value *SpecialOperand = InInst->getOperand(0);
       std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
-
-
 
       PROPAGATE( //from I to endofblock propagate x or y depend on edge
               LESSDEF(VAR(reg, Physical),
@@ -729,7 +722,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
       INFRULE(PHIPOS(SRC, PN, InInst),
               llvmberry::ConsTransitivity::make(
                       VAR(oldphi, Physical), VAR(reg, Physical),
-                      INSN(BINOP(bop, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
+                      INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
                                  VAL(BinOp->getOperand(1), Physical)))));
 
       // { z >= a + b } at src after phinode
@@ -739,7 +732,6 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
               BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
       }
 
-
     PhiVal = InVal;
     delete NewPN;
   } else {
@@ -748,12 +740,14 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                 Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
                 std::string reg = llvmberry::getVariable(*InInst);
                 BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
-                llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
 
                 Value *SpecialOperand = InInst->getOperand(0);
                 std::string reg_block_special = llvmberry::getVariable(*SpecialOperand);
                 std::string newphi = llvmberry::getVariable(*NewPN);
 
+                PROPAGATE(  //t maydiff global propagate
+                          llvmberry::ConsMaydiff::make(newphi, llvmberry::Physical),
+                          llvmberry::ConsGlobal::make());
 
                 PROPAGATE( //from I to endofblock propagate x or y depend on edge
                         LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
@@ -764,7 +758,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                 INFRULE(PHIPOS(SRC, PN, InInst),
                         llvmberry::ConsTransitivity::make(
                                 VAR(oldphi, Physical), VAR(reg, Previous),
-                                INSN(BINOP(bop, TYPEOF(SpecialOperand), VAL(SpecialOperand, Previous),
+                                INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), VAL(SpecialOperand, Previous),
                                            VAL(ConstantOp, Physical)))));
 
                 // introduce a^ >= k && k >= a^
@@ -780,14 +774,14 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                 INFRULE(PHIPOS(SRC, PN, InInst),
                         llvmberry::ConsReplaceRhs::make(
                                 REGISTER(reg_block_special, Previous), ID("K", Ghost), VAR(oldphi, Physical),
-                                INSN(BINOP(bop, TYPEOF(SpecialOperand), VAL(SpecialOperand, Previous),
+                                INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), VAL(SpecialOperand, Previous),
                                            VAL(ConstantOp, Physical))),
-                                INSN(BINOP(bop, TYPEOF(SpecialOperand), ID("K", Ghost),
+                                INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), ID("K", Ghost),
                                            VAL(ConstantOp, Physical)))));
 
                 // { z >= K + const } at src after phinode
                 PROPAGATE(LESSDEF(VAR(oldphi, Physical),
-                                  INSN(BINOP(bop, TYPEOF(SpecialOperand), ID("K", Ghost),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), ID("K", Ghost),
                                              VAL(ConstantOp, Physical))), SRC),
                           BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
@@ -795,8 +789,6 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                 PROPAGATE(LESSDEF(VAR("K", Ghost),
                                   VAR(newphi, Physical), TGT),
                           BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
-
-
               }
 
     InsertNewInstBefore(NewPN, PN);
