@@ -78,11 +78,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
     return nullptr;
 
   // Otherwise, this is safe to transform!
-  
-  llvmberry::ValidationUnit::Begin("fold_phi_bin",
-                                   FirstInst->getParent()->getParent());
-
-  // ex) FirstInst x = a + b  I = a + c
 
   Value *InLHS = FirstInst->getOperand(0);    //a
   Value *InRHS = FirstInst->getOperand(1);    //b
@@ -117,6 +112,10 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
       }
     }
   }
+
+  // ex) FirstInst x = a + b  I = a + c
+  llvmberry::ValidationUnit::Begin("fold_phi_bin",
+                                   FirstInst->getParent()->getParent());
 
   llvmberry::ValidationUnit::GetInstance()->intrude(
           [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
@@ -658,7 +657,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                                    FirstInst->getParent()->getParent());
   
   llvmberry::ValidationUnit::GetInstance()->intrude(
-          [&PN, &InVal, &NewPN, &ConstantOp, &PhiVal, this](llvmberry::ValidationUnit::Dictionary &data,
+          [&PN](llvmberry::ValidationUnit::Dictionary &data,
                                              llvmberry::CoreHint &hints) {
             std::string oldphi = llvmberry::getVariable(PN);
             BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
@@ -667,11 +666,15 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
             PROPAGATE(   //from PN to insertPos propagate z in maydiff
                     llvmberry::ConsMaydiff::make(oldphi, llvmberry::Physical),
                     BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
-
+            });
   if (InVal) {
     // The new PHI unions all of the same values together.  This is really
     // common, so we handle it intelligently here for compile-time speed.
-      std::string newphi = llvmberry::getVariable(*NewPN);
+    llvmberry::ValidationUnit::GetInstance()->intrude(
+          [&PN, &ConstantOp](llvmberry::ValidationUnit::Dictionary &data, 
+                                                          llvmberry::CoreHint &hints){      
+      std::string oldphi = llvmberry::getVariable(PN);
+      BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
 
       for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
         Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
@@ -707,11 +710,19 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                         RHS(reg, Physical, SRC), SRC),
                 BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
       }
-
+  });
     PhiVal = InVal;
     delete NewPN;
   } else {
-      for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+
+    llvmberry::ValidationUnit::GetInstance()->intrude(
+          [&PN, &NewPN, &ConstantOp](llvmberry::ValidationUnit::Dictionary &data,
+                                                          llvmberry::CoreHint &hints){ 
+
+      std::string oldphi = llvmberry::getVariable(PN);
+      BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
+
+     for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
         Instruction *InInst = cast<Instruction>(PN.getIncomingValue(i));
         std::string reg = llvmberry::getVariable(*InInst);
         BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
@@ -765,11 +776,11 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                           VAR(newphi, Physical), TGT),
                   BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
       }
-
+  });
     InsertNewInstBefore(NewPN, PN);
     PhiVal = NewPN;
   }
-});
+
   // Insert and return the new operation.
   if (CastInst *FirstCI = dyn_cast<CastInst>(FirstInst)) {
     CastInst *NewCI = CastInst::Create(FirstCI->getOpcode(), PhiVal,
