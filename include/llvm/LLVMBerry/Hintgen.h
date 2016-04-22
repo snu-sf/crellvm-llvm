@@ -55,6 +55,19 @@ namespace llvmberry{
           llvm::Value *X1_val, llvm::Value *X2_val,
           llvm::Value *A, llvm::Value *B,
           bool needsY1Commutativity, bool needsY2Commutativity);
+  void generateHintForAddXorAnd(llvm::BinaryOperator &I,
+          llvm::BinaryOperator *X,
+          llvm::BinaryOperator *Y,
+          llvm::Value *A,
+          llvm::Value *B,
+          bool needsYCommutative, bool needsZCommutative);
+  void generateHintForAddOrAnd(llvm::BinaryOperator &I,
+          llvm::BinaryOperator *X,
+          llvm::BinaryOperator *Y,
+          llvm::Value *A,
+          llvm::Value *B,
+          bool needsYCommutative, bool needsZCommutative);
+
 
   // inserting nop
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
