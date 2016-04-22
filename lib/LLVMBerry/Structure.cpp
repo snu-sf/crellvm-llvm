@@ -855,9 +855,9 @@ std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value, enum TyTag _tag) 
   std::shared_ptr<TyValue> vptr = TyValue::make(value, _tag);
   TyValue *v = vptr.get();
   if(ConsId *cid = dynamic_cast<ConsId *>(v)){
-    return std::shared_ptr<TyExpr>(new ConsVar(std::shared_ptr<TyRegister>(cid->reg.get())));
+    return std::shared_ptr<TyExpr>(new ConsVar(cid->reg));
   }else if(ConsConstVal *ccv = dynamic_cast<ConsConstVal *>(v)){
-    return std::shared_ptr<TyExpr>(new ConsConst(std::shared_ptr<TyConstant>(ccv->constant.get())));
+    return std::shared_ptr<TyExpr>(new ConsConst(ccv->constant));
   }else{
     assert("Unknown value type" && false);
   }
