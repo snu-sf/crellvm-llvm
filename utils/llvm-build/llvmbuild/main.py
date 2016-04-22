@@ -139,11 +139,12 @@ class LLVMProjectInfo(object):
             # Check for a cycles.
             if ci in current_set:
                 # We found a cycle, report it and error out.
-                cycle_description = ' -> '.join(
-                    '%r (%s)' % (ci.name, relation)
-                    for relation,ci in current_stack)
-                fatal("found cycle to %r after following: %s -> %s" % (
-                        ci.name, cycle_description, ci.name))
+                # cycle_description = ' -> '.join(
+                #   '%r (%s)' % (ci.name, relation)
+                #   for relation,ci in current_stack)
+                # fatal("found cycle to %r after following: %s -> %s" % (
+                #       ci.name, cycle_description, ci.name))
+                return
 
             # If we have already visited this item, we are done.
             if ci not in components_to_visit:

@@ -17,29 +17,10 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Hintgen.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "instcombine"
-
-#define PHIPOS(SCOPE, PN, prevI) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), prevI->getParent()->getName()) 
-#define PHIPOSJustPhi(SCOPE, PN) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
-#define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
-#define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
-#define PROPAGATE(what, where) hints.addCommand(llvmberry::ConsPropagate::make(what, where))
-#define VAR(name, tag) llvmberry::ConsVar::make(name, llvmberry::tag)
-#define RHS(name, tag, SCOPE) llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
-#define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
-#define LESSDEF(left, right, SCOPE) llvmberry::ConsLessdef::make(left, right, SCOPE)
-#define INSN(x) llvmberry::ConsInsn::make(x)
-#define VAL(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
-#define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
-#define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
-#define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
-#define BINOP(bop, type, val1, val2) llvmberry::ConsBinaryOp::make(bop, type, val1, val2)
-#define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
-
-#define SRC llvmberry::Source
-#define TGT llvmberry::Target
 
 /// If we have something like phi [add (a,b), add(a,c)] and if a/b/c and the
 /// adds all have a single use, turn this into a phi and a single binop.
@@ -172,7 +153,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 if(NewLHS) { CommonOperand = InInst->getOperand(1); SpecialOperand = InInst->getOperand(0); }
                 else       { CommonOperand = InInst->getOperand(0); SpecialOperand = InInst->getOperand(1); }
                 BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
-                llvmberry::TyBop bop = llvmberry::getBop(BinOp->getOpcode());
 
                 PROPAGATE( //from I to endofblock propagate x or y depend on edge
                         LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
@@ -183,7 +163,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 INFRULE(PHIPOS(SRC, PN, InInst),
                         llvmberry::ConsTransitivity::make(
                                 VAR(oldphi, Physical), VAR(reg, Previous),
-                                INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Previous),
+                                INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Previous),
                                            VAL(BinOp->getOperand(1), Previous)))));
 
                 if (NewLHS) {
@@ -195,9 +175,9 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsReplaceRhs::make(
                                   REGISTER(reg_common, Previous), ID(reg_common, Physical), VAR(oldphi, Physical),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
                                              VAL(CommonOperand, Previous))),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
                                              VAL(CommonOperand, Physical)))));
 
                   // introduce a^ >= k && k >= a^
@@ -213,15 +193,16 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsReplaceRhs::make(
                                   REGISTER(reg_block_special, Previous), ID("K", Ghost), VAR(oldphi, Physical),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(SpecialOperand, Previous),
                                              VAL(CommonOperand, Physical))),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), ID("K", Ghost),
                                              VAL(CommonOperand, Physical)))));
 
                   // { z >= K + b } at src after phinode
                   PROPAGATE(LESSDEF(VAR(oldphi, Physical),
-                                    INSN(BINOP(bop, TYPEOF(CommonOperand), ID("K", Ghost),
-                                               VAL(CommonOperand, Physical))), SRC),
+                                    INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), ID("K", Ghost),
+                                               VAL(CommonOperand, Physical))),
+                                    SRC),
                             BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
                   // { K  >= t } at tgt after phinode
@@ -238,9 +219,9 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsReplaceRhs::make(
                                   REGISTER(reg_common, Previous), ID(reg_common, Physical), VAR(oldphi, Physical),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Previous),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(CommonOperand, Previous),
                                              VAL(SpecialOperand, Previous))),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
                                              VAL(SpecialOperand, Previous)))));
 
                   // introduce k >= b^ && b^ >= k in src and tgt
@@ -255,16 +236,16 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsReplaceRhs::make(
                                   REGISTER(reg_block_special, Previous), ID("K", Ghost), VAR(oldphi, Physical),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
                                              VAL(SpecialOperand, Previous))),
-                                  INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
                                              ID("K", Ghost)))));
 
                   // { z >= a + K } at src after phinode
-                  PROPAGATE(
-                            LESSDEF(VAR(oldphi, Physical), 
-                                    INSN(BINOP(bop, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
-                                               ID("K", Ghost))), SRC),
+                  PROPAGATE(LESSDEF(VAR(oldphi, Physical),
+                                    INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(CommonOperand, Physical),
+                                               ID("K", Ghost))),
+                                    SRC),
                             BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
                   // { K  >= t } at tgt after phinode
@@ -307,14 +288,14 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   INFRULE(PHIPOS(SRC, PN, InInst),
                           llvmberry::ConsTransitivity::make(
                                   VAR(oldphi, Physical), VAR(reg, Physical),
-                                  INSN(BINOP(bop, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
+                                  INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
                                              VAL(BinOp->getOperand(1), Physical)))));
 
                   // { z >= a + b } at src after phinode
                   PROPAGATE( //from I to endofblock propagate x or y depend on edge
-                            LESSDEF(VAR(oldphi, Physical),
-                                    RHS(reg, Physical, SRC), SRC),
-                            BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+                          LESSDEF(VAR(oldphi, Physical),
+                                  RHS(reg, Physical, SRC), SRC),
+                          BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
                 }
               }

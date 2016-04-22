@@ -74,8 +74,16 @@ ValidationUnit::~ValidationUnit() {
 }
 
 // public functions
-const std::string &ValidationUnit::getOptimizationName() {
+const std::string &ValidationUnit::getOptimizationName() const{
   return _Instance->_optname;
+}
+
+const std::string &ValidationUnit::getDescription() const{
+  return _Instance->_corehint.getDescription();
+}
+
+void ValidationUnit::setDescription(const std::string &str){
+  _Instance->_corehint.setDescription(str);
 }
 
 void ValidationUnit::setReturnCode(RETURN_CODE return_code) {

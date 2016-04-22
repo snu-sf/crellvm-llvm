@@ -23,7 +23,9 @@ public:
   enum RETURN_CODE { COMMIT = 0, ABORT };
 
   CoreHint &getHint();
-  const std::string &getOptimizationName();
+  const std::string &getOptimizationName() const;
+  const std::string &getDescription() const;
+  void setDescription(const std::string &str);
   void setReturnCode(RETURN_CODE return_code);
   void intrude(std::function<void(Dictionary &, CoreHint &)> func);
 
