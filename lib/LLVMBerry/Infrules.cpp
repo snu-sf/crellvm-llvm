@@ -12,13 +12,13 @@
 
 namespace llvmberry{
 
-TyAddAssociative::TyAddAssociative(std::unique_ptr<TyRegister> _x,
-                                   std::unique_ptr<TyRegister> _y,
-                                   std::unique_ptr<TyRegister> _z,
-                                   std::unique_ptr<TyConstInt> _c1,
-                                   std::unique_ptr<TyConstInt> _c2,
-                                   std::unique_ptr<TyConstInt> _c3,
-                                   std::unique_ptr<TySize> _sz)
+TyAddAssociative::TyAddAssociative(std::shared_ptr<TyRegister> _x,
+                                   std::shared_ptr<TyRegister> _y,
+                                   std::shared_ptr<TyRegister> _z,
+                                   std::shared_ptr<TyConstInt> _c1,
+                                   std::shared_ptr<TyConstInt> _c2,
+                                   std::shared_ptr<TyConstInt> _c3,
+                                   std::shared_ptr<TySize> _sz)
     : x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c1(std::move(_c1)),
       c2(std::move(_c2)), c3(std::move(_c3)), sz(std::move(_sz)) {}
 
@@ -27,7 +27,7 @@ void TyAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
           CEREAL_NVP(c2), CEREAL_NVP(c3), CEREAL_NVP(sz));
 }
 
-TyAddConstNot::TyAddConstNot(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
+TyAddConstNot::TyAddConstNot(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
 }
 void TyAddConstNot::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -38,11 +38,11 @@ void TyAddConstNot::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsAddConstNot::ConsAddConstNot(std::unique_ptr<TyAddConstNot> _add_const_not) : add_const_not(std::move(_add_const_not)){
+ConsAddConstNot::ConsAddConstNot(std::shared_ptr<TyAddConstNot> _add_const_not) : add_const_not(std::move(_add_const_not)){
 }
-std::unique_ptr<TyInfrule> ConsAddConstNot::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddConstNot> _val(new TyAddConstNot(std::move(_z), std::move(_y), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddConstNot(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAddConstNot::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAddConstNot> _val(new TyAddConstNot(std::move(_z), std::move(_y), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddConstNot(std::move(_val)));
 }
 void ConsAddConstNot::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -51,7 +51,7 @@ void ConsAddConstNot::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(add_const_not));
 }
 
-TyAddMask::TyAddMask(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), yprime(std::move(_yprime)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
+TyAddMask::TyAddMask(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), yprime(std::move(_yprime)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
 }
 void TyAddMask::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -63,11 +63,11 @@ void TyAddMask::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsAddMask::ConsAddMask(std::unique_ptr<TyAddMask> _add_mask) : add_mask(std::move(_add_mask)){
+ConsAddMask::ConsAddMask(std::shared_ptr<TyAddMask> _add_mask) : add_mask(std::move(_add_mask)){
 }
-std::unique_ptr<TyInfrule> ConsAddMask::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _yprime, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddMask> _val(new TyAddMask(std::move(_z), std::move(_y), std::move(_yprime), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddMask(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAddMask::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAddMask> _val(new TyAddMask(std::move(_z), std::move(_y), std::move(_yprime), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddMask(std::move(_val)));
 }
 void ConsAddMask::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -76,7 +76,7 @@ void ConsAddMask::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(add_mask));
 }
 
-TyAddSelectZero::TyAddSelectZero(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), c(std::move(_c)), n(std::move(_n)), a(std::move(_a)), sz(std::move(_sz)){
+TyAddSelectZero::TyAddSelectZero(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c, std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), c(std::move(_c)), n(std::move(_n)), a(std::move(_a)), sz(std::move(_sz)){
 }
 void TyAddSelectZero::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -88,11 +88,11 @@ void TyAddSelectZero::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsAddSelectZero::ConsAddSelectZero(std::unique_ptr<TyAddSelectZero> _add_select_zero) : add_select_zero(std::move(_add_select_zero)){
+ConsAddSelectZero::ConsAddSelectZero(std::shared_ptr<TyAddSelectZero> _add_select_zero) : add_select_zero(std::move(_add_select_zero)){
 }
-std::unique_ptr<TyInfrule> ConsAddSelectZero::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddSelectZero> _val(new TyAddSelectZero(std::move(_z), std::move(_x), std::move(_y), std::move(_c), std::move(_n), std::move(_a), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddSelectZero(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAddSelectZero::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c, std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAddSelectZero> _val(new TyAddSelectZero(std::move(_z), std::move(_x), std::move(_y), std::move(_c), std::move(_n), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddSelectZero(std::move(_val)));
 }
 void ConsAddSelectZero::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -101,7 +101,7 @@ void ConsAddSelectZero::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(add_select_zero));
 }
 
-TyAddSelectZero2::TyAddSelectZero2(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), c(std::move(_c)), n(std::move(_n)), a(std::move(_a)), sz(std::move(_sz)){
+TyAddSelectZero2::TyAddSelectZero2(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c, std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), c(std::move(_c)), n(std::move(_n)), a(std::move(_a)), sz(std::move(_sz)){
 }
 void TyAddSelectZero2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -113,11 +113,11 @@ void TyAddSelectZero2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsAddSelectZero2::ConsAddSelectZero2(std::unique_ptr<TyAddSelectZero2> _add_select_zero2) : add_select_zero2(std::move(_add_select_zero2)){
+ConsAddSelectZero2::ConsAddSelectZero2(std::shared_ptr<TyAddSelectZero2> _add_select_zero2) : add_select_zero2(std::move(_add_select_zero2)){
 }
-std::unique_ptr<TyInfrule> ConsAddSelectZero2::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _c, std::unique_ptr<TyValue> _n, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddSelectZero2> _val(new TyAddSelectZero2(std::move(_z), std::move(_x), std::move(_y), std::move(_c), std::move(_n), std::move(_a), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddSelectZero2(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAddSelectZero2::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c, std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAddSelectZero2> _val(new TyAddSelectZero2(std::move(_z), std::move(_x), std::move(_y), std::move(_c), std::move(_n), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddSelectZero2(std::move(_val)));
 }
 void ConsAddSelectZero2::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -126,9 +126,9 @@ void ConsAddSelectZero2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(add_select_zero2));
 }
 
-TyAddSub::TyAddSub(std::unique_ptr<TyRegister> _minusy,
-                   std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x,
-                   std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz)
+TyAddSub::TyAddSub(std::shared_ptr<TyRegister> _minusy,
+                   std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
+                   std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz)
     : minusy(std::move(_minusy)), z(std::move(_z)), x(std::move(_x)),
       y(std::move(_y)), sz(std::move(_sz)) {}
 
@@ -137,10 +137,10 @@ void TyAddSub::serialize(cereal::JSONOutputArchive &archive) const {
           CEREAL_NVP(sz));
 }
 
-TyAddCommutative::TyAddCommutative(std::unique_ptr<TyRegister> _z,
-                                   std::unique_ptr<TyValue> _x,
-                                   std::unique_ptr<TyValue> _y,
-                                   std::unique_ptr<TySize> _sz)
+TyAddCommutative::TyAddCommutative(std::shared_ptr<TyRegister> _z,
+                                   std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y,
+                                   std::shared_ptr<TySize> _sz)
     : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {
 }
 
@@ -149,7 +149,7 @@ void TyAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 ConsAddCommutative::ConsAddCommutative(
-    std::unique_ptr<TyAddCommutative> _add_comm)
+    std::shared_ptr<TyAddCommutative> _add_comm)
     : add_commutative(std::move(_add_comm)) {}
 
 void ConsAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
@@ -160,20 +160,20 @@ void ConsAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(add_commutative));
 }
 
-std::unique_ptr<TyInfrule> ConsAddCommutative::make(
-    std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x,
-    std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddCommutative> _add_comm(new TyAddCommutative(
+std::shared_ptr<TyInfrule> ConsAddCommutative::make(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAddCommutative> _add_comm(new TyAddCommutative(
       std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(
+  return std::shared_ptr<TyInfrule>(
       new ConsAddCommutative(std::move(_add_comm)));
 }
 
 
-TyAddCommutativeTgt::TyAddCommutativeTgt(std::unique_ptr<TyRegister> _z,
-                                   std::unique_ptr<TyValue> _x,
-                                   std::unique_ptr<TyValue> _y,
-                                   std::unique_ptr<TySize> _sz)
+TyAddCommutativeTgt::TyAddCommutativeTgt(std::shared_ptr<TyRegister> _z,
+                                   std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y,
+                                   std::shared_ptr<TySize> _sz)
     : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {
 }
 
@@ -182,7 +182,7 @@ void TyAddCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 ConsAddCommutativeTgt::ConsAddCommutativeTgt(
-    std::unique_ptr<TyAddCommutativeTgt> _add_comm)
+    std::shared_ptr<TyAddCommutativeTgt> _add_comm)
     : add_commutative_tgt(std::move(_add_comm)) {}
 
 void ConsAddCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
@@ -193,18 +193,18 @@ void ConsAddCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const 
   archive(CEREAL_NVP(add_commutative_tgt));
 }
 
-std::unique_ptr<TyInfrule> ConsAddCommutativeTgt::make(
-    std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x,
-    std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddCommutativeTgt> _add_comm(new TyAddCommutativeTgt(
+std::shared_ptr<TyInfrule> ConsAddCommutativeTgt::make(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAddCommutativeTgt> _add_comm(new TyAddCommutativeTgt(
       std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(
+  return std::shared_ptr<TyInfrule>(
       new ConsAddCommutativeTgt(std::move(_add_comm)));
 }
 
 
 ConsAddAssociative::ConsAddAssociative(
-    std::unique_ptr<TyAddAssociative> _add_associative)
+    std::shared_ptr<TyAddAssociative> _add_associative)
     : add_associative(std::move(_add_associative)) {}
 
 void ConsAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
@@ -215,19 +215,19 @@ void ConsAddAssociative::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(add_associative));
 }
 
-std::unique_ptr<TyInfrule> ConsAddAssociative::make(
-    std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y,
-    std::unique_ptr<TyRegister> _z, std::unique_ptr<TyConstInt> _c1,
-    std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3,
-    std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddAssociative> _add_assoc(new TyAddAssociative(
+std::shared_ptr<TyInfrule> ConsAddAssociative::make(
+    std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y,
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyConstInt> _c1,
+    std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TyConstInt> _c3,
+    std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAddAssociative> _add_assoc(new TyAddAssociative(
       std::move(_x), std::move(_y), std::move(_z), std::move(_c1),
       std::move(_c2), std::move(_c3), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(
+  return std::shared_ptr<TyInfrule>(
       new ConsAddAssociative(std::move(_add_assoc)));
 }
 
-TyAddDistSub::TyAddDistSub(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _minusx, std::unique_ptr<TyValue> _minusy, std::unique_ptr<TyRegister> _w, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), minusx(std::move(_minusx)), minusy(std::move(_minusy)), w(std::move(_w)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TyAddDistSub::TyAddDistSub(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _minusx, std::shared_ptr<TyValue> _minusy, std::shared_ptr<TyRegister> _w, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), minusx(std::move(_minusx)), minusy(std::move(_minusy)), w(std::move(_w)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyAddDistSub::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -239,11 +239,11 @@ void TyAddDistSub::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsAddDistSub::ConsAddDistSub(std::unique_ptr<TyAddDistSub> _add_dist_sub) : add_dist_sub(std::move(_add_dist_sub)){
+ConsAddDistSub::ConsAddDistSub(std::shared_ptr<TyAddDistSub> _add_dist_sub) : add_dist_sub(std::move(_add_dist_sub)){
 }
-std::unique_ptr<TyInfrule> ConsAddDistSub::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _minusx, std::unique_ptr<TyValue> _minusy, std::unique_ptr<TyRegister> _w, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddDistSub> _val(new TyAddDistSub(std::move(_z), std::move(_minusx), std::move(_minusy), std::move(_w), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddDistSub(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAddDistSub::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _minusx, std::shared_ptr<TyValue> _minusy, std::shared_ptr<TyRegister> _w, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAddDistSub> _val(new TyAddDistSub(std::move(_z), std::move(_minusx), std::move(_minusy), std::move(_w), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddDistSub(std::move(_val)));
 }
 void ConsAddDistSub::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -252,7 +252,7 @@ void ConsAddDistSub::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(add_dist_sub));
 }
 
-ConsAddSub::ConsAddSub(std::unique_ptr<TyAddSub> _add_sub)
+ConsAddSub::ConsAddSub(std::shared_ptr<TyAddSub> _add_sub)
     : add_sub(std::move(_add_sub)) {}
 
 void ConsAddSub::serialize(cereal::JSONOutputArchive &archive) const {
@@ -263,18 +263,18 @@ void ConsAddSub::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(add_sub));
 }
 
-std::unique_ptr<TyInfrule> ConsAddSub::make(std::unique_ptr<TyRegister> _minusy,
-                                            std::unique_ptr<TyRegister> _z,
-                                            std::unique_ptr<TyValue> _x,
-                                            std::unique_ptr<TyValue> _y,
-                                            std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddSub> _add_sub(
+std::shared_ptr<TyInfrule> ConsAddSub::make(std::shared_ptr<TyRegister> _minusy,
+                                            std::shared_ptr<TyRegister> _z,
+                                            std::shared_ptr<TyValue> _x,
+                                            std::shared_ptr<TyValue> _y,
+                                            std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAddSub> _add_sub(
       new TyAddSub(std::move(_minusy), std::move(_z), std::move(_x),
                    std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddSub(std::move(_add_sub)));
+  return std::shared_ptr<TyInfrule>(new ConsAddSub(std::move(_add_sub)));
 }
 
-TyAddOnebit::TyAddOnebit(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)){
+TyAddOnebit::TyAddOnebit(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)){
 }
 void TyAddOnebit::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -282,11 +282,11 @@ void TyAddOnebit::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(y));
 }
 
-ConsAddOnebit::ConsAddOnebit(std::unique_ptr<TyAddOnebit> _add_onebit) : add_onebit(std::move(_add_onebit)){
+ConsAddOnebit::ConsAddOnebit(std::shared_ptr<TyAddOnebit> _add_onebit) : add_onebit(std::move(_add_onebit)){
 }
-std::unique_ptr<TyInfrule> ConsAddOnebit::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y){
-  std::unique_ptr<TyAddOnebit> _val(new TyAddOnebit(std::move(_z), std::move(_x), std::move(_y)));
-  return std::unique_ptr<TyInfrule>(new ConsAddOnebit(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAddOnebit::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y){
+  std::shared_ptr<TyAddOnebit> _val(new TyAddOnebit(std::move(_z), std::move(_x), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsAddOnebit(std::move(_val)));
 }
 void ConsAddOnebit::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -295,15 +295,65 @@ void ConsAddOnebit::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(add_onebit));
 }
 
-TyAddShift::TyAddShift(std::unique_ptr<TyRegister> _y,
-                       std::unique_ptr<TyValue> _v, std::unique_ptr<TySize> _sz)
+TyAddOrAnd::TyAddOrAnd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), a(std::move(_a)), b(std::move(_b)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+}
+void TyAddOrAnd::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAddOrAnd::ConsAddOrAnd(std::shared_ptr<TyAddOrAnd> _add_or_and) : add_or_and(std::move(_add_or_and)){
+}
+std::shared_ptr<TyInfrule> ConsAddOrAnd::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAddOrAnd> _val(new TyAddOrAnd(std::move(_z), std::move(_a), std::move(_b), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddOrAnd(std::move(_val)));
+}
+void ConsAddOrAnd::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddOrAnd");
+  archive(CEREAL_NVP(add_or_and));
+}
+
+TyAddSextSext::TyAddSextSext(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _xprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TySize> _from_sz, std::shared_ptr<TySize> _to_sz) : z(std::move(_z)), xprime(std::move(_xprime)), x(std::move(_x)), yprime(std::move(_yprime)), y(std::move(_y)), zprime(std::move(_zprime)), from_sz(std::move(_from_sz)), to_sz(std::move(_to_sz)){
+}
+void TyAddSextSext::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(xprime));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(yprime));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(zprime));
+  archive(CEREAL_NVP(from_sz));
+  archive(CEREAL_NVP(to_sz));
+}
+
+ConsAddSextSext::ConsAddSextSext(std::shared_ptr<TyAddSextSext> _add_sext_sext) : add_sext_sext(std::move(_add_sext_sext)){
+}
+std::shared_ptr<TyInfrule> ConsAddSextSext::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _xprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TySize> _from_sz, std::shared_ptr<TySize> _to_sz){
+  std::shared_ptr<TyAddSextSext> _val(new TyAddSextSext(std::move(_z), std::move(_xprime), std::move(_x), std::move(_yprime), std::move(_y), std::move(_zprime), std::move(_from_sz), std::move(_to_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddSextSext(std::move(_val)));
+}
+void ConsAddSextSext::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddSextSext");
+  archive(CEREAL_NVP(add_sext_sext));
+}
+
+TyAddShift::TyAddShift(std::shared_ptr<TyRegister> _y,
+                       std::shared_ptr<TyValue> _v, std::shared_ptr<TySize> _sz)
     : y(std::move(_y)), v(std::move(_v)), sz(std::move(_sz)) {}
 
 void TyAddShift::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(y), CEREAL_NVP(v), CEREAL_NVP(sz));
 }
 
-ConsAddShift::ConsAddShift(std::unique_ptr<TyAddShift> _add_shift)
+ConsAddShift::ConsAddShift(std::shared_ptr<TyAddShift> _add_shift)
     : add_shift(std::move(_add_shift)) {}
 
 void ConsAddShift::serialize(cereal::JSONOutputArchive &archive) const {
@@ -314,18 +364,18 @@ void ConsAddShift::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(add_shift));
 }
 
-std::unique_ptr<TyInfrule> ConsAddShift::make(std::unique_ptr<TyRegister> _y,
-                                              std::unique_ptr<TyValue> _v,
-                                              std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddShift> _add_shift(
+std::shared_ptr<TyInfrule> ConsAddShift::make(std::shared_ptr<TyRegister> _y,
+                                              std::shared_ptr<TyValue> _v,
+                                              std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAddShift> _add_shift(
       new TyAddShift(std::move(_y), std::move(_v), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddShift(std::move(_add_shift)));
+  return std::shared_ptr<TyInfrule>(new ConsAddShift(std::move(_add_shift)));
 }
 
-TyAddSignbit::TyAddSignbit(std::unique_ptr<TyRegister> _x,
-                           std::unique_ptr<TyValue> _e1,
-                           std::unique_ptr<TyValue> _e2,
-                           std::unique_ptr<TySize> _sz)
+TyAddSignbit::TyAddSignbit(std::shared_ptr<TyRegister> _x,
+                           std::shared_ptr<TyValue> _e1,
+                           std::shared_ptr<TyValue> _e2,
+                           std::shared_ptr<TySize> _sz)
     : x(std::move(_x)), e1(std::move(_e1)), e2(std::move(_e2)),
       sz(std::move(_sz)) {}
 
@@ -336,7 +386,7 @@ void TyAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(sz));
 }
 
-ConsAddSignbit::ConsAddSignbit(std::unique_ptr<TyAddSignbit> _add_signbit)
+ConsAddSignbit::ConsAddSignbit(std::shared_ptr<TyAddSignbit> _add_signbit)
     : add_signbit(std::move(_add_signbit)) {}
 
 void ConsAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
@@ -347,17 +397,41 @@ void ConsAddSignbit::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(add_signbit));
 }
 
-std::unique_ptr<TyInfrule> ConsAddSignbit::make(std::unique_ptr<TyRegister> _x,
-                                                std::unique_ptr<TyValue> _e1,
-                                                std::unique_ptr<TyValue> _e2,
-                                                std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyAddSignbit> _add_signbit(new TyAddSignbit(
+std::shared_ptr<TyInfrule> ConsAddSignbit::make(std::shared_ptr<TyRegister> _x,
+                                                std::shared_ptr<TyValue> _e1,
+                                                std::shared_ptr<TyValue> _e2,
+                                                std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAddSignbit> _add_signbit(new TyAddSignbit(
       std::move(_x), std::move(_e1), std::move(_e2), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(
+  return std::shared_ptr<TyInfrule>(
       new ConsAddSignbit(std::move(_add_signbit)));
 }
 
-TyAddZextBool::TyAddZextBool(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _b, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz) : x(std::move(_x)), y(std::move(_y)), b(std::move(_b)), c(std::move(_c)), cprime(std::move(_cprime)), sz(std::move(_sz)){
+TyAddXorAnd::TyAddXorAnd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), a(std::move(_a)), b(std::move(_b)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+}
+void TyAddXorAnd::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAddXorAnd::ConsAddXorAnd(std::shared_ptr<TyAddXorAnd> _add_xor_and) : add_xor_and(std::move(_add_xor_and)){
+}
+std::shared_ptr<TyInfrule> ConsAddXorAnd::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAddXorAnd> _val(new TyAddXorAnd(std::move(_z), std::move(_a), std::move(_b), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddXorAnd(std::move(_val)));
+}
+void ConsAddXorAnd::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AddXorAnd");
+  archive(CEREAL_NVP(add_xor_and));
+}
+
+TyAddZextBool::TyAddZextBool(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _b, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz) : x(std::move(_x)), y(std::move(_y)), b(std::move(_b)), c(std::move(_c)), cprime(std::move(_cprime)), sz(std::move(_sz)){
 }
 void TyAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(x));
@@ -368,11 +442,11 @@ void TyAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsAddZextBool::ConsAddZextBool(std::unique_ptr<TyAddZextBool> _add_zext_bool) : add_zext_bool(std::move(_add_zext_bool)){
+ConsAddZextBool::ConsAddZextBool(std::shared_ptr<TyAddZextBool> _add_zext_bool) : add_zext_bool(std::move(_add_zext_bool)){
 }
-std::unique_ptr<TyInfrule> ConsAddZextBool::make(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _b, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAddZextBool> _val(new TyAddZextBool(std::move(_x), std::move(_y), std::move(_b), std::move(_c), std::move(_cprime), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAddZextBool(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAddZextBool::make(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _b, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAddZextBool> _val(new TyAddZextBool(std::move(_x), std::move(_y), std::move(_b), std::move(_c), std::move(_cprime), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAddZextBool(std::move(_val)));
 }
 void ConsAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -381,7 +455,7 @@ void ConsAddZextBool::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(add_zext_bool));
 }
 
-TyAndCommutative::TyAndCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TyAndCommutative::TyAndCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyAndCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -390,11 +464,11 @@ void TyAndCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsAndCommutative::ConsAndCommutative(std::unique_ptr<TyAndCommutative> _and_commutative) : and_commutative(std::move(_and_commutative)){
+ConsAndCommutative::ConsAndCommutative(std::shared_ptr<TyAndCommutative> _and_commutative) : and_commutative(std::move(_and_commutative)){
 }
-std::unique_ptr<TyInfrule> ConsAndCommutative::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAndCommutative> _val(new TyAndCommutative(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAndCommutative(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAndCommutative::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAndCommutative> _val(new TyAndCommutative(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAndCommutative(std::move(_val)));
 }
 void ConsAndCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -403,7 +477,7 @@ void ConsAndCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(and_commutative));
 }
 
-TyAndDeMorgan::TyAndDeMorgan(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), zprime(std::move(_zprime)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
+TyAndDeMorgan::TyAndDeMorgan(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), zprime(std::move(_zprime)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
 }
 void TyAndDeMorgan::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -415,11 +489,11 @@ void TyAndDeMorgan::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsAndDeMorgan::ConsAndDeMorgan(std::unique_ptr<TyAndDeMorgan> _and_de_morgan) : and_de_morgan(std::move(_and_de_morgan)){
+ConsAndDeMorgan::ConsAndDeMorgan(std::shared_ptr<TyAndDeMorgan> _and_de_morgan) : and_de_morgan(std::move(_and_de_morgan)){
 }
-std::unique_ptr<TyInfrule> ConsAndDeMorgan::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _zprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyAndDeMorgan> _val(new TyAndDeMorgan(std::move(_z), std::move(_x), std::move(_y), std::move(_zprime), std::move(_a), std::move(_b), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsAndDeMorgan(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsAndDeMorgan::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyAndDeMorgan> _val(new TyAndDeMorgan(std::move(_z), std::move(_x), std::move(_y), std::move(_zprime), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAndDeMorgan(std::move(_val)));
 }
 void ConsAndDeMorgan::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -428,7 +502,7 @@ void ConsAndDeMorgan::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(and_de_morgan));
 }
 
-TyBitcastptr::TyBitcastptr(std::unique_ptr<TyValue> _v, std::unique_ptr<TyValue> _vprime, std::unique_ptr<TyExpr> _bitcastinst) : v(std::move(_v)), vprime(std::move(_vprime)), bitcastinst(std::move(_bitcastinst)){
+TyBitcastptr::TyBitcastptr(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _vprime, std::shared_ptr<TyExpr> _bitcastinst) : v(std::move(_v)), vprime(std::move(_vprime)), bitcastinst(std::move(_bitcastinst)){
 }
 void TyBitcastptr::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(v));
@@ -436,11 +510,11 @@ void TyBitcastptr::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(bitcastinst));
 }
 
-ConsBitcastptr::ConsBitcastptr(std::unique_ptr<TyBitcastptr> _bitcastptr) : bitcastptr(std::move(_bitcastptr)){
+ConsBitcastptr::ConsBitcastptr(std::shared_ptr<TyBitcastptr> _bitcastptr) : bitcastptr(std::move(_bitcastptr)){
 }
-std::unique_ptr<TyInfrule> ConsBitcastptr::make(std::unique_ptr<TyValue> _v, std::unique_ptr<TyValue> _vprime, std::unique_ptr<TyExpr> _bitcastinst){
-  std::unique_ptr<TyBitcastptr> _val(new TyBitcastptr(std::move(_v), std::move(_vprime), std::move(_bitcastinst)));
-  return std::unique_ptr<TyInfrule>(new ConsBitcastptr(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsBitcastptr::make(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _vprime, std::shared_ptr<TyExpr> _bitcastinst){
+  std::shared_ptr<TyBitcastptr> _val(new TyBitcastptr(std::move(_v), std::move(_vprime), std::move(_bitcastinst)));
+  return std::shared_ptr<TyInfrule>(new ConsBitcastptr(std::move(_val)));
 }
 void ConsBitcastptr::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -449,7 +523,7 @@ void ConsBitcastptr::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(bitcastptr));
 }
 
-TyBopDistributiveOverSelectinst::TyBopDistributiveOverSelectinst(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty) : opcode(std::move(_opcode)), r(std::move(_r)), s(std::move(_s)), tprime(std::move(_tprime)), t0(std::move(_t0)), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c(std::move(_c)), bopsz(std::move(_bopsz)), selty(std::move(_selty)){
+TyBopDistributiveOverSelectinst::TyBopDistributiveOverSelectinst(TyBop _opcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, std::shared_ptr<TySize> _bopsz, std::shared_ptr<TyValueType> _selty) : opcode(std::move(_opcode)), r(std::move(_r)), s(std::move(_s)), tprime(std::move(_tprime)), t0(std::move(_t0)), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c(std::move(_c)), bopsz(std::move(_bopsz)), selty(std::move(_selty)){
 }
 void TyBopDistributiveOverSelectinst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("opcode", llvmberry::toString(opcode)));
@@ -465,11 +539,11 @@ void TyBopDistributiveOverSelectinst::serialize(cereal::JSONOutputArchive& archi
   archive(CEREAL_NVP(selty));
 }
 
-ConsBopDistributiveOverSelectinst::ConsBopDistributiveOverSelectinst(std::unique_ptr<TyBopDistributiveOverSelectinst> _bop_distributive_over_selectinst) : bop_distributive_over_selectinst(std::move(_bop_distributive_over_selectinst)){
+ConsBopDistributiveOverSelectinst::ConsBopDistributiveOverSelectinst(std::shared_ptr<TyBopDistributiveOverSelectinst> _bop_distributive_over_selectinst) : bop_distributive_over_selectinst(std::move(_bop_distributive_over_selectinst)){
 }
-std::unique_ptr<TyInfrule> ConsBopDistributiveOverSelectinst::make(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty){
-  std::unique_ptr<TyBopDistributiveOverSelectinst> _val(new TyBopDistributiveOverSelectinst(std::move(_opcode), std::move(_r), std::move(_s), std::move(_tprime), std::move(_t0), std::move(_x), std::move(_y), std::move(_z), std::move(_c), std::move(_bopsz), std::move(_selty)));
-  return std::unique_ptr<TyInfrule>(new ConsBopDistributiveOverSelectinst(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsBopDistributiveOverSelectinst::make(TyBop _opcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, std::shared_ptr<TySize> _bopsz, std::shared_ptr<TyValueType> _selty){
+  std::shared_ptr<TyBopDistributiveOverSelectinst> _val(new TyBopDistributiveOverSelectinst(std::move(_opcode), std::move(_r), std::move(_s), std::move(_tprime), std::move(_t0), std::move(_x), std::move(_y), std::move(_z), std::move(_c), std::move(_bopsz), std::move(_selty)));
+  return std::shared_ptr<TyInfrule>(new ConsBopDistributiveOverSelectinst(std::move(_val)));
 }
 void ConsBopDistributiveOverSelectinst::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -478,7 +552,7 @@ void ConsBopDistributiveOverSelectinst::serialize(cereal::JSONOutputArchive& arc
   archive(CEREAL_NVP(bop_distributive_over_selectinst));
 }
 
-TyBopDistributiveOverSelectinst2::TyBopDistributiveOverSelectinst2(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty) : opcode(std::move(_opcode)), r(std::move(_r)), s(std::move(_s)), tprime(std::move(_tprime)), t0(std::move(_t0)), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c(std::move(_c)), bopsz(std::move(_bopsz)), selty(std::move(_selty)){
+TyBopDistributiveOverSelectinst2::TyBopDistributiveOverSelectinst2(TyBop _opcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, std::shared_ptr<TySize> _bopsz, std::shared_ptr<TyValueType> _selty) : opcode(std::move(_opcode)), r(std::move(_r)), s(std::move(_s)), tprime(std::move(_tprime)), t0(std::move(_t0)), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c(std::move(_c)), bopsz(std::move(_bopsz)), selty(std::move(_selty)){
 }
 void TyBopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("opcode", llvmberry::toString(opcode)));
@@ -494,11 +568,11 @@ void TyBopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& arch
   archive(CEREAL_NVP(selty));
 }
 
-ConsBopDistributiveOverSelectinst2::ConsBopDistributiveOverSelectinst2(std::unique_ptr<TyBopDistributiveOverSelectinst2> _bop_distributive_over_selectinst2) : bop_distributive_over_selectinst2(std::move(_bop_distributive_over_selectinst2)){
+ConsBopDistributiveOverSelectinst2::ConsBopDistributiveOverSelectinst2(std::shared_ptr<TyBopDistributiveOverSelectinst2> _bop_distributive_over_selectinst2) : bop_distributive_over_selectinst2(std::move(_bop_distributive_over_selectinst2)){
 }
-std::unique_ptr<TyInfrule> ConsBopDistributiveOverSelectinst2::make(TyBop _opcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, std::unique_ptr<TySize> _bopsz, std::unique_ptr<TyValueType> _selty){
-  std::unique_ptr<TyBopDistributiveOverSelectinst2> _val(new TyBopDistributiveOverSelectinst2(std::move(_opcode), std::move(_r), std::move(_s), std::move(_tprime), std::move(_t0), std::move(_x), std::move(_y), std::move(_z), std::move(_c), std::move(_bopsz), std::move(_selty)));
-  return std::unique_ptr<TyInfrule>(new ConsBopDistributiveOverSelectinst2(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsBopDistributiveOverSelectinst2::make(TyBop _opcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, std::shared_ptr<TySize> _bopsz, std::shared_ptr<TyValueType> _selty){
+  std::shared_ptr<TyBopDistributiveOverSelectinst2> _val(new TyBopDistributiveOverSelectinst2(std::move(_opcode), std::move(_r), std::move(_s), std::move(_tprime), std::move(_t0), std::move(_x), std::move(_y), std::move(_z), std::move(_c), std::move(_bopsz), std::move(_selty)));
+  return std::shared_ptr<TyInfrule>(new ConsBopDistributiveOverSelectinst2(std::move(_val)));
 }
 void ConsBopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -508,7 +582,7 @@ void ConsBopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& ar
 }
 
 
-TySdivMone::TySdivMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
+TySdivMone::TySdivMone(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
 }
 void TySdivMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -516,11 +590,11 @@ void TySdivMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsSdivMone::ConsSdivMone(std::unique_ptr<TySdivMone> _div_mone) : div_mone(std::move(_div_mone)){
+ConsSdivMone::ConsSdivMone(std::shared_ptr<TySdivMone> _div_mone) : div_mone(std::move(_div_mone)){
 }
-std::unique_ptr<TyInfrule> ConsSdivMone::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TySdivMone> _val(new TySdivMone(std::move(_z), std::move(_x), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSdivMone(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSdivMone::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySdivMone> _val(new TySdivMone(std::move(_z), std::move(_x), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSdivMone(std::move(_val)));
 }
 void ConsSdivMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -529,7 +603,7 @@ void ConsSdivMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(div_mone));
 }
 
-TyRemNeg::TyRemNeg(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _my, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), my(std::move(_my)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TyRemNeg::TyRemNeg(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _my, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), my(std::move(_my)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyRemNeg::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -539,11 +613,11 @@ void TyRemNeg::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsRemNeg::ConsRemNeg(std::unique_ptr<TyRemNeg> _rem_neg) : rem_neg(std::move(_rem_neg)){
+ConsRemNeg::ConsRemNeg(std::shared_ptr<TyRemNeg> _rem_neg) : rem_neg(std::move(_rem_neg)){
 }
-std::unique_ptr<TyInfrule> ConsRemNeg::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _my, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyRemNeg> _val(new TyRemNeg(std::move(_z), std::move(_my), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsRemNeg(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsRemNeg::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _my, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyRemNeg> _val(new TyRemNeg(std::move(_z), std::move(_my), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsRemNeg(std::move(_val)));
 }
 void ConsRemNeg::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -552,11 +626,11 @@ void ConsRemNeg::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(rem_neg));
 }
 
-ConsSdivSubSrem::ConsSdivSubSrem(std::unique_ptr<TySdivSubSrem> _div_sub_srem) : div_sub_srem(std::move(_div_sub_srem)){
+ConsSdivSubSrem::ConsSdivSubSrem(std::shared_ptr<TySdivSubSrem> _div_sub_srem) : div_sub_srem(std::move(_div_sub_srem)){
 }
-std::unique_ptr<TyInfrule> ConsSdivSubSrem::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TySdivSubSrem> _val(new TySdivSubSrem(std::move(_z), std::move(_b), std::move(_a), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSdivSubSrem(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSdivSubSrem::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _b, std::shared_ptr<TyRegister> _a, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySdivSubSrem> _val(new TySdivSubSrem(std::move(_z), std::move(_b), std::move(_a), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSdivSubSrem(std::move(_val)));
 }
 void ConsSdivSubSrem::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -565,7 +639,7 @@ void ConsSdivSubSrem::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(div_sub_srem));
 }
 
-TySdivSubSrem::TySdivSubSrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), b(std::move(_b)), a(std::move(_a)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TySdivSubSrem::TySdivSubSrem(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _b, std::shared_ptr<TyRegister> _a, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), b(std::move(_b)), a(std::move(_a)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TySdivSubSrem::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -576,11 +650,11 @@ void TySdivSubSrem::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsUdivSubUrem::ConsUdivSubUrem(std::unique_ptr<TyUdivSubUrem> _div_sub_urem) : div_sub_urem(std::move(_div_sub_urem)){
+ConsUdivSubUrem::ConsUdivSubUrem(std::shared_ptr<TyUdivSubUrem> _div_sub_urem) : div_sub_urem(std::move(_div_sub_urem)){
 }
-std::unique_ptr<TyInfrule> ConsUdivSubUrem::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyUdivSubUrem> _val(new TyUdivSubUrem(std::move(_z), std::move(_b), std::move(_a), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsUdivSubUrem(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsUdivSubUrem::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _b, std::shared_ptr<TyRegister> _a, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyUdivSubUrem> _val(new TyUdivSubUrem(std::move(_z), std::move(_b), std::move(_a), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsUdivSubUrem(std::move(_val)));
 }
 void ConsUdivSubUrem::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -589,7 +663,7 @@ void ConsUdivSubUrem::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(div_sub_urem));
 }
 
-TyUdivSubUrem::TyUdivSubUrem(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _b, std::unique_ptr<TyRegister> _a, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), b(std::move(_b)), a(std::move(_a)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TyUdivSubUrem::TyUdivSubUrem(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _b, std::shared_ptr<TyRegister> _a, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), b(std::move(_b)), a(std::move(_a)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyUdivSubUrem::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -601,11 +675,11 @@ void TyUdivSubUrem::serialize(cereal::JSONOutputArchive& archive) const{
 }
 
 TySubAdd::TySubAdd
-        (std::unique_ptr<TyRegister> _z,
-         std::unique_ptr<TyValue> _my,
-         std::unique_ptr<TyRegister> _x,
-         std::unique_ptr<TyValue> _y,
-         std::unique_ptr<TySize> _sz)
+        (std::shared_ptr<TyRegister> _z,
+         std::shared_ptr<TyValue> _my,
+         std::shared_ptr<TyRegister> _x,
+         std::shared_ptr<TyValue> _y,
+         std::shared_ptr<TySize> _sz)
         : z(std::move(_z)), my(std::move(_my)), x(std::move(_x)),
           y(std::move(_y)), sz(std::move(_sz)) {}
 
@@ -614,7 +688,7 @@ void TySubAdd::serialize(cereal::JSONOutputArchive &archive) const {
           CEREAL_NVP(y), CEREAL_NVP(sz));
 }
 
-ConsSubAdd::ConsSubAdd(std::unique_ptr<TySubAdd> _sub_add)
+ConsSubAdd::ConsSubAdd(std::shared_ptr<TySubAdd> _sub_add)
         : sub_add(std::move(_sub_add)) {}
 
 void ConsSubAdd::serialize(cereal::JSONOutputArchive &archive) const {
@@ -625,20 +699,20 @@ void ConsSubAdd::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(sub_add));
 }
 
-std::unique_ptr<TyInfrule> ConsSubAdd::make
-        (std::unique_ptr<TyRegister> _z,
-         std::unique_ptr<TyValue> _my,
-         std::unique_ptr<TyRegister> _x,
-         std::unique_ptr<TyValue> _y,
-         std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TySubAdd> _sub_add
+std::shared_ptr<TyInfrule> ConsSubAdd::make
+        (std::shared_ptr<TyRegister> _z,
+         std::shared_ptr<TyValue> _my,
+         std::shared_ptr<TyRegister> _x,
+         std::shared_ptr<TyValue> _y,
+         std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TySubAdd> _sub_add
           (new TySubAdd
                    (std::move(_z), std::move(_my), std::move(_x),
                     std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
+  return std::shared_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
 }
 
-TySubMone::TySubMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
+TySubMone::TySubMone(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
 }
 void TySubMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -646,11 +720,11 @@ void TySubMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsSubMone::ConsSubMone(std::unique_ptr<TySubMone> _sub_mone) : sub_mone(std::move(_sub_mone)){
+ConsSubMone::ConsSubMone(std::shared_ptr<TySubMone> _sub_mone) : sub_mone(std::move(_sub_mone)){
 }
-std::unique_ptr<TyInfrule> ConsSubMone::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TySubMone> _val(new TySubMone(std::move(_z), std::move(_x), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSubMone(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSubMone::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySubMone> _val(new TySubMone(std::move(_z), std::move(_x), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSubMone(std::move(_val)));
 }
 void ConsSubMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -659,7 +733,7 @@ void ConsSubMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sub_mone));
 }
 
-TySubOnebit::TySubOnebit(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)){
+TySubOnebit::TySubOnebit(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)){
 }
 void TySubOnebit::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -667,11 +741,11 @@ void TySubOnebit::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(y));
 }
 
-ConsSubOnebit::ConsSubOnebit(std::unique_ptr<TySubOnebit> _sub_onebit) : sub_onebit(std::move(_sub_onebit)){
+ConsSubOnebit::ConsSubOnebit(std::shared_ptr<TySubOnebit> _sub_onebit) : sub_onebit(std::move(_sub_onebit)){
 }
-std::unique_ptr<TyInfrule> ConsSubOnebit::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y){
-  std::unique_ptr<TySubOnebit> _val(new TySubOnebit(std::move(_z), std::move(_x), std::move(_y)));
-  return std::unique_ptr<TyInfrule>(new ConsSubOnebit(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSubOnebit::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y){
+  std::shared_ptr<TySubOnebit> _val(new TySubOnebit(std::move(_z), std::move(_x), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsSubOnebit(std::move(_val)));
 }
 void ConsSubOnebit::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -680,7 +754,7 @@ void ConsSubOnebit::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sub_onebit));
 }
 
-TySubConstNot::TySubConstNot(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
+TySubConstNot::TySubConstNot(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), sz(std::move(_sz)){
 }
 void TySubConstNot::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -691,11 +765,11 @@ void TySubConstNot::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsSubConstNot::ConsSubConstNot(std::unique_ptr<TySubConstNot> _sub_const_not) : sub_const_not(std::move(_sub_const_not)){
+ConsSubConstNot::ConsSubConstNot(std::shared_ptr<TySubConstNot> _sub_const_not) : sub_const_not(std::move(_sub_const_not)){
 }
-std::unique_ptr<TyInfrule> ConsSubConstNot::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TySubConstNot> _val(new TySubConstNot(std::move(_z), std::move(_y), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSubConstNot(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSubConstNot::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySubConstNot> _val(new TySubConstNot(std::move(_z), std::move(_y), std::move(_x), std::move(_c1), std::move(_c2), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSubConstNot(std::move(_val)));
 }
 void ConsSubConstNot::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -704,7 +778,7 @@ void ConsSubConstNot::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sub_const_not));
 }
 
-TySubConstAdd::TySubConstAdd(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), c3(std::move(_c3)), sz(std::move(_sz)){
+TySubConstAdd::TySubConstAdd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c1(std::move(_c1)), c2(std::move(_c2)), c3(std::move(_c3)), sz(std::move(_sz)){
 }
 void TySubConstAdd::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -716,11 +790,11 @@ void TySubConstAdd::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsSubConstAdd::ConsSubConstAdd(std::unique_ptr<TySubConstAdd> _sub_const_add) : sub_const_add(std::move(_sub_const_add)){
+ConsSubConstAdd::ConsSubConstAdd(std::shared_ptr<TySubConstAdd> _sub_const_add) : sub_const_add(std::move(_sub_const_add)){
 }
-std::unique_ptr<TyInfrule> ConsSubConstAdd::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c1, std::unique_ptr<TyConstInt> _c2, std::unique_ptr<TyConstInt> _c3, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TySubConstAdd> _val(new TySubConstAdd(std::move(_z), std::move(_y), std::move(_x), std::move(_c1), std::move(_c2), std::move(_c3), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSubConstAdd(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSubConstAdd::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySubConstAdd> _val(new TySubConstAdd(std::move(_z), std::move(_y), std::move(_x), std::move(_c1), std::move(_c2), std::move(_c3), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSubConstAdd(std::move(_val)));
 }
 void ConsSubConstAdd::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -729,7 +803,31 @@ void ConsSubConstAdd::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sub_const_add));
 }
 
-TySubSdiv::TySubSdiv(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c(std::move(_c)), cprime(std::move(_cprime)), sz(std::move(_sz)){
+TySubOrXor::TySubOrXor(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), a(std::move(_a)), b(std::move(_b)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+}
+void TySubOrXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsSubOrXor::ConsSubOrXor(std::shared_ptr<TySubOrXor> _sub_or_xor) : sub_or_xor(std::move(_sub_or_xor)){
+}
+std::shared_ptr<TyInfrule> ConsSubOrXor::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySubOrXor> _val(new TySubOrXor(std::move(_z), std::move(_a), std::move(_b), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSubOrXor(std::move(_val)));
+}
+void ConsSubOrXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SubOrXor");
+  archive(CEREAL_NVP(sub_or_xor));
+}
+
+TySubSdiv::TySubSdiv(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), c(std::move(_c)), cprime(std::move(_cprime)), sz(std::move(_sz)){
 }
 void TySubSdiv::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -740,11 +838,11 @@ void TySubSdiv::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsSubSdiv::ConsSubSdiv(std::unique_ptr<TySubSdiv> _sub_sdiv) : sub_sdiv(std::move(_sub_sdiv)){
+ConsSubSdiv::ConsSubSdiv(std::shared_ptr<TySubSdiv> _sub_sdiv) : sub_sdiv(std::move(_sub_sdiv)){
 }
-std::unique_ptr<TyInfrule> ConsSubSdiv::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyConstInt> _c, std::unique_ptr<TyConstInt> _cprime, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TySubSdiv> _val(new TySubSdiv(std::move(_z), std::move(_y), std::move(_x), std::move(_c), std::move(_cprime), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSubSdiv(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSubSdiv::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySubSdiv> _val(new TySubSdiv(std::move(_z), std::move(_y), std::move(_x), std::move(_c), std::move(_cprime), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSubSdiv(std::move(_val)));
 }
 void ConsSubSdiv::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -753,7 +851,7 @@ void ConsSubSdiv::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sub_sdiv));
 }
 
-TySubShl::TySubShl(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _mx, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), mx(std::move(_mx)), a(std::move(_a)), sz(std::move(_sz)){
+TySubShl::TySubShl(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _mx, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), mx(std::move(_mx)), a(std::move(_a)), sz(std::move(_sz)){
 }
 void TySubShl::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -764,11 +862,11 @@ void TySubShl::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsSubShl::ConsSubShl(std::unique_ptr<TySubShl> _sub_shl) : sub_shl(std::move(_sub_shl)){
+ConsSubShl::ConsSubShl(std::shared_ptr<TySubShl> _sub_shl) : sub_shl(std::move(_sub_shl)){
 }
-std::unique_ptr<TyInfrule> ConsSubShl::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _mx, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TySubShl> _val(new TySubShl(std::move(_z), std::move(_x), std::move(_y), std::move(_mx), std::move(_a), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSubShl(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSubShl::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _mx, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySubShl> _val(new TySubShl(std::move(_z), std::move(_x), std::move(_y), std::move(_mx), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSubShl(std::move(_val)));
 }
 void ConsSubShl::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -777,7 +875,7 @@ void ConsSubShl::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sub_shl));
 }
 
-TyGepzero::TyGepzero(std::unique_ptr<TyValue> _v, std::unique_ptr<TyValue> _vprime, std::unique_ptr<TyExpr> _gepinst) : v(std::move(_v)), vprime(std::move(_vprime)), gepinst(std::move(_gepinst)){
+TyGepzero::TyGepzero(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _vprime, std::shared_ptr<TyExpr> _gepinst) : v(std::move(_v)), vprime(std::move(_vprime)), gepinst(std::move(_gepinst)){
 }
 void TyGepzero::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(v));
@@ -785,11 +883,11 @@ void TyGepzero::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(gepinst));
 }
 
-ConsGepzero::ConsGepzero(std::unique_ptr<TyGepzero> _gepzero) : gepzero(std::move(_gepzero)){
+ConsGepzero::ConsGepzero(std::shared_ptr<TyGepzero> _gepzero) : gepzero(std::move(_gepzero)){
 }
-std::unique_ptr<TyInfrule> ConsGepzero::make(std::unique_ptr<TyValue> _v, std::unique_ptr<TyValue> _vprime, std::unique_ptr<TyExpr> _gepinst){
-  std::unique_ptr<TyGepzero> _val(new TyGepzero(std::move(_v), std::move(_vprime), std::move(_gepinst)));
-  return std::unique_ptr<TyInfrule>(new ConsGepzero(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsGepzero::make(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _vprime, std::shared_ptr<TyExpr> _gepinst){
+  std::shared_ptr<TyGepzero> _val(new TyGepzero(std::move(_v), std::move(_vprime), std::move(_gepinst)));
+  return std::shared_ptr<TyInfrule>(new ConsGepzero(std::move(_val)));
 }
 void ConsGepzero::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -799,7 +897,30 @@ void ConsGepzero::serialize(cereal::JSONOutputArchive& archive) const{
 }
 
 
-TyFaddCommutativeTgt::TyFaddCommutativeTgt(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, TyFloatType _fty) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), fty(_fty){
+TySubSub::TySubSub(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), w(std::move(_w)), sz(std::move(_sz)){
+}
+void TySubSub::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(w));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsSubSub::ConsSubSub(std::shared_ptr<TySubSub> _sub_sub) : sub_sub(std::move(_sub_sub)){
+}
+std::shared_ptr<TyInfrule> ConsSubSub::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySubSub> _val(new TySubSub(std::move(_z), std::move(_x), std::move(_y), std::move(_w), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSubSub(std::move(_val)));
+}
+void ConsSubSub::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SubSub");
+  archive(CEREAL_NVP(sub_sub));
+}
+
+TyFaddCommutativeTgt::TyFaddCommutativeTgt(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, TyFloatType _fty) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), fty(_fty){
 }
 void TyFaddCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -808,11 +929,11 @@ void TyFaddCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("fty", toString(fty)));
 }
 
-ConsFaddCommutativeTgt::ConsFaddCommutativeTgt(std::unique_ptr<TyFaddCommutativeTgt> _fadd_commutative_tgt) : fadd_commutative_tgt(std::move(_fadd_commutative_tgt)){
+ConsFaddCommutativeTgt::ConsFaddCommutativeTgt(std::shared_ptr<TyFaddCommutativeTgt> _fadd_commutative_tgt) : fadd_commutative_tgt(std::move(_fadd_commutative_tgt)){
 }
-std::unique_ptr<TyInfrule> ConsFaddCommutativeTgt::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, TyFloatType _fty){
-  std::unique_ptr<TyFaddCommutativeTgt> _val(new TyFaddCommutativeTgt(std::move(_z), std::move(_x), std::move(_y), std::move(_fty)));
-  return std::unique_ptr<TyInfrule>(new ConsFaddCommutativeTgt(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsFaddCommutativeTgt::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, TyFloatType _fty){
+  std::shared_ptr<TyFaddCommutativeTgt> _val(new TyFaddCommutativeTgt(std::move(_z), std::move(_x), std::move(_y), std::move(_fty)));
+  return std::shared_ptr<TyInfrule>(new ConsFaddCommutativeTgt(std::move(_val)));
 }
 void ConsFaddCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -821,7 +942,7 @@ void ConsFaddCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const
   archive(CEREAL_NVP(fadd_commutative_tgt));
 }
 
-TyFbopDistributiveOverSelectinst::TyFbopDistributiveOverSelectinst(TyFbop _fopcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, TyFloatType _fbopty, std::unique_ptr<TyValueType> _selty) : fopcode(std::move(_fopcode)), r(std::move(_r)), s(std::move(_s)), tprime(std::move(_tprime)), t0(std::move(_t0)), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c(std::move(_c)), fbopty(std::move(_fbopty)), selty(std::move(_selty)){
+TyFbopDistributiveOverSelectinst::TyFbopDistributiveOverSelectinst(TyFbop _fopcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, TyFloatType _fbopty, std::shared_ptr<TyValueType> _selty) : fopcode(std::move(_fopcode)), r(std::move(_r)), s(std::move(_s)), tprime(std::move(_tprime)), t0(std::move(_t0)), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c(std::move(_c)), fbopty(std::move(_fbopty)), selty(std::move(_selty)){
 }
 void TyFbopDistributiveOverSelectinst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("fopcode", toString(fopcode)));
@@ -837,11 +958,11 @@ void TyFbopDistributiveOverSelectinst::serialize(cereal::JSONOutputArchive& arch
   archive(CEREAL_NVP(selty));
 }
 
-ConsFbopDistributiveOverSelectinst::ConsFbopDistributiveOverSelectinst(std::unique_ptr<TyFbopDistributiveOverSelectinst> _fbop_distributive_over_selectinst) : fbop_distributive_over_selectinst(std::move(_fbop_distributive_over_selectinst)){
+ConsFbopDistributiveOverSelectinst::ConsFbopDistributiveOverSelectinst(std::shared_ptr<TyFbopDistributiveOverSelectinst> _fbop_distributive_over_selectinst) : fbop_distributive_over_selectinst(std::move(_fbop_distributive_over_selectinst)){
 }
-std::unique_ptr<TyInfrule> ConsFbopDistributiveOverSelectinst::make(TyFbop _fopcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, TyFloatType _fbopty, std::unique_ptr<TyValueType> _selty){
-  std::unique_ptr<TyFbopDistributiveOverSelectinst> _val(new TyFbopDistributiveOverSelectinst(std::move(_fopcode), std::move(_r), std::move(_s), std::move(_tprime), std::move(_t0), std::move(_x), std::move(_y), std::move(_z), std::move(_c), std::move(_fbopty), std::move(_selty)));
-  return std::unique_ptr<TyInfrule>(new ConsFbopDistributiveOverSelectinst(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsFbopDistributiveOverSelectinst::make(TyFbop _fopcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, TyFloatType _fbopty, std::shared_ptr<TyValueType> _selty){
+  std::shared_ptr<TyFbopDistributiveOverSelectinst> _val(new TyFbopDistributiveOverSelectinst(std::move(_fopcode), std::move(_r), std::move(_s), std::move(_tprime), std::move(_t0), std::move(_x), std::move(_y), std::move(_z), std::move(_c), std::move(_fbopty), std::move(_selty)));
+  return std::shared_ptr<TyInfrule>(new ConsFbopDistributiveOverSelectinst(std::move(_val)));
 }
 void ConsFbopDistributiveOverSelectinst::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -850,7 +971,7 @@ void ConsFbopDistributiveOverSelectinst::serialize(cereal::JSONOutputArchive& ar
   archive(CEREAL_NVP(fbop_distributive_over_selectinst));
 }
 
-TyFbopDistributiveOverSelectinst2::TyFbopDistributiveOverSelectinst2(TyFbop _fopcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, TyFloatType _fbopty, std::unique_ptr<TyValueType> _selty) : fopcode(std::move(_fopcode)), r(std::move(_r)), s(std::move(_s)), tprime(std::move(_tprime)), t0(std::move(_t0)), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c(std::move(_c)), fbopty(std::move(_fbopty)), selty(std::move(_selty)){
+TyFbopDistributiveOverSelectinst2::TyFbopDistributiveOverSelectinst2(TyFbop _fopcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, TyFloatType _fbopty, std::shared_ptr<TyValueType> _selty) : fopcode(std::move(_fopcode)), r(std::move(_r)), s(std::move(_s)), tprime(std::move(_tprime)), t0(std::move(_t0)), x(std::move(_x)), y(std::move(_y)), z(std::move(_z)), c(std::move(_c)), fbopty(std::move(_fbopty)), selty(std::move(_selty)){
 }
 void TyFbopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("fopcode", toString(fopcode)));
@@ -866,11 +987,11 @@ void TyFbopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& arc
   archive(CEREAL_NVP(selty));
 }
 
-ConsFbopDistributiveOverSelectinst2::ConsFbopDistributiveOverSelectinst2(std::unique_ptr<TyFbopDistributiveOverSelectinst2> _fbop_distributive_over_selectinst2) : fbop_distributive_over_selectinst2(std::move(_fbop_distributive_over_selectinst2)){
+ConsFbopDistributiveOverSelectinst2::ConsFbopDistributiveOverSelectinst2(std::shared_ptr<TyFbopDistributiveOverSelectinst2> _fbop_distributive_over_selectinst2) : fbop_distributive_over_selectinst2(std::move(_fbop_distributive_over_selectinst2)){
 }
-std::unique_ptr<TyInfrule> ConsFbopDistributiveOverSelectinst2::make(TyFbop _fopcode, std::unique_ptr<TyRegister> _r, std::unique_ptr<TyRegister> _s, std::unique_ptr<TyRegister> _tprime, std::unique_ptr<TyRegister> _t0, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _c, TyFloatType _fbopty, std::unique_ptr<TyValueType> _selty){
-  std::unique_ptr<TyFbopDistributiveOverSelectinst2> _val(new TyFbopDistributiveOverSelectinst2(std::move(_fopcode), std::move(_r), std::move(_s), std::move(_tprime), std::move(_t0), std::move(_x), std::move(_y), std::move(_z), std::move(_c), std::move(_fbopty), std::move(_selty)));
-  return std::unique_ptr<TyInfrule>(new ConsFbopDistributiveOverSelectinst2(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsFbopDistributiveOverSelectinst2::make(TyFbop _fopcode, std::shared_ptr<TyRegister> _r, std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime, std::shared_ptr<TyRegister> _t0, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _c, TyFloatType _fbopty, std::shared_ptr<TyValueType> _selty){
+  std::shared_ptr<TyFbopDistributiveOverSelectinst2> _val(new TyFbopDistributiveOverSelectinst2(std::move(_fopcode), std::move(_r), std::move(_s), std::move(_tprime), std::move(_t0), std::move(_x), std::move(_y), std::move(_z), std::move(_c), std::move(_fbopty), std::move(_selty)));
+  return std::shared_ptr<TyInfrule>(new ConsFbopDistributiveOverSelectinst2(std::move(_val)));
 }
 void ConsFbopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -880,7 +1001,7 @@ void ConsFbopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& a
 }
 
 
-TyMulCommutative::TyMulCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TyMulCommutative::TyMulCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyMulCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -889,11 +1010,11 @@ void TyMulCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsMulCommutative::ConsMulCommutative(std::unique_ptr<TyMulCommutative> _mul_commutative) : mul_commutative(std::move(_mul_commutative)){
+ConsMulCommutative::ConsMulCommutative(std::shared_ptr<TyMulCommutative> _mul_commutative) : mul_commutative(std::move(_mul_commutative)){
 }
-std::unique_ptr<TyInfrule> ConsMulCommutative::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyMulCommutative> _val(new TyMulCommutative(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsMulCommutative(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsMulCommutative::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyMulCommutative> _val(new TyMulCommutative(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsMulCommutative(std::move(_val)));
 }
 void ConsMulCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -903,12 +1024,12 @@ void ConsMulCommutative::serialize(cereal::JSONOutputArchive& archive) const{
 }
 
 TyMulNeg::TyMulNeg
-        (std::unique_ptr<TyRegister> _z,
-         std::unique_ptr<TyValue> _mx,
-         std::unique_ptr<TyValue> _my,
-         std::unique_ptr<TyValue> _x,
-         std::unique_ptr<TyValue> _y,
-         std::unique_ptr<TySize> _sz)
+        (std::shared_ptr<TyRegister> _z,
+         std::shared_ptr<TyValue> _mx,
+         std::shared_ptr<TyValue> _my,
+         std::shared_ptr<TyValue> _x,
+         std::shared_ptr<TyValue> _y,
+         std::shared_ptr<TySize> _sz)
         : z(std::move(_z)), mx(std::move(_mx)), my(std::move(_my)), x(std::move(_x)),
           y(std::move(_y)), sz(std::move(_sz)) {}
 
@@ -917,7 +1038,7 @@ void TyMulNeg::serialize(cereal::JSONOutputArchive &archive) const {
           CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
 }
 
-ConsMulNeg::ConsMulNeg(std::unique_ptr<TyMulNeg> _mul_neg)
+ConsMulNeg::ConsMulNeg(std::shared_ptr<TyMulNeg> _mul_neg)
         : mul_neg(std::move(_mul_neg)) {}
 
 void ConsMulNeg::serialize(cereal::JSONOutputArchive &archive) const {
@@ -928,21 +1049,21 @@ void ConsMulNeg::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(mul_neg));
 }
 
-std::unique_ptr<TyInfrule> ConsMulNeg::make
-        (std::unique_ptr<TyRegister> _z,
-         std::unique_ptr<TyValue> _mx,
-         std::unique_ptr<TyValue> _my,
-         std::unique_ptr<TyValue> _x,
-         std::unique_ptr<TyValue> _y,
-         std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyMulNeg> _mul_neg
+std::shared_ptr<TyInfrule> ConsMulNeg::make
+        (std::shared_ptr<TyRegister> _z,
+         std::shared_ptr<TyValue> _mx,
+         std::shared_ptr<TyValue> _my,
+         std::shared_ptr<TyValue> _x,
+         std::shared_ptr<TyValue> _y,
+         std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyMulNeg> _mul_neg
           (new TyMulNeg
                    (std::move(_z), std::move(_mx), std::move(_my),
                     std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsMulNeg(std::move(_mul_neg)));
+  return std::shared_ptr<TyInfrule>(new ConsMulNeg(std::move(_mul_neg)));
 }
 
-TyMulMone::TyMulMone(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
+TyMulMone::TyMulMone(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
 }
 void TyMulMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -950,11 +1071,11 @@ void TyMulMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsMulMone::ConsMulMone(std::unique_ptr<TyMulMone> _mul_mone) : mul_mone(std::move(_mul_mone)){
+ConsMulMone::ConsMulMone(std::shared_ptr<TyMulMone> _mul_mone) : mul_mone(std::move(_mul_mone)){
 }
-std::unique_ptr<TyInfrule> ConsMulMone::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyMulMone> _val(new TyMulMone(std::move(_z), std::move(_x), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsMulMone(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsMulMone::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyMulMone> _val(new TyMulMone(std::move(_z), std::move(_x), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsMulMone(std::move(_val)));
 }
 void ConsMulMone::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -964,16 +1085,16 @@ void ConsMulMone::serialize(cereal::JSONOutputArchive& archive) const{
 }
 
 TyNegVal::TyNegVal
-          (std::unique_ptr<TyConstInt> _c1,
-           std::unique_ptr<TyConstInt> _c2,
-           std::unique_ptr<TySize> _sz)
+          (std::shared_ptr<TyConstInt> _c1,
+           std::shared_ptr<TyConstInt> _c2,
+           std::shared_ptr<TySize> _sz)
            : c1(std::move(_c1)), c2(std::move(_c2)),sz(std::move(_sz)) {}
 
 void TyNegVal::serialize(cereal::JSONOutputArchive &archive) const {
         archive(CEREAL_NVP(c1), CEREAL_NVP(c2), CEREAL_NVP(sz));
 }
 
-ConsNegVal::ConsNegVal(std::unique_ptr<TyNegVal> _neg_val)
+ConsNegVal::ConsNegVal(std::shared_ptr<TyNegVal> _neg_val)
                 : neg_val(std::move(_neg_val)) {}
 
 void ConsNegVal::serialize(cereal::JSONOutputArchive &archive) const {
@@ -984,28 +1105,28 @@ void ConsNegVal::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(neg_val));
 }
 
-std::unique_ptr<TyInfrule> ConsNegVal::make
-  (std::unique_ptr<TyConstInt> _c1,
-   std::unique_ptr<TyConstInt> _c2,
-   std::unique_ptr<TySize> _sz) {
-  std::unique_ptr<TyNegVal> _neg_val(new TyNegVal
+std::shared_ptr<TyInfrule> ConsNegVal::make
+  (std::shared_ptr<TyConstInt> _c1,
+   std::shared_ptr<TyConstInt> _c2,
+   std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyNegVal> _neg_val(new TyNegVal
    (std::move(_c1), std::move(_c2), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsNegVal(std::move(_neg_val)));
+  return std::shared_ptr<TyInfrule>(new ConsNegVal(std::move(_neg_val)));
 }
 
-TyNoaliasGlobalAlloca::TyNoaliasGlobalAlloca(std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y) : x(std::move(_x)), y(std::move(_y)){
+TyNoaliasGlobalAlloca::TyNoaliasGlobalAlloca(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y) : x(std::move(_x)), y(std::move(_y)){
 }
 void TyNoaliasGlobalAlloca::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(x));
   archive(CEREAL_NVP(y));
 }
 
-ConsNoaliasGlobalAlloca::ConsNoaliasGlobalAlloca(std::unique_ptr<TyNoaliasGlobalAlloca> _noalias_global_alloca) : noalias_global_alloca(std::move(_noalias_global_alloca)){
+ConsNoaliasGlobalAlloca::ConsNoaliasGlobalAlloca(std::shared_ptr<TyNoaliasGlobalAlloca> _noalias_global_alloca) : noalias_global_alloca(std::move(_noalias_global_alloca)){
 }
-std::unique_ptr<TyInfrule> ConsNoaliasGlobalAlloca::make(std::unique_ptr<TyRegister> _x, 
-        std::unique_ptr<TyRegister> _y){
-  std::unique_ptr<TyNoaliasGlobalAlloca> _val(new TyNoaliasGlobalAlloca(std::move(_x), std::move(_y)));
-  return std::unique_ptr<TyInfrule>(new ConsNoaliasGlobalAlloca(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsNoaliasGlobalAlloca::make(std::shared_ptr<TyRegister> _x, 
+        std::shared_ptr<TyRegister> _y){
+  std::shared_ptr<TyNoaliasGlobalAlloca> _val(new TyNoaliasGlobalAlloca(std::move(_x), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsNoaliasGlobalAlloca(std::move(_val)));
 }
 void ConsNoaliasGlobalAlloca::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1014,20 +1135,20 @@ void ConsNoaliasGlobalAlloca::serialize(cereal::JSONOutputArchive& archive) cons
   archive(CEREAL_NVP(noalias_global_alloca));
 }
 
-TyNoaliasGlobalGlobal::TyNoaliasGlobalGlobal(std::unique_ptr<TyRegister> _x, 
-        std::unique_ptr<TyRegister> _y) : x(std::move(_x)), y(std::move(_y)){
+TyNoaliasGlobalGlobal::TyNoaliasGlobalGlobal(std::shared_ptr<TyRegister> _x, 
+        std::shared_ptr<TyRegister> _y) : x(std::move(_x)), y(std::move(_y)){
 }
 void TyNoaliasGlobalGlobal::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(x));
   archive(CEREAL_NVP(y));
 }
 
-ConsNoaliasGlobalGlobal::ConsNoaliasGlobalGlobal(std::unique_ptr<TyNoaliasGlobalGlobal> _noalias_global_global) : noalias_global_global(std::move(_noalias_global_global)){
+ConsNoaliasGlobalGlobal::ConsNoaliasGlobalGlobal(std::shared_ptr<TyNoaliasGlobalGlobal> _noalias_global_global) : noalias_global_global(std::move(_noalias_global_global)){
 }
-std::unique_ptr<TyInfrule> ConsNoaliasGlobalGlobal::make(std::unique_ptr<TyRegister> _x, 
-        std::unique_ptr<TyRegister> _y){
-  std::unique_ptr<TyNoaliasGlobalGlobal> _val(new TyNoaliasGlobalGlobal(std::move(_x), std::move(_y)));
-  return std::unique_ptr<TyInfrule>(new ConsNoaliasGlobalGlobal(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsNoaliasGlobalGlobal::make(std::shared_ptr<TyRegister> _x, 
+        std::shared_ptr<TyRegister> _y){
+  std::shared_ptr<TyNoaliasGlobalGlobal> _val(new TyNoaliasGlobalGlobal(std::move(_x), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsNoaliasGlobalGlobal(std::move(_val)));
 }
 void ConsNoaliasGlobalGlobal::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1036,7 +1157,7 @@ void ConsNoaliasGlobalGlobal::serialize(cereal::JSONOutputArchive& archive) cons
   archive(CEREAL_NVP(noalias_global_global));
 }
 
-TyNoaliasLessthan::TyNoaliasLessthan(std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _xprime, std::unique_ptr<TyValue> _yprime) : x(std::move(_x)), y(std::move(_y)), xprime(std::move(_xprime)), yprime(std::move(_yprime)){
+TyNoaliasLessthan::TyNoaliasLessthan(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime) : x(std::move(_x)), y(std::move(_y)), xprime(std::move(_xprime)), yprime(std::move(_yprime)){
 }
 void TyNoaliasLessthan::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(x));
@@ -1045,11 +1166,11 @@ void TyNoaliasLessthan::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(yprime));
 }
 
-ConsNoaliasLessthan::ConsNoaliasLessthan(std::unique_ptr<TyNoaliasLessthan> _noalias_lessthan) : noalias_lessthan(std::move(_noalias_lessthan)){
+ConsNoaliasLessthan::ConsNoaliasLessthan(std::shared_ptr<TyNoaliasLessthan> _noalias_lessthan) : noalias_lessthan(std::move(_noalias_lessthan)){
 }
-std::unique_ptr<TyInfrule> ConsNoaliasLessthan::make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _xprime, std::unique_ptr<TyValue> _yprime){
-  std::unique_ptr<TyNoaliasLessthan> _val(new TyNoaliasLessthan(std::move(_x), std::move(_y), std::move(_xprime), std::move(_yprime)));
-  return std::unique_ptr<TyInfrule>(new ConsNoaliasLessthan(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsNoaliasLessthan::make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime){
+  std::shared_ptr<TyNoaliasLessthan> _val(new TyNoaliasLessthan(std::move(_x), std::move(_y), std::move(_xprime), std::move(_yprime)));
+  return std::shared_ptr<TyInfrule>(new ConsNoaliasLessthan(std::move(_val)));
 }
 void ConsNoaliasLessthan::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1058,7 +1179,7 @@ void ConsNoaliasLessthan::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(noalias_lessthan));
 }
 
-TyOrCommutative::TyOrCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TyOrCommutative::TyOrCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyOrCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1067,11 +1188,11 @@ void TyOrCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsOrCommutative::ConsOrCommutative(std::unique_ptr<TyOrCommutative> _or_commutative) : or_commutative(std::move(_or_commutative)){
+ConsOrCommutative::ConsOrCommutative(std::shared_ptr<TyOrCommutative> _or_commutative) : or_commutative(std::move(_or_commutative)){
 }
-std::unique_ptr<TyInfrule> ConsOrCommutative::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyOrCommutative> _val(new TyOrCommutative(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsOrCommutative(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsOrCommutative::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrCommutative> _val(new TyOrCommutative(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrCommutative(std::move(_val)));
 }
 void ConsOrCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1080,7 +1201,7 @@ void ConsOrCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(or_commutative));
 }
 
-TyOrOr::TyOrOr(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
+TyOrOr::TyOrOr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
 }
 void TyOrOr::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1091,11 +1212,11 @@ void TyOrOr::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsOrOr::ConsOrOr(std::unique_ptr<TyOrOr> _or_or) : or_or(std::move(_or_or)){
+ConsOrOr::ConsOrOr(std::shared_ptr<TyOrOr> _or_or) : or_or(std::move(_or_or)){
 }
-std::unique_ptr<TyInfrule> ConsOrOr::make(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyOrOr> _val(new TyOrOr(std::move(_z), std::move(_x), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsOrOr(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsOrOr::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrOr> _val(new TyOrOr(std::move(_z), std::move(_x), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrOr(std::move(_val)));
 }
 void ConsOrOr::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1104,7 +1225,7 @@ void ConsOrOr::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(or_or));
 }
 
-TyOrOr2::TyOrOr2(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _yprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), yprime(std::move(_yprime)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
+TyOrOr2::TyOrOr2(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), yprime(std::move(_yprime)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
 }
 void TyOrOr2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1116,11 +1237,11 @@ void TyOrOr2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsOrOr2::ConsOrOr2(std::unique_ptr<TyOrOr2> _or_or2) : or_or2(std::move(_or_or2)){
+ConsOrOr2::ConsOrOr2(std::shared_ptr<TyOrOr2> _or_or2) : or_or2(std::move(_or_or2)){
 }
-std::unique_ptr<TyInfrule> ConsOrOr2::make(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _yprime, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyOrOr2> _val(new TyOrOr2(std::move(_z), std::move(_x), std::move(_y), std::move(_yprime), std::move(_a), std::move(_b), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsOrOr2(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsOrOr2::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrOr2> _val(new TyOrOr2(std::move(_z), std::move(_x), std::move(_y), std::move(_yprime), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrOr2(std::move(_val)));
 }
 void ConsOrOr2::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1129,7 +1250,7 @@ void ConsOrOr2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(or_or2));
 }
 
-TyOrXor::TyOrXor(std::unique_ptr<TyValue> _w, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz) : w(std::move(_w)), z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
+TyOrXor::TyOrXor(std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : w(std::move(_w)), z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
 }
 void TyOrXor::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(w));
@@ -1141,11 +1262,11 @@ void TyOrXor::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsOrXor::ConsOrXor(std::unique_ptr<TyOrXor> _or_xor) : or_xor(std::move(_or_xor)){
+ConsOrXor::ConsOrXor(std::shared_ptr<TyOrXor> _or_xor) : or_xor(std::move(_or_xor)){
 }
-std::unique_ptr<TyInfrule> ConsOrXor::make(std::unique_ptr<TyValue> _w, std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyOrXor> _val(new TyOrXor(std::move(_w), std::move(_z), std::move(_x), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsOrXor(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsOrXor::make(std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrXor> _val(new TyOrXor(std::move(_w), std::move(_z), std::move(_x), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrXor(std::move(_val)));
 }
 void ConsOrXor::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1154,7 +1275,7 @@ void ConsOrXor::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(or_xor));
 }
 
-TyOrXor2::TyOrXor2(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x1, std::unique_ptr<TyValue> _y1, std::unique_ptr<TyValue> _x2, std::unique_ptr<TyValue> _y2, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x1(std::move(_x1)), y1(std::move(_y1)), x2(std::move(_x2)), y2(std::move(_y2)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
+TyOrXor2::TyOrXor2(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x1, std::shared_ptr<TyValue> _y1, std::shared_ptr<TyValue> _x2, std::shared_ptr<TyValue> _y2, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x1(std::move(_x1)), y1(std::move(_y1)), x2(std::move(_x2)), y2(std::move(_y2)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
 }
 void TyOrXor2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1168,11 +1289,11 @@ void TyOrXor2::serialize(cereal::JSONOutputArchive& archive) const{
 }
 
 
-ConsOrXor2::ConsOrXor2(std::unique_ptr<TyOrXor2> _or_xor2) : or_xor2(std::move(_or_xor2)){
+ConsOrXor2::ConsOrXor2(std::shared_ptr<TyOrXor2> _or_xor2) : or_xor2(std::move(_or_xor2)){
 }
-std::unique_ptr<TyInfrule> ConsOrXor2::make(std::unique_ptr<TyValue> _z, std::unique_ptr<TyValue> _x1, std::unique_ptr<TyValue> _y1, std::unique_ptr<TyValue> _x2, std::unique_ptr<TyValue> _y2, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyOrXor2> _val(new TyOrXor2(std::move(_z), std::move(_x1), std::move(_y1), std::move(_x2), std::move(_y2), std::move(_a), std::move(_b), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsOrXor2(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsOrXor2::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x1, std::shared_ptr<TyValue> _y1, std::shared_ptr<TyValue> _x2, std::shared_ptr<TyValue> _y2, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrXor2> _val(new TyOrXor2(std::move(_z), std::move(_x1), std::move(_y1), std::move(_x2), std::move(_y2), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrXor2(std::move(_val)));
 }
 void ConsOrXor2::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1181,11 +1302,11 @@ void ConsOrXor2::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(or_xor2));
 }
 
-TySubRemove::TySubRemove(std::unique_ptr<TyRegister> _z,
-                       std::unique_ptr<TyRegister> _y,
-                       std::unique_ptr<TyValue> _a,
-                       std::unique_ptr<TyValue> _b,
-                       std::unique_ptr<TySize> _sz)
+TySubRemove::TySubRemove(std::shared_ptr<TyRegister> _z,
+                       std::shared_ptr<TyRegister> _y,
+                       std::shared_ptr<TyValue> _a,
+                       std::shared_ptr<TyValue> _b,
+                       std::shared_ptr<TySize> _sz)
   : z(std::move(_z)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)),
     sz(std::move(_sz)) {}
 
@@ -1194,7 +1315,7 @@ void TySubRemove::serialize(cereal::JSONOutputArchive &archive) const {
           CEREAL_NVP(sz));
 }
 
-ConsSubRemove::ConsSubRemove(std::unique_ptr<TySubRemove> _sub_remove)
+ConsSubRemove::ConsSubRemove(std::shared_ptr<TySubRemove> _sub_remove)
     : sub_remove(std::move(_sub_remove)) {}
 
 void ConsSubRemove::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1205,21 +1326,21 @@ void ConsSubRemove::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(sub_remove));
 }
 
-std::unique_ptr<TyInfrule> ConsSubRemove::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TySubRemove> _val(new TySubRemove(std::move(_z), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsSubRemove(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsSubRemove::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TySubRemove> _val(new TySubRemove(std::move(_z), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsSubRemove(std::move(_val)));
 }
 
-TyMulBool::TyMulBool(std::unique_ptr<TyRegister> _z,
-                     std::unique_ptr<TyRegister> _x,
-                     std::unique_ptr<TyRegister> _y)
+TyMulBool::TyMulBool(std::shared_ptr<TyRegister> _z,
+                     std::shared_ptr<TyRegister> _x,
+                     std::shared_ptr<TyRegister> _y)
     : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)) {}
 
 void TyMulBool::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(y));
 }
 
-ConsMulBool::ConsMulBool(std::unique_ptr<TyMulBool> _mul_bool)
+ConsMulBool::ConsMulBool(std::shared_ptr<TyMulBool> _mul_bool)
     : mul_bool(std::move(_mul_bool)) {}
 
 void ConsMulBool::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1230,16 +1351,16 @@ void ConsMulBool::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(mul_bool));
 }
 
-std::unique_ptr<TyInfrule> ConsMulBool::make(std::unique_ptr<TyRegister> _z,
-                                             std::unique_ptr<TyRegister> _x,
-                                             std::unique_ptr<TyRegister> _y) {
-  std::unique_ptr<TyMulBool> _mul_bool(
+std::shared_ptr<TyInfrule> ConsMulBool::make(std::shared_ptr<TyRegister> _z,
+                                             std::shared_ptr<TyRegister> _x,
+                                             std::shared_ptr<TyRegister> _y) {
+  std::shared_ptr<TyMulBool> _mul_bool(
       new TyMulBool(std::move(_z), std::move(_x), std::move(_y)));
 
-  return std::unique_ptr<TyInfrule>(new ConsMulBool(std::move(_mul_bool)));
+  return std::shared_ptr<TyInfrule>(new ConsMulBool(std::move(_mul_bool)));
 }
 
-TyMulShl::TyMulShl(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), a(std::move(_a)), sz(std::move(_sz)){
+TyMulShl::TyMulShl(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), a(std::move(_a)), sz(std::move(_sz)){
 }
 void TyMulShl::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1249,11 +1370,11 @@ void TyMulShl::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsMulShl::ConsMulShl(std::unique_ptr<TyMulShl> _mul_shl) : mul_shl(std::move(_mul_shl)){
+ConsMulShl::ConsMulShl(std::shared_ptr<TyMulShl> _mul_shl) : mul_shl(std::move(_mul_shl)){
 }
-std::unique_ptr<TyInfrule> ConsMulShl::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _a, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyMulShl> _val(new TyMulShl(std::move(_z), std::move(_y), std::move(_x), std::move(_a), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsMulShl(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsMulShl::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyMulShl> _val(new TyMulShl(std::move(_z), std::move(_y), std::move(_x), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsMulShl(std::move(_val)));
 }
 void ConsMulShl::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1262,9 +1383,9 @@ void ConsMulShl::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(mul_shl));
 }
 
-TyTransitivity::TyTransitivity(std::unique_ptr<TyExpr> _e1,
-                               std::unique_ptr<TyExpr> _e2,
-                               std::unique_ptr<TyExpr> _e3)
+TyTransitivity::TyTransitivity(std::shared_ptr<TyExpr> _e1,
+                               std::shared_ptr<TyExpr> _e2,
+                               std::shared_ptr<TyExpr> _e3)
     : e1(std::move(_e1)), e2(std::move(_e2)), e3(std::move(_e3)) {}
 
 void TyTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1272,7 +1393,7 @@ void TyTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 ConsTransitivity::ConsTransitivity(
-    std::unique_ptr<TyTransitivity> _transitivity)
+    std::shared_ptr<TyTransitivity> _transitivity)
     : transitivity(std::move(_transitivity)) {}
 
 void ConsTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1283,16 +1404,16 @@ void ConsTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(transitivity));
 }
 
-std::unique_ptr<TyInfrule> ConsTransitivity::make(std::unique_ptr<TyExpr> _e1,
-                                                  std::unique_ptr<TyExpr> _e2,
-                                                  std::unique_ptr<TyExpr> _e3) {
-  std::unique_ptr<TyTransitivity> _transitivity(
+std::shared_ptr<TyInfrule> ConsTransitivity::make(std::shared_ptr<TyExpr> _e1,
+                                                  std::shared_ptr<TyExpr> _e2,
+                                                  std::shared_ptr<TyExpr> _e3) {
+  std::shared_ptr<TyTransitivity> _transitivity(
       new TyTransitivity(std::move(_e1), std::move(_e2), std::move(_e3)));
-  return std::unique_ptr<TyInfrule>(
+  return std::shared_ptr<TyInfrule>(
       new ConsTransitivity(std::move(_transitivity)));
 }
 
-TyTransitivityPointerLhs::TyTransitivityPointerLhs(std::unique_ptr<TyValue> _p, std::unique_ptr<TyValue> _q, std::unique_ptr<TyValue> _v, std::unique_ptr<TyExpr> _loadq) : p(std::move(_p)), q(std::move(_q)), v(std::move(_v)), loadq(std::move(_loadq)){
+TyTransitivityPointerLhs::TyTransitivityPointerLhs(std::shared_ptr<TyValue> _p, std::shared_ptr<TyValue> _q, std::shared_ptr<TyValue> _v, std::shared_ptr<TyExpr> _loadq) : p(std::move(_p)), q(std::move(_q)), v(std::move(_v)), loadq(std::move(_loadq)){
 }
 void TyTransitivityPointerLhs::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(p));
@@ -1301,11 +1422,11 @@ void TyTransitivityPointerLhs::serialize(cereal::JSONOutputArchive& archive) con
   archive(CEREAL_NVP(loadq));
 }
 
-ConsTransitivityPointerLhs::ConsTransitivityPointerLhs(std::unique_ptr<TyTransitivityPointerLhs> _transitivity_pointer_lhs) : transitivity_pointer_lhs(std::move(_transitivity_pointer_lhs)){
+ConsTransitivityPointerLhs::ConsTransitivityPointerLhs(std::shared_ptr<TyTransitivityPointerLhs> _transitivity_pointer_lhs) : transitivity_pointer_lhs(std::move(_transitivity_pointer_lhs)){
 }
-std::unique_ptr<TyInfrule> ConsTransitivityPointerLhs::make(std::unique_ptr<TyValue> _p, std::unique_ptr<TyValue> _q, std::unique_ptr<TyValue> _v, std::unique_ptr<TyExpr> _loadq){
-  std::unique_ptr<TyTransitivityPointerLhs> _val(new TyTransitivityPointerLhs(std::move(_p), std::move(_q), std::move(_v), std::move(_loadq)));
-  return std::unique_ptr<TyInfrule>(new ConsTransitivityPointerLhs(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsTransitivityPointerLhs::make(std::shared_ptr<TyValue> _p, std::shared_ptr<TyValue> _q, std::shared_ptr<TyValue> _v, std::shared_ptr<TyExpr> _loadq){
+  std::shared_ptr<TyTransitivityPointerLhs> _val(new TyTransitivityPointerLhs(std::move(_p), std::move(_q), std::move(_v), std::move(_loadq)));
+  return std::shared_ptr<TyInfrule>(new ConsTransitivityPointerLhs(std::move(_val)));
 }
 void ConsTransitivityPointerLhs::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1314,7 +1435,7 @@ void ConsTransitivityPointerLhs::serialize(cereal::JSONOutputArchive& archive) c
   archive(CEREAL_NVP(transitivity_pointer_lhs));
 }
 
-TyTransitivityPointerRhs::TyTransitivityPointerRhs(std::unique_ptr<TyValue> _p, std::unique_ptr<TyValue> _q, std::unique_ptr<TyValue> _v, std::unique_ptr<TyExpr> _loadp) : p(std::move(_p)), q(std::move(_q)), v(std::move(_v)), loadp(std::move(_loadp)){
+TyTransitivityPointerRhs::TyTransitivityPointerRhs(std::shared_ptr<TyValue> _p, std::shared_ptr<TyValue> _q, std::shared_ptr<TyValue> _v, std::shared_ptr<TyExpr> _loadp) : p(std::move(_p)), q(std::move(_q)), v(std::move(_v)), loadp(std::move(_loadp)){
 }
 void TyTransitivityPointerRhs::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(p));
@@ -1323,11 +1444,11 @@ void TyTransitivityPointerRhs::serialize(cereal::JSONOutputArchive& archive) con
   archive(CEREAL_NVP(loadp));
 }
 
-ConsTransitivityPointerRhs::ConsTransitivityPointerRhs(std::unique_ptr<TyTransitivityPointerRhs> _transitivity_pointer_rhs) : transitivity_pointer_rhs(std::move(_transitivity_pointer_rhs)){
+ConsTransitivityPointerRhs::ConsTransitivityPointerRhs(std::shared_ptr<TyTransitivityPointerRhs> _transitivity_pointer_rhs) : transitivity_pointer_rhs(std::move(_transitivity_pointer_rhs)){
 }
-std::unique_ptr<TyInfrule> ConsTransitivityPointerRhs::make(std::unique_ptr<TyValue> _p, std::unique_ptr<TyValue> _q, std::unique_ptr<TyValue> _v, std::unique_ptr<TyExpr> _loadp){
-  std::unique_ptr<TyTransitivityPointerRhs> _val(new TyTransitivityPointerRhs(std::move(_p), std::move(_q), std::move(_v), std::move(_loadp)));
-  return std::unique_ptr<TyInfrule>(new ConsTransitivityPointerRhs(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsTransitivityPointerRhs::make(std::shared_ptr<TyValue> _p, std::shared_ptr<TyValue> _q, std::shared_ptr<TyValue> _v, std::shared_ptr<TyExpr> _loadp){
+  std::shared_ptr<TyTransitivityPointerRhs> _val(new TyTransitivityPointerRhs(std::move(_p), std::move(_q), std::move(_v), std::move(_loadp)));
+  return std::shared_ptr<TyInfrule>(new ConsTransitivityPointerRhs(std::move(_val)));
 }
 void ConsTransitivityPointerRhs::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1337,16 +1458,16 @@ void ConsTransitivityPointerRhs::serialize(cereal::JSONOutputArchive& archive) c
 }
 
 TyTransitivityTgt::TyTransitivityTgt
-(std::unique_ptr<TyExpr> _e1,
- std::unique_ptr<TyExpr> _e2,
- std::unique_ptr<TyExpr> _e3)
+(std::shared_ptr<TyExpr> _e1,
+ std::shared_ptr<TyExpr> _e2,
+ std::shared_ptr<TyExpr> _e3)
   : e1(std::move(_e1)), e2(std::move(_e2)), e3(std::move(_e3)) {}
   
 void TyTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
 }
 
-ConsTransitivityTgt::ConsTransitivityTgt(std::unique_ptr<TyTransitivityTgt> _transitivity_tgt)
+ConsTransitivityTgt::ConsTransitivityTgt(std::shared_ptr<TyTransitivityTgt> _transitivity_tgt)
   : transitivity_tgt(std::move(_transitivity_tgt)) {}
 
 void ConsTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1357,20 +1478,20 @@ void ConsTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(transitivity_tgt));
 }
 
-std::unique_ptr<TyInfrule> ConsTransitivityTgt::make
-(std::unique_ptr<TyExpr> _e1,
- std::unique_ptr<TyExpr> _e2,
- std::unique_ptr<TyExpr> _e3) {
-  std::unique_ptr<TyTransitivityTgt> _transitivity_tgt
+std::shared_ptr<TyInfrule> ConsTransitivityTgt::make
+(std::shared_ptr<TyExpr> _e1,
+ std::shared_ptr<TyExpr> _e2,
+ std::shared_ptr<TyExpr> _e3) {
+  std::shared_ptr<TyTransitivityTgt> _transitivity_tgt
     (new TyTransitivityTgt(std::move(_e1), std::move(_e2), std::move(_e3)));
-  return std::unique_ptr<TyInfrule>(new ConsTransitivityTgt(std::move(_transitivity_tgt)));
+  return std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(std::move(_transitivity_tgt)));
 }
 
-TyReplaceRhs::TyReplaceRhs(std::unique_ptr<TyRegister> _x,
-                           std::unique_ptr<TyValue> _y,
-                           std::unique_ptr<TyExpr> _e1,
-                           std::unique_ptr<TyExpr> _e2,
-                           std::unique_ptr<TyExpr> _e2_p)
+TyReplaceRhs::TyReplaceRhs(std::shared_ptr<TyRegister> _x,
+                           std::shared_ptr<TyValue> _y,
+                           std::shared_ptr<TyExpr> _e1,
+                           std::shared_ptr<TyExpr> _e2,
+                           std::shared_ptr<TyExpr> _e2_p)
     : x(std::move(_x)), y(std::move(_y)), e1(std::move(_e1)),
       e2(std::move(_e2)), e2_p(std::move(_e2_p)) {}
 
@@ -1379,7 +1500,7 @@ void TyReplaceRhs::serialize(cereal::JSONOutputArchive &archive) const {
           cereal::make_nvp("e2\'", e2_p));
 }
 
-ConsReplaceRhs::ConsReplaceRhs(std::unique_ptr<TyReplaceRhs> _replace_rhs)
+ConsReplaceRhs::ConsReplaceRhs(std::shared_ptr<TyReplaceRhs> _replace_rhs)
     : replace_rhs(std::move(_replace_rhs)) {}
 
 void ConsReplaceRhs::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1390,19 +1511,54 @@ void ConsReplaceRhs::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(replace_rhs));
 }
 
-std::unique_ptr<TyInfrule> ConsReplaceRhs::make(std::unique_ptr<TyRegister> _x,
-                                                std::unique_ptr<TyValue> _y,
-                                                std::unique_ptr<TyExpr> _e1,
-                                                std::unique_ptr<TyExpr> _e2,
-                                                std::unique_ptr<TyExpr> _e2_p) {
-  std::unique_ptr<TyReplaceRhs> _replace_rhs(
+std::shared_ptr<TyInfrule> ConsReplaceRhs::make(std::shared_ptr<TyRegister> _x,
+                                                std::shared_ptr<TyValue> _y,
+                                                std::shared_ptr<TyExpr> _e1,
+                                                std::shared_ptr<TyExpr> _e2,
+                                                std::shared_ptr<TyExpr> _e2_p) {
+  std::shared_ptr<TyReplaceRhs> _replace_rhs(
       new TyReplaceRhs(std::move(_x), std::move(_y), std::move(_e1),
                        std::move(_e2), std::move(_e2_p)));
-  return std::unique_ptr<TyInfrule>(
+  return std::shared_ptr<TyInfrule>(
       new ConsReplaceRhs(std::move(_replace_rhs)));
 }
 
-TyUdivZext::TyUdivZext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), k(std::move(_k)), a(std::move(_a)), b(std::move(_b)), sz1(std::move(_sz1)), sz2(std::move(_sz2)){
+TyReplaceRhsOpt::TyReplaceRhsOpt(std::shared_ptr<TyRegister> _x,
+                                 std::shared_ptr<TyValue> _y,
+                                 std::shared_ptr<TyExpr> _e1,
+                                 std::shared_ptr<TyExpr> _e2,
+                                 std::shared_ptr<TyExpr> _e2_p)
+        : x(std::move(_x)), y(std::move(_y)), e1(std::move(_e1)),
+          e2(std::move(_e2)), e2_p(std::move(_e2_p)) {}
+
+void TyReplaceRhsOpt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(e1), CEREAL_NVP(e2),
+          cereal::make_nvp("e2\'", e2_p));
+}
+
+ConsReplaceRhsOpt::ConsReplaceRhsOpt(std::shared_ptr<TyReplaceRhsOpt> _replace_rhs_opt)
+    : replace_rhs_opt(std::move(_replace_rhs_opt)) {}
+
+void ConsReplaceRhsOpt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("ReplaceRhsOpt");
+  archive(CEREAL_NVP(replace_rhs_opt));
+}
+std::shared_ptr<TyInfrule> ConsReplaceRhsOpt::make(std::shared_ptr<TyRegister> _x,
+                                                   std::shared_ptr<TyValue> _y,
+                                                   std::shared_ptr<TyExpr> _e1,
+                                                   std::shared_ptr<TyExpr> _e2,
+                                                   std::shared_ptr<TyExpr> _e2_p) {
+  std::shared_ptr<TyReplaceRhsOpt> _replace_rhs_opt(
+          new TyReplaceRhsOpt(std::move(_x), std::move(_y), std::move(_e1),
+                              std::move(_e2), std::move(_e2_p)));
+  return std::shared_ptr<TyInfrule>(
+          new ConsReplaceRhsOpt(std::move(_replace_rhs_opt)));
+}
+
+TyUdivZext::TyUdivZext(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), k(std::move(_k)), a(std::move(_a)), b(std::move(_b)), sz1(std::move(_sz1)), sz2(std::move(_sz2)){
 }
 void TyUdivZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1415,11 +1571,11 @@ void TyUdivZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz2));
 }
 
-ConsUdivZext::ConsUdivZext(std::unique_ptr<TyUdivZext> _udiv_zext) : udiv_zext(std::move(_udiv_zext)){
+ConsUdivZext::ConsUdivZext(std::shared_ptr<TyUdivZext> _udiv_zext) : udiv_zext(std::move(_udiv_zext)){
 }
-std::unique_ptr<TyInfrule> ConsUdivZext::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2){
-  std::unique_ptr<TyUdivZext> _val(new TyUdivZext(std::move(_z), std::move(_x), std::move(_y), std::move(_k), std::move(_a), std::move(_b), std::move(_sz1), std::move(_sz2)));
-  return std::unique_ptr<TyInfrule>(new ConsUdivZext(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsUdivZext::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2){
+  std::shared_ptr<TyUdivZext> _val(new TyUdivZext(std::move(_z), std::move(_x), std::move(_y), std::move(_k), std::move(_a), std::move(_b), std::move(_sz1), std::move(_sz2)));
+  return std::shared_ptr<TyInfrule>(new ConsUdivZext(std::move(_val)));
 }
 void ConsUdivZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1428,7 +1584,7 @@ void ConsUdivZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(udiv_zext));
 }
 
-TyUremZext::TyUremZext(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), k(std::move(_k)), a(std::move(_a)), b(std::move(_b)), sz1(std::move(_sz1)), sz2(std::move(_sz2)){
+TyUremZext::TyUremZext(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), k(std::move(_k)), a(std::move(_a)), b(std::move(_b)), sz1(std::move(_sz1)), sz2(std::move(_sz2)){
 }
 void TyUremZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1441,11 +1597,11 @@ void TyUremZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz2));
 }
 
-ConsUremZext::ConsUremZext(std::unique_ptr<TyUremZext> _urem_zext) : urem_zext(std::move(_urem_zext)){
+ConsUremZext::ConsUremZext(std::shared_ptr<TyUremZext> _urem_zext) : urem_zext(std::move(_urem_zext)){
 }
-std::unique_ptr<TyInfrule> ConsUremZext::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyRegister> _x, std::unique_ptr<TyRegister> _y, std::unique_ptr<TyRegister> _k, std::unique_ptr<TyValue> _a, std::unique_ptr<TyValue> _b, std::unique_ptr<TySize> _sz1, std::unique_ptr<TySize> _sz2){
-  std::unique_ptr<TyUremZext> _val(new TyUremZext(std::move(_z), std::move(_x), std::move(_y), std::move(_k), std::move(_a), std::move(_b), std::move(_sz1), std::move(_sz2)));
-  return std::unique_ptr<TyInfrule>(new ConsUremZext(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsUremZext::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2){
+  std::shared_ptr<TyUremZext> _val(new TyUremZext(std::move(_z), std::move(_x), std::move(_y), std::move(_k), std::move(_a), std::move(_b), std::move(_sz1), std::move(_sz2)));
+  return std::shared_ptr<TyInfrule>(new ConsUremZext(std::move(_val)));
 }
 void ConsUremZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1454,7 +1610,7 @@ void ConsUremZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(urem_zext));
 }
 
-TyIntroGhost::TyIntroGhost(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g) : x(std::move(_x)), g(std::move(_g)){
+TyIntroGhost::TyIntroGhost(std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _g) : x(std::move(_x)), g(std::move(_g)){
 }
 
 void TyIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
@@ -1462,11 +1618,11 @@ void TyIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(g));
 }
 
-ConsIntroGhost::ConsIntroGhost(std::unique_ptr<TyIntroGhost> _intro_ghost) : intro_ghost(std::move(_intro_ghost)) {}
+ConsIntroGhost::ConsIntroGhost(std::shared_ptr<TyIntroGhost> _intro_ghost) : intro_ghost(std::move(_intro_ghost)) {}
 
-std::unique_ptr<TyInfrule> ConsIntroGhost::make(std::unique_ptr<TyValue> _x, std::unique_ptr<TyRegister> _g) {
-  std::unique_ptr<TyIntroGhost> _val(new TyIntroGhost(std::move(_x), std::move(_g)));
-  return std::unique_ptr<TyInfrule>(new ConsIntroGhost(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsIntroGhost::make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyRegister> _g) {
+  std::shared_ptr<TyIntroGhost> _val(new TyIntroGhost(std::move(_x), std::move(_g)));
+  return std::shared_ptr<TyInfrule>(new ConsIntroGhost(std::move(_val)));
 }
 
 void ConsIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
@@ -1476,18 +1632,18 @@ void ConsIntroGhost::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(intro_ghost));
 }
 
-TyIntroEq::TyIntroEq(std::unique_ptr<TyValue> _x) : x(std::move(_x)){
+TyIntroEq::TyIntroEq(std::shared_ptr<TyValue> _x) : x(std::move(_x)){
 }
 
 void TyIntroEq::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(x));
 }
 
-ConsIntroEq::ConsIntroEq(std::unique_ptr<TyIntroEq> _intro_eq) : intro_eq(std::move(_intro_eq)) {}
+ConsIntroEq::ConsIntroEq(std::shared_ptr<TyIntroEq> _intro_eq) : intro_eq(std::move(_intro_eq)) {}
 
-std::unique_ptr<TyInfrule> ConsIntroEq::make(std::unique_ptr<TyValue> _x) {
-  std::unique_ptr<TyIntroEq> _val(new TyIntroEq(std::move(_x)));
-  return std::unique_ptr<TyInfrule>(new ConsIntroEq(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsIntroEq::make(std::shared_ptr<TyValue> _x) {
+  std::shared_ptr<TyIntroEq> _val(new TyIntroEq(std::move(_x)));
+  return std::shared_ptr<TyInfrule>(new ConsIntroEq(std::move(_val)));
 }
 
 void ConsIntroEq::serialize(cereal::JSONOutputArchive& archive) const{
@@ -1498,8 +1654,7 @@ void ConsIntroEq::serialize(cereal::JSONOutputArchive& archive) const{
 }
 
 
-
-TyXorCommutative::TyXorCommutative(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TyXorCommutative::TyXorCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyXorCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1508,11 +1663,11 @@ void TyXorCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsXorCommutative::ConsXorCommutative(std::unique_ptr<TyXorCommutative> _xor_commutative) : xor_commutative(std::move(_xor_commutative)){
+ConsXorCommutative::ConsXorCommutative(std::shared_ptr<TyXorCommutative> _xor_commutative) : xor_commutative(std::move(_xor_commutative)){
 }
-std::unique_ptr<TyInfrule> ConsXorCommutative::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyXorCommutative> _val(new TyXorCommutative(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsXorCommutative(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsXorCommutative::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyXorCommutative> _val(new TyXorCommutative(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsXorCommutative(std::move(_val)));
 }
 void ConsXorCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1521,7 +1676,7 @@ void ConsXorCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(xor_commutative));
 }
 
-TyXorCommutativeTgt::TyXorCommutativeTgt(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+TyXorCommutativeTgt::TyXorCommutativeTgt(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyXorCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(z));
@@ -1530,11 +1685,11 @@ void TyXorCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(sz));
 }
 
-ConsXorCommutativeTgt::ConsXorCommutativeTgt(std::unique_ptr<TyXorCommutativeTgt> _xor_commutative_tgt) : xor_commutative_tgt(std::move(_xor_commutative_tgt)){
+ConsXorCommutativeTgt::ConsXorCommutativeTgt(std::shared_ptr<TyXorCommutativeTgt> _xor_commutative_tgt) : xor_commutative_tgt(std::move(_xor_commutative_tgt)){
 }
-std::unique_ptr<TyInfrule> ConsXorCommutativeTgt::make(std::unique_ptr<TyRegister> _z, std::unique_ptr<TyValue> _x, std::unique_ptr<TyValue> _y, std::unique_ptr<TySize> _sz){
-  std::unique_ptr<TyXorCommutativeTgt> _val(new TyXorCommutativeTgt(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::unique_ptr<TyInfrule>(new ConsXorCommutativeTgt(std::move(_val)));
+std::shared_ptr<TyInfrule> ConsXorCommutativeTgt::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyXorCommutativeTgt> _val(new TyXorCommutativeTgt(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsXorCommutativeTgt(std::move(_val)));
 }
 void ConsXorCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();

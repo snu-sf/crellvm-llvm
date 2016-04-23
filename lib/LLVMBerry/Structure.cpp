@@ -325,14 +325,15 @@ int getTerminatorIndex(const llvm::TerminatorInst *instr) {
   }
 }
 
-std::unique_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si) {
+
+std::shared_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si) {
   llvm::Value* Val = si->getOperand(0);
 
   if (llvm::ConstantInt* C = llvm::dyn_cast<llvm::ConstantInt>(Val)) {
     int storeval = C->getSExtValue();
     int bitwidth = C->getBitWidth();
 
-    return std::unique_ptr<llvmberry::TyExpr>
+    return std::shared_ptr<llvmberry::TyExpr>
               (new ConsConst(storeval, bitwidth));
   } else {
     std::string reg_stored = getVariable(*Val);
@@ -357,7 +358,7 @@ void TyPositionCommand::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(index), CEREAL_NVP(register_name));
 }
 
-ConsPhinode::ConsPhinode(std::unique_ptr<TyPositionPhinode> _position_phinode)
+ConsPhinode::ConsPhinode(std::shared_ptr<TyPositionPhinode> _position_phinode)
     : position_phinode(std::move(_position_phinode)) {}
 
 void ConsPhinode::serialize(cereal::JSONOutputArchive &archive) const {
@@ -368,7 +369,7 @@ void ConsPhinode::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(position_phinode));
 }
 
-ConsCommand::ConsCommand(std::unique_ptr<TyPositionCommand> _position_command)
+ConsCommand::ConsCommand(std::shared_ptr<TyPositionCommand> _position_command)
     : position_command(std::move(_position_command)) {}
 
 void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
@@ -380,7 +381,7 @@ void ConsCommand::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 TyPosition::TyPosition(enum TyScope _scope, std::string _block_name,
-                       std::unique_ptr<TyInstrIndex> _instr_index)
+                       std::shared_ptr<TyInstrIndex> _instr_index)
     : scope(_scope), block_name(_block_name),
       instr_index(std::move(_instr_index)) {}
 
@@ -388,36 +389,41 @@ void TyPosition::serialize(cereal::JSONOutputArchive &archive) const {
   archive(cereal::make_nvp("scope", ::toString(scope)), CEREAL_NVP(block_name), CEREAL_NVP(instr_index));
 }
 
-std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+std::shared_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
                                              std::string _block_name,
                                              std::string _prev_block_name) {
-  std::unique_ptr<TyPositionPhinode> _pos_phi(
+  std::shared_ptr<TyPositionPhinode> _pos_phi(
       new TyPositionPhinode(_prev_block_name));
 
-  std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
+  std::shared_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
 
-  return std::unique_ptr<TyPosition>(
+  return std::shared_ptr<TyPosition>(
       new TyPosition(_scope, _block_name, std::move(_phi)));
 }
 
-std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+std::shared_ptr<TyPosition>
+TyPosition::make_start_of_block(enum TyScope _scope, std::string _block_name) {
+  return TyPosition::make(_scope, _block_name, "");
+}
+
+std::shared_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
                                              const llvm::Instruction &I) {
   std::string empty_str = "";
   return std::move(TyPosition::make(_scope, I, empty_str));
 }
 
-std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+std::shared_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
                                              const llvm::Instruction &I, std::string _prev_block_name) {
 
   std::string _block_name = getBasicBlockIndex(I.getParent());
   std::string _register_name = getVariable(I);
 
-  std::unique_ptr<TyInstrIndex> _instr_index;
+  std::shared_ptr<TyInstrIndex> _instr_index;
 
   if (llvm::isa<llvm::PHINode>(I)) {
-    std::unique_ptr<TyPositionPhinode> _pos_phi(new TyPositionPhinode(_prev_block_name));
+    std::shared_ptr<TyPositionPhinode> _pos_phi(new TyPositionPhinode(_prev_block_name));
 
-    std::unique_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
+    std::shared_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
 
     _instr_index = std::move(_phi);
   } else {
@@ -427,19 +433,19 @@ std::unique_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
     } else {
       _index = getCommandIndex(I);
     }
-    std::unique_ptr<TyPositionCommand> _pos_cmd(
+    std::shared_ptr<TyPositionCommand> _pos_cmd(
         new TyPositionCommand(_index, _register_name));
 
-    std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+    std::shared_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
 
     _instr_index = std::move(_cmd);
   }
 
-  return std::unique_ptr<TyPosition>(
+  return std::shared_ptr<TyPosition>(
       new TyPosition(_scope, _block_name, std::move(_instr_index)));
 }
 
-std::unique_ptr<TyPosition>
+std::shared_ptr<TyPosition>
 TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
   const llvm::TerminatorInst *term = BB.getTerminator();
@@ -449,12 +455,12 @@ TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
   int _index = getTerminatorIndex(term);
 
-  std::unique_ptr<TyPositionCommand> _pos_cmd(
+  std::shared_ptr<TyPositionCommand> _pos_cmd(
       new TyPositionCommand(_index, _register_name));
 
-  std::unique_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+  std::shared_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
 
-  return std::unique_ptr<TyPosition>(
+  return std::shared_ptr<TyPosition>(
       new TyPosition(_scope, _block_name, std::move(_cmd)));
 
 }
@@ -471,9 +477,9 @@ void TyRegister::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(name), cereal::make_nvp("tag", ::toString(tag)));
 }
 
-std::unique_ptr<TyRegister> TyRegister::make(std::string _name,
+std::shared_ptr<TyRegister> TyRegister::make(std::string _name,
                                              enum TyTag _tag) {
-  return std::unique_ptr<TyRegister>(new TyRegister(_name, _tag));
+  return std::shared_ptr<TyRegister>(new TyRegister(_name, _tag));
 }
 
 // constant
@@ -487,7 +493,7 @@ void ConsIntType::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(value));
 }
 
-TyConstInt::TyConstInt(int64_t _int_value, std::unique_ptr<TyIntType> _int_type)
+TyConstInt::TyConstInt(int64_t _int_value, std::shared_ptr<TyIntType> _int_type)
     : int_value(_int_value), int_type(std::move(_int_type)) {}
 
 TyConstInt::TyConstInt(int64_t _int_value, int _bitwidth)
@@ -497,8 +503,8 @@ void TyConstInt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(cereal::make_nvp("int_value", int_value), CEREAL_NVP(int_type));
 }
 
-std::unique_ptr<TyConstInt> TyConstInt::make(int64_t _int_value, int _value) {
-  return std::unique_ptr<TyConstInt>(new TyConstInt(_int_value, _value));
+std::shared_ptr<TyConstInt> TyConstInt::make(int64_t _int_value, int _value) {
+  return std::shared_ptr<TyConstInt>(new TyConstInt(_int_value, _value));
 }
 
 TyConstFloat::TyConstFloat(double _float_value, enum TyFloatType _float_type)
@@ -509,39 +515,39 @@ void TyConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
           cereal::make_nvp("float_type", toString(float_type)));
 }
 
-std::unique_ptr<TyConstFloat> TyConstFloat::make(double _float_value,
+std::shared_ptr<TyConstFloat> TyConstFloat::make(double _float_value,
                                                  enum TyFloatType _float_type) {
-  return std::unique_ptr<TyConstFloat>(
+  return std::shared_ptr<TyConstFloat>(
       new TyConstFloat(_float_value, _float_type));
 }
 
-TyConstGlobalVarAddr::TyConstGlobalVarAddr(std::string _var_id, std::unique_ptr<TyValueType> _var_type) : var_id(std::move(_var_id)), var_type(std::move(_var_type)){
+TyConstGlobalVarAddr::TyConstGlobalVarAddr(std::string _var_id, std::shared_ptr<TyValueType> _var_type) : var_id(std::move(_var_id)), var_type(std::move(_var_type)){
 }
 void TyConstGlobalVarAddr::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(var_id));
   archive(CEREAL_NVP(var_type));
 }
 
-std::unique_ptr<TyConstGlobalVarAddr> TyConstGlobalVarAddr::make(const llvm::GlobalVariable &gv) {
+std::shared_ptr<TyConstGlobalVarAddr> TyConstGlobalVarAddr::make(const llvm::GlobalVariable &gv) {
   llvm::Type *ty = gv.getType();
   assert(ty->isPointerTy()); // jylee : As far as I understand, global variables must be pointers to their location!
   ty = ty->getPointerElementType();
   
-  return std::unique_ptr<TyConstGlobalVarAddr>(
+  return std::shared_ptr<TyConstGlobalVarAddr>(
       new TyConstGlobalVarAddr(std::string("@") + std::string(gv.getName().data()), std::move(TyValueType::make(*ty))));
 }
 
 // value
-std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
+std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value, enum TyTag _tag) {
   if (llvm::isa<llvm::Instruction>(value) ||
       llvm::isa<llvm::Argument>(value) ||
       llvm::isa<llvm::ConstantExpr>(value)) {
-    return std::unique_ptr<TyValue>(
-        new ConsId(TyRegister::make(getVariable(value), llvmberry::Physical)));
+    return std::shared_ptr<TyValue>(
+        new ConsId(TyRegister::make(getVariable(value), _tag)));
   } else if (llvm::isa<llvm::ConstantInt>(value)) {
     const llvm::ConstantInt *v = llvm::dyn_cast<llvm::ConstantInt>(&value);
-    return std::unique_ptr<TyValue>(
-        new ConsConstVal(std::unique_ptr<TyConstant>(new ConsConstInt(
+    return std::shared_ptr<TyValue>(
+        new ConsConstVal(std::shared_ptr<TyConstant>(new ConsConstInt(
             TyConstInt::make(v->getSExtValue(), v->getBitWidth())))));
   } else if (llvm::isa<llvm::ConstantFP>(value)) {
     const llvm::ConstantFP *v = llvm::dyn_cast<llvm::ConstantFP>(&value);
@@ -564,20 +570,25 @@ std::unique_ptr<TyValue> TyValue::make(const llvm::Value &value) {
     else
       assert("Unknown floating point type" && false);
 
-    return std::unique_ptr<TyValue>(
-        new ConsConstVal(std::unique_ptr<TyConstant>(new ConsConstFloat(
+    return std::shared_ptr<TyValue>(
+        new ConsConstVal(std::shared_ptr<TyConstant>(new ConsConstFloat(
             TyConstFloat::make(apf.convertToDouble(), fty)))));
   } else if (llvm::isa<llvm::GlobalVariable>(value)) {
     const llvm::GlobalVariable *gv = llvm::dyn_cast<llvm::GlobalVariable>(&value);
-    return std::unique_ptr<TyValue>(
-        new ConsConstVal(std::unique_ptr<TyConstant>(new ConsConstGlobalVarAddr(
+    return std::shared_ptr<TyValue>(
+        new ConsConstVal(std::shared_ptr<TyConstant>(new ConsConstGlobalVarAddr(
             TyConstGlobalVarAddr::make(*gv)))));
+  } else if (llvm::isa<llvm::UndefValue>(value)) {
+      return std::shared_ptr<TyValue>(
+        new ConsConstVal(std::shared_ptr<TyConstant>
+                          (new ConsConstUndef
+                            (TyValueType::make(*value.getType())))));
   } else {
     assert("Unknown value type" && false);
   }
 }
 
-ConsConstInt::ConsConstInt(std::unique_ptr<TyConstInt> _const_int)
+ConsConstInt::ConsConstInt(std::shared_ptr<TyConstInt> _const_int)
     : const_int(std::move(_const_int)) {}
 
 ConsConstInt::ConsConstInt(int64_t _int_value, int _bitwidth)
@@ -591,7 +602,7 @@ void ConsConstInt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(const_int));
 }
 
-ConsConstFloat::ConsConstFloat(std::unique_ptr<TyConstFloat> _const_float)
+ConsConstFloat::ConsConstFloat(std::shared_ptr<TyConstFloat> _const_float)
     : const_float(std::move(_const_float)) {}
 
 ConsConstFloat::ConsConstFloat(float _float_value, enum TyFloatType _float_type)
@@ -605,11 +616,11 @@ void ConsConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(const_float));
 }
 
-ConsConstGlobalVarAddr::ConsConstGlobalVarAddr(std::unique_ptr<TyConstGlobalVarAddr> _const_global_var_addr) : const_global_var_addr(std::move(_const_global_var_addr)){
+ConsConstGlobalVarAddr::ConsConstGlobalVarAddr(std::shared_ptr<TyConstGlobalVarAddr> _const_global_var_addr) : const_global_var_addr(std::move(_const_global_var_addr)){
 }
-std::unique_ptr<TyConstant> ConsConstGlobalVarAddr::make(std::string _var_id, std::unique_ptr<TyValueType> _var_type){
-  std::unique_ptr<TyConstGlobalVarAddr> _val(new TyConstGlobalVarAddr(std::move(_var_id), std::move(_var_type)));
-  return std::unique_ptr<TyConstant>(new ConsConstGlobalVarAddr(std::move(_val)));
+std::shared_ptr<TyConstant> ConsConstGlobalVarAddr::make(std::string _var_id, std::shared_ptr<TyValueType> _var_type){
+  std::shared_ptr<TyConstGlobalVarAddr> _val(new TyConstGlobalVarAddr(std::move(_var_id), std::move(_var_type)));
+  return std::shared_ptr<TyConstant>(new ConsConstGlobalVarAddr(std::move(_val)));
 }
 void ConsConstGlobalVarAddr::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -618,7 +629,18 @@ void ConsConstGlobalVarAddr::serialize(cereal::JSONOutputArchive& archive) const
   archive(CEREAL_NVP(const_global_var_addr));
 }
 
-ConsId::ConsId(std::unique_ptr<TyRegister> _register)
+ConsConstUndef::ConsConstUndef(std::shared_ptr<TyValueType> _value_type)
+    : value_type(std::move(_value_type)) {}
+
+void ConsConstUndef::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("ConstUndef");
+  archive(CEREAL_NVP(value_type));
+}
+
+ConsId::ConsId(std::shared_ptr<TyRegister> _register)
     : reg(std::move(_register)) {}
 
 void ConsId::serialize(cereal::JSONOutputArchive &archive) const {
@@ -629,12 +651,12 @@ void ConsId::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(reg));
 }
 
-std::unique_ptr<TyValue> ConsId::make(std::string _name, enum TyTag _tag) {
-  std::unique_ptr<TyRegister> _reg(new TyRegister(_name, _tag));
-  return std::unique_ptr<TyValue>(new ConsId(std::move(_reg)));
+std::shared_ptr<TyValue> ConsId::make(std::string _name, enum TyTag _tag) {
+  std::shared_ptr<TyRegister> _reg(new TyRegister(_name, _tag));
+  return std::shared_ptr<TyValue>(new ConsId(std::move(_reg)));
 }
 
-ConsConstVal::ConsConstVal(std::unique_ptr<TyConstant> _constant)
+ConsConstVal::ConsConstVal(std::shared_ptr<TyConstant> _constant)
     : constant(std::move(_constant)) {}
 
 void ConsConstVal::serialize(cereal::JSONOutputArchive &archive) const {
@@ -657,72 +679,74 @@ void ConsSize::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(size));
 }
 
-std::unique_ptr<TySize> ConsSize::make(int _size) {
-  return std::unique_ptr<TySize>(new ConsSize(_size));
+std::shared_ptr<TySize> ConsSize::make(int _size) {
+  return std::shared_ptr<TySize>(new ConsSize(_size));
 }
-
 
 // valuetype
 
-std::unique_ptr<TyValueType> TyValueType::make(const llvm::Type &type){
+std::shared_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
   TyValueType *vt;
-  if(const llvm::IntegerType *itype = llvm::dyn_cast<llvm::IntegerType>(&type)){
-    vt = new ConsIntValueType(std::move(std::unique_ptr<TyIntType>(new ConsIntType(itype->getBitWidth()))));
-  }else if(const llvm::PointerType *ptype = llvm::dyn_cast<llvm::PointerType>(&type)){
+  if (const llvm::IntegerType *itype = llvm::dyn_cast<llvm::IntegerType>(&type)) {
+    vt = new ConsIntValueType(std::move(std::shared_ptr<TyIntType>
+              (new ConsIntType(itype->getBitWidth()))));
+  } else if (const llvm::PointerType *ptype = llvm::dyn_cast<llvm::PointerType>(&type)) {
     vt = new ConsPtrType(ptype->getAddressSpace(), 
         std::move(TyValueType::make(*ptype->getPointerElementType())));
-  }else if(const llvm::StructType *stype = llvm::dyn_cast<llvm::StructType>(&type)){
+  } else if (const llvm::StructType *stype = llvm::dyn_cast<llvm::StructType>(&type)) {
     assert(stype->hasName());
     vt = new ConsNamedType(stype->getName().str());
-  }else if(type.isHalfTy()){
+  } else if (type.isHalfTy()) {
     vt = new ConsFloatValueType(HalfType);
-  }else if(type.isFloatTy()){
+  } else if (type.isFloatTy()) {
     vt = new ConsFloatValueType(FloatType);
-  }else if(type.isDoubleTy()){
+  } else if (type.isDoubleTy()) {
     vt = new ConsFloatValueType(DoubleType);
-  }else if(type.isFP128Ty()){
+  } else if (type.isFP128Ty()) {
     vt = new ConsFloatValueType(FP128Type);
-  }else if(type.isPPC_FP128Ty()){
+  } else if (type.isPPC_FP128Ty()) {
     vt = new ConsFloatValueType(PPC_FP128Type);
-  }else if(type.isX86_FP80Ty()){
+  } else if (type.isX86_FP80Ty()) {
     vt = new ConsFloatValueType(X86_FP80Type);
-  }else{
+  } else {
     assert("TyValueType::make(const llvmType &) : unknown value type" && false);
     vt = nullptr;
   }
-    return std::unique_ptr<TyValueType>(vt);
-  }
-
-  ConsIntValueType::ConsIntValueType(std::unique_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)){
-  }
-  void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const{
-    archive.makeArray();
-    archive.writeName();
-    archive.saveValue("IntValueType");
-    archive(CEREAL_NVP(int_type));
-  }
-
-  ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type){
-  }
-  void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const{
-    archive.makeArray();
-    archive.writeName();
-    archive.saveValue("FloatValueType");
-    archive(cereal::make_nvp("float_type", toString(float_type)));
+    
+  return std::shared_ptr<TyValueType>(vt);
 }
 
-ConsNamedType::ConsNamedType(std::string _s) : s(std::move(_s)){
+ConsIntValueType::ConsIntValueType(std::shared_ptr<TyIntType> _int_type) : int_type(std::move(_int_type)) {}
+
+void ConsIntValueType::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IntValueType");
+  archive(CEREAL_NVP(int_type));
 }
-void ConsNamedType::serialize(cereal::JSONOutputArchive& archive) const{
+
+ConsFloatValueType::ConsFloatValueType(TyFloatType _float_type) : float_type(_float_type) {}
+
+void ConsFloatValueType::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("FloatValueType");
+  archive(cereal::make_nvp("float_type", toString(float_type)));
+}
+
+ConsNamedType::ConsNamedType(std::string _s) : s(std::move(_s)) {}
+
+void ConsNamedType::serialize(cereal::JSONOutputArchive& archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("NamedType");
   archive(CEREAL_NVP(s));
 }
 
-ConsPtrType::ConsPtrType(int _address_space, std::unique_ptr<TyValueType> _valuetype) : address_space(_address_space), valuetype(std::move(_valuetype)){
-}
-void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
+ConsPtrType::ConsPtrType(int _address_space, std::shared_ptr<TyValueType> _valuetype) 
+    : address_space(_address_space), valuetype(std::move(_valuetype)) {}
+
+void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("PtrType");
@@ -734,40 +758,91 @@ void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const{
   archive.finishNode();
 }
 
-
 // instruction
 
-std::unique_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i){
+std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
   if (const llvm::BinaryOperator *bo = llvm::dyn_cast<llvm::BinaryOperator>(&i)) {
     if(isFloatOpcode(bo->getOpcode()))
-      return std::unique_ptr<TyInstruction>(new ConsFloatBinaryOp(
+      return std::shared_ptr<TyInstruction>(new ConsFloatBinaryOp(
         std::move(TyFloatBinaryOperator::make(*bo))));
     else
-      return std::unique_ptr<TyInstruction>(new ConsBinaryOp(
+      return std::shared_ptr<TyInstruction>(new ConsBinaryOp(
         std::move(TyBinaryOperator::make(*bo))));
   } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
-    return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
+    return std::shared_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
   } else if (const llvm::StoreInst *si = llvm::dyn_cast<llvm::StoreInst>(&i)) {
-    return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*si))));
+    return std::shared_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*si))));
   } else if (const llvm::BitCastInst *bci = llvm::dyn_cast<llvm::BitCastInst>(&i)) {
-    return std::unique_ptr<TyInstruction>(new ConsBitCastInst(std::move(TyBitCastInst::make(*bci))));
+    return std::shared_ptr<TyInstruction>(new ConsBitCastInst(std::move(TyBitCastInst::make(*bci))));
   } else if (const llvm::GetElementPtrInst *gepi = llvm::dyn_cast<llvm::GetElementPtrInst>(&i)) {
-    return std::unique_ptr<TyInstruction>(new ConsGetElementPtrInst(std::move(TyGetElementPtrInst::make(*gepi))));
+    return std::shared_ptr<TyInstruction>(new ConsGetElementPtrInst(std::move(TyGetElementPtrInst::make(*gepi))));
   } else {
     assert("TyInstruction::make : unsupporting instruction type" && false);
-    return std::unique_ptr<TyInstruction>(nullptr);
+    return std::shared_ptr<TyInstruction>(nullptr);
   }
 }
 
 // instruction constructor classes
-ConsBinaryOp::ConsBinaryOp(std::unique_ptr<TyBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
+
+std::shared_ptr<TyBitCastInst> TyBitCastInst::make(const llvm::BitCastInst &bci){
+  return std::shared_ptr<TyBitCastInst>(new TyBitCastInst(
+        TyValueType::make(*bci.getSrcTy()),
+        TyValue::make(*bci.getOperand(0)),
+        TyValueType::make(*bci.getDestTy())));
 }
-std::unique_ptr<TyInstruction> ConsBinaryOp::make(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2){
-  std::unique_ptr<TyBinaryOperator> _val(new TyBinaryOperator(_opcode, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
-  return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(_val)));
+
+std::shared_ptr<TyGetElementPtrInst> TyGetElementPtrInst::make(const llvm::GetElementPtrInst &gepi){
+  std::vector<std::pair<std::shared_ptr<TySize>, std::shared_ptr<TyValue> > > indexes;
+  for(llvm::User::const_op_iterator i = gepi.idx_begin(); i != gepi.idx_end(); i++){
+    const llvm::Value *v = i->get();
+    const llvm::Type *ty = v->getType();
+    assert(ty->isIntegerTy());
+    indexes.push_back(std::make_pair(ConsSize::make(ty->getIntegerBitWidth()), TyValue::make(*v)));
+  }
+  return std::shared_ptr<TyGetElementPtrInst>(new TyGetElementPtrInst(
+        TyValueType::make(*gepi.getSourceElementType()),
+        TyValueType::make(*gepi.getPointerOperandType()),
+        TyValue::make(*gepi.getPointerOperand()),
+        indexes,
+        gepi.isInBounds()));
 }
-std::unique_ptr<TyInstruction> ConsBinaryOp::make(const llvm::BinaryOperator &bop){
-  return std::unique_ptr<TyInstruction>(new ConsBinaryOp(std::move(TyBinaryOperator::make(bop))));
+
+std::shared_ptr<TyBinaryOperator> TyBinaryOperator::make(const llvm::BinaryOperator &bopinst){
+  llvmberry::TyBop bop = llvmberry::getBop(bopinst.getOpcode());
+  return std::shared_ptr<TyBinaryOperator>(new TyBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
+        TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
+}
+
+std::shared_ptr<TyFloatBinaryOperator> TyFloatBinaryOperator::make(const llvm::BinaryOperator &bopinst){
+  llvmberry::TyFbop bop = llvmberry::getFbop(bopinst.getOpcode());
+  return std::shared_ptr<TyFloatBinaryOperator>(new TyFloatBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
+        TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
+}
+
+std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
+  return std::shared_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*li.getPointerOperand()->getType()),
+        TyValueType::make(*li.getType()),
+        TyValue::make(*li.getPointerOperand()),
+        li.getAlignment()));
+}
+
+std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
+  return std::shared_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*si.getOperand(1)->getType()),
+        TyValueType::make(*si.getOperand(0)->getType()),
+        TyValue::make(*si.getOperand(1)),
+        si.getAlignment()));
+}
+
+ConsBinaryOp::ConsBinaryOp(std::shared_ptr<TyBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
+}
+std::shared_ptr<TyInstruction> ConsBinaryOp::make(TyBop _opcode, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2){
+  std::shared_ptr<TyBinaryOperator> _val(new TyBinaryOperator(_opcode, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
+  return std::shared_ptr<TyInstruction>(new ConsBinaryOp(std::move(_val)));
+}
+std::shared_ptr<TyInstruction> ConsBinaryOp::make(const llvm::BinaryOperator &bop){
+  return std::shared_ptr<TyInstruction>(new ConsBinaryOp(std::move(TyBinaryOperator::make(bop))));
 }
 void ConsBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -776,14 +851,14 @@ void ConsBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(binary_operator));
 }
 
-ConsFloatBinaryOp::ConsFloatBinaryOp(std::unique_ptr<TyFloatBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
+ConsFloatBinaryOp::ConsFloatBinaryOp(std::shared_ptr<TyFloatBinaryOperator> _binary_operator) : binary_operator(std::move(_binary_operator)){
 }
-std::unique_ptr<TyInstruction> ConsFloatBinaryOp::make(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2){
-  std::unique_ptr<TyFloatBinaryOperator> _val(new TyFloatBinaryOperator(_opcode, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
-  return std::unique_ptr<TyInstruction>(new ConsFloatBinaryOp(std::move(_val)));
+std::shared_ptr<TyInstruction> ConsFloatBinaryOp::make(TyFbop _opcode, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2){
+  std::shared_ptr<TyFloatBinaryOperator> _val(new TyFloatBinaryOperator(_opcode, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
+  return std::shared_ptr<TyInstruction>(new ConsFloatBinaryOp(std::move(_val)));
 }
-std::unique_ptr<TyInstruction> ConsFloatBinaryOp::make(const llvm::BinaryOperator &bop){
-  return std::unique_ptr<TyInstruction>(new ConsFloatBinaryOp(std::move(TyFloatBinaryOperator::make(bop))));
+std::shared_ptr<TyInstruction> ConsFloatBinaryOp::make(const llvm::BinaryOperator &bop){
+  return std::shared_ptr<TyInstruction>(new ConsFloatBinaryOp(std::move(TyFloatBinaryOperator::make(bop))));
 }
 void ConsFloatBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -792,14 +867,14 @@ void ConsFloatBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(binary_operator));
 }
 
-ConsLoadInst::ConsLoadInst(std::unique_ptr<TyLoadInst> _load_inst) : load_inst(std::move(_load_inst)){
+ConsLoadInst::ConsLoadInst(std::shared_ptr<TyLoadInst> _load_inst) : load_inst(std::move(_load_inst)){
 }
-std::unique_ptr<TyInstruction> ConsLoadInst::make(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align){
-  std::unique_ptr<TyLoadInst> _val(new TyLoadInst(std::move(_pointertype), std::move(_valtype), std::move(_ptrvalue), std::move(_align)));
-  return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(_val)));
+std::shared_ptr<TyInstruction> ConsLoadInst::make(std::shared_ptr<TyValueType> _pointertype, std::shared_ptr<TyValueType> _valtype, std::shared_ptr<TyValue> _ptrvalue, int _align){
+  std::shared_ptr<TyLoadInst> _val(new TyLoadInst(std::move(_pointertype), std::move(_valtype), std::move(_ptrvalue), std::move(_align)));
+  return std::shared_ptr<TyInstruction>(new ConsLoadInst(std::move(_val)));
 }
-std::unique_ptr<TyInstruction> ConsLoadInst::make(const llvm::LoadInst &li){
-  return std::unique_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(li))));
+std::shared_ptr<TyInstruction> ConsLoadInst::make(const llvm::LoadInst &li){
+  return std::shared_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(li))));
 }
 void ConsLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -808,11 +883,11 @@ void ConsLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(load_inst));
 }
 
-ConsBitCastInst::ConsBitCastInst(std::unique_ptr<TyBitCastInst> _bit_cast_inst) : bit_cast_inst(std::move(_bit_cast_inst)){
+ConsBitCastInst::ConsBitCastInst(std::shared_ptr<TyBitCastInst> _bit_cast_inst) : bit_cast_inst(std::move(_bit_cast_inst)){
 }
-std::unique_ptr<TyInstruction> ConsBitCastInst::make(std::unique_ptr<TyValueType> _fromty, std::unique_ptr<TyValue> _v, std::unique_ptr<TyValueType> _toty){
-  std::unique_ptr<TyBitCastInst> _val(new TyBitCastInst(std::move(_fromty), std::move(_v), std::move(_toty)));
-  return std::unique_ptr<TyInstruction>(new ConsBitCastInst(std::move(_val)));
+std::shared_ptr<TyInstruction> ConsBitCastInst::make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty){
+  std::shared_ptr<TyBitCastInst> _val(new TyBitCastInst(std::move(_fromty), std::move(_v), std::move(_toty)));
+  return std::shared_ptr<TyInstruction>(new ConsBitCastInst(std::move(_val)));
 }
 void ConsBitCastInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -821,11 +896,11 @@ void ConsBitCastInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(bit_cast_inst));
 }
 
-ConsGetElementPtrInst::ConsGetElementPtrInst(std::unique_ptr<TyGetElementPtrInst> _get_element_ptr_inst) : get_element_ptr_inst(std::move(_get_element_ptr_inst)){
+ConsGetElementPtrInst::ConsGetElementPtrInst(std::shared_ptr<TyGetElementPtrInst> _get_element_ptr_inst) : get_element_ptr_inst(std::move(_get_element_ptr_inst)){
 }
-std::unique_ptr<TyInstruction> ConsGetElementPtrInst::make(std::unique_ptr<TyValueType> _ty, std::unique_ptr<TyValueType> _ptrty, std::unique_ptr<TyValue> _ptr, std::vector<std::pair<std::unique_ptr<TySize>,std::unique_ptr<TyValue>>> &_indexes, bool _is_inbounds){
-  std::unique_ptr<TyGetElementPtrInst> _val(new TyGetElementPtrInst(std::move(_ty), std::move(_ptrty), std::move(_ptr), _indexes, _is_inbounds));
-  return std::unique_ptr<TyInstruction>(new ConsGetElementPtrInst(std::move(_val)));
+std::shared_ptr<TyInstruction> ConsGetElementPtrInst::make(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _ptr, std::vector<std::pair<std::shared_ptr<TySize>,std::shared_ptr<TyValue>>> &_indexes, bool _is_inbounds){
+  std::shared_ptr<TyGetElementPtrInst> _val(new TyGetElementPtrInst(std::move(_ty), std::move(_ptrty), std::move(_ptr), _indexes, _is_inbounds));
+  return std::shared_ptr<TyInstruction>(new ConsGetElementPtrInst(std::move(_val)));
 }
 void ConsGetElementPtrInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -837,60 +912,8 @@ void ConsGetElementPtrInst::serialize(cereal::JSONOutputArchive& archive) const{
 
 
 // instruction type classes
-std::unique_ptr<TyBinaryOperator> TyBinaryOperator::make(const llvm::BinaryOperator &bopinst){
-  llvmberry::TyBop bop = llvmberry::getBop(bopinst.getOpcode());
-  return std::unique_ptr<TyBinaryOperator>(new TyBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
-        TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
-}
 
-std::unique_ptr<TyFloatBinaryOperator> TyFloatBinaryOperator::make(const llvm::BinaryOperator &bopinst){
-  llvmberry::TyFbop bop = llvmberry::getFbop(bopinst.getOpcode());
-  return std::unique_ptr<TyFloatBinaryOperator>(new TyFloatBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
-        TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
-}
-
-std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
-  return std::unique_ptr<TyLoadInst>(new TyLoadInst(
-        TyValueType::make(*li.getPointerOperand()->getType()),
-        TyValueType::make(*li.getType()),
-        TyValue::make(*li.getPointerOperand()),
-        li.getAlignment()));
-}
-
-std::unique_ptr<TyBitCastInst> TyBitCastInst::make(const llvm::BitCastInst &bci){
-  return std::unique_ptr<TyBitCastInst>(new TyBitCastInst(
-        TyValueType::make(*bci.getSrcTy()),
-        TyValue::make(*bci.getOperand(0)),
-        TyValueType::make(*bci.getDestTy())));
-}
-
-std::unique_ptr<TyGetElementPtrInst> TyGetElementPtrInst::make(const llvm::GetElementPtrInst &gepi){
-  std::vector<std::pair<std::unique_ptr<TySize>, std::unique_ptr<TyValue> > > indexes;
-  for(llvm::User::const_op_iterator i = gepi.idx_begin(); i != gepi.idx_end(); i++){
-    const llvm::Value *v = i->get();
-    const llvm::Type *ty = v->getType();
-    assert(ty->isIntegerTy());
-    indexes.push_back(std::make_pair(ConsSize::make(ty->getIntegerBitWidth()), TyValue::make(*v)));
-  }
-  return std::unique_ptr<TyGetElementPtrInst>(new TyGetElementPtrInst(
-        TyValueType::make(*gepi.getSourceElementType()),
-        TyValueType::make(*gepi.getPointerOperandType()),
-        TyValue::make(*gepi.getPointerOperand()),
-        indexes,
-        gepi.isInBounds()));
-}
-
-std::unique_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
-  return std::unique_ptr<TyLoadInst>(new TyLoadInst(
-        TyValueType::make(*si.getOperand(1)->getType()),
-        TyValueType::make(*si.getOperand(0)->getType()),
-        TyValue::make(*si.getOperand(1)),
-        si.getAlignment()));
-}
-
-
-
-TyBinaryOperator::TyBinaryOperator(TyBop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2) : opcode(std::move(_opcode)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+TyBinaryOperator::TyBinaryOperator(TyBop _opcode, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : opcode(std::move(_opcode)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
 }
 void TyBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("opcode", toString(opcode)));
@@ -899,7 +922,7 @@ void TyBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(operand2));
 }
 
-TyFloatBinaryOperator::TyFloatBinaryOperator(TyFbop _opcode, std::unique_ptr<TyValueType> _operandtype, std::unique_ptr<TyValue> _operand1, std::unique_ptr<TyValue> _operand2) : opcode(_opcode), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+TyFloatBinaryOperator::TyFloatBinaryOperator(TyFbop _opcode, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : opcode(_opcode), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
 }
 void TyFloatBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("opcode", toString(opcode)));
@@ -908,7 +931,7 @@ void TyFloatBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(operand2));
 }
 
-TyLoadInst::TyLoadInst(std::unique_ptr<TyValueType> _pointertype, std::unique_ptr<TyValueType> _valtype, std::unique_ptr<TyValue> _ptrvalue, int _align) : pointertype(std::move(_pointertype)), valtype(std::move(_valtype)), ptrvalue(std::move(_ptrvalue)), align(std::move(_align)){
+TyLoadInst::TyLoadInst(std::shared_ptr<TyValueType> _pointertype, std::shared_ptr<TyValueType> _valtype, std::shared_ptr<TyValue> _ptrvalue, int _align) : pointertype(std::move(_pointertype)), valtype(std::move(_valtype)), ptrvalue(std::move(_ptrvalue)), align(std::move(_align)){
 }
 void TyLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(pointertype));
@@ -917,7 +940,7 @@ void TyLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(align));
 }
 
-TyBitCastInst::TyBitCastInst(std::unique_ptr<TyValueType> _fromty, std::unique_ptr<TyValue> _v, std::unique_ptr<TyValueType> _toty) : fromty(std::move(_fromty)), v(std::move(_v)), toty(std::move(_toty)){
+TyBitCastInst::TyBitCastInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty) : fromty(std::move(_fromty)), v(std::move(_v)), toty(std::move(_toty)){
 }
 void TyBitCastInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(fromty));
@@ -925,7 +948,7 @@ void TyBitCastInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(toty));
 }
 
-TyGetElementPtrInst::TyGetElementPtrInst(std::unique_ptr<TyValueType> _ty, std::unique_ptr<TyValueType> _ptrty, std::unique_ptr<TyValue> _ptr, std::vector<std::pair<std::unique_ptr<TySize>, std::unique_ptr<TyValue>> > &_indexes, bool _is_inbounds) : ty(std::move(_ty)), ptrty(std::move(_ptrty)), ptr(std::move(_ptr)), indexes(std::move(_indexes)), is_inbounds(std::move(_is_inbounds)){
+TyGetElementPtrInst::TyGetElementPtrInst(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _ptr, std::vector<std::pair<std::shared_ptr<TySize>, std::shared_ptr<TyValue>> > &_indexes, bool _is_inbounds) : ty(std::move(_ty)), ptrty(std::move(_ptrty)), ptr(std::move(_ptr)), indexes(std::move(_indexes)), is_inbounds(std::move(_is_inbounds)){
 }
 void TyGetElementPtrInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(ty));
@@ -936,20 +959,22 @@ void TyGetElementPtrInst::serialize(cereal::JSONOutputArchive& archive) const{
 }
 
 
-// exprs
+// propagate expr
+// ConsVar or ConsConst
 
-std::unique_ptr<TyExpr> TyExpr::make(std::unique_ptr<TyValue> &&vptr){
+std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value, enum TyTag _tag) {
+  std::shared_ptr<TyValue> vptr = TyValue::make(value, _tag);
   TyValue *v = vptr.get();
   if(ConsId *cid = dynamic_cast<ConsId *>(v)){
-    return std::unique_ptr<TyExpr>(new ConsVar(std::unique_ptr<TyRegister>(cid->reg.release())));
+    return std::shared_ptr<TyExpr>(new ConsVar(cid->reg));
   }else if(ConsConstVal *ccv = dynamic_cast<ConsConstVal *>(v)){
-    return std::unique_ptr<TyExpr>(new ConsConst(std::unique_ptr<TyConstant>(ccv->constant.release())));
+    return std::shared_ptr<TyExpr>(new ConsConst(ccv->constant));
   }else{
     assert("Unknown value type" && false);
   }
 }
 
-ConsVar::ConsVar(std::unique_ptr<TyRegister> _register_name)
+ConsVar::ConsVar(std::shared_ptr<TyRegister> _register_name)
     : register_name(std::move(_register_name)) {}
 
 ConsVar::ConsVar(std::string _name, enum TyTag _tag)
@@ -963,12 +988,12 @@ void ConsVar::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(register_name));
 }
 
-std::unique_ptr<TyExpr> ConsVar::make(std::string _name,
+std::shared_ptr<TyExpr> ConsVar::make(std::string _name,
                                                enum TyTag _tag) {
-  return std::unique_ptr<TyExpr>(new ConsVar(_name, _tag));
+  return std::shared_ptr<TyExpr>(new ConsVar(_name, _tag));
 }
 
-ConsRhs::ConsRhs(std::unique_ptr<TyRegister> _register_name, enum TyScope _scope)
+ConsRhs::ConsRhs(std::shared_ptr<TyRegister> _register_name, enum TyScope _scope)
     : register_name(std::move(_register_name)), scope(_scope) {}
 
 ConsRhs::ConsRhs(std::string _name, enum TyTag _tag, enum TyScope _scope)
@@ -986,17 +1011,17 @@ void ConsRhs::serialize(cereal::JSONOutputArchive &archive) const {
 
 }
 
-std::unique_ptr<TyExpr> ConsRhs::make(std::string _name,
+std::shared_ptr<TyExpr> ConsRhs::make(std::string _name,
                                                enum TyTag _tag,
                                                enum TyScope _scope) {
-  return std::unique_ptr<TyExpr>(new ConsRhs(_name, _tag, _scope));
+  return std::shared_ptr<TyExpr>(new ConsRhs(_name, _tag, _scope));
 }
 
-ConsConst::ConsConst(std::unique_ptr<TyConstant> _constant)
+ConsConst::ConsConst(std::shared_ptr<TyConstant> _constant)
     : constant(std::move(_constant)) {}
 
-ConsConst::ConsConst(int _int_value, int _value)
-    : constant(new ConsConstInt(_int_value, _value)) {}
+ConsConst::ConsConst(int _int_value, int _bitwidth)
+    : constant(new ConsConstInt(_int_value, _bitwidth)) {}
 
 ConsConst::ConsConst(float _float_value, enum TyFloatType _float_type)
     : constant(new ConsConstFloat(_float_value, _float_type)) {}
@@ -1009,10 +1034,13 @@ void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(constant));
 }
 
-ConsInsn::ConsInsn(std::unique_ptr<TyInstruction> _instruction) : instruction(std::move(_instruction)){
+ConsInsn::ConsInsn(std::shared_ptr<TyInstruction> _instruction) : instruction(std::move(_instruction)){
 }
-std::unique_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i){
-  return std::unique_ptr<TyExpr>(new ConsInsn(std::move(TyInstruction::make(i))));
+std::shared_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i){
+  return std::shared_ptr<TyExpr>(new ConsInsn(std::move(TyInstruction::make(i))));
+}
+std::shared_ptr<TyExpr> ConsInsn::make(std::shared_ptr<TyInstruction> _instruction) {
+  return std::shared_ptr<TyExpr>(new ConsInsn(std::move(_instruction)));
 }
 void ConsInsn::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
@@ -1027,8 +1055,8 @@ void ConsInsn::serialize(cereal::JSONOutputArchive& archive) const{
 
 // propagate object
 
-TyPropagateLessdef::TyPropagateLessdef(std::unique_ptr<TyExpr> _lhs,
-                                       std::unique_ptr<TyExpr> _rhs,
+TyPropagateLessdef::TyPropagateLessdef(std::shared_ptr<TyExpr> _lhs,
+                                       std::shared_ptr<TyExpr> _rhs,
                                        enum TyScope _scope)
     : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
 
@@ -1037,25 +1065,30 @@ void TyPropagateLessdef::serialize(cereal::JSONOutputArchive &archive) const {
           cereal::make_nvp("scope", ::toString(scope)));
 }
 
-std::unique_ptr<TyPropagateLessdef>
-TyPropagateLessdef::make(std::unique_ptr<TyExpr> _lhs,
-                         std::unique_ptr<TyExpr> _rhs,
+std::shared_ptr<TyPropagateLessdef>
+TyPropagateLessdef::make(std::shared_ptr<TyExpr> _lhs,
+                         std::shared_ptr<TyExpr> _rhs,
                          enum TyScope _scope) {
-  return std::unique_ptr<TyPropagateLessdef>(
+  return std::shared_ptr<TyPropagateLessdef>(
       new TyPropagateLessdef(std::move(_lhs), std::move(_rhs), _scope));
 }
 
-TyPropagateNoalias::TyPropagateNoalias(std::unique_ptr<TyValue> _lhs,
-                                       std::unique_ptr<TyValue> _rhs,
+TyPropagateNoalias::TyPropagateNoalias(std::shared_ptr<TyRegister> _lhs,
+                                       std::shared_ptr<TyRegister> _rhs,
                                        enum TyScope _scope)
     : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
+
+TyPropagateNoalias::TyPropagateNoalias(std::string _lhs_name, enum TyTag _lhs_tag,
+                                        std::string _rhs_name, enum TyTag _rhs_tag,
+                                        enum TyScope _scope)
+    : lhs(TyRegister::make(_lhs_name, _lhs_tag)), rhs(TyRegister::make(_rhs_name, _rhs_tag)), scope(_scope){}
 
 void TyPropagateNoalias::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs),
           cereal::make_nvp("scope", ::toString(scope)));
 }
 
-TyPropagateAlloca::TyPropagateAlloca(std::unique_ptr<TyRegister> _p, 
+TyPropagateAlloca::TyPropagateAlloca(std::shared_ptr<TyRegister> _p, 
                                      enum TyScope _scope) 
     : p(std::move(_p)), scope(std::move(_scope)) {
 }
@@ -1065,7 +1098,7 @@ void TyPropagateAlloca::serialize(cereal::JSONOutputArchive& archive) const {
   archive(cereal::make_nvp("scope", ::toString(scope)));
 }
 
-TyPropagatePrivate::TyPropagatePrivate(std::unique_ptr<TyRegister> _p, 
+TyPropagatePrivate::TyPropagatePrivate(std::shared_ptr<TyRegister> _p, 
                                        enum TyScope _scope) 
     : p(std::move(_p)), scope(std::move(_scope)) {
 }
@@ -1075,7 +1108,7 @@ void TyPropagatePrivate::serialize(cereal::JSONOutputArchive& archive) const {
   archive(cereal::make_nvp("scope", ::toString(scope)));
 }
 
-ConsLessdef::ConsLessdef(std::unique_ptr<TyPropagateLessdef> _propagate_lessdef)
+ConsLessdef::ConsLessdef(std::shared_ptr<TyPropagateLessdef> _propagate_lessdef)
     : propagate_lessdef(std::move(_propagate_lessdef)) {}
 
 void ConsLessdef::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1086,29 +1119,23 @@ void ConsLessdef::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(propagate_lessdef));
 }
 
-std::unique_ptr<TyPropagateObject>
-ConsLessdef::make(std::unique_ptr<TyExpr> _lhs,
-                  std::unique_ptr<TyExpr> _rhs, enum TyScope _scope) {
+std::shared_ptr<TyPropagateObject>
+ConsLessdef::make(std::shared_ptr<TyExpr> _lhs,
+                  std::shared_ptr<TyExpr> _rhs, enum TyScope _scope) {
   auto ty_prop_ld = TyPropagateLessdef::make(std::move(_lhs), std::move(_rhs),
                                              std::move(_scope));
-  return std::unique_ptr<TyPropagateObject>(
+  return std::shared_ptr<TyPropagateObject>(
       new ConsLessdef(std::move(ty_prop_ld)));
 }
 
-ConsNoalias::ConsNoalias(std::unique_ptr<TyPropagateNoalias> _propagate_noalias)
+ConsNoalias::ConsNoalias(std::shared_ptr<TyPropagateNoalias> _propagate_noalias)
     : propagate_noalias(std::move(_propagate_noalias)) {}
 
 ConsNoalias::ConsNoalias(std::string _lhs, enum TyTag _lhs_tag, std::string _rhs, 
         enum TyTag _rhs_tag, enum TyScope _scope) : 
         propagate_noalias(new TyPropagateNoalias(
-          ConsId::make(_lhs, _lhs_tag),ConsId::make(_rhs, _rhs_tag),_scope)) {}
+          _lhs, _lhs_tag, _rhs, _rhs_tag ,_scope)) {}
 
-std::unique_ptr<TyPropagateObject> ConsNoalias::make(std::unique_ptr<TyValue> _lhs,
-        std::unique_ptr<TyValue> _rhs, enum TyScope _scope) {
-  std::unique_ptr<TyPropagateNoalias> _val(new TyPropagateNoalias(std::move(_lhs), std::move(_rhs), _scope));
-
-  return std::unique_ptr<TyPropagateObject>(new ConsNoalias(std::move(_val)));
-}
 
 void ConsNoalias::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -1118,15 +1145,15 @@ void ConsNoalias::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(propagate_noalias));
 }
 
-ConsAlloca::ConsAlloca(std::unique_ptr<TyPropagateAlloca> _propagate_alloca) 
+ConsAlloca::ConsAlloca(std::shared_ptr<TyPropagateAlloca> _propagate_alloca) 
     : propagate_alloca(std::move(_propagate_alloca)) {}
 
-std::unique_ptr<TyPropagateObject> ConsAlloca::make(std::unique_ptr<TyRegister> _p, 
+std::shared_ptr<TyPropagateObject> ConsAlloca::make(std::shared_ptr<TyRegister> _p, 
                                                     enum TyScope _scope) {
-  std::unique_ptr<TyPropagateAlloca> _val
+  std::shared_ptr<TyPropagateAlloca> _val
                     (new TyPropagateAlloca(std::move(_p), _scope));
 
-  return std::unique_ptr<TyPropagateObject>(new ConsAlloca(std::move(_val)));
+  return std::shared_ptr<TyPropagateObject>(new ConsAlloca(std::move(_val)));
 }
 
 void ConsAlloca::serialize(cereal::JSONOutputArchive& archive) const{
@@ -1136,15 +1163,15 @@ void ConsAlloca::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(propagate_alloca));
 }
 
-ConsMaydiff::ConsMaydiff(std::unique_ptr<TyRegister> _register_name)
+ConsMaydiff::ConsMaydiff(std::shared_ptr<TyRegister> _register_name)
     : register_name(std::move(_register_name)) {}
 
 ConsMaydiff::ConsMaydiff(std::string _name, enum TyTag _tag)
     : register_name(new TyRegister(_name, _tag)) {}
 
-std::unique_ptr<TyPropagateObject> ConsMaydiff::make(std::string _name,
+std::shared_ptr<TyPropagateObject> ConsMaydiff::make(std::string _name,
                                                      enum TyTag _tag) {
-  return std::unique_ptr<TyPropagateObject>
+  return std::shared_ptr<TyPropagateObject>
           (new ConsMaydiff(TyRegister::make(_name, _tag)));
 }
 
@@ -1156,15 +1183,15 @@ void ConsMaydiff::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(register_name));
 }
 
-ConsPrivate::ConsPrivate(std::unique_ptr<TyPropagatePrivate> _propagate_private) 
+ConsPrivate::ConsPrivate(std::shared_ptr<TyPropagatePrivate> _propagate_private) 
     : propagate_private(std::move(_propagate_private)) {}
 
-std::unique_ptr<TyPropagateObject> ConsPrivate::make(std::unique_ptr<TyRegister> _p, 
+std::shared_ptr<TyPropagateObject> ConsPrivate::make(std::shared_ptr<TyRegister> _p, 
                                                      enum TyScope _scope) {
-  std::unique_ptr<TyPropagatePrivate> _val
+  std::shared_ptr<TyPropagatePrivate> _val
                     (new TyPropagatePrivate(std::move(_p), _scope));
 
-  return std::unique_ptr<TyPropagateObject>(new ConsPrivate(std::move(_val)));
+  return std::shared_ptr<TyPropagateObject>(new ConsPrivate(std::move(_val)));
 }
 
 void ConsPrivate::serialize(cereal::JSONOutputArchive& archive) const{
@@ -1176,8 +1203,8 @@ void ConsPrivate::serialize(cereal::JSONOutputArchive& archive) const{
 
 // propagate range
 
-ConsBounds::ConsBounds(std::unique_ptr<TyPosition> _from,
-                       std::unique_ptr<TyPosition> _to)
+ConsBounds::ConsBounds(std::shared_ptr<TyPosition> _from,
+                       std::shared_ptr<TyPosition> _to)
     : from(std::move(_from)), to(std::move(_to)) {}
 
 void ConsBounds::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1191,10 +1218,10 @@ void ConsBounds::serialize(cereal::JSONOutputArchive &archive) const {
   archive.finishNode();
 }
 
-std::unique_ptr<TyPropagateRange>
-ConsBounds::make(std::unique_ptr<TyPosition> _from,
-                 std::unique_ptr<TyPosition> _to) {
-  return std::unique_ptr<TyPropagateRange>(
+std::shared_ptr<TyPropagateRange>
+ConsBounds::make(std::shared_ptr<TyPosition> _from,
+                 std::shared_ptr<TyPosition> _to) {
+  return std::shared_ptr<TyPropagateRange>(
       new ConsBounds(std::move(_from), std::move(_to)));
 }
 
@@ -1210,12 +1237,12 @@ void ConsGlobal::serialize(cereal::JSONOutputArchive &archive) const {
   archive(s);
 }
 
-std::unique_ptr<TyPropagateRange> ConsGlobal::make() {
-  return std::unique_ptr<TyPropagateRange>(new ConsGlobal());
+std::shared_ptr<TyPropagateRange> ConsGlobal::make() {
+  return std::shared_ptr<TyPropagateRange>(new ConsGlobal());
 }
 
-TyPropagate::TyPropagate(std::unique_ptr<TyPropagateObject> _propagate,
-                         std::unique_ptr<TyPropagateRange> _propagate_range)
+TyPropagate::TyPropagate(std::shared_ptr<TyPropagateObject> _propagate,
+                         std::shared_ptr<TyPropagateRange> _propagate_range)
     : propagate(std::move(_propagate)),
       propagate_range(std::move(_propagate_range)) {}
 
@@ -1228,7 +1255,7 @@ void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   }
 }
 
-ConsPropagate::ConsPropagate(std::unique_ptr<TyPropagate> _propagate)
+ConsPropagate::ConsPropagate(std::shared_ptr<TyPropagate> _propagate)
     : propagate(std::move(_propagate)) {}
 
 void ConsPropagate::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1239,21 +1266,21 @@ void ConsPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(propagate));
 }
 
-std::unique_ptr<TyCommand>
-ConsPropagate::make(std::unique_ptr<TyPropagate> _propagate) {
-  return std::unique_ptr<TyCommand>(new ConsPropagate(std::move(_propagate)));
+std::shared_ptr<TyCommand>
+ConsPropagate::make(std::shared_ptr<TyPropagate> _propagate) {
+  return std::shared_ptr<TyCommand>(new ConsPropagate(std::move(_propagate)));
 }
 
-std::unique_ptr<TyCommand>
-ConsPropagate::make(std::unique_ptr<TyPropagateObject> _obj,
-                    std::unique_ptr<TyPropagateRange> _range) {
-  std::unique_ptr<TyPropagate> _propagate(
+std::shared_ptr<TyCommand>
+ConsPropagate::make(std::shared_ptr<TyPropagateObject> _obj,
+                    std::shared_ptr<TyPropagateRange> _range) {
+  std::shared_ptr<TyPropagate> _propagate(
       new TyPropagate(std::move(_obj), std::move(_range)));
-  return std::unique_ptr<TyCommand>(new ConsPropagate(std::move(_propagate)));
+  return std::shared_ptr<TyCommand>(new ConsPropagate(std::move(_propagate)));
 }
 
-ConsInfrule::ConsInfrule(std::unique_ptr<TyPosition> _position,
-                         std::unique_ptr<TyInfrule> _infrule)
+ConsInfrule::ConsInfrule(std::shared_ptr<TyPosition> _position,
+                         std::shared_ptr<TyInfrule> _infrule)
     : position(std::move(_position)), infrule(std::move(_infrule)) {}
 
 void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
@@ -1268,10 +1295,10 @@ void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
   archive.finishNode();
 }
 
-std::unique_ptr<TyCommand>
-ConsInfrule::make(std::unique_ptr<TyPosition> _position,
-                  std::unique_ptr<TyInfrule> _infrule) {
-  return std::unique_ptr<TyCommand>(
+std::shared_ptr<TyCommand>
+ConsInfrule::make(std::shared_ptr<TyPosition> _position,
+                  std::shared_ptr<TyInfrule> _infrule) {
+  return std::shared_ptr<TyCommand>(
       new ConsInfrule(std::move(_position), std::move(_infrule)));
 }
 
@@ -1294,11 +1321,11 @@ void CoreHint::setDescription(const std::string &desc) {
   this->description = desc;
 }
 
-void CoreHint::addCommand(std::unique_ptr<TyCommand> c) {
+void CoreHint::addCommand(std::shared_ptr<TyCommand> c) {
   commands.push_back(std::move(c));
 }
 
-void CoreHint::addNopPosition(std::unique_ptr<TyPosition> position) {
+void CoreHint::addNopPosition(std::shared_ptr<TyPosition> position) {
   nop_positions.push_back(std::move(position));
 }
 

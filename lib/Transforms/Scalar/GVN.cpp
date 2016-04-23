@@ -2020,14 +2020,34 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
   Value *Val = nullptr;
   if (DT->dominates(Vals.BB, BB)) {
     Val = Vals.Val;
+    if (llvmberry::ValidationUnit::Exists())
+      llvmberry::ValidationUnit::GetInstance()->intrude([&Vals](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) { data["findLeader#BB"] = Vals.BB; });
     if (isa<Constant>(Val)) return Val;
   }
 
   LeaderTableEntry* Next = Vals.Next;
   while (Next) {
     if (DT->dominates(Next->BB, BB)) {
-      if (isa<Constant>(Next->Val)) return Next->Val;
-      if (!Val) Val = Next->Val;
+      if (isa<Constant>(Next->Val)) {
+        if (llvmberry::ValidationUnit::Exists())
+          llvmberry::ValidationUnit::GetInstance()->intrude(
+              [&Next](llvmberry::ValidationUnit::Dictionary &data,
+                      llvmberry::CoreHint &hints) {
+                data["findLeader#BB"] = Next->BB;
+              });
+        return Next->Val;
+      }
+      if (!Val) {
+        Val = Next->Val;
+        if (llvmberry::ValidationUnit::Exists())
+          llvmberry::ValidationUnit::GetInstance()->intrude(
+              [&Next](llvmberry::ValidationUnit::Dictionary &data,
+                      llvmberry::CoreHint &hints) {
+                data["findLeader#BB"] = Next->BB;
+              });
+      }
     }
 
     Next = Next->Next;
@@ -2308,18 +2328,22 @@ bool GVN::processInstruction(Instruction *I) {
     return false;
   }
 
+  llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
+
   // Perform fast-path value-number based elimination of values inherited from
   // dominators.
   Value *repl = findLeader(I->getParent(), Num);
   if (!repl) {
     // Failure, just remember this instance for future use.
     addToLeaderTable(Num, I, I->getParent());
+    llvmberry::ValidationUnit::GetInstance()->setReturnCode(
+        llvmberry::ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::End();
+
     return false;
   }
 
   // Remove it!
-
-  llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
 
   llvmberry::ValidationUnit::GetInstance()->intrude([&I, &repl](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
@@ -2333,7 +2357,7 @@ bool GVN::processInstruction(Instruction *I) {
       for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
         if (!isa<Instruction>(UI->getUser())) {
           // let the validation fail when the user is not an instruction
-          return;
+          assert(false && "User is not an instruction");
         }
         std::string user = llvmberry::getVariable(*UI->getUser());
         Instruction *user_I = dyn_cast<Instruction>(UI->getUser());
@@ -2371,6 +2395,8 @@ bool GVN::processInstruction(Instruction *I) {
             llvmberry::ConsBounds::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *I),
                 llvmberry::TyPosition::make(llvmberry::Source, *user_I, prev_block_name))));
+        if (isa<TerminatorInst>(user_I)) {
+        }
         if (isa<PHINode>(user_I)) {
           hints.addCommand(llvmberry::ConsInfrule::make(
               llvmberry::TyPosition::make(llvmberry::Source, *user_I,
@@ -2394,11 +2420,121 @@ bool GVN::processInstruction(Instruction *I) {
         }
       }
 
-    } else {
-      // TODO: repl not an instruction (ex. icmp)
-      // For now we just don't print anything as a hint
-    }
+    } else if (ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(repl)) {
+      std::string to_rem = llvmberry::getVariable(*I);
 
+      assert(data.find("findLeader#BB") != data.end());
+      const BasicBlock *leader_bb =
+          boost::any_cast<const BasicBlock *>(data["findLeader#BB"]);
+      const BasicBlock *leader_bb_pred = leader_bb->getSinglePredecessor();
+      assert(leader_bb_pred &&
+             "Expect it to be introduced from propagateEquality, and it checks "
+             "RootDominatesEnd, meaning it has single predecessor");
+      TerminatorInst *TI =
+          const_cast<TerminatorInst *>(leader_bb_pred->getTerminator());
+      if (BranchInst *BI = llvm::dyn_cast<llvm::BranchInst>(TI)) {
+        Instruction *cond = llvm::dyn_cast<Instruction>(BI->getCondition());
+        std::string cond_name = llvmberry::getVariable(*cond);
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsRhs::make(cond_name, llvmberry::Physical,
+                                         llvmberry::Source),
+                llvmberry::ConsVar::make(cond_name, llvmberry::Physical),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *cond),
+                llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
+                                                         *leader_bb_pred))));
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsRhs::make(cond_name, llvmberry::Physical,
+                                         llvmberry::Source),
+                std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst(
+                    (C->getValue()).getSExtValue(), C->getBitWidth())),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make_start_of_block(
+                    llvmberry::Source,
+                    llvmberry::getBasicBlockIndex(leader_bb)),
+                llvmberry::TyPosition::make(llvmberry::Source, *I))));
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(
+                llvmberry::Source, llvmberry::getBasicBlockIndex(leader_bb),
+                llvmberry::getBasicBlockIndex(leader_bb_pred)),
+            llvmberry::ConsTransitivity::make(
+                llvmberry::ConsRhs::make(to_rem, llvmberry::Physical,
+                                         llvmberry::Source),
+                llvmberry::ConsVar::make(cond_name, llvmberry::Physical),
+                std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst(
+                    (C->getValue()).getSExtValue(), C->getBitWidth())))));
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, *I),
+            llvmberry::ConsTransitivity::make(
+                llvmberry::ConsVar::make(to_rem, llvmberry::Physical),
+                llvmberry::ConsRhs::make(to_rem, llvmberry::Physical,
+                                         llvmberry::Source),
+                std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst(
+                    (C->getValue()).getSExtValue(), C->getBitWidth())))));
+
+        for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+          if (!isa<Instruction>(UI->getUser())) {
+            // let the validation fail when the user is not an instruction
+            assert(false && "User is not an instruction");
+          }
+
+          std::string user = llvmberry::getVariable(*UI->getUser());
+          Instruction *user_I = dyn_cast<Instruction>(UI->getUser());
+
+          std::string prev_block_name = "";
+          if (isa<PHINode>(user_I)) {
+            BasicBlock *bb_from =
+                dyn_cast<PHINode>(user_I)->getIncomingBlock(*UI);
+            prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+          }
+
+          hints.addCommand(llvmberry::ConsPropagate::make(
+              llvmberry::ConsLessdef::make(
+                  llvmberry::ConsVar::make(to_rem, llvmberry::Physical),
+                  // llvmberry::ConsVar::make(leader, llvmberry::Physical),
+                  std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst(
+                      (C->getValue()).getSExtValue(), C->getBitWidth())),
+                  llvmberry::Source),
+              llvmberry::ConsBounds::make(
+                  llvmberry::TyPosition::make(llvmberry::Source, *I),
+                  llvmberry::TyPosition::make(llvmberry::Source, *user_I,
+                                              prev_block_name))));
+          if (isa<TerminatorInst>(user_I)) {
+          } else if (isa<PHINode>(user_I)) {
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *user_I,
+                                            prev_block_name),
+                llvmberry::ConsTransitivity::make(
+                    llvmberry::ConsVar::make(user, llvmberry::Physical),
+                    llvmberry::ConsVar::make(to_rem, llvmberry::Previous),
+                    std::unique_ptr<llvmberry::TyExpr>(new llvmberry::ConsConst(
+                        (C->getValue()).getSExtValue(), C->getBitWidth())))));
+          } else {
+            hints.addCommand(llvmberry::ConsInfrule::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *user_I,
+                                            prev_block_name),
+                llvmberry::ConsReplaceRhs::make(
+                    llvmberry::TyRegister::make(to_rem, llvmberry::Physical),
+                    llvmberry::TyValue::make(*repl),
+                    llvmberry::ConsVar::make(user, llvmberry::Physical),
+                    llvmberry::ConsRhs::make(user, llvmberry::Physical,
+                                             llvmberry::Source),
+                    llvmberry::ConsRhs::make(user, llvmberry::Physical,
+                                             llvmberry::Target))));
+          }
+        }
+      } else if (SwitchInst *SI = llvm::dyn_cast<llvm::SwitchInst>(TI)) {
+        assert(false &&
+               "Cannot validate, as it is not formalized in vellvm yet.");
+      } else
+        assert(false && "Should not occur");
+    }
   });
 
   patchAndReplaceAllUsesWith(I, repl);

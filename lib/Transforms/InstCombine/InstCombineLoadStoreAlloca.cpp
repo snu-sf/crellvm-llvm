@@ -800,8 +800,8 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                 llvmberry::TyValue::make(*ptr1src))));
           hints.addCommand(llvmberry::ConsPropagate::make(
             llvmberry::ConsLessdef::make(
-                llvmberry::TyExpr::make(llvmberry::TyValue::make(*ptr1src)),
-                llvmberry::TyExpr::make(llvmberry::TyValue::make(*ptr1src)),
+                llvmberry::TyExpr::make(*ptr1src),
+                llvmberry::TyExpr::make(*ptr1src),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *NLI),
@@ -856,8 +856,8 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                 Instruction *from, Instruction *to){
           hints.addCommand(llvmberry::ConsPropagate::make(
             llvmberry::ConsLessdef::make(
-                llvmberry::TyExpr::make(llvmberry::TyValue::make(*greaterv)),
-                llvmberry::TyExpr::make(llvmberry::TyValue::make(*lesserv)),
+                llvmberry::TyExpr::make(*greaterv),
+                llvmberry::TyExpr::make(*lesserv),
                 llvmberry::Source),
             llvmberry::ConsBounds::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *from),
@@ -869,9 +869,9 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
           hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, *pos),
             llvmberry::ConsTransitivity::make(
-                llvmberry::TyExpr::make(llvmberry::TyValue::make(*x1)),
-                llvmberry::TyExpr::make(llvmberry::TyValue::make(*x2)),
-                llvmberry::TyExpr::make(llvmberry::TyValue::make(*x3)))));
+                llvmberry::TyExpr::make(*x1),
+                llvmberry::TyExpr::make(*x2),
+                llvmberry::TyExpr::make(*x3))));
         };
 
         auto applyGepZeroAndPropagate = [&hints, &LI, &NLI, &propagateLessdef, 
@@ -999,6 +999,17 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                 }else{
                   noalias_propagate_beg = ptr3_alloca;
                 }
+                hints.addCommand(llvmberry::ConsPropagate::make(
+                  std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsNoalias(
+                      llvmberry::getVariable(*ptr1_alloca),
+                      llvmberry::Physical,
+                      llvmberry::getVariable(*ptr3_alloca),
+                      llvmberry::Physical,
+                      llvmberry::Source
+                      )),
+                  llvmberry::ConsBounds::make(
+                      llvmberry::TyPosition::make(llvmberry::Source, *noalias_propagate_beg),
+                      llvmberry::TyPosition::make(llvmberry::Source, *noalias_si))));
               }else if(GlobalVariable *ptr1_gv = llvm::dyn_cast<GlobalVariable>(ptr1src)){
                 hints.addCommand(llvmberry::ConsInfrule::make(
                   llvmberry::TyPosition::make(llvmberry::Source, *ptr3_alloca),
@@ -1035,15 +1046,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
               assert("Noalias store must be (alloca OR global) _|_ (alloca OR global)" && false);
             }
             if(noalias_propagate_beg != noalias_si){
-              hints.addCommand(llvmberry::ConsPropagate::make(
-                llvmberry::ConsNoalias::make(
-                    llvmberry::TyValue::make(*ptr1src),
-                    llvmberry::TyValue::make(*ptr3src),
-                    llvmberry::Source
-                    ),
-                llvmberry::ConsBounds::make(
-                    llvmberry::TyPosition::make(llvmberry::Source, *noalias_propagate_beg),
-                    llvmberry::TyPosition::make(llvmberry::Source, *noalias_si))));
+
             }
             // ptr1src >= ptr1 is already shown.
             // We have to show ptr3src >= ptr3.

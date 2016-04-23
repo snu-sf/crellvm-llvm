@@ -52,4 +52,5 @@ add_llvm_library(LLVMCore
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/IR
   )
 
+#set_target_properties(LLVMCore LLVMBerry PROPERTIES LINK_INTERFACE_MULTIPLICITY 3)
 add_dependencies(LLVMCore intrinsics_gen)

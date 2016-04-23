@@ -244,23 +244,8 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
                 int64_t b = B_const->getSExtValue();
                 int64_t c = C_const->getSExtValue();
                 int64_t v = V_const->getSExtValue();
-
-                hints.addCommand
-                  (llvmberry::ConsPropagate::make
-                   (llvmberry::ConsLessdef::make
-                    (llvmberry::ConsVar::make
-                     (reg1_name, llvmberry::Physical),
-                     llvmberry::ConsRhs::make
-                     (reg1_name, llvmberry::Physical, llvmberry::Source),
-                     llvmberry::Source)
-                    ,
-                    llvmberry::ConsBounds::make
-                    (llvmberry::TyPosition::make
-                     (llvmberry::Source, *reg1_instr),
-                     llvmberry::TyPosition::make
-                     (llvmberry::Source, I))
-                    )
-                   );
+                
+                llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
 
                 hints.addCommand
                   (llvmberry::ConsInfrule::make
@@ -278,7 +263,7 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
                     )
                    );
               }
-               );
+            );
 
           } else {
             llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
