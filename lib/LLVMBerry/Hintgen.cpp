@@ -36,49 +36,48 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
  *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
  */
 void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope, bool propagateEquivalence) {
-  if (llvmberry::ValidationUnit::Exists()) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([&from, &to, &scope, &propagateEquivalence](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
-      std::string reg_name = llvmberry::getVariable(*from);
+  if (ValidationUnit::Exists()) {
+    ValidationUnit::GetInstance()->intrude([&from, &to, &scope, &propagateEquivalence](
+        ValidationUnit::Dictionary &data, CoreHint &hints) {
+      std::string reg_name = getVariable(*from);
 
-      if(scope == llvmberry::Source){
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsVar::make(reg_name, llvmberry::Physical),
-                llvmberry::ConsRhs::make(reg_name, llvmberry::Physical, scope),
+      if(scope == Source){
+        hints.addCommand(ConsPropagate::make(
+            ConsLessdef::make(
+                ConsVar::make(reg_name, Physical),
+                ConsRhs::make(reg_name, Physical, scope),
                 scope),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(scope, *from),
-                llvmberry::TyPosition::make(scope, *to))));
+            ConsBounds::make(
+                TyPosition::make(scope, *from),
+                TyPosition::make(scope, *to))));
         if(propagateEquivalence){
-          hints.addCommand(llvmberry::ConsPropagate::make(
-              llvmberry::ConsLessdef::make(
-                  llvmberry::ConsRhs::make(reg_name, llvmberry::Physical, scope),
-                  llvmberry::ConsVar::make(reg_name, llvmberry::Physical),
+          hints.addCommand(ConsPropagate::make(
+              ConsLessdef::make(
+                  ConsRhs::make(reg_name, Physical, scope),
+                  ConsVar::make(reg_name, Physical),
                   scope),
-              llvmberry::ConsBounds::make(
-                  llvmberry::TyPosition::make(scope, *from),
-                  llvmberry::TyPosition::make(scope, *to))));
+              ConsBounds::make(
+                  TyPosition::make(scope, *from),
+                  TyPosition::make(scope, *to))));
         }
-      }else if(scope == llvmberry::Target){
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(reg_name, llvmberry::Physical, scope),
-                llvmberry::ConsVar::make(reg_name, llvmberry::Physical),
+      }else if(scope == Target){
+        hints.addCommand(ConsPropagate::make(
+            ConsLessdef::make(
+                ConsRhs::make(reg_name, Physical, scope),
+                ConsVar::make(reg_name, Physical),
                 scope),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(scope, *from),
-                llvmberry::TyPosition::make(scope, *to))));
+            ConsBounds::make(
+                TyPosition::make(scope, *from),
+                TyPosition::make(scope, *to))));
         if(propagateEquivalence){
-          hints.addCommand(llvmberry::ConsPropagate::make(
-              llvmberry::ConsLessdef::make(
-                  llvmberry::ConsVar::make(reg_name, llvmberry::Physical),
-                  llvmberry::ConsRhs::make(reg_name, llvmberry::Physical, scope),
+          hints.addCommand(ConsPropagate::make(
+              ConsLessdef::make(
+                  ConsVar::make(reg_name, Physical),
+                  ConsRhs::make(reg_name, Physical, scope),
                   scope),
-              llvmberry::ConsBounds::make(
-                  llvmberry::TyPosition::make(scope, *from),
-                  llvmberry::TyPosition::make(scope, *to))));
+              ConsBounds::make(
+                  TyPosition::make(scope, *from),
+                  TyPosition::make(scope, *to))));
         }
       }else{
         assert("propagateInstruction() : scope is neither llvmberry::Source nor llvmberry::Target" && false);
@@ -182,6 +181,21 @@ void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expre
   }); 
 }
 
+void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest, llvm::Value *v_mid, llvm::Value *v_smallest, TyScope scope) {
+  if (!llvmberry::ValidationUnit::Exists()){
+    return;
+  }
+  llvmberry::ValidationUnit::GetInstance()->intrude([&position, &v_smallest, &v_mid, &v_greatest, &scope](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+    hints.addCommand(llvmberry::ConsInfrule::make(
+       INSTPOS(scope, position),
+       llvmberry::ConsTransitivity::make(
+         TyExpr::make(*v_greatest, Physical),
+         TyExpr::make(*v_mid, Physical),
+         TyExpr::make(*v_smallest, Physical))));
+  });
+}
+
 void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope) {
   if (llvm::BinaryOperator::isNeg(V)) {
     if (llvmberry::ValidationUnit::Exists()) {
@@ -253,61 +267,53 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *r
     llvm::Instruction *I = source;
     llvm::Value *repl = replaceTo;
 
-    if (llvm::isa<llvm::Instruction>(repl)) {
-      std::string leader = llvmberry::getVariable(*repl);
-      std::string to_rem = llvmberry::getVariable(*I);
+    std::string to_rem = llvmberry::getVariable(*I);
 
-      for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
-        if (!llvm::isa<llvm::Instruction>(UI->getUser())) {
-          // let the validation fail when the user is not an instruction
-          return;
-        }
-        std::string user = llvmberry::getVariable(*UI->getUser());
-        llvm::Instruction *user_I = llvm::dyn_cast<llvm::Instruction>(UI->getUser());
+    for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+      if (!llvm::isa<llvm::Instruction>(UI->getUser())) {
+        // let the validation fail when the user is not an instruction
+        return;
+      }
+      std::string user = llvmberry::getVariable(*UI->getUser());
+      llvm::Instruction *user_I = llvm::dyn_cast<llvm::Instruction>(UI->getUser());
 
-        std::string prev_block_name = "";
-        if (llvm::isa<llvm::PHINode>(user_I)) {
-          llvm::BasicBlock *bb_from =
-              llvm::dyn_cast<llvm::PHINode>(user_I)->getIncomingBlock(*UI);
-          prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-        }
-
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsVar::make(to_rem, llvmberry::Physical),
-                llvmberry::ConsVar::make(leader, llvmberry::Physical),
-                llvmberry::Source),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Source, *I),
-                llvmberry::TyPosition::make(llvmberry::Source, *user_I, prev_block_name))));
-        if (llvm::isa<llvm::PHINode>(user_I)) {
-          hints.addCommand(llvmberry::ConsInfrule::make(
-              llvmberry::TyPosition::make(llvmberry::Source, *user_I,
-                                          prev_block_name),
-              llvmberry::ConsTransitivity::make(
-                  llvmberry::ConsVar::make(user, llvmberry::Physical),
-                  llvmberry::ConsVar::make(to_rem, llvmberry::Previous),
-                  llvmberry::ConsVar::make(leader, llvmberry::Previous))));
-        } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
-          hints.addCommand(llvmberry::ConsInfrule::make(
-              llvmberry::TyPosition::make(llvmberry::Source, *user_I,
-                                          prev_block_name),
-              llvmberry::ConsReplaceRhs::make(
-                  llvmberry::TyRegister::make(to_rem, llvmberry::Physical),
-                  llvmberry::ConsId::make(leader, llvmberry::Physical),
-                  llvmberry::ConsVar::make(user, llvmberry::Physical),
-                  llvmberry::ConsRhs::make(user, llvmberry::Physical,
-                                           llvmberry::Source),
-                  llvmberry::ConsRhs::make(user, llvmberry::Physical,
-                                           llvmberry::Target))));
-        }
+      std::string prev_block_name = "";
+      if (llvm::isa<llvm::PHINode>(user_I)) {
+        llvm::BasicBlock *bb_from =
+            llvm::dyn_cast<llvm::PHINode>(user_I)->getIncomingBlock(*UI);
+        prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
       }
 
-    } else {
-      // TODO: repl not an instruction (ex. icmp)
-      // For now we just don't print anything as a hint
+      hints.addCommand(llvmberry::ConsPropagate::make(
+          llvmberry::ConsLessdef::make(
+              llvmberry::ConsVar::make(to_rem, llvmberry::Physical),
+              llvmberry::TyExpr::make(*repl, llvmberry::Physical),
+              llvmberry::Source),
+          llvmberry::ConsBounds::make(
+              llvmberry::TyPosition::make(llvmberry::Source, *I),
+              llvmberry::TyPosition::make(llvmberry::Source, *user_I, prev_block_name))));
+      if (llvm::isa<llvm::PHINode>(user_I)) {
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, *user_I,
+                                        prev_block_name),
+            llvmberry::ConsTransitivity::make(
+                llvmberry::ConsVar::make(user, llvmberry::Physical),
+                llvmberry::ConsVar::make(to_rem, llvmberry::Previous),
+                llvmberry::TyExpr::make(*repl, llvmberry::Previous))));
+      } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Source, *user_I,
+                                        prev_block_name),
+            llvmberry::ConsReplaceRhs::make(
+                llvmberry::TyRegister::make(to_rem, llvmberry::Physical),
+                llvmberry::TyValue::make(*repl, llvmberry::Physical),
+                llvmberry::ConsVar::make(user, llvmberry::Physical),
+                llvmberry::ConsRhs::make(user, llvmberry::Physical,
+                                         llvmberry::Source),
+                llvmberry::ConsRhs::make(user, llvmberry::Physical,
+                                         llvmberry::Target))));
+      }
     }
-
   });
 
 }
@@ -579,4 +585,61 @@ void generateHintForAddOrAnd(llvm::BinaryOperator &I,
           llvmberry::ConsSize::make(bitwidth))));
   });
 }
+
+void generateHintForAndOr(llvm::BinaryOperator &I,
+          llvm::Value *X,
+          llvm::BinaryOperator *Y,
+          llvm::Value *A,
+          bool needsZCommutativity){
+  ValidationUnit::GetInstance()->intrude([&I, &X, &Y, &A,
+      &needsZCommutativity]
+      (ValidationUnit::Dictionary &data, CoreHint &hints) {
+    llvm::BinaryOperator *Z = llvm::dyn_cast<llvm::BinaryOperator>(&I);
+    assert(Z);
+
+    propagateInstruction(Y, Z, Source);
+    if(Y->getOperand(0) != X)
+      applyCommutativity(Z, Y, Source);
+    if(needsZCommutativity)
+      applyCommutativity(Z, Z, Source);
+    hints.addCommand(ConsInfrule::make(
+        INSTPOS(Source, Z),
+        ConsAndOr::make(
+            VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), VAL(A, Physical),
+            ConsSize::make(Z->getType()->getIntegerBitWidth()))));
+  });
+}
+
+
+
+
+
+
+SimplifyAndInstArg::SimplifyAndInstArg(){
+  this->activated = false;
+}
+
+void SimplifyAndInstArg::setHintGenFunc(std::string _microoptName, std::function<void(llvm::Instruction *)> _hintGenFunc){
+  this->activated = true;
+  this->microoptName = _microoptName;
+  this->hintGenFunc = _hintGenFunc;
+}
+
+void SimplifyAndInstArg::generateHint(llvm::Instruction *arg) const{
+  assert(this->activated);
+  auto &func = this->hintGenFunc;
+  ValidationUnit::GetInstance()->intrude([&func, &arg]
+      (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hint){
+    func(arg);
+  });
+}
+
+std::string SimplifyAndInstArg::getMicroOptName() const{
+  return this->microoptName;
+}
+
+bool SimplifyAndInstArg::isActivated() const{
+  return activated;
+}
+
 }

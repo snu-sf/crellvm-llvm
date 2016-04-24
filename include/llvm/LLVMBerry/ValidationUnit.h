@@ -25,6 +25,7 @@ public:
   CoreHint &getHint();
   const std::string &getOptimizationName() const;
   const std::string &getDescription() const;
+  void setOptimizationName(const std::string &name);
   void setDescription(const std::string &str);
   void setReturnCode(RETURN_CODE return_code);
   void intrude(std::function<void(Dictionary &, CoreHint &)> func);
@@ -35,7 +36,6 @@ private:
   void begin();
   void commit();
   void abort();
-  // TODO: abort leaves src.bc
 
   std::string _filename;
   std::string _optname;
@@ -51,6 +51,7 @@ public:
   static bool BeginIfNotExists(const std::string &optname,
                                llvm::Function *func);
   static void End();
+  static void Abort();
   static bool EndIfExists();
   static bool Exists();
 
