@@ -76,7 +76,16 @@ std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
 
   // If a block has its own name, just return it.
   if (block->hasName()) {
-    return block->getName();
+    std::string tempstr;
+    llvm::raw_string_ostream rso(tempstr);
+    block->printAsOperand(rso);
+
+    std::string name = rso.str();
+    std::string label("label %");
+    if(name.compare(0, label.length(), label) != 0) {
+      assert(false && "if we get block name by printAsOperand(), it should begin with \"label %\"");
+    }
+    return name.substr(label.length());
   }
 
   // If else, calculate the index and return it.

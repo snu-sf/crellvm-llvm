@@ -6,6 +6,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/Support/raw_ostream.h"
 #include "cereal/archives/json.hpp"
 #include "cereal/types/vector.hpp"
 #include <cereal/types/memory.hpp>
