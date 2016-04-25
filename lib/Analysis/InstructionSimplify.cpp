@@ -34,6 +34,12 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/IR/ValueHandle.h"
 #include <algorithm>
+
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
+#include <memory>
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -1558,6 +1564,15 @@ static Value *SimplifyAndOfICmps(ICmpInst *Op0, ICmpInst *Op1) {
 /// fold the result.  If not, this returns null.
 static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
                               unsigned MaxRecurse) {
+  bool llvmberry_doHintGen = llvmberry::ValidationUnit::Exists() &&
+        llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_and_inst";
+  if(llvmberry_doHintGen){
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      assert(data.find("SimplifyAndInst.arg") != data.end());
+      data["SimplifyAndInst.isSwapped"] = false;
+    });
+  }
   if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
     if (Constant *CRHS = dyn_cast<Constant>(Op1)) {
       Constant *Ops[] = { CLHS, CRHS };
@@ -1567,39 +1582,232 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
 
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        data["SimplifyAndInst.isSwapped"] = true;
+      });
+    }
   }
 
   // X & undef -> 0
-  if (match(Op1, m_Undef()))
+  if (match(Op1, m_Undef())){
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>      |  <tgt>
+        // Z = X & undef | (Z equals 0)
+        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+            (data["SimplifyAndInst.arg"]);
+        bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
+        
+        ptr->setHintGenFunc("and_undef", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          auto zero = Constant::getNullValue(Op0->getType());
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+          if(isSwapped){
+            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
+          }
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              INSTPOS(llvmberry::Source, Z),
+              llvmberry::ConsAndUndef::make(
+                  VAL(Z, Physical), VAL(Op0, Physical),
+                  llvmberry::ConsSize::make(bitwidth))));
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              INSTPOS(llvmberry::Source, Z),
+              llvmberry::ConsLessthanUndef::make(
+                  llvmberry::TyValueType::make(*Op0->getType()),
+                  llvmberry::TyValue::make(*zero))));
+          llvmberry::applyTransitivity(Z, Z, Op1, zero, llvmberry::Source);
+        });
+      });
+    }
     return Constant::getNullValue(Op0->getType());
+  }
 
   // X & X = X
-  if (Op0 == Op1)
+  if (Op0 == Op1){
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>  |  <tgt>
+        // Z = X & X | (Z equals X)
+        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+            (data["SimplifyAndInst.arg"]);
+        
+        ptr->setHintGenFunc("and_same", [Op0, Op1, &hints](llvm::Instruction *I){
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              INSTPOS(llvmberry::Source, Z),
+              llvmberry::ConsAndSame::make(
+                  VAL(Z, Physical), VAL(Op0, Physical),
+                  llvmberry::ConsSize::make(bitwidth))));
+
+        });
+      });
+    }
     return Op0;
+  }
 
   // X & 0 = 0
-  if (match(Op1, m_Zero()))
+  if (match(Op1, m_Zero())){
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>  |  <tgt>
+        // Z = X & 0 | (Z equals 0)
+        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+            (data["SimplifyAndInst.arg"]);
+        bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
+        
+        ptr->setHintGenFunc("and_zero", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+          if(isSwapped){
+            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
+          }
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              INSTPOS(llvmberry::Source, Z),
+              llvmberry::ConsAndZero::make(
+                  VAL(Z, Physical), VAL(Op0, Physical),
+                  llvmberry::ConsSize::make(bitwidth))));
+
+        });
+      });
+    }
     return Op1;
+  }
 
   // X & -1 = X
-  if (match(Op1, m_AllOnes()))
+  if (match(Op1, m_AllOnes())){
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>   |  <tgt>
+        // Z = X & -1 | (Z equals X)
+        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+            (data["SimplifyAndInst.arg"]);
+        bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
+        
+        ptr->setHintGenFunc("and_mone", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+          if(isSwapped){
+            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
+          }
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              INSTPOS(llvmberry::Source, Z),
+              llvmberry::ConsAndMone::make(
+                  VAL(Z, Physical), VAL(Op0, Physical),
+                  llvmberry::ConsSize::make(bitwidth))));
+
+        });
+      });
+    }
     return Op0;
+  }
 
   // A & ~A  =  ~A & A  =  0
   if (match(Op0, m_Not(m_Specific(Op1))) ||
-      match(Op1, m_Not(m_Specific(Op0))))
+      match(Op1, m_Not(m_Specific(Op0)))){
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>   |  <tgt>
+        // Y = X ^ -1 | Y = X ^ -1
+        // Z = X & Y  | (Z equals 0)
+        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+            (data["SimplifyAndInst.arg"]);
+        bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
+        bool isOp1NotOfOp0 = match(Op1, m_Not(m_Specific(Op0))); // if this is true, (Op0 & Op1) coalesces with and_not inference rule
+        
+        ptr->setHintGenFunc("and_not", [isSwapped, isOp1NotOfOp0, Op0, Op1, &hints](llvm::Instruction *I){
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          Value *X = isOp1NotOfOp0 ? Op0 : Op1;
+          BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOfOp0 ? Op1 : Op0);
+          assert(Y);
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+
+          llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+          if(Y->getOperand(0) != X){
+            llvmberry::applyCommutativity(Z, Y, llvmberry::Source);
+          }
+          if((isSwapped && isOp1NotOfOp0) || (!isSwapped && !isOp1NotOfOp0)){
+            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
+          }
+          hints.addCommand(llvmberry::ConsInfrule::make(
+              INSTPOS(llvmberry::Source, Z),
+              llvmberry::ConsAndNot::make(
+                  VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical),
+                  llvmberry::ConsSize::make(bitwidth))));
+
+        });
+      });
+    }
     return Constant::getNullValue(Op0->getType());
+  }
 
   // (A | ?) & A = A
   Value *A = nullptr, *B = nullptr;
   if (match(Op0, m_Or(m_Value(A), m_Value(B))) &&
-      (A == Op1 || B == Op1))
+      (A == Op1 || B == Op1)){
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>  |   <tgt>
+        // Y = X | A | Y = X | A
+        // Z = X & Y | (Z equals X)
+        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+            (data["SimplifyAndInst.arg"]);
+        bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
+        
+        ptr->setHintGenFunc("and_or", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          Value *X = Op1;
+          BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
+          assert(Z);
+          assert(Y);
+          llvmberry::generateHintForAndOr(*Z, X, Y, 
+              (Y->getOperand(0) == X ? Y->getOperand(1) : Y->getOperand(0)), !isSwapped);
+        });
+      });
+    }
     return Op1;
+  }
 
   // A & (A | ?) = A
   if (match(Op1, m_Or(m_Value(A), m_Value(B))) &&
-      (A == Op0 || B == Op0))
-    return Op0;
+      (A == Op0 || B == Op0)){
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>  |   <tgt>
+        // Y = X | A | Y = X | A
+        // Z = X & Y | (Z equals X)
+        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+            (data["SimplifyAndInst.arg"]);
+        bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
+        
+        ptr->setHintGenFunc("and_or", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          Value *X = Op0;
+          BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+          assert(Y);
+          llvmberry::generateHintForAndOr(*Z, X, Y, 
+              (Y->getOperand(0) == X ? Y->getOperand(1) : Y->getOperand(0)), isSwapped);
+        });
+      });
+    }
+   return Op0;
+  }
 
   // A & (-A) = A if A is a power of two or zero.
   if (match(Op0, m_Neg(m_Specific(Op1))) ||

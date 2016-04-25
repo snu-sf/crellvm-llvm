@@ -1223,4 +1223,8 @@ void CoreHint::setDescription(const std::string &desc){
   this->description = desc;
 }
 
+void CoreHint::setOptimizationName(const std::string &name){
+  this->opt_name = name;
+}
+
 } // llvmberry

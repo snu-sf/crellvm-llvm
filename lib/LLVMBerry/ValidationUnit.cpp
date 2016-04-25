@@ -82,6 +82,11 @@ const std::string &ValidationUnit::getDescription() const{
   return _Instance->_corehint.getDescription();
 }
 
+void ValidationUnit::setOptimizationName(const std::string &str){
+  _optname = str;
+  _Instance->_corehint.setOptimizationName(str);
+}
+
 void ValidationUnit::setDescription(const std::string &str){
   _Instance->_corehint.setDescription(str);
 }
@@ -171,6 +176,13 @@ bool ValidationUnit::BeginIfNotExists(const std::string &optname,
 }
 
 void ValidationUnit::End() {
+  assert(Exists() && "No ValidationUnit exists");
+  delete _Instance;
+  _Instance = nullptr;
+}
+
+void ValidationUnit::Abort() {
+  _Instance->setReturnCode(ABORT);
   assert(Exists() && "No ValidationUnit exists");
   delete _Instance;
   _Instance = nullptr;
