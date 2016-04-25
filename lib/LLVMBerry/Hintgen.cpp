@@ -36,31 +36,21 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
  *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
  */
 void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope, bool propagateEquivalence) {
-  if (ValidationUnit::Exists()) {
-    ValidationUnit::GetInstance()->intrude([&from, &to, &scope, &propagateEquivalence](
-        ValidationUnit::Dictionary &data, CoreHint &hints) {
-      std::string reg_name = getVariable(*from);
+  assert(ValidationUnit::Exists());
+  ValidationUnit::GetInstance()->intrude([&from, &to, &scope, &propagateEquivalence](
+      ValidationUnit::Dictionary &data, CoreHint &hints) {
+    std::string reg_name = getVariable(*from);
 
-      if(scope == Source){
-        hints.addCommand(ConsPropagate::make(
-            ConsLessdef::make(
-                ConsVar::make(reg_name, Physical),
-                ConsRhs::make(reg_name, Physical, scope),
-                scope),
-            ConsBounds::make(
-                TyPosition::make(scope, *from),
-                TyPosition::make(scope, *to))));
-        if(propagateEquivalence){
-          hints.addCommand(ConsPropagate::make(
-              ConsLessdef::make(
-                  ConsRhs::make(reg_name, Physical, scope),
-                  ConsVar::make(reg_name, Physical),
-                  scope),
-              ConsBounds::make(
-                  TyPosition::make(scope, *from),
-                  TyPosition::make(scope, *to))));
-        }
-      }else if(scope == Target){
+    if(scope == Source){
+      hints.addCommand(ConsPropagate::make(
+          ConsLessdef::make(
+              ConsVar::make(reg_name, Physical),
+              ConsRhs::make(reg_name, Physical, scope),
+              scope),
+          ConsBounds::make(
+              TyPosition::make(scope, *from),
+              TyPosition::make(scope, *to))));
+      if(propagateEquivalence){
         hints.addCommand(ConsPropagate::make(
             ConsLessdef::make(
                 ConsRhs::make(reg_name, Physical, scope),
@@ -69,27 +59,35 @@ void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScop
             ConsBounds::make(
                 TyPosition::make(scope, *from),
                 TyPosition::make(scope, *to))));
-        if(propagateEquivalence){
-          hints.addCommand(ConsPropagate::make(
-              ConsLessdef::make(
-                  ConsVar::make(reg_name, Physical),
-                  ConsRhs::make(reg_name, Physical, scope),
-                  scope),
-              ConsBounds::make(
-                  TyPosition::make(scope, *from),
-                  TyPosition::make(scope, *to))));
-        }
-      }else{
-        assert("propagateInstruction() : scope is neither llvmberry::Source nor llvmberry::Target" && false);
       }
-    });
-  }
+    }else if(scope == Target){
+      hints.addCommand(ConsPropagate::make(
+          ConsLessdef::make(
+              ConsRhs::make(reg_name, Physical, scope),
+              ConsVar::make(reg_name, Physical),
+              scope),
+          ConsBounds::make(
+              TyPosition::make(scope, *from),
+              TyPosition::make(scope, *to))));
+      if(propagateEquivalence){
+        hints.addCommand(ConsPropagate::make(
+            ConsLessdef::make(
+                ConsVar::make(reg_name, Physical),
+                ConsRhs::make(reg_name, Physical, scope),
+                scope),
+            ConsBounds::make(
+                TyPosition::make(scope, *from),
+                TyPosition::make(scope, *to))));
+      }
+    }else{
+      assert("propagateInstruction() : scope is neither llvmberry::Source nor llvmberry::Target" && false);
+    }
+  });
 }
 
 void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expression, TyScope scope){
-  if (!llvmberry::ValidationUnit::Exists()){
-    return;
-  }
+  assert(llvmberry::ValidationUnit::Exists());
+  
   llvmberry::ValidationUnit::GetInstance()->intrude([&position, &expression, &scope](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
     int bitwidth = llvmberry::isFloatOpcode(expression->getOpcode()) ? -1 : expression->getType()->getIntegerBitWidth();
@@ -182,9 +180,8 @@ void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expre
 }
 
 void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest, llvm::Value *v_mid, llvm::Value *v_smallest, TyScope scope) {
-  if (!llvmberry::ValidationUnit::Exists()){
-    return;
-  }
+  assert(llvmberry::ValidationUnit::Exists());
+  
   llvmberry::ValidationUnit::GetInstance()->intrude([&position, &v_smallest, &v_mid, &v_greatest, &scope](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
     hints.addCommand(llvmberry::ConsInfrule::make(
@@ -197,63 +194,61 @@ void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest, llv
 }
 
 void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope) {
+  assert(llvmberry::ValidationUnit::Exists());
+
   if (llvm::BinaryOperator::isNeg(V)) {
-    if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([&V, &I, &scope](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&V, &I, &scope](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
 
-        std::string reg0_name = llvmberry::getVariable(I); // z = x -my
-        std::string reg1_name = llvmberry::getVariable(*V); // my
+      std::string reg0_name = llvmberry::getVariable(I); // z = x -my
+      std::string reg1_name = llvmberry::getVariable(*V); // my
 
-        llvm::Instruction *Vins = llvm::dyn_cast<llvm::Instruction>(V);
+      llvm::Instruction *Vins = llvm::dyn_cast<llvm::Instruction>(V);
 
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), // my = -y
-                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, scope),
-                scope),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(scope, *Vins), // From my to z = x -my
-                llvmberry::TyPosition::make(scope, I))));
+      hints.addCommand(llvmberry::ConsPropagate::make(
+          llvmberry::ConsLessdef::make(
+              llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), // my = -y
+              llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, scope),
+              scope),
+          llvmberry::ConsBounds::make(
+              llvmberry::TyPosition::make(scope, *Vins), // From my to z = x -my
+              llvmberry::TyPosition::make(scope, I))));
 
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, scope),
-                llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), // my = -y
-                scope),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(scope, *Vins), // From my to z = x -my
-                llvmberry::TyPosition::make(scope, I))));
-      });
-    }
+      hints.addCommand(llvmberry::ConsPropagate::make(
+          llvmberry::ConsLessdef::make(
+              llvmberry::ConsRhs::make(reg1_name, llvmberry::Physical, scope),
+              llvmberry::ConsVar::make(reg1_name, llvmberry::Physical), // my = -y
+              scope),
+          llvmberry::ConsBounds::make(
+              llvmberry::TyPosition::make(scope, *Vins), // From my to z = x -my
+              llvmberry::TyPosition::make(scope, I))));
+    });
   }
   // Constants can be considered to be negated values if they can be folded.
   if (llvm::ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(V)) {
-    if (llvmberry::ValidationUnit::Exists()) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V, &C, &scope](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V, &C, &scope](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
 
-        std::string reg0_name = llvmberry::getVariable(I); // z = x -my
+      std::string reg0_name = llvmberry::getVariable(I); // z = x -my
 
-        unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
-        int64_t c1 = C->getSExtValue();
-        int64_t c2 = -c1;
+      unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
+      int64_t c1 = C->getSExtValue();
+      int64_t c2 = -c1;
 
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(scope, I),
-            llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
-                                        llvmberry::TyConstInt::make(c2, sz_bw),
-                                        llvmberry::ConsSize::make(sz_bw))));
+      hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(scope, I),
+          llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
+                                      llvmberry::TyConstInt::make(c2, sz_bw),
+                                      llvmberry::ConsSize::make(sz_bw))));
 
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(scope, I),
-            llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
-                                        llvmberry::TyConstInt::make(c2, sz_bw),
-                                        llvmberry::ConsSize::make(sz_bw))));
-      });
-    }
+      hints.addCommand(llvmberry::ConsInfrule::make(
+          llvmberry::TyPosition::make(scope, I),
+          llvmberry::ConsNegVal::make(llvmberry::TyConstInt::make(c1, sz_bw),
+                                      llvmberry::TyConstInt::make(c2, sz_bw),
+                                      llvmberry::ConsSize::make(sz_bw))));
+    });
   }
   //  if(ConstantDataVector *C = dyn_cast<ConstantDataVector>(V))
   //  {
@@ -262,6 +257,8 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope sc
 }
 
 void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *replaceTo){
+  assert(llvmberry::ValidationUnit::Exists());
+  
   llvmberry::ValidationUnit::GetInstance()->intrude([&source, &replaceTo](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
     llvm::Instruction *I = source;
@@ -323,9 +320,11 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
                                   llvm::SelectInst *Y, 
                                   bool needs_commutativity,
                                   bool is_leftform){
+  assert(llvmberry::ValidationUnit::Exists());
   assert(Z);
   assert(X);
   assert(Y);
+  
   llvmberry::ValidationUnit::GetInstance()->intrude([&Z, &X, &Y, 
                 needs_commutativity, is_leftform](
       llvmberry::ValidationUnit::Dictionary &data,
@@ -410,6 +409,8 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
 }
 
 void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, llvm::Value *op1, bool needsCommutativity){
+  assert(llvmberry::ValidationUnit::Exists());
+  
   llvmberry::ValidationUnit::GetInstance()->intrude([&I, &op0, &op1, &needsCommutativity](
       llvmberry::ValidationUnit::Dictionary &data,
       llvmberry::CoreHint &hints) {
@@ -552,6 +553,8 @@ void generateHintForAddOrAnd(llvm::BinaryOperator &I,
         llvm::BinaryOperator *Y,
         llvm::Value *A, llvm::Value *B,
         bool needsYCommutativity, bool needsZCommutativity){
+  assert(llvmberry::ValidationUnit::Exists());
+  
   llvmberry::ValidationUnit::GetInstance()->intrude([&I, &X, &Y,
       &needsYCommutativity,
       &needsZCommutativity]
@@ -591,6 +594,8 @@ void generateHintForAndOr(llvm::BinaryOperator &I,
           llvm::BinaryOperator *Y,
           llvm::Value *A,
           bool needsZCommutativity){
+  assert(ValidationUnit::Exists());
+
   ValidationUnit::GetInstance()->intrude([&I, &X, &Y, &A,
       &needsZCommutativity]
       (ValidationUnit::Dictionary &data, CoreHint &hints) {
