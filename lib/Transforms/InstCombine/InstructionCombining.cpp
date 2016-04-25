@@ -2914,6 +2914,7 @@ bool InstCombiner::run() {
         DEBUG(dbgs() << "IC: Mod = " << OrigI << '\n'
                      << "    New = " << *I << '\n');
 #endif
+        llvmberry::ValidationUnit::EndIfExists();
 
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.

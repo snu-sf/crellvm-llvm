@@ -766,6 +766,7 @@ public:
   const std::string &getDescription() const;
   void setDescription(const std::string &desc);
   void addCommand(std::shared_ptr<TyCommand> c);
+  void setOptimizationName(const std::string &name);
   void addNopPosition(std::shared_ptr<TyPosition> position);
   void serialize(cereal::JSONOutputArchive &archive) const;
 

@@ -34,6 +34,10 @@ namespace llvmberry{
    *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the position I
    */
   void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expression, TyScope scope);
+  /* applyTransitivity(I, v1, v2, v3, scope) : 
+   *   Applies transitivity rule (v1 >= v2 >= v3) to the position I
+   */
+  void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest, llvm::Value *v_mid, llvm::Value *v_smallest, TyScope scope); 
   /* propagateInstruction(I1, I2, scope, propagateEquivalence) : 
    *   if propagateEquivalence == false : 
    *     Propagates I1 >= rhs(I1) from I1 to I2 if scope == Source, or
@@ -42,11 +46,19 @@ namespace llvmberry{
    *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
    */
   void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope, bool propagateEquivalence = false);
+  /* generateHintForNegValue(V, I, Scope) : 
+   *   If V is a BinaryOperator (V = 0 - mV), propagate (V >= 0 - mV, 0 - mV >= V) from V to I in Scope
+   *   If V is a constant C, add invariants (C >=src 0 - (-C)), ((0 - (-C)) >=tgt C). (It does nothing with scope)
+   */
   void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope = Source);
   /* generateHintForReplaceAllUsesWith(v1, v2) : 
    *   for each use U of v1, propagates hints that prove replacing v1 with v2 in U is safe
    */
   void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *replaceTo);
+
+  /* Hint generation functions for instcombine/instsimplify micro-optimizations
+   * that appear multiple times
+   */
   void generateHintForAddSelectZero(llvm::BinaryOperator *Z, 
           llvm::BinaryOperator *X, 
           llvm::SelectInst *Y, 
@@ -63,18 +75,38 @@ namespace llvmberry{
           llvm::BinaryOperator *Y,
           llvm::Value *A,
           llvm::Value *B,
-          bool needsYCommutative, bool needsZCommutative);
+          bool needsYCommutativity, bool needsZCommutativity);
   void generateHintForAddOrAnd(llvm::BinaryOperator &I,
           llvm::BinaryOperator *X,
           llvm::BinaryOperator *Y,
           llvm::Value *A,
           llvm::Value *B,
-          bool needsYCommutative, bool needsZCommutative);
+          bool needsYCommutativity, bool needsZCommutativity);
+  void generateHintForAndOr(llvm::BinaryOperator &I,
+          llvm::Value *X,
+          llvm::BinaryOperator *Y,
+          llvm::Value *A,
+          bool needsZCommutativity);
 
 
   // inserting nop
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
   void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
+
+
+  // Used in InstructionSimplify.cpp : SimplifyAndInst()
+  struct SimplifyAndInstArg{
+  public:
+    SimplifyAndInstArg();
+    void setHintGenFunc(std::string microoptName, std::function<void(llvm::Instruction *)> hintGenFunc);
+    void generateHint(llvm::Instruction *arg) const;
+    bool isActivated() const;
+    std::string getMicroOptName() const;
+  private:
+    bool activated;
+    std::string microoptName;
+    std::function<void(llvm::Instruction *)> hintGenFunc;
+  };
 
   // lib/IR/Value.cpp : Value::stripPointerCasts(), stripPointerCastsAndOffsets()
   struct StripPointerCastsArgs{

@@ -1214,8 +1214,34 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  if (Value *V = SimplifyAndInst(Op0, Op1, DL, TLI, DT, AC))
+  
+  llvmberry::ValidationUnit::Begin("simplify_and_inst", I.getParent()->getParent());
+  llvmberry::ValidationUnit::GetInstance()->intrude([](
+      llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    data["SimplifyAndInst.arg"] = std::shared_ptr<llvmberry::SimplifyAndInstArg>
+                (new llvmberry::SimplifyAndInstArg());
+  });
+
+  if (Value *V = SimplifyAndInst(Op0, Op1, DL, TLI, DT, AC)){
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
+      std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
+          <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+          (data["SimplifyAndInst.arg"]);
+      if(ptr->isActivated()){
+        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
+        ptr->generateHint(&I);
+        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+      }else{
+        llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+      }
+    });
+
     return ReplaceInstUsesWith(I, V);
+  }
+  llvmberry::ValidationUnit::Abort();
 
   // (A|B)&(A|C) -> A|(B&C) etc
   if (Value *V = SimplifyUsingDistributiveLaws(I))
