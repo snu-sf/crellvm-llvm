@@ -111,6 +111,7 @@ std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
 
 std::string getVariable(const llvm::Value &value) {
   std::string val;
+  std::string val2;
 
   if (llvm::isa<llvm::GlobalValue>(value)) {
     val = std::string("@");
@@ -121,6 +122,14 @@ std::string getVariable(const llvm::Value &value) {
   } else {
     assert("value must be a global value or an instruction" && false);
   }
+
+  std::string tempstr;
+  llvm::raw_string_ostream rso(tempstr);
+  value.printAsOperand(rso, /*PrintType=*/false);
+
+  val2 = rso.str();
+  if(val2.compare("<badref>") != 0)
+    return val2;
 
   val += std::string(value.getName().data());
 

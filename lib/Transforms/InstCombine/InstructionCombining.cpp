@@ -2803,7 +2803,6 @@ bool InstCombiner::run() {
                 llvmberry::ConsGlobal::make()));
 
             insertTgtNopAtSrcI(hints, I);
-
             if(CallInst *ci = dyn_cast<CallInst>(I)) {
               hints.setDescription("dce read-only call instruction. validation will fail");
             }
