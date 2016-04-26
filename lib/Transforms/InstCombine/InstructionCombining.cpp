@@ -2793,20 +2793,7 @@ bool InstCombiner::run() {
       llvmberry::name_instructions(*(I->getParent()->getParent()));
       llvmberry::ValidationUnit::Begin("dead_code_elim",
                                        I->getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude(
-          [&I](llvmberry::ValidationUnit::Dictionary &data,
-               llvmberry::CoreHint &hints) {
-            std::string reg = llvmberry::getVariable(*I);
-
-            hints.addCommand(llvmberry::ConsPropagate::make(
-                llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
-                llvmberry::ConsGlobal::make()));
-
-            insertTgtNopAtSrcI(hints, I);
-            if(CallInst *ci = dyn_cast<CallInst>(I)) {
-              hints.setDescription("dce read-only call instruction. validation will fail");
-            }
-          });
+      llvmberry::generateHintForTrivialDCE(*I);
       EraseInstFromFunction(*I);
       llvmberry::ValidationUnit::End();
       ++NumDeadInst;
@@ -2925,23 +2912,7 @@ bool InstCombiner::run() {
           llvmberry::name_instructions(*(I->getParent()->getParent()));
            llvmberry::ValidationUnit::Begin("dead_code_elim",
                             I->getParent()->getParent());
-           llvmberry::ValidationUnit::GetInstance()->intrude
-             ([&I]
-             (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-               std::string reg = llvmberry::getVariable(*I);
-
-               hints.addCommand(
-                 llvmberry::ConsPropagate::make(
-                   llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
-                   llvmberry::ConsGlobal::make()
-                 )
-               );
-
-               insertTgtNopAtSrcI(hints, I);
-               if(CallInst *ci = dyn_cast<CallInst>(I)) {
-                 hints.setDescription("dce read-only call instruction. validation will fail");
-               }
-             });
+           llvmberry::generateHintForTrivialDCE(*I);
           EraseInstFromFunction(*I);
           llvmberry::ValidationUnit::End();
         } else {
@@ -2994,24 +2965,7 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
         llvmberry::name_instructions(*(Inst->getParent()->getParent()));
         llvmberry::ValidationUnit::Begin("dead_code_elim",
                               Inst->getParent()->getParent());
-        llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&Inst]
-          (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-            std::string reg = llvmberry::getVariable(*Inst);
-
-            hints.addCommand(
-              llvmberry::ConsPropagate::make(
-                llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
-                llvmberry::ConsGlobal::make()
-              )
-            );
-
-            insertTgtNopAtSrcI(hints, Inst);
-            if(CallInst *ci = dyn_cast<CallInst>(Inst)) {
-              hints.setDescription("dce read-only call instruction. validation will fail");
-            }
-          });
- 
+        llvmberry::generateHintForTrivialDCE(*Inst);
         Inst->eraseFromParent();
         llvmberry::ValidationUnit::End();
         continue;

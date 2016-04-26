@@ -84,7 +84,7 @@ namespace llvmberry{
           llvm::BinaryOperator *Y,
           llvm::Value *A,
           bool needsZCommutativity);
-
+  void generateHintForTrivialDCE(llvm::Instruction &I);
 
   // inserting nop
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
