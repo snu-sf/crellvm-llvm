@@ -2938,6 +2938,9 @@ bool InstCombiner::run() {
                );
 
                insertTgtNopAtSrcI(hints, I);
+               if(CallInst *ci = dyn_cast<CallInst>(I)) {
+                 hints.setDescription("dce read-only call instruction. validation will fail");
+               }
              });
           EraseInstFromFunction(*I);
           llvmberry::ValidationUnit::End();
@@ -3004,6 +3007,9 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
             );
 
             insertTgtNopAtSrcI(hints, Inst);
+            if(CallInst *ci = dyn_cast<CallInst>(Inst)) {
+              hints.setDescription("dce read-only call instruction. validation will fail");
+            }
           });
  
         Inst->eraseFromParent();
