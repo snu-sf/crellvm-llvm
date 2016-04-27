@@ -1647,7 +1647,7 @@ bool GVN::PerformLoadPRE(LoadInst *LI, AvailValInBlkVect &ValuesPerBlock,
       llvmberry::name_instructions(*(I->getParent()->getParent()));
       llvmberry::ValidationUnit::Begin("GVN_dead_code_elim2",
                                        I->getParent()->getParent());
-      llvmberry::generateHintForTrivialDCE(*I);
+      llvmberry::generateHintForGVNDCE(*I);
       I->eraseFromParent();
       llvmberry::ValidationUnit::End();
     }
@@ -2649,7 +2649,7 @@ bool GVN::processBlock(BasicBlock *BB) {
       llvmberry::name_instructions(*((*I)->getParent()->getParent()));
       llvmberry::ValidationUnit::Begin("GVN_dead_code_elim1",
                                        (*I)->getParent()->getParent());
-      llvmberry::generateHintForTrivialDCE(**I);
+      llvmberry::generateHintForGVNDCE(**I);
       (*I)->eraseFromParent();
       llvmberry::ValidationUnit::End();
     }
@@ -2841,7 +2841,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
   llvmberry::ValidationUnit::Begin("GVN_dead_code_elim3",
                                    CurInst->getParent()->getParent());
-  llvmberry::generateHintForTrivialDCE(*CurInst);
+  llvmberry::generateHintForGVNDCE(*CurInst);
   CurInst->eraseFromParent();
   llvmberry::ValidationUnit::End();
   ++NumGVNInstr;

@@ -85,6 +85,7 @@ namespace llvmberry{
           llvm::Value *A,
           bool needsZCommutativity);
   void generateHintForTrivialDCE(llvm::Instruction &I);
+  void generateHintForGVNDCE(llvm::Instruction &I);
 
   // inserting nop
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);

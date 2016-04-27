@@ -615,7 +615,7 @@ void generateHintForAndOr(llvm::BinaryOperator &I,
   });
 }
 
-void generateHintForTrivialDCE(llvm::Instruction &I) {
+void generateHintForDCE(llvm::Instruction &I) {
   assert(llvmberry::ValidationUnit::Exists());
   llvmberry::ValidationUnit::GetInstance()->intrude([&I](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
@@ -626,8 +626,34 @@ void generateHintForTrivialDCE(llvm::Instruction &I) {
         llvmberry::ConsGlobal::make()));
 
     insertTgtNopAtSrcI(hints, &I);
+  });
+}
+
+void generateHintForTrivialDCE(llvm::Instruction &I) {
+  assert(llvmberry::ValidationUnit::Exists());
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+    generateHintForDCE(I);
     if (llvm::CallInst *CI = llvm::dyn_cast<llvm::CallInst>(&I)) {
-      hints.setDescription("DCE read-only call instruction.");
+      hints.setDescription("DCE on call "
+                           "instruction.\n\"isInstructionTriviallyDead\" "
+                           "should give enough power to validate.");
+      hints.appendAdmittedToDescription();
+    }
+  });
+}
+
+void generateHintForGVNDCE(llvm::Instruction &I) {
+  assert(llvmberry::ValidationUnit::Exists());
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+    generateHintForDCE(I);
+    if (llvm::CallInst *CI = llvm::dyn_cast<llvm::CallInst>(&I)) {
+      hints.setDescription("DCE on call instruction inside GVN.\nIt might be "
+                           "introduced from SimplifyInstruction or "
+                           "lookup_or_add_call.");
       hints.appendAdmittedToDescription();
     }
   });
