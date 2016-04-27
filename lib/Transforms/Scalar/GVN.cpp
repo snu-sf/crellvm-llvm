@@ -2435,14 +2435,111 @@ bool GVN::processInstruction(Instruction *I) {
     } // end [ repl is-a Inst ]
 
     if (!repl_inv) {
-      // TODO: icmp case
+      // TODO: cmp case
+
+      // case 1:
+      // c = e_c
+      // br c b_1 b_2
+      //
+      // b_k: # val(c) = B
+      // x = e_c
+      // y = f(x) -> f(B)
+
+      // case 2:
+      // a = e_a
+      // c = icmp P a b
+      // br c b_1 b_2
+      //
+      // b_k: # val(c) = B
+      // d = icmp ~P a b
+      // y = f(d) -> f(~B)
       
+      // case 3:
+      // a = e_a
+      // c = icmp P a b
+      // br c b_1 b_2
+      //
+      // b_k: # val(c) = B
+      // x = e_a
+      // y = f(x) -> f(b)
+
+      const BasicBlock *leaderBB =
+          boost::any_cast<const BasicBlock *>(data["findLeader#BB"]);
+      const BasicBlock *leaderBB_pred = leaderBB->getSinglePredecessor();
+      assert(leaderBB_pred &&
+             "Expect it to be introduced from propagateEquality, and it checks "
+             "RootDominatesEnd, meaning it has single predecessor");
+      TerminatorInst *TI =
+          const_cast<TerminatorInst *>(leaderBB_pred->getTerminator());
+
+      if (BranchInst *BI = llvm::dyn_cast<llvm::BranchInst>(TI)) {
+        Instruction *condI = llvm::dyn_cast<Instruction>(BI->getCondition());
+        
+        // if condition is constant, fail the validation
+        if (!condI) return;
+        std::string condI_id = llvmberry::getVariable(*condI);
+
+        bool cond_value = false;
+        std::shared_ptr<llvmberry::TyExpr> cond_expr;
+        std::shared_ptr<llvmberry::TyExpr> cond_neg_expr;
+
+        std::shared_ptr<llvmberry::TyExpr> true_expr =
+          std::make_shared<llvmberry::ConsConst>(1, 1);
+
+        std::shared_ptr<llvmberry::TyExpr> false_expr =
+          std::make_shared<llvmberry::ConsConst>(0, 1);
+
+        // Find out branch condition of current path
+        
+        if (BI->getSuccessor(0) == leaderBB) {
+          // TODO: check if this is really true
+          cond_value = true;
+          cond_expr = true_expr;
+        } else if (BI->getSuccessor(1) == leaderBB) {
+          cond_value = false;
+          cond_expr = false_expr;
+        } else assert("Leader_bb is not a successor of leader_bb_pred");
+
+        cond_neg_expr = (cond_expr == true_expr)? false_expr : true_expr;
+
+        // propagate [ e_c >= c ] in src until the end of block
+        hints.addCommand(llvmberry::ConsPropagate::make(
+            llvmberry::ConsLessdef::make(
+                llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
+                                         llvmberry::Source),
+                llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
+                llvmberry::Source),
+            llvmberry::ConsBounds::make(
+                llvmberry::TyPosition::make(llvmberry::Source, *condI),
+                llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
+                                                         *leaderBB_pred))));
+
+        // transitivity [ e_c >= c /\ c >= B ] => [ e_c >= B ] in src at PHI
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(
+                llvmberry::Source, llvmberry::getBasicBlockIndex(leaderBB),
+                llvmberry::getBasicBlockIndex(leaderBB_pred)),
+            llvmberry::ConsTransitivity::make(
+                llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
+                                         llvmberry::Source),
+                llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
+                cond_expr)));
+        
+      } else if (llvm::dyn_cast<llvm::SwitchInst>(TI)) {
+        assert("Should not occur, as it is not formalized in vellvm yet.");
+      } else
+        assert(false && "Should not occur");
+
       return;
     }
 
     // For each user of I, replace I with repl.
     // Propagate repl_inv from I to each use, and
     //  apply replace_rhs if needed
+
+    // if we failed to find repl_inv, fail the validation
+    if (!repl_inv) return;
+    
     for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
       if (!isa<Instruction>(UI->getUser())) {
         // let the validation fail when the user is not an instruction
