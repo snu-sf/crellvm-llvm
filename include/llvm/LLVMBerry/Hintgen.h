@@ -130,6 +130,7 @@ namespace llvmberry{
     TyPtrEqValues ptr1EquivalentValues;
     TyPtrEqValues ptr2EquivalentValues;
     bool isLoadStore;
+    llvm::StoreInst *loadstoreStoreInst;
     
     FindAvailableLoadedValueArgs();
   };

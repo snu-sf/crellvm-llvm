@@ -195,7 +195,7 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
   if(llvmberry_isActive){
      llvmberry::ValidationUnit::GetInstance()->intrude([](
         llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-      assert(data.find("FindAvailableLoadedValueArgs") != data.end());
+      assert(data.find("FindAvailableLoadedValue.arg") != data.end());
     });
   }
 
@@ -212,7 +212,7 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
   if(llvmberry_isActive){
     llvmberry::ValidationUnit::GetInstance()->intrude([](
         llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-      data["StripPointerCastsArgs"] = std::make_shared<llvmberry::StripPointerCastsArgs>(
+      data["StripPointerCasts.arg"] = std::make_shared<llvmberry::StripPointerCastsArgs>(
           llvmberry::StripPointerCastsArgs());
     });
   }
@@ -223,11 +223,11 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
     llvmberry::ValidationUnit::GetInstance()->intrude([](
         llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
       auto falvarg = boost::any_cast<std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> >
-          (data["FindAvailableLoadedValueArgs"]);
+          (data["FindAvailableLoadedValue.arg"]);
       auto spcarg = boost::any_cast<std::shared_ptr<llvmberry::StripPointerCastsArgs> >
-          (data["StripPointerCastsArgs"]);
+          (data["StripPointerCasts.arg"]);
       falvarg->ptr2EquivalentValues = spcarg->strippedValues;
-      data.erase(data.find("StripPointerCastsArgs"));
+      data.erase(data.find("StripPointerCasts.arg"));
     });
   }
 
@@ -253,7 +253,7 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       if(llvmberry_isActive){
         llvmberry::ValidationUnit::GetInstance()->intrude([](
             llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-          data["StripPointerCastsArgs"] = std::make_shared<llvmberry::StripPointerCastsArgs>(
+          data["StripPointerCasts.arg"] = std::make_shared<llvmberry::StripPointerCastsArgs>(
               llvmberry::StripPointerCastsArgs());
         });
       }
@@ -264,11 +264,11 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
         llvmberry::ValidationUnit::GetInstance()->intrude([](
             llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
           auto falvarg = boost::any_cast<std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> >
-              (data["FindAvailableLoadedValueArgs"]);
+              (data["FindAvailableLoadedValue.arg"]);
           auto spcarg = boost::any_cast<std::shared_ptr<llvmberry::StripPointerCastsArgs> >
-              (data["StripPointerCastsArgs"]);
+              (data["StripPointerCasts.arg"]);
           falvarg->ptr1EquivalentValues = spcarg->strippedValues;
-          data.erase(data.find("StripPointerCastsArgs"));
+          data.erase(data.find("StripPointerCasts.arg"));
         });
       }
 
@@ -285,7 +285,7 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       if(llvmberry_isActive){
         llvmberry::ValidationUnit::GetInstance()->intrude([](
             llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-          data["StripPointerCastsArgs"] = std::make_shared<llvmberry::StripPointerCastsArgs>(
+          data["StripPointerCasts.arg"] = std::make_shared<llvmberry::StripPointerCastsArgs>(
               llvmberry::StripPointerCastsArgs());
         });
       }
@@ -296,11 +296,11 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
         llvmberry::ValidationUnit::GetInstance()->intrude([](
             llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
           auto falvarg = boost::any_cast<std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> >
-              (data["FindAvailableLoadedValueArgs"]);
+              (data["FindAvailableLoadedValue.arg"]);
           auto spcarg = boost::any_cast<std::shared_ptr<llvmberry::StripPointerCastsArgs> >
-              (data["StripPointerCastsArgs"]);
+              (data["StripPointerCasts.arg"]);
           falvarg->ptr1EquivalentValues = spcarg->strippedValues;
-          data.erase(data.find("StripPointerCastsArgs"));
+          data.erase(data.find("StripPointerCasts.arg"));
         });
       }
 
@@ -311,11 +311,12 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
           CastInst::isBitOrNoopPointerCastable(SI->getValueOperand()->getType(),
                                                AccessTy, DL)) {
         if(llvmberry_isActive){
-          llvmberry::ValidationUnit::GetInstance()->intrude([](
+          llvmberry::ValidationUnit::GetInstance()->intrude([&SI](
               llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
             auto falvarg = boost::any_cast<std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> >
-                (data["FindAvailableLoadedValueArgs"]);
+                (data["FindAvailableLoadedValue.arg"]);
             falvarg->isLoadStore = true;
+            falvarg->loadstoreStoreInst = SI;
           });
         }       
         if (AATags)
@@ -333,7 +334,7 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
           llvmberry::ValidationUnit::GetInstance()->intrude([SI](
               llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
             auto falvarg = boost::any_cast<std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> >
-                (data["FindAvailableLoadedValueArgs"]);
+                (data["FindAvailableLoadedValue.arg"]);
             falvarg->orthogonalStores->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "alloca_or_global")));
           });
         }
@@ -349,7 +350,7 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
           llvmberry::ValidationUnit::GetInstance()->intrude([SI](
               llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
             auto falvarg = boost::any_cast<std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> >
-                (data["FindAvailableLoadedValueArgs"]);
+                (data["FindAvailableLoadedValue.arg"]);
             falvarg->orthogonalStores->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "aliasanalysis")));
           });
         }

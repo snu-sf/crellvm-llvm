@@ -523,6 +523,27 @@ void ConsBitcastptr::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(bitcastptr));
 }
 
+TyBitcastptrTgt::TyBitcastptrTgt(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _vprime, std::shared_ptr<TyExpr> _bitcastinst) : v(std::move(_v)), vprime(std::move(_vprime)), bitcastinst(std::move(_bitcastinst)){
+}
+void TyBitcastptrTgt::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(v));
+  archive(CEREAL_NVP(vprime));
+  archive(CEREAL_NVP(bitcastinst));
+}
+
+ConsBitcastptrTgt::ConsBitcastptrTgt(std::shared_ptr<TyBitcastptrTgt> _bitcastptrtgt) : bitcastptrtgt(std::move(_bitcastptrtgt)){
+}
+std::shared_ptr<TyInfrule> ConsBitcastptrTgt::make(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _vprime, std::shared_ptr<TyExpr> _bitcastinst){
+  std::shared_ptr<TyBitcastptrTgt> _val(new TyBitcastptrTgt(std::move(_v), std::move(_vprime), std::move(_bitcastinst)));
+  return std::shared_ptr<TyInfrule>(new ConsBitcastptrTgt(std::move(_val)));
+}
+void ConsBitcastptrTgt::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("BitcastptrTgt");
+  archive(CEREAL_NVP(bitcastptrtgt));
+}
+
 TyAndMone::TyAndMone(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
 }
 void TyAndMone::serialize(cereal::JSONOutputArchive& archive) const{
@@ -710,6 +731,89 @@ void ConsBopDistributiveOverSelectinst2::serialize(cereal::JSONOutputArchive& ar
   archive(CEREAL_NVP(bop_distributive_over_selectinst2));
 }
 
+TyDiffblockGlobalAlloca::TyDiffblockGlobalAlloca(std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyRegister> _y) : gx(std::move(_gx)), y(std::move(_y)){
+}
+void TyDiffblockGlobalAlloca::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(gx));
+  archive(CEREAL_NVP(y));
+}
+
+ConsDiffblockGlobalAlloca::ConsDiffblockGlobalAlloca(std::shared_ptr<TyDiffblockGlobalAlloca> _diffblock_global_alloca) : diffblock_global_alloca(std::move(_diffblock_global_alloca)){
+}
+std::shared_ptr<TyInfrule> ConsDiffblockGlobalAlloca::make(std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyRegister> _y){
+  std::shared_ptr<TyDiffblockGlobalAlloca> _val(new TyDiffblockGlobalAlloca(std::move(_gx), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockGlobalAlloca(std::move(_val)));
+}
+void ConsDiffblockGlobalAlloca::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockGlobalAlloca");
+  archive(CEREAL_NVP(diffblock_global_alloca));
+}
+
+TyDiffblockGlobalGlobal::TyDiffblockGlobalGlobal(std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyConstant> _gy) : gx(std::move(_gx)), gy(std::move(_gy)){
+}
+void TyDiffblockGlobalGlobal::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(gx));
+  archive(CEREAL_NVP(gy));
+}
+
+ConsDiffblockGlobalGlobal::ConsDiffblockGlobalGlobal(std::shared_ptr<TyDiffblockGlobalGlobal> _diffblock_global_global) : diffblock_global_global(std::move(_diffblock_global_global)){
+}
+std::shared_ptr<TyInfrule> ConsDiffblockGlobalGlobal::make(std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyConstant> _gy){
+  std::shared_ptr<TyDiffblockGlobalGlobal> _val(new TyDiffblockGlobalGlobal(std::move(_gx), std::move(_gy)));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockGlobalGlobal(std::move(_val)));
+}
+void ConsDiffblockGlobalGlobal::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockGlobalGlobal");
+  archive(CEREAL_NVP(diffblock_global_global));
+}
+
+ConsDiffblockLessthan::ConsDiffblockLessthan(std::shared_ptr<TyDiffblockLessthan> _diffblock_lessthan) : diffblock_lessthan(std::move(_diffblock_lessthan)){
+}
+std::shared_ptr<TyInfrule> ConsDiffblockLessthan::make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime){
+  std::shared_ptr<TyDiffblockLessthan> _val(new TyDiffblockLessthan(std::move(_x), std::move(_y), std::move(_xprime), std::move(_yprime)));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockLessthan(std::move(_val)));
+}
+void ConsDiffblockLessthan::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockLessthan");
+  archive(CEREAL_NVP(diffblock_lessthan));
+}
+
+TyDiffblockLessthan::TyDiffblockLessthan(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime) : x(std::move(_x)), y(std::move(_y)), xprime(std::move(_xprime)), yprime(std::move(_yprime)){
+}
+void TyDiffblockLessthan::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(xprime));
+  archive(CEREAL_NVP(yprime));
+}
+
+ConsDiffblockNoalias::ConsDiffblockNoalias(std::shared_ptr<TyDiffblockNoalias> _diffblock_noalias) : diffblock_noalias(std::move(_diffblock_noalias)){
+}
+std::shared_ptr<TyInfrule> ConsDiffblockNoalias::make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyPointer> _xprime, std::shared_ptr<TyPointer> _yprime){
+  std::shared_ptr<TyDiffblockNoalias> _val(new TyDiffblockNoalias(std::move(_x), std::move(_y), std::move(_xprime), std::move(_yprime)));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockNoalias(std::move(_val)));
+}
+void ConsDiffblockNoalias::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockNoalias");
+  archive(CEREAL_NVP(diffblock_noalias));
+}
+
+TyDiffblockNoalias::TyDiffblockNoalias(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyPointer> _xprime, std::shared_ptr<TyPointer> _yprime) : x(std::move(_x)), y(std::move(_y)), xprime(std::move(_xprime)), yprime(std::move(_yprime)){
+}
+void TyDiffblockNoalias::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(xprime));
+  archive(CEREAL_NVP(yprime));
+}
 
 TySdivMone::TySdivMone(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)){
 }
@@ -1261,71 +1365,6 @@ std::shared_ptr<TyInfrule> ConsNegVal::make
   std::shared_ptr<TyNegVal> _neg_val(new TyNegVal
    (std::move(_c1), std::move(_c2), std::move(_sz)));
   return std::shared_ptr<TyInfrule>(new ConsNegVal(std::move(_neg_val)));
-}
-
-TyNoaliasGlobalAlloca::TyNoaliasGlobalAlloca(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y) : x(std::move(_x)), y(std::move(_y)){
-}
-void TyNoaliasGlobalAlloca::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-}
-
-ConsNoaliasGlobalAlloca::ConsNoaliasGlobalAlloca(std::shared_ptr<TyNoaliasGlobalAlloca> _noalias_global_alloca) : noalias_global_alloca(std::move(_noalias_global_alloca)){
-}
-std::shared_ptr<TyInfrule> ConsNoaliasGlobalAlloca::make(std::shared_ptr<TyRegister> _x, 
-        std::shared_ptr<TyRegister> _y){
-  std::shared_ptr<TyNoaliasGlobalAlloca> _val(new TyNoaliasGlobalAlloca(std::move(_x), std::move(_y)));
-  return std::shared_ptr<TyInfrule>(new ConsNoaliasGlobalAlloca(std::move(_val)));
-}
-void ConsNoaliasGlobalAlloca::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("NoaliasGlobalAlloca");
-  archive(CEREAL_NVP(noalias_global_alloca));
-}
-
-TyNoaliasGlobalGlobal::TyNoaliasGlobalGlobal(std::shared_ptr<TyRegister> _x, 
-        std::shared_ptr<TyRegister> _y) : x(std::move(_x)), y(std::move(_y)){
-}
-void TyNoaliasGlobalGlobal::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-}
-
-ConsNoaliasGlobalGlobal::ConsNoaliasGlobalGlobal(std::shared_ptr<TyNoaliasGlobalGlobal> _noalias_global_global) : noalias_global_global(std::move(_noalias_global_global)){
-}
-std::shared_ptr<TyInfrule> ConsNoaliasGlobalGlobal::make(std::shared_ptr<TyRegister> _x, 
-        std::shared_ptr<TyRegister> _y){
-  std::shared_ptr<TyNoaliasGlobalGlobal> _val(new TyNoaliasGlobalGlobal(std::move(_x), std::move(_y)));
-  return std::shared_ptr<TyInfrule>(new ConsNoaliasGlobalGlobal(std::move(_val)));
-}
-void ConsNoaliasGlobalGlobal::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("NoaliasGlobalGlobal");
-  archive(CEREAL_NVP(noalias_global_global));
-}
-
-TyNoaliasLessthan::TyNoaliasLessthan(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime) : x(std::move(_x)), y(std::move(_y)), xprime(std::move(_xprime)), yprime(std::move(_yprime)){
-}
-void TyNoaliasLessthan::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(xprime));
-  archive(CEREAL_NVP(yprime));
-}
-
-ConsNoaliasLessthan::ConsNoaliasLessthan(std::shared_ptr<TyNoaliasLessthan> _noalias_lessthan) : noalias_lessthan(std::move(_noalias_lessthan)){
-}
-std::shared_ptr<TyInfrule> ConsNoaliasLessthan::make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime){
-  std::shared_ptr<TyNoaliasLessthan> _val(new TyNoaliasLessthan(std::move(_x), std::move(_y), std::move(_xprime), std::move(_yprime)));
-  return std::shared_ptr<TyInfrule>(new ConsNoaliasLessthan(std::move(_val)));
-}
-void ConsNoaliasLessthan::serialize(cereal::JSONOutputArchive& archive) const{
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("NoaliasLessthan");
-  archive(CEREAL_NVP(noalias_lessthan));
 }
 
 TyOrCommutative::TyOrCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){

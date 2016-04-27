@@ -421,9 +421,9 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
   if(llvmberry_isActive){
     llvmberry::ValidationUnit::GetInstance()->intrude([V](
         llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-      assert(data.find("StripPointerCastsArgs") != data.end());
+      assert(data.find("StripPointerCasts.arg") != data.end());
       auto ptr = boost::any_cast<std::shared_ptr<llvmberry::StripPointerCastsArgs> >
-            (data["StripPointerCastsArgs"]);
+            (data["StripPointerCasts.arg"]);
       ptr->strippedValues->push_back(V);
     });
   }
@@ -471,7 +471,7 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
       llvmberry::ValidationUnit::GetInstance()->intrude([V](
           llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
         auto ptr = boost::any_cast<std::shared_ptr<llvmberry::StripPointerCastsArgs> >
-              (data["StripPointerCastsArgs"]);
+              (data["StripPointerCasts.arg"]);
         ptr->strippedValues->push_back(V);
       });
     }
@@ -487,7 +487,7 @@ Value *Value::stripPointerCasts() {
   if(llvmberry_isActive){
     llvmberry::ValidationUnit::GetInstance()->intrude([](
         llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-      assert(data.find("StripPointerCastsArgs") != data.end());
+      assert(data.find("StripPointerCasts.arg") != data.end());
     });
   }
   Value *res = stripPointerCastsAndOffsets<PSK_ZeroIndicesAndAliases>(this);

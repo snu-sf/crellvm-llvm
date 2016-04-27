@@ -537,52 +537,25 @@ std::shared_ptr<TyConstGlobalVarAddr> TyConstGlobalVarAddr::make(const llvm::Glo
       new TyConstGlobalVarAddr(std::string("@") + std::string(gv.getName().data()), std::move(TyValueType::make(*ty))));
 }
 
-// value
+/*
+ * Value
+ */
 std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value, enum TyTag _tag) {
   if (llvm::isa<llvm::Instruction>(value) ||
-      llvm::isa<llvm::Argument>(value) ||
-      llvm::isa<llvm::ConstantExpr>(value)) {
+      llvm::isa<llvm::Argument>(value)) {
     return std::shared_ptr<TyValue>(
         new ConsId(TyRegister::make(getVariable(value), _tag)));
-  } else if (llvm::isa<llvm::ConstantInt>(value)) {
-    const llvm::ConstantInt *v = llvm::dyn_cast<llvm::ConstantInt>(&value);
-    return std::shared_ptr<TyValue>(
-        new ConsConstVal(std::shared_ptr<TyConstant>(new ConsConstInt(
-            TyConstInt::make(v->getSExtValue(), v->getBitWidth())))));
-  } else if (llvm::isa<llvm::ConstantFP>(value)) {
-    const llvm::ConstantFP *v = llvm::dyn_cast<llvm::ConstantFP>(&value);
-    const llvm::APFloat &apf = v->getValueAPF();
-    const llvm::Type *typ = v->getType();
-
-    llvmberry::TyFloatType fty;
-    if (typ->isHalfTy())
-      fty = llvmberry::HalfType;
-    else if (typ->isFloatTy())
-      fty = llvmberry::FloatType;
-    else if (typ->isDoubleTy())
-      fty = llvmberry::DoubleType;
-    else if (typ->isX86_FP80Ty())
-      fty = llvmberry::X86_FP80Type;
-    else if (typ->isFP128Ty())
-      fty = llvmberry::FP128Type;
-    else if (typ->isPPC_FP128Ty())
-      fty = llvmberry::PPC_FP128Type;
-    else
-      assert("Unknown floating point type" && false);
-
-    return std::shared_ptr<TyValue>(
-        new ConsConstVal(std::shared_ptr<TyConstant>(new ConsConstFloat(
-            TyConstFloat::make(apf.convertToDouble(), fty)))));
-  } else if (llvm::isa<llvm::GlobalVariable>(value)) {
-    const llvm::GlobalVariable *gv = llvm::dyn_cast<llvm::GlobalVariable>(&value);
-    return std::shared_ptr<TyValue>(
-        new ConsConstVal(std::shared_ptr<TyConstant>(new ConsConstGlobalVarAddr(
-            TyConstGlobalVarAddr::make(*gv)))));
-  } else if (llvm::isa<llvm::UndefValue>(value)) {
+  } else if (llvm::isa<llvm::ConstantExpr>(value)) {
+    const llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(&value);
+    if (ce->getName().str() != "") {
       return std::shared_ptr<TyValue>(
-        new ConsConstVal(std::shared_ptr<TyConstant>
-                          (new ConsConstUndef
-                            (TyValueType::make(*value.getType())))));
+          new ConsId(TyRegister::make(getVariable(*ce), _tag)));
+    } else {
+      return std::shared_ptr<TyValue>(new ConsConstVal(TyConstant::make(*ce)));
+    }
+  } else if (llvm::isa<llvm::Constant>(value)) {
+    const llvm::Constant *c = llvm::dyn_cast<llvm::Constant>(&value);
+    return std::shared_ptr<TyValue>(new ConsConstVal(TyConstant::make(*c)));
   } else {
     assert("Unknown value type" && false);
   }
@@ -622,6 +595,66 @@ std::shared_ptr<TyConstant> ConsConstGlobalVarAddr::make(std::string _var_id, st
   std::shared_ptr<TyConstGlobalVarAddr> _val(new TyConstGlobalVarAddr(std::move(_var_id), std::move(_var_type)));
   return std::shared_ptr<TyConstant>(new ConsConstGlobalVarAddr(std::move(_val)));
 }
+std::shared_ptr<TyConstant> ConsConstGlobalVarAddr::make(const llvm::GlobalVariable &gv) {
+  return std::shared_ptr<TyConstant>(new ConsConstGlobalVarAddr(
+      TyConstGlobalVarAddr::make(gv)));
+}
+
+// constant expressions
+
+std::shared_ptr<TyConstantExpr> TyConstantExpr::make(const llvm::ConstantExpr &ce) {
+  if(ce.getOpcode() == llvm::Instruction::GetElementPtr)
+    return ConsConstExprGetElementPtr::make(ce);
+  assert("TyConstantExpr::make() : unsupported constant expression" && false);
+}
+
+ConsConstExprGetElementPtr::ConsConstExprGetElementPtr(std::shared_ptr<TyConstExprGetElementPtr> _const_expr_get_element_ptr) : const_expr_get_element_ptr(std::move(_const_expr_get_element_ptr)){
+}
+std::shared_ptr<TyConstantExpr> ConsConstExprGetElementPtr::make(std::shared_ptr<TyValueType> _srcelemty, std::shared_ptr<TyConstant> _v, std::vector<std::shared_ptr<TyConstant>> _idxlist, std::shared_ptr<TyValueType> _dstty, bool _is_inbounds){
+  std::shared_ptr<TyConstExprGetElementPtr> _val(new TyConstExprGetElementPtr(std::move(_srcelemty), std::move(_v), std::move(_idxlist), std::move(_dstty), std::move(_is_inbounds)));
+  return std::shared_ptr<TyConstantExpr>(new ConsConstExprGetElementPtr(std::move(_val)));
+}
+void ConsConstExprGetElementPtr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstExprGetElementPtr");
+  archive(CEREAL_NVP(const_expr_get_element_ptr));
+}
+std::shared_ptr<TyConstantExpr> ConsConstExprGetElementPtr::make(const llvm::ConstantExpr &ce){
+  llvm::GetElementPtrInst *gepi = llvm::dyn_cast<llvm::GetElementPtrInst>(const_cast<llvm::ConstantExpr &>(ce).getAsInstruction());
+  assert(gepi);
+  llvm::Constant *ptr = llvm::dyn_cast<llvm::Constant>(gepi->getPointerOperand());
+  assert(ptr);
+  std::vector<std::shared_ptr<TyConstant>> idxlist;
+
+  for(auto itr = gepi->idx_begin(); itr != gepi->idx_end(); itr++){
+    llvm::Constant *idx = llvm::dyn_cast<llvm::Constant>(*itr);
+    assert(idx);
+    idxlist.push_back(TyConstant::make(*idx));
+  }
+  bool inBounds = gepi->isInBounds();
+  llvm::Type *srcty = gepi->getSourceElementType();
+  llvm::Type *destty = gepi->getResultElementType();
+  delete gepi;
+
+  return make(TyValueType::make(*srcty),
+        TyConstant::make(*ptr),
+        idxlist,
+        TyValueType::make(*destty),
+        inBounds);
+}
+
+TyConstExprGetElementPtr::TyConstExprGetElementPtr(std::shared_ptr<TyValueType> _srcelemty, std::shared_ptr<TyConstant> _v, std::vector<std::shared_ptr<TyConstant>> _idxlist, std::shared_ptr<TyValueType> _dstty, bool _is_inbounds) : srcelemty(std::move(_srcelemty)), v(std::move(_v)), idxlist(std::move(_idxlist)), dstty(std::move(_dstty)), is_inbounds(std::move(_is_inbounds)){
+}
+void TyConstExprGetElementPtr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(srcelemty));
+  archive(CEREAL_NVP(v));
+  archive(CEREAL_NVP(idxlist));
+  archive(CEREAL_NVP(dstty));
+  archive(CEREAL_NVP(is_inbounds));
+}
+
+
 void ConsConstGlobalVarAddr::serialize(cereal::JSONOutputArchive& archive) const{
   archive.makeArray();
   archive.writeName();
@@ -639,6 +672,8 @@ void ConsConstUndef::serialize(cereal::JSONOutputArchive& archive) const {
   archive.saveValue("ConstUndef");
   archive(CEREAL_NVP(value_type));
 }
+
+// values
 
 ConsId::ConsId(std::shared_ptr<TyRegister> _register)
     : reg(std::move(_register)) {}
@@ -667,6 +702,63 @@ void ConsConstVal::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(constant));
 }
 
+ConsConstExpr::ConsConstExpr(std::shared_ptr<TyConstantExpr> _constant_expr) : constant_expr(std::move(_constant_expr)){
+}
+void ConsConstExpr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstExpr");
+  archive(CEREAL_NVP(constant_expr));
+}
+
+std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
+  if (llvm::isa<llvm::ConstantExpr>(value)) {
+    const llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(&value);
+    return std::shared_ptr<TyConstant>(new ConsConstExpr(
+            TyConstantExpr::make(*ce)));
+
+  } else if (llvm::isa<llvm::ConstantInt>(value)) {
+    const llvm::ConstantInt *v = llvm::dyn_cast<llvm::ConstantInt>(&value);
+    return std::shared_ptr<TyConstant>(new ConsConstInt(
+            TyConstInt::make(v->getSExtValue(), v->getBitWidth())));
+
+  } else if (llvm::isa<llvm::ConstantFP>(value)) {
+    const llvm::ConstantFP *v = llvm::dyn_cast<llvm::ConstantFP>(&value);
+    const llvm::APFloat &apf = v->getValueAPF();
+    const llvm::Type *typ = v->getType();
+
+    llvmberry::TyFloatType fty;
+    if (typ->isHalfTy())
+      fty = llvmberry::HalfType;
+    else if (typ->isFloatTy())
+      fty = llvmberry::FloatType;
+    else if (typ->isDoubleTy())
+      fty = llvmberry::DoubleType;
+    else if (typ->isX86_FP80Ty())
+      fty = llvmberry::X86_FP80Type;
+    else if (typ->isFP128Ty())
+      fty = llvmberry::FP128Type;
+    else if (typ->isPPC_FP128Ty())
+      fty = llvmberry::PPC_FP128Type;
+    else
+      assert("Unknown floating point type" && false);
+
+    return std::shared_ptr<TyConstant>(new ConsConstFloat(
+            TyConstFloat::make(apf.convertToDouble(), fty)));
+
+  } else if (llvm::isa<llvm::GlobalVariable>(value)) {
+    const llvm::GlobalVariable *gv = llvm::dyn_cast<llvm::GlobalVariable>(&value);
+    return std::shared_ptr<TyConstant>(new ConsConstGlobalVarAddr(
+            TyConstGlobalVarAddr::make(*gv)));
+
+  } else if (llvm::isa<llvm::UndefValue>(value)) {
+    return std::shared_ptr<TyConstant>(new ConsConstUndef
+          (TyValueType::make(*value.getType())));
+  }
+  assert("TyConstant::make() : unsupported value" && false);
+}
+
+
 // size
 
 ConsSize::ConsSize(int _size) : size(_size) {}
@@ -683,6 +775,23 @@ std::shared_ptr<TySize> ConsSize::make(int _size) {
   return std::shared_ptr<TySize>(new ConsSize(_size));
 }
 
+/*
+ * pointer
+ */
+TyPointer::TyPointer(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _ty)
+        : v(_v), ty(_ty) {}
+
+void TyPointer::serialize(cereal::JSONOutputArchive &archive) const{
+  archive(CEREAL_NVP(v));
+  archive(CEREAL_NVP(ty));
+}
+
+std::shared_ptr<TyPointer> TyPointer::make(const llvm::Value &v){
+  llvm::Type *ty = v.getType();
+  assert(ty->isPointerTy());
+  return std::shared_ptr<TyPointer>(new TyPointer(TyValue::make(v), TyValueType::make(*ty)));
+}
+
 // valuetype
 
 std::shared_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
@@ -696,6 +805,8 @@ std::shared_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
   } else if (const llvm::StructType *stype = llvm::dyn_cast<llvm::StructType>(&type)) {
     assert(stype->hasName());
     vt = new ConsNamedType(stype->getName().str());
+  } else if (const llvm::ArrayType *atype = llvm::dyn_cast<llvm::ArrayType>(&type)) {
+    vt = new ConsArrayType(atype->getNumElements(), TyValueType::make(*atype->getElementType()));
   } else if (type.isHalfTy()) {
     vt = new ConsFloatValueType(HalfType);
   } else if (type.isFloatTy()) {
@@ -754,6 +865,21 @@ void ConsPtrType::serialize(cereal::JSONOutputArchive& archive) const {
   archive.startNode();
   archive.makeArray();
   archive(cereal::make_nvp("address_space", address_space));
+  archive(CEREAL_NVP(valuetype));
+  archive.finishNode();
+}
+
+ConsArrayType::ConsArrayType(uint64_t _array_size, std::shared_ptr<TyValueType> _valuetype) 
+    : array_size(_array_size), valuetype(std::move(_valuetype)) {}
+
+void ConsArrayType::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ArrayType");
+
+  archive.startNode();
+  archive.makeArray();
+  archive(cereal::make_nvp("array_size", array_size));
   archive(CEREAL_NVP(valuetype));
   archive.finishNode();
 }
@@ -1073,20 +1199,37 @@ TyPropagateLessdef::make(std::shared_ptr<TyExpr> _lhs,
       new TyPropagateLessdef(std::move(_lhs), std::move(_rhs), _scope));
 }
 
-TyPropagateNoalias::TyPropagateNoalias(std::shared_ptr<TyRegister> _lhs,
-                                       std::shared_ptr<TyRegister> _rhs,
+TyPropagateNoalias::TyPropagateNoalias(std::shared_ptr<TyPointer> _lhs,
+                                       std::shared_ptr<TyPointer> _rhs,
                                        enum TyScope _scope)
     : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
-
-TyPropagateNoalias::TyPropagateNoalias(std::string _lhs_name, enum TyTag _lhs_tag,
-                                        std::string _rhs_name, enum TyTag _rhs_tag,
-                                        enum TyScope _scope)
-    : lhs(TyRegister::make(_lhs_name, _lhs_tag)), rhs(TyRegister::make(_rhs_name, _rhs_tag)), scope(_scope){}
 
 void TyPropagateNoalias::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs),
           cereal::make_nvp("scope", ::toString(scope)));
 }
+
+std::shared_ptr<TyPropagateNoalias> TyPropagateNoalias::make(std::shared_ptr<TyPointer> _lhs,
+        std::shared_ptr<TyPointer> _rhs, enum TyScope _scope) {
+  return std::shared_ptr<TyPropagateNoalias>(new TyPropagateNoalias(_lhs, _rhs, _scope));
+}
+
+TyPropagateDiffblock::TyPropagateDiffblock(std::shared_ptr<TyValue> _lhs,
+                                       std::shared_ptr<TyValue> _rhs,
+                                       enum TyScope _scope)
+    : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
+
+void TyPropagateDiffblock::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs),
+          cereal::make_nvp("scope", ::toString(scope)));
+}
+
+std::shared_ptr<TyPropagateDiffblock> TyPropagateDiffblock::make(
+        std::shared_ptr<TyValue> _lhs,
+        std::shared_ptr<TyValue> _rhs, enum TyScope _scope) {
+  return std::shared_ptr<TyPropagateDiffblock>(new TyPropagateDiffblock(_lhs, _rhs, _scope));
+}
+
 
 TyPropagateAlloca::TyPropagateAlloca(std::shared_ptr<TyRegister> _p, 
                                      enum TyScope _scope) 
@@ -1131,11 +1274,11 @@ ConsLessdef::make(std::shared_ptr<TyExpr> _lhs,
 ConsNoalias::ConsNoalias(std::shared_ptr<TyPropagateNoalias> _propagate_noalias)
     : propagate_noalias(std::move(_propagate_noalias)) {}
 
-ConsNoalias::ConsNoalias(std::string _lhs, enum TyTag _lhs_tag, std::string _rhs, 
-        enum TyTag _rhs_tag, enum TyScope _scope) : 
-        propagate_noalias(new TyPropagateNoalias(
-          _lhs, _lhs_tag, _rhs, _rhs_tag ,_scope)) {}
-
+std::shared_ptr<TyPropagateObject> ConsNoalias::make(std::shared_ptr<TyPointer> _lhs,
+        std::shared_ptr<TyPointer> _rhs, enum TyScope _scope){
+  return std::shared_ptr<TyPropagateObject>(
+      new ConsNoalias(TyPropagateNoalias::make(_lhs, _rhs, _scope)));
+}
 
 void ConsNoalias::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -1143,6 +1286,23 @@ void ConsNoalias::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Noalias");
   archive(CEREAL_NVP(propagate_noalias));
+}
+
+ConsDiffblock::ConsDiffblock(std::shared_ptr<TyPropagateDiffblock> _propagate_diffblock)
+    : propagate_diffblock(std::move(_propagate_diffblock)) {}
+
+std::shared_ptr<TyPropagateObject> ConsDiffblock::make(std::shared_ptr<TyValue> _lhs,
+        std::shared_ptr<TyValue> _rhs, enum TyScope _scope){
+  return std::shared_ptr<TyPropagateObject>(
+      new ConsDiffblock(TyPropagateDiffblock::make(_lhs, _rhs, _scope)));
+}
+
+void ConsDiffblock::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("Diffblock");
+  archive(CEREAL_NVP(propagate_diffblock));
 }
 
 ConsAlloca::ConsAlloca(std::shared_ptr<TyPropagateAlloca> _propagate_alloca) 
@@ -1337,14 +1497,6 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(description));
   archive(CEREAL_NVP(commands));
   archive(CEREAL_NVP(nop_positions));
-}
-
-const std::string &CoreHint::getDescription() const {
-  return description;
-}
-
-void CoreHint::setDescription(const std::string &desc){
-  this->description = desc;
 }
 
 void CoreHint::setOptimizationName(const std::string &name){

@@ -276,6 +276,17 @@ private :
   std::shared_ptr<TyExpr> bitcastinst;
 };
 
+struct TyBitcastptrTgt{
+public : 
+  TyBitcastptrTgt(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _vprime, std::shared_ptr<TyExpr> _bitcastinst);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValue> vprime;
+  std::shared_ptr<TyExpr> bitcastinst;
+};
+
 struct TyAndMone{
 public : 
   TyAndMone(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
@@ -381,6 +392,50 @@ private :
   std::shared_ptr<TyValue> c;
   std::shared_ptr<TySize> bopsz;
   std::shared_ptr<TyValueType> selty;
+};
+
+struct TyDiffblockGlobalAlloca{
+public : 
+  TyDiffblockGlobalAlloca(std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyRegister> _y);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyConstant> gx;
+  std::shared_ptr<TyRegister> y;
+};
+
+struct TyDiffblockGlobalGlobal{
+public : 
+  TyDiffblockGlobalGlobal(std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyConstant> _gy);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyConstant> gx;
+  std::shared_ptr<TyConstant> gy;
+};
+
+struct TyDiffblockLessthan{
+public : 
+  TyDiffblockLessthan(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> xprime;
+  std::shared_ptr<TyValue> yprime;
+};
+
+struct TyDiffblockNoalias{
+public : 
+  TyDiffblockNoalias(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyPointer> _xprime, std::shared_ptr<TyPointer> _yprime);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyPointer> xprime;
+  std::shared_ptr<TyPointer> yprime;
 };
 
 struct TyFaddCommutativeTgt{
@@ -782,38 +837,6 @@ private:
   std::shared_ptr<TyRegister> y;
 };
 
-struct TyNoaliasGlobalAlloca{
-public : 
-  TyNoaliasGlobalAlloca(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::shared_ptr<TyRegister> x;
-  std::shared_ptr<TyRegister> y;
-};
-
-struct TyNoaliasGlobalGlobal{
-public : 
-  TyNoaliasGlobalGlobal(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::shared_ptr<TyRegister> x;
-  std::shared_ptr<TyRegister> y;
-
-};
-struct TyNoaliasLessthan{
-public : 
-  TyNoaliasLessthan(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::shared_ptr<TyValue> x;
-  std::shared_ptr<TyValue> y;
-  std::shared_ptr<TyValue> xprime;
-  std::shared_ptr<TyValue> yprime;
-};
-
 struct TyTransitivity {
 public:
   TyTransitivity(std::shared_ptr<TyExpr> _e1, std::shared_ptr<TyExpr> _e2,
@@ -1180,6 +1203,16 @@ private :
   std::shared_ptr<TyBitcastptr> bitcastptr;
 };
 
+struct ConsBitcastptrTgt : public TyInfrule{
+public : 
+  ConsBitcastptrTgt(std::shared_ptr<TyBitcastptrTgt> _bitcastptrtgt);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _vprime, std::shared_ptr<TyExpr> _bitcastinst);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyBitcastptrTgt> bitcastptrtgt;
+};
+
 struct ConsAndMone : public TyInfrule{
 public : 
   ConsAndMone(std::shared_ptr<TyAndMone> _and_mone);
@@ -1258,6 +1291,46 @@ public :
 
 private : 
   std::shared_ptr<TyBopDistributiveOverSelectinst2> bop_distributive_over_selectinst2;
+};
+
+struct ConsDiffblockGlobalAlloca : public TyInfrule{
+public : 
+  ConsDiffblockGlobalAlloca(std::shared_ptr<TyDiffblockGlobalAlloca> _diffblock_global_alloca);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyRegister> _y);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyDiffblockGlobalAlloca> diffblock_global_alloca;
+};
+
+struct ConsDiffblockGlobalGlobal : public TyInfrule{
+public : 
+  ConsDiffblockGlobalGlobal(std::shared_ptr<TyDiffblockGlobalGlobal> _diffblock_global_global);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyConstant> _gy);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyDiffblockGlobalGlobal> diffblock_global_global;
+};
+
+struct ConsDiffblockLessthan : public TyInfrule{
+public : 
+  ConsDiffblockLessthan(std::shared_ptr<TyDiffblockLessthan> _diffblock_lessthan);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyDiffblockLessthan> diffblock_lessthan;
+};
+
+struct ConsDiffblockNoalias : public TyInfrule{
+public : 
+  ConsDiffblockNoalias(std::shared_ptr<TyDiffblockNoalias> _diffblock_noalias);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyPointer> _xprime, std::shared_ptr<TyPointer> _yprime);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyDiffblockNoalias> diffblock_noalias;
 };
 
 struct ConsFaddCommutativeTgt : public TyInfrule{
@@ -1416,37 +1489,6 @@ public :
 
 private : 
   std::shared_ptr<TyMulShl> mul_shl;
-};
-
-struct ConsNoaliasGlobalAlloca : public TyInfrule{
-public : 
-  ConsNoaliasGlobalAlloca(std::shared_ptr<TyNoaliasGlobalAlloca> _noalias_global_alloca);
-  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyRegister> _y);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::shared_ptr<TyNoaliasGlobalAlloca> noalias_global_alloca;
-};
-
-struct ConsNoaliasGlobalGlobal : public TyInfrule{
-public : 
-  ConsNoaliasGlobalGlobal(std::shared_ptr<TyNoaliasGlobalGlobal> _noalias_global_global);
-  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x, 
-        std::shared_ptr<TyRegister> _y);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::shared_ptr<TyNoaliasGlobalGlobal> noalias_global_global;
-};
-
-struct ConsNoaliasLessthan : public TyInfrule{
-public : 
-  ConsNoaliasLessthan(std::shared_ptr<TyNoaliasLessthan> _noalias_lessthan);
-  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _yprime);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::shared_ptr<TyNoaliasLessthan> noalias_lessthan;
 };
 
 struct ConsOrCommutative : public TyInfrule{
