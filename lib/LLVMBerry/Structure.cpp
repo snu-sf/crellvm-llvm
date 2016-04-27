@@ -1241,6 +1241,13 @@ void CoreHint::setDescription(const std::string &desc){
   this->description = desc;
 }
 
+void CoreHint::appendAdmittedToDescription() {
+  this->description += "This validation unit is ADMITTED, which means it "
+                       "should fail, but it is intended. These cases might "
+                       "include: validations that can clearly be done with "
+                       "some effort, but does not fit cost-efficiency.\n";
+}
+
 void CoreHint::setOptimizationName(const std::string &name){
   this->opt_name = name;
 }

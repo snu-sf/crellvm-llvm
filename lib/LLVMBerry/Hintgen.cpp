@@ -627,8 +627,8 @@ void generateHintForTrivialDCE(llvm::Instruction &I) {
 
     insertTgtNopAtSrcI(hints, &I);
     if (llvm::CallInst *CI = llvm::dyn_cast<llvm::CallInst>(&I)) {
-      hints.setDescription(
-          "dce read-only call instruction. validation will fail");
+      hints.setDescription("DCE read-only call instruction.");
+      hints.appendAdmittedToDescription();
     }
   });
 }
