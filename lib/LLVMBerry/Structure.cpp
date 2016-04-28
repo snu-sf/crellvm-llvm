@@ -276,6 +276,37 @@ TyBop getBop(llvm::Instruction::BinaryOps ops){
   return bop;
 }
 
+
+TyPredicate getPredicate(llvm::ICmpInst::Predicate prd) {
+TyPredicate predicate;
+
+  switch(prd){
+    case llvm::ICmpInst::ICMP_EQ:
+      predicate = llvmberry::ICMP_EQ; break;
+    case llvm::ICmpInst::ICMP_NE:
+      predicate = llvmberry::ICMP_NE; break;
+    case llvm::ICmpInst::ICMP_UGT:
+      predicate = llvmberry::ICMP_UGT; break;
+    case llvm::ICmpInst::ICMP_UGE:
+      predicate = llvmberry::ICMP_UGE; break;
+    case llvm::ICmpInst::ICMP_ULT:
+      predicate = llvmberry::ICMP_ULT; break;
+    case llvm::ICmpInst::ICMP_ULE:
+      predicate = llvmberry::ICMP_ULE; break;
+    case llvm::ICmpInst::ICMP_SGT:
+      predicate = llvmberry::ICMP_SGT; break;
+    case llvm::ICmpInst::ICMP_SGE:
+      predicate = llvmberry::ICMP_SGE; break;
+    case llvm::ICmpInst::ICMP_SLT:
+      predicate = llvmberry::ICMP_SLT; break;
+    case llvm::ICmpInst::ICMP_SLE:
+      predicate = llvmberry::ICMP_SLE; break;
+    default:
+      assert("llvmberry::getFbop(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+  }
+  return predicate;
+}
+
 bool name_instructions(llvm::Function &F) {
   for (llvm::Function::arg_iterator AI = F.arg_begin(), AE = F.arg_end();
        AI != AE; ++AI)
@@ -734,6 +765,8 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
     else
       return std::shared_ptr<TyInstruction>(new ConsBinaryOp(
         std::move(TyBinaryOperator::make(*bo))));
+  } else if (const llvm::ICmpInst *cmpi = llvm::dyn_cast<llvm::ICmpInst>(&i)) {
+    return std::shared_ptr<TyInstruction>(new ConsICmpInst(std::move(TyICmpInst::make(*cmpi))));
   } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
     return std::shared_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
   } else if (const llvm::StoreInst *si = llvm::dyn_cast<llvm::StoreInst>(&i)) {
@@ -754,6 +787,12 @@ std::shared_ptr<TyFloatBinaryOperator> TyFloatBinaryOperator::make(const llvm::B
   llvmberry::TyFbop bop = llvmberry::getFbop(bopinst.getOpcode());
   return std::shared_ptr<TyFloatBinaryOperator>(new TyFloatBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
         TyValue::make(*bopinst.getOperand(0)), TyValue::make(*bopinst.getOperand(1))));
+}
+
+std::shared_ptr<TyICmpInst> TyICmpInst::make(const llvm::ICmpInst &icmpInst){
+  llvmberry::TyPredicate predicate = llvmberry::getPredicate(icmpInst.getPredicate());
+  return std::shared_ptr<TyICmpInst>(new TyICmpInst(predicate, TyValueType::make(*icmpInst.getType()),
+                                    TyValue::make(*icmpInst.getOperand(0)), TyValue::make(*icmpInst.getOperand(1))));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
@@ -804,6 +843,22 @@ void ConsFloatBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(binary_operator));
 }
 
+ConsICmpInst::ConsICmpInst(std::shared_ptr<TyICmpInst> _icmp_inst) : icmp_inst(std::move(_icmp_inst)){
+}
+std::shared_ptr<TyInstruction> ConsICmpInst::make(TyPredicate _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2){
+  std::shared_ptr<TyICmpInst> _val(new TyICmpInst(_predicate, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
+  return std::shared_ptr<TyInstruction>(new ConsICmpInst(std::move(_val)));
+}
+std::shared_ptr<TyInstruction> ConsICmpInst::make(const llvm::ICmpInst &iCmpInst){
+  return std::shared_ptr<TyInstruction>(new ConsICmpInst(std::move(TyICmpInst::make(iCmpInst))));
+}
+void ConsICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ICmpInst");
+  archive(CEREAL_NVP(icmp_inst));
+}
+
 ConsLoadInst::ConsLoadInst(std::shared_ptr<TyLoadInst> _load_inst) : load_inst(std::move(_load_inst)){
 }
 std::shared_ptr<TyInstruction> ConsLoadInst::make(std::shared_ptr<TyValueType> _pointertype, std::shared_ptr<TyValueType> _valtype, std::shared_ptr<TyValue> _ptrvalue, int _align){
@@ -833,6 +888,15 @@ TyFloatBinaryOperator::TyFloatBinaryOperator(TyFbop _opcode, std::shared_ptr<TyV
 }
 void TyFloatBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("opcode", toString(opcode)));
+  archive(CEREAL_NVP(operandtype));
+  archive(CEREAL_NVP(operand1));
+  archive(CEREAL_NVP(operand2));
+}
+
+TyICmpInst::TyICmpInst(TyPredicate _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+}
+void TyICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(predicate));
   archive(CEREAL_NVP(operandtype));
   archive(CEREAL_NVP(operand1));
   archive(CEREAL_NVP(operand2));

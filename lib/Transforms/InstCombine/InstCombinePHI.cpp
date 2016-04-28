@@ -116,7 +116,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
   // ex) FirstInst x = a + b  I = a + c
   llvmberry::ValidationUnit::Begin("fold_phi_bin",
                                    FirstInst->getParent()->getParent());
-
+  if (isa<BinaryOperator>(FirstInst)){
   llvmberry::ValidationUnit::GetInstance()->intrude(
           [&PN, &NewLHS, &NewRHS](llvmberry::ValidationUnit::Dictionary &data,
                                   llvmberry::CoreHint &hints) {
@@ -152,7 +152,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 if(NewLHS) { CommonOperand = InInst->getOperand(1); SpecialOperand = InInst->getOperand(0); }
                 else       { CommonOperand = InInst->getOperand(0); SpecialOperand = InInst->getOperand(1); }
                 BinaryOperator *BinOp = cast<BinaryOperator>(InInst);
-
+                //Instruction *BinOp = (InInst);
                 PROPAGATE( //from I to endofblock propagate x or y depend on edge
                         LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
                         BOUNDS(INSTPOS(SRC, InInst),
@@ -282,7 +282,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                           llvmberry::ConsTransitivity::make(
                                   VAR(oldphi, Physical), VAR(reg, Physical),
                                   INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
-                                             VAL(BinOp->getOperand(1), Physical)))));
+                                            VAL(BinOp->getOperand(1), Physical)))));
 
                   // { z >= a + b } at src after phinode
                   PROPAGATE( //from I to endofblock propagate x or y depend on edge
@@ -294,7 +294,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
               }
             }
       });
-
+  }
   if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
     CmpInst *NewCI = CmpInst::Create(CIOp->getOpcode(), CIOp->getPredicate(),
                                      LHSVal, RHSVal);
