@@ -615,10 +615,43 @@ void generateHintForAndOr(llvm::BinaryOperator &I,
   });
 }
 
+void generateHintForDCE(llvmberry::CoreHint &hints, llvm::Instruction &I) {
+  std::string reg = llvmberry::getVariable(I);
 
+  hints.addCommand(llvmberry::ConsPropagate::make(
+      llvmberry::ConsMaydiff::make(reg, llvmberry::Physical),
+      llvmberry::ConsGlobal::make()));
 
+  insertTgtNopAtSrcI(hints, &I);
+}
 
+void generateHintForTrivialDCE(llvm::Instruction &I) {
+  assert(llvmberry::ValidationUnit::Exists());
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    generateHintForDCE(hints, I);
+    if (llvm::CallInst *CI = llvm::dyn_cast<llvm::CallInst>(&I)) {
+      hints.setDescription("DCE on call "
+                           "instruction.\n\"isInstructionTriviallyDead\" "
+                           "should give enough power to validate.");
+      hints.appendAdmittedToDescription();
+    }
+  });
+}
 
+void generateHintForGVNDCE(llvm::Instruction &I) {
+  assert(llvmberry::ValidationUnit::Exists());
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    generateHintForDCE(hints, I);
+    if (llvm::CallInst *CI = llvm::dyn_cast<llvm::CallInst>(&I)) {
+      hints.setDescription("DCE on call instruction inside GVN.\nIt might be "
+                           "introduced from SimplifyInstruction or "
+                           "lookup_or_add_call.");
+      hints.appendAdmittedToDescription();
+    }
+  });
+}
 
 SimplifyAndInstArg::SimplifyAndInstArg(){
   this->activated = false;
