@@ -85,6 +85,22 @@ void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScop
   });
 }
 
+void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, const llvm::Value *lesserval,
+        const llvm::Value *greaterval, TyScope scope) {
+  assert(ValidationUnit::Exists());
+  ValidationUnit::GetInstance()->intrude([&from, &to, &lesserval, &greaterval, &scope](
+      ValidationUnit::Dictionary &data, CoreHint &hints) {
+    hints.addCommand(llvmberry::ConsPropagate::make(
+      llvmberry::ConsLessdef::make(
+          llvmberry::TyExpr::make(*greaterval),
+          llvmberry::TyExpr::make(*lesserval),
+          scope),
+      llvmberry::ConsBounds::make(
+          llvmberry::TyPosition::make(scope, *from),
+          llvmberry::TyPosition::make(scope, *to))));
+  });
+}
+
 void applyCommutativity(llvm::Instruction *position, llvm::BinaryOperator *expression, TyScope scope){
   assert(llvmberry::ValidationUnit::Exists());
   
@@ -613,50 +629,6 @@ void generateHintForAndOr(llvm::BinaryOperator &I,
             VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), VAL(A, Physical),
             ConsSize::make(Z->getType()->getIntegerBitWidth()))));
   });
-}
-
-
-
-
-
-
-SimplifyAndInstArg::SimplifyAndInstArg(){
-  this->activated = false;
-}
-
-void SimplifyAndInstArg::setHintGenFunc(std::string _microoptName, std::function<void(llvm::Instruction *)> _hintGenFunc){
-  this->activated = true;
-  this->microoptName = _microoptName;
-  this->hintGenFunc = _hintGenFunc;
-}
-
-void SimplifyAndInstArg::generateHint(llvm::Instruction *arg) const{
-  assert(this->activated);
-  auto &func = this->hintGenFunc;
-  ValidationUnit::GetInstance()->intrude([&func, &arg]
-      (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hint){
-    func(arg);
-  });
-}
-
-std::string SimplifyAndInstArg::getMicroOptName() const{
-  return this->microoptName;
-}
-
-bool SimplifyAndInstArg::isActivated() const{
-  return activated;
-}
-
-StripPointerCastsArgs::StripPointerCastsArgs(){
-  strippedValues = TyStrippedValues(new TyStrippedValuesObj());
-}
-
-FindAvailableLoadedValueArgs::FindAvailableLoadedValueArgs(){
-  orthogonalStores = TyOrthogonalStores(new TyOrthogonalStoresObj());
-  ptr1EquivalentValues = TyPtrEqValues(new TyPtrEqValuesObj());
-  ptr2EquivalentValues = TyPtrEqValues(new TyPtrEqValuesObj());
-  isLoadStore = false;
-  loadstoreStoreInst = nullptr;
 }
 
 }

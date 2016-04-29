@@ -38,6 +38,7 @@
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Hintgen.h"
+#include "llvm/LLVMBerry/Dictionary.h"
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -420,10 +421,8 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
   if(llvmberry_isActive){
     llvmberry::ValidationUnit::GetInstance()->intrude([V](
-        llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-      assert(data.find("StripPointerCasts.arg") != data.end());
-      auto ptr = boost::any_cast<std::shared_ptr<llvmberry::StripPointerCastsArgs> >
-            (data["StripPointerCasts.arg"]);
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+      auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
       ptr->strippedValues->push_back(V);
     });
   }
@@ -469,9 +468,8 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
 
     if(llvmberry_isActive){
       llvmberry::ValidationUnit::GetInstance()->intrude([V](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-        auto ptr = boost::any_cast<std::shared_ptr<llvmberry::StripPointerCastsArgs> >
-              (data["StripPointerCasts.arg"]);
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
         ptr->strippedValues->push_back(V);
       });
     }
@@ -486,12 +484,11 @@ Value *Value::stripPointerCasts() {
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
   if(llvmberry_isActive){
     llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-      assert(data.find("StripPointerCasts.arg") != data.end());
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+      data.assertExists<llvmberry::ArgForStripPointerCasts>();
     });
   }
-  Value *res = stripPointerCastsAndOffsets<PSK_ZeroIndicesAndAliases>(this);
-  return res;
+  return stripPointerCastsAndOffsets<PSK_ZeroIndicesAndAliases>(this);
 }
 
 Value *Value::stripPointerCastsNoFollowAliases() {

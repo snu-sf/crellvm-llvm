@@ -530,7 +530,7 @@ void TyConstGlobalVarAddr::serialize(cereal::JSONOutputArchive& archive) const{
 
 std::shared_ptr<TyConstGlobalVarAddr> TyConstGlobalVarAddr::make(const llvm::GlobalVariable &gv) {
   llvm::Type *ty = gv.getType();
-  assert(ty->isPointerTy()); // jylee : As far as I understand, global variables must be pointers to their location!
+  assert(ty->isPointerTy() && "Global variables must be pointers to their locations."); // jylee
   ty = ty->getPointerElementType();
   
   return std::shared_ptr<TyConstGlobalVarAddr>(
@@ -546,6 +546,13 @@ std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value, enum TyTag _tag
     return std::shared_ptr<TyValue>(
         new ConsId(TyRegister::make(getVariable(value), _tag)));
   } else if (llvm::isa<llvm::ConstantExpr>(value)) {
+    // Constant expressions have two kinds of forms : 
+    // (1) %x = add i32 1, 2
+    //     ^^^^^^^^^^^^^^^^^
+    // (2) %x = add i32 %y, add (i32 1, i32 2)
+    //                      ^^^^^^^^^^^^^^^^^^
+    // For the case (1), TyValue::make returns register id "%x"
+    // For the case (2), TyValue::make returns a constant expression "add (i32 1, i32 2)"
     const llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(&value);
     if (ce->getName().str() != "") {
       return std::shared_ptr<TyValue>(

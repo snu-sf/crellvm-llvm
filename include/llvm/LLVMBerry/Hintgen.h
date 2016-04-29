@@ -45,7 +45,13 @@ namespace llvmberry{
    *   else : 
    *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
    */
-  void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope, bool propagateEquivalence = false);
+  void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope, 
+        bool propagateEquivalence = false);
+  /* propagateLessdef(I1, I2, v1, v2, scope) : 
+   *   Propagates v1 >= v2 from I1 to I2 in scope
+   */
+  void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, const llvm::Value *lesserval, 
+        const llvm::Value *greaterval, TyScope scope);
   /* generateHintForNegValue(V, I, Scope) : 
    *   If V is a BinaryOperator (V = 0 - mV), propagate (V >= 0 - mV, 0 - mV >= V) from V to I in Scope
    *   If V is a constant C, add invariants (C >=src 0 - (-C)), ((0 - (-C)) >=tgt C). (It does nothing with scope)
@@ -94,46 +100,6 @@ namespace llvmberry{
   void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
 
-  // Used in InstructionSimplify.cpp : SimplifyAndInst()
-  struct SimplifyAndInstArg{
-  public:
-    SimplifyAndInstArg();
-    void setHintGenFunc(std::string microoptName, std::function<void(llvm::Instruction *)> hintGenFunc);
-    void generateHint(llvm::Instruction *arg) const;
-    bool isActivated() const;
-    std::string getMicroOptName() const;
-  private:
-    bool activated;
-    std::string microoptName;
-    std::function<void(llvm::Instruction *)> hintGenFunc;
-  };
-
-  // lib/IR/Value.cpp : Value::stripPointerCasts(), stripPointerCastsAndOffsets()
-  struct StripPointerCastsArgs{
-  public:
-    typedef std::vector<llvm::Value *> TyStrippedValuesObj;
-    typedef std::shared_ptr<TyStrippedValuesObj> TyStrippedValues;
-    TyStrippedValues strippedValues;
-
-    StripPointerCastsArgs();
-  };
-  // lib/Analysis/Loads.cpp : FindAvailableLoadedValueArgs
-  struct FindAvailableLoadedValueArgs{
-  public: 
-    typedef std::vector<std::pair<
-        llvmberry::StripPointerCastsArgs::TyStrippedValues, 
-        std::pair<llvm::StoreInst *, std::string> > > TyOrthogonalStoresObj;
-    typedef llvmberry::StripPointerCastsArgs::TyStrippedValuesObj TyPtrEqValuesObj;
-    typedef std::shared_ptr<TyOrthogonalStoresObj> TyOrthogonalStores;
-    typedef std::shared_ptr<TyPtrEqValuesObj> TyPtrEqValues;
-    TyOrthogonalStores orthogonalStores;
-    TyPtrEqValues ptr1EquivalentValues;
-    TyPtrEqValues ptr2EquivalentValues;
-    bool isLoadStore;
-    llvm::StoreInst *loadstoreStoreInst;
-    
-    FindAvailableLoadedValueArgs();
-  };
 }
 
 #endif

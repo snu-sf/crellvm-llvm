@@ -3,7 +3,7 @@ add_llvm_library(LLVMLLVMBerry
   Structure.cpp
   Hintgen.cpp
   ValidationUnit.cpp
-  Hintgen.cpp
+  Dictionary.cpp
   )
 
 add_dependencies(LLVMLLVMBerry LLVMBitWriter)

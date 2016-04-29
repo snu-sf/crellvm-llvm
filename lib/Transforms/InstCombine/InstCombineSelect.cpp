@@ -158,9 +158,9 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
     llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints){
-      data["case"] = std::string("XY/XZ");
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+      data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
+          llvmberry::FoldSelectOpOpArg::XY_XZ;
     });
   } else if (TI->getOperand(1) == FI->getOperand(1)) {
     MatchOp  = TI->getOperand(1);
@@ -168,9 +168,9 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = false;
     llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints){
-      data["case"] = std::string("YX/ZX");
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+      data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
+          llvmberry::FoldSelectOpOpArg::YX_ZX;
     });
   } else if (!TI->isCommutative()) {
     llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::
@@ -186,7 +186,8 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     llvmberry::ValidationUnit::GetInstance()->intrude([](
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints){
-      data["case"] = std::string("XY/ZX");
+      data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
+          llvmberry::FoldSelectOpOpArg::XY_ZX;
     });
   } else if (TI->getOperand(1) == FI->getOperand(0)) {
     MatchOp  = TI->getOperand(1);
@@ -194,9 +195,9 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
     llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints){
-      data["case"] = std::string("YX/XZ");
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+      data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
+          llvmberry::FoldSelectOpOpArg::YX_XZ;
     });
   } else {
     llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::
@@ -214,8 +215,8 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
         &NewSI, &OtherOpT, &OtherOpF](
       llvmberry::ValidationUnit::Dictionary &data,
       llvmberry::CoreHint &hints) {
-    assert(data.find("case") != data.end());
-    std::string case_string = boost::any_cast<std::string>(data["case"]);
+    llvmberry::FoldSelectOpOpArg::OperandCases the_case = 
+        data.get<llvmberry::ArgForFoldSelectOpOp>()->the_case;
     // case == "XY/XZ" : 
     //        <src>          |         <tgt>
     // R  = X bop Y          | R = X bop Y
@@ -271,13 +272,13 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     llvmberry::propagateInstruction(S, T0, llvmberry::Target);
     llvmberry::propagateInstruction(Tprime, T0, llvmberry::Target);
     
-    if(case_string == "XY/ZX"){
+    if(the_case == llvmberry::FoldSelectOpOpArg::XY_ZX){
       llvmberry::applyCommutativity(T0, S, llvmberry::Target);
-    }else if(case_string == "YX/XZ"){
+    }else if(the_case == llvmberry::FoldSelectOpOpArg::YX_XZ){
       llvmberry::applyCommutativity(T0, R, llvmberry::Target);
     }
 
-    if(case_string == "YX/ZX"){
+    if(the_case == llvmberry::FoldSelectOpOpArg::YX_ZX){
       if(llvmberry::isFloatOpcode(bop)){
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Target, *T0),
