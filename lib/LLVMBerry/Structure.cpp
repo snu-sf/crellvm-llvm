@@ -276,9 +276,8 @@ TyBop getBop(llvm::Instruction::BinaryOps ops){
   return bop;
 }
 
-
-TyPredicate getPredicate(llvm::ICmpInst::Predicate prd) {
-TyPredicate predicate;
+TyCond getIPredicate(llvm::ICmpInst::Predicate prd) {
+TyCond predicate;
 
   switch(prd){
     case llvm::ICmpInst::ICMP_EQ:
@@ -302,7 +301,49 @@ TyPredicate predicate;
     case llvm::ICmpInst::ICMP_SLE:
       predicate = llvmberry::ICMP_SLE; break;
     default:
-      assert("llvmberry::getFbop(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+      assert("llvmberry::getIPredicate(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+  }
+  return predicate;
+}
+
+TyFCond getFPredicate(llvm::FCmpInst::Predicate prd) {
+TyFCond predicate;
+
+  switch(prd){
+    case llvm::FCmpInst::FCMP_FALSE:
+      predicate = llvmberry::FCMP_FALSE; break;
+    case llvm::FCmpInst::FCMP_OEQ:
+      predicate = llvmberry::FCMP_OEQ; break;
+    case llvm::FCmpInst::FCMP_OGT:
+      predicate = llvmberry::FCMP_OGT; break;
+    case llvm::FCmpInst::FCMP_OGE:
+      predicate = llvmberry::FCMP_OGE; break;
+    case llvm::FCmpInst::FCMP_OLT:
+      predicate = llvmberry::FCMP_OLT; break;
+    case llvm::FCmpInst::FCMP_OLE:
+      predicate = llvmberry::FCMP_OLE; break;
+    case llvm::FCmpInst::FCMP_ONE:
+      predicate = llvmberry::FCMP_ONE; break;
+    case llvm::FCmpInst::FCMP_ORD:
+      predicate = llvmberry::FCMP_ORD; break;
+    case llvm::FCmpInst::FCMP_UNO:
+      predicate = llvmberry::FCMP_UNO; break;
+    case llvm::FCmpInst::FCMP_UEQ:
+      predicate = llvmberry::FCMP_UEQ; break;
+    case llvm::FCmpInst::FCMP_UGT:
+      predicate = llvmberry::FCMP_UGT; break;
+    case llvm::FCmpInst::FCMP_UGE:
+      predicate = llvmberry::FCMP_UGE; break;
+    case llvm::FCmpInst::FCMP_ULT:
+      predicate = llvmberry::FCMP_ULT; break;
+    case llvm::FCmpInst::FCMP_ULE:
+      predicate = llvmberry::FCMP_ULE; break;
+    case llvm::FCmpInst::FCMP_UNE:
+      predicate = llvmberry::FCMP_UNE; break;
+    case llvm::FCmpInst::FCMP_TRUE:
+      predicate = llvmberry::FCMP_TRUE; break;
+    default:
+      assert("llvmberry::getFPredicate(llvm::Instruction::BinaryOps) : unknown opcode" && false);
   }
   return predicate;
 }
@@ -355,8 +396,6 @@ int getTerminatorIndex(const llvm::TerminatorInst *instr) {
     return -1; // not a terminator
   }
 }
-
-
 
 std::shared_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si) {
   llvm::Value* Val = si->getOperand(0);
@@ -496,7 +535,6 @@ TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
       new TyPosition(_scope, _block_name, std::move(_cmd)));
 
 }
-
 
 /* value */
 
@@ -765,8 +803,10 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
     else
       return std::shared_ptr<TyInstruction>(new ConsBinaryOp(
         std::move(TyBinaryOperator::make(*bo))));
-  } else if (const llvm::ICmpInst *cmpi = llvm::dyn_cast<llvm::ICmpInst>(&i)) {
-    return std::shared_ptr<TyInstruction>(new ConsICmpInst(std::move(TyICmpInst::make(*cmpi))));
+  } else if (const llvm::ICmpInst *icmp = llvm::dyn_cast<llvm::ICmpInst>(&i)) {
+    return std::shared_ptr<TyInstruction>(new ConsICmpInst(std::move(TyICmpInst::make(*icmp))));
+  } else if (const llvm::FCmpInst *fcmp = llvm::dyn_cast<llvm::FCmpInst>(&i)) {
+    return std::shared_ptr<TyInstruction>(new ConsFCmpInst(std::move(TyFCmpInst::make(*fcmp))));
   } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
     return std::shared_ptr<TyInstruction>(new ConsLoadInst(std::move(TyLoadInst::make(*li))));
   } else if (const llvm::StoreInst *si = llvm::dyn_cast<llvm::StoreInst>(&i)) {
@@ -790,9 +830,15 @@ std::shared_ptr<TyFloatBinaryOperator> TyFloatBinaryOperator::make(const llvm::B
 }
 
 std::shared_ptr<TyICmpInst> TyICmpInst::make(const llvm::ICmpInst &icmpInst){
-  llvmberry::TyPredicate predicate = llvmberry::getPredicate(icmpInst.getPredicate());
+  llvmberry::TyCond predicate = llvmberry::getIPredicate(icmpInst.getPredicate());
   return std::shared_ptr<TyICmpInst>(new TyICmpInst(predicate, TyValueType::make(*icmpInst.getType()),
                                     TyValue::make(*icmpInst.getOperand(0)), TyValue::make(*icmpInst.getOperand(1))));
+}
+
+std::shared_ptr<TyFCmpInst> TyFCmpInst::make(const llvm::FCmpInst &fcmpInst){
+  llvmberry::TyFCond predicate = llvmberry::getFPredicate(fcmpInst.getPredicate());
+  return std::shared_ptr<TyFCmpInst>(new TyFCmpInst(predicate, TyValueType::make(*fcmpInst.getType()),
+                                    TyValue::make(*fcmpInst.getOperand(0)), TyValue::make(*fcmpInst.  getOperand(1))));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
@@ -845,7 +891,7 @@ void ConsFloatBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
 
 ConsICmpInst::ConsICmpInst(std::shared_ptr<TyICmpInst> _icmp_inst) : icmp_inst(std::move(_icmp_inst)){
 }
-std::shared_ptr<TyInstruction> ConsICmpInst::make(TyPredicate _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2){
+std::shared_ptr<TyInstruction> ConsICmpInst::make(TyCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2){
   std::shared_ptr<TyICmpInst> _val(new TyICmpInst(_predicate, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
   return std::shared_ptr<TyInstruction>(new ConsICmpInst(std::move(_val)));
 }
@@ -857,6 +903,22 @@ void ConsICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive.writeName();
   archive.saveValue("ICmpInst");
   archive(CEREAL_NVP(icmp_inst));
+}
+
+ConsFCmpInst::ConsFCmpInst(std::shared_ptr<TyFCmpInst> _fcmp_inst) : fcmp_inst(std::move(_fcmp_inst)){
+}
+std::shared_ptr<TyInstruction> ConsFCmpInst::make(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue>_operand2){
+  std::shared_ptr<TyFCmpInst> _val(new TyFCmpInst(_predicate, std::move(_operandtype), std::          move(_operand1), std::move(_operand2)));
+  return std::shared_ptr<TyInstruction>(new ConsFCmpInst(std::move(_val)));
+}
+std::shared_ptr<TyInstruction> ConsFCmpInst::make(const llvm::FCmpInst &fCmpInst){
+  return std::shared_ptr<TyInstruction>(new ConsFCmpInst(std::move(TyFCmpInst::make(fCmpInst))));
+}
+void ConsFCmpInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("FCmpInst");
+  archive(CEREAL_NVP(fcmp_inst));
 }
 
 ConsLoadInst::ConsLoadInst(std::shared_ptr<TyLoadInst> _load_inst) : load_inst(std::move(_load_inst)){
@@ -893,9 +955,18 @@ void TyFloatBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(operand2));
 }
 
-TyICmpInst::TyICmpInst(TyPredicate _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+TyICmpInst::TyICmpInst(TyCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
 }
 void TyICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(predicate));
+  archive(CEREAL_NVP(operandtype));
+  archive(CEREAL_NVP(operand1));
+  archive(CEREAL_NVP(operand2));
+}
+
+TyFCmpInst::TyFCmpInst(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::            shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::                  move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)),              operand2(std::move(_operand2)){
+}
+void TyFCmpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(predicate));
   archive(CEREAL_NVP(operandtype));
   archive(CEREAL_NVP(operand1));

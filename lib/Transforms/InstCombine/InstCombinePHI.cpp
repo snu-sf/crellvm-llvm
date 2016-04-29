@@ -167,7 +167,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 }
                 else if(CmpInst)
                 {             
-                  apr_bpr = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()),       
+                  apr_bpr = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()),       
                                                             TYPEOF(CommonOperand),
                                                              VAL(CmpInst->getOperand(0), Previous),
                                                              VAL(CmpInst->getOperand(1), Previous)));
@@ -195,7 +195,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   }
                   else if(CmpInst)
                   {
-                    apr_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
+                    apr_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
                                                                  VAL(CmpInst->getOperand(0), Previous),
                                                                  VAL(CmpInst->getOperand(1), Physical)));
                   }
@@ -225,7 +225,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   }
                   else if(CmpInst)
                   {
-                    kgh_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
+                    kgh_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
                                                                  ID("K", Ghost),
                                                                  VAL(CmpInst->getOperand(1), Physical)));
                   }
@@ -266,7 +266,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   }
                   else if(CmpInst)
                   {
-                    aph_bpr = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
+                    aph_bpr = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
                                                                  VAL(CmpInst->getOperand(0), Physical),
                                                                  VAL(CmpInst->getOperand(1), Previous)));
                   }
@@ -297,7 +297,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   }
                   else if(CmpInst)
                   {
-                    aph_kgh = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
+                    aph_kgh = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
                                                                  VAL(CmpInst->getOperand(0), Physical),
                                                                  ID("K",Ghost)));
                   }
@@ -354,7 +354,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   }
                   else if(CmpInst)
                   {
-                    aph_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()), TYPEOF(CmpInst->getOperand(0)),
+                    aph_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CmpInst->getOperand(0)),
                                                                  VAL(CmpInst->getOperand(0), Physical),
                                                                  VAL(CmpInst->getOperand(1), Physical)));
                   }
@@ -984,7 +984,7 @@ if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) {
                   }
                   else if(CmpInst)
                   {
-                    aph_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()),
+                    aph_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()),
                                                                  TYPEOF(InInst->getOperand(0)),
                                                                  VAL(CmpInst->getOperand(0), Physical),
                                                                  VAL(CmpInst->getOperand(1), Physical)));
@@ -1087,7 +1087,7 @@ if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) {
                   }
                   else if(CmpInst)
                   {
-                    apr_con = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()),
+                    apr_con = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()),
                                                                  TYPEOF(SpecialOperand),
                                                                  VAL(SpecialOperand, Previous),
                                                                  VAL(ConstantOp, Physical)));
@@ -1108,7 +1108,6 @@ if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) {
                           llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOperand, Previous),
                                                                VAR(newphi, Physical)));
 
-
                   std::shared_ptr<llvmberry::TyExpr> kgh_con;
                   if(BinOp)
                   {
@@ -1117,7 +1116,7 @@ if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) {
                   }
                   else if(CmpInst)
                   {
-                    kgh_con = INSN(llvmberry::ConsICmpInst::make(llvmberry::getPredicate(CmpInst->getPredicate()),
+                    kgh_con = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()),
                                                                  TYPEOF(SpecialOperand),
                                                                  ID("K",Ghost),
                                                                  VAL(ConstantOp, Physical)));

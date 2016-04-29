@@ -40,15 +40,18 @@ enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl,
 
 enum TyFbop { BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
 
-enum  TyPredicate {
+enum  TyCond {
+          ICMP_EQ = 32,
+          ICMP_NE = 33, ICMP_UGT = 34, ICMP_UGE = 35, ICMP_ULT = 36,
+          ICMP_ULE = 37, ICMP_SGT = 38, ICMP_SGE = 39, ICMP_SLT = 40,
+          ICMP_SLE = 41, FIRST_ICMP_PREDICATE = ICMP_EQ, LAST_ICMP_PREDICATE = ICMP_SLE, BAD_ICMP_PREDICATE = ICMP_SLE + 1
+};
+enum TyFCond {
           FCMP_FALSE = 0, FCMP_OEQ = 1, FCMP_OGT = 2, FCMP_OGE = 3,
           FCMP_OLT = 4, FCMP_OLE = 5, FCMP_ONE = 6, FCMP_ORD = 7,
           FCMP_UNO = 8, FCMP_UEQ = 9, FCMP_UGT = 10, FCMP_UGE = 11,
           FCMP_ULT = 12, FCMP_ULE = 13, FCMP_UNE = 14, FCMP_TRUE = 15,
-          FIRST_FCMP_PREDICATE = FCMP_FALSE, LAST_FCMP_PREDICATE = FCMP_TRUE, BAD_FCMP_PREDICATE = FCMP_TRUE + 1, ICMP_EQ = 32,
-          ICMP_NE = 33, ICMP_UGT = 34, ICMP_UGE = 35, ICMP_ULT = 36,
-          ICMP_ULE = 37, ICMP_SGT = 38, ICMP_SGE = 39, ICMP_SLT = 40,
-          ICMP_SLE = 41, FIRST_ICMP_PREDICATE = ICMP_EQ, LAST_ICMP_PREDICATE = ICMP_SLE, BAD_ICMP_PREDICATE = ICMP_SLE + 1
+          FIRST_FCMP_PREDICATE = FCMP_FALSE, LAST_FCMP_PREDICATE = FCMP_TRUE, BAD_FCMP_PREDICATE = FCMP_TRUE + 1
 };
 
 class CoreHint;
@@ -67,7 +70,8 @@ bool isFloatOpcode(llvm::Instruction::BinaryOps ops);
 TyFloatType getFloatType(llvm::Type *typ);
 TyFbop getFbop(llvm::Instruction::BinaryOps ops);
 TyBop getBop(llvm::Instruction::BinaryOps ops);
-TyPredicate getPredicate(llvm::ICmpInst::Predicate prd);
+TyCond getIPredicate(llvm::ICmpInst::Predicate prd);
+TyFCond getFPredicate(llvm::FCmpInst::Predicate prd);
 
 /* position */
 
@@ -343,12 +347,25 @@ private :
 
 struct TyICmpInst{
 public :
-  TyICmpInst(TyPredicate _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
+  TyICmpInst(TyCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyICmpInst> make(const llvm::ICmpInst &iCmpInst);
 
 private :
-  TyPredicate predicate;
+  TyCond predicate;
+  std::shared_ptr<TyValueType> operandtype;
+  std::shared_ptr<TyValue> operand1;
+  std::shared_ptr<TyValue> operand2;
+};
+
+struct TyFCmpInst{
+public :
+  TyFCmpInst(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyFCmpInst> make(const llvm::FCmpInst &fCmpInst);
+
+private :
+  TyFCond predicate;
   std::shared_ptr<TyValueType> operandtype;
   std::shared_ptr<TyValue> operand1;
   std::shared_ptr<TyValue> operand2;
@@ -393,12 +410,23 @@ private :
 struct ConsICmpInst : public TyInstruction{
 public :
   ConsICmpInst(std::shared_ptr<TyICmpInst> _icmp_inst);
-  static std::shared_ptr<TyInstruction> make(TyPredicate _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
+  static std::shared_ptr<TyInstruction> make(TyCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   static std::shared_ptr<TyInstruction> make(const llvm::ICmpInst &iCmpInst);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private :
   std::shared_ptr<TyICmpInst> icmp_inst;
+};
+
+struct ConsFCmpInst : public TyInstruction{
+public :
+  ConsFCmpInst(std::shared_ptr<TyFCmpInst> _fcmp_inst);
+  static std::shared_ptr<TyInstruction> make(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::                   shared_ptr<TyValue> _operand2);
+  static std::shared_ptr<TyInstruction> make(const llvm::FCmpInst &fCmpInst);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private :
+  std::shared_ptr<TyFCmpInst> fcmp_inst;
 };
 
 struct ConsLoadInst : public TyInstruction{
