@@ -431,7 +431,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       ShlNSW = cast<ShlOperator>(Op1)->hasNoSignedWrap();
       llvmberry::ValidationUnit::GetInstance()->intrude([](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
         data.create<llvmberry::ArgForVisitMul>();
-        data.get<llvmberry::ArgForVisitMul>()->needsTransitivity = false;
+        data.get<llvmberry::ArgForVisitMul>()->needsTransitivity = true;
       });
     }
 
