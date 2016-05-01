@@ -1032,7 +1032,7 @@ void TyICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
 TyFCmpInst::TyFCmpInst(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::            shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::                  move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)),              operand2(std::move(_operand2)){
 }
 void TyFCmpInst::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(predicate));
+  archive(cereal::make_nvp("predicate", toString(predicate)));
   archive(CEREAL_NVP(operandtype));
   archive(CEREAL_NVP(operand1));
   archive(CEREAL_NVP(operand2));
