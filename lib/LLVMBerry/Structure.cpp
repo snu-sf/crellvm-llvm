@@ -47,7 +47,6 @@ std::string toString(llvmberry::TyTag tag) {
   }
 }
 
-
 unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
   const llvm::BasicBlock *parent = instr.getParent();
   const llvm::BasicBlock::InstListType &instList = parent->getInstList();
@@ -189,8 +188,8 @@ std::string toString(llvmberry::TyFloatType float_type) {
   }
 }
 
-std::string toString(llvmberry::TyCond icmp){
-  switch (icmp) {
+std::string toString(llvmberry::TyCond cond){
+  switch(cond) {
   case llvmberry::CondEq:
     return std::string("CondEq");
   case llvmberry::CondNe:
@@ -211,20 +210,48 @@ std::string toString(llvmberry::TyCond icmp){
     return std::string("CondSlt");
   case llvmberry::CondSle:
     return std::string("CondSle");
-  //case llvmberry::FIRST_ICMP_PREDICATE:
-  //  return std::string("CondEq");
-  //case llvmberry::LAST_ICMP_PREDICATE:
-  //  return std::string("Condsle");
-  default:
+ default:
     assert(false && "Cond toString");
-
- 
- 
-
-
   }
+}
 
-
+std::string toString(llvmberry::TyFCond fcond) {
+  switch(fcond){
+    case llvmberry::CondFfalse:
+      return std::string("CondFfalse");
+    case llvmberry::CondFoeq:
+      return std::string("CondFoeq");
+    case llvmberry::CondFogt:
+      return std::string("CondFogt");
+    case llvmberry::CondFoge:
+      return std::string("CondFoge");
+    case llvmberry::CondFolt:
+      return std::string("CondFolt");
+    case llvmberry::CondFole:
+      return std::string("CondFole");
+    case llvmberry::CondFone:
+      return std::string("CondFone");
+    case llvmberry::CondFord:
+      return std::string("CondFord");
+    case llvmberry::CondFuno:
+      return std::string("CondFuno");
+    case llvmberry::CondFueq:
+      return std::string("CondFueq");
+    case llvmberry::CondFugt:
+      return std::string("CondFugt");
+    case llvmberry::CondFuge:
+      return std::string("CondFuge");
+    case llvmberry::CondFult:
+      return std::string("CondFult");
+    case llvmberry::CondFule:
+      return std::string("CondFule");
+    case llvmberry::CondFune:
+      return std::string("CondFune");
+    case llvmberry::CondFtrue:
+      return std::string("CondFtrue");
+    default:
+      assert("llvmberry::getFPredicate(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+  }
 }
 
 llvmberry::TyFloatType getFloatType(llvm::Type *typ){
@@ -349,37 +376,37 @@ TyFCond predicate;
 
   switch(prd){
     case llvm::FCmpInst::FCMP_FALSE:
-      predicate = llvmberry::FCMP_FALSE; break;
+      predicate = llvmberry::CondFfalse; break;
     case llvm::FCmpInst::FCMP_OEQ:
-      predicate = llvmberry::FCMP_OEQ; break;
+      predicate = llvmberry::CondFoeq; break;
     case llvm::FCmpInst::FCMP_OGT:
-      predicate = llvmberry::FCMP_OGT; break;
+      predicate = llvmberry::CondFogt; break;
     case llvm::FCmpInst::FCMP_OGE:
-      predicate = llvmberry::FCMP_OGE; break;
+      predicate = llvmberry::CondFoge; break;
     case llvm::FCmpInst::FCMP_OLT:
-      predicate = llvmberry::FCMP_OLT; break;
+      predicate = llvmberry::CondFolt; break;
     case llvm::FCmpInst::FCMP_OLE:
-      predicate = llvmberry::FCMP_OLE; break;
+      predicate = llvmberry::CondFole; break;
     case llvm::FCmpInst::FCMP_ONE:
-      predicate = llvmberry::FCMP_ONE; break;
+      predicate = llvmberry::CondFone; break;
     case llvm::FCmpInst::FCMP_ORD:
-      predicate = llvmberry::FCMP_ORD; break;
+      predicate = llvmberry::CondFord; break;
     case llvm::FCmpInst::FCMP_UNO:
-      predicate = llvmberry::FCMP_UNO; break;
+      predicate = llvmberry::CondFuno; break;
     case llvm::FCmpInst::FCMP_UEQ:
-      predicate = llvmberry::FCMP_UEQ; break;
+      predicate = llvmberry::CondFueq; break;
     case llvm::FCmpInst::FCMP_UGT:
-      predicate = llvmberry::FCMP_UGT; break;
+      predicate = llvmberry::CondFugt; break;
     case llvm::FCmpInst::FCMP_UGE:
-      predicate = llvmberry::FCMP_UGE; break;
+      predicate = llvmberry::CondFuge; break;
     case llvm::FCmpInst::FCMP_ULT:
-      predicate = llvmberry::FCMP_ULT; break;
+      predicate = llvmberry::CondFult; break;
     case llvm::FCmpInst::FCMP_ULE:
-      predicate = llvmberry::FCMP_ULE; break;
+      predicate = llvmberry::CondFule; break;
     case llvm::FCmpInst::FCMP_UNE:
-      predicate = llvmberry::FCMP_UNE; break;
+      predicate = llvmberry::CondFune; break;
     case llvm::FCmpInst::FCMP_TRUE:
-      predicate = llvmberry::FCMP_TRUE; break;
+      predicate = llvmberry::CondFtrue; break;
     default:
       assert("llvmberry::getFPredicate(llvm::Instruction::BinaryOps) : unknown opcode" && false);
   }

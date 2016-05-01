@@ -41,21 +41,17 @@ enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl,
 enum TyFbop { BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
 
 enum  TyCond {
-          CondEq,
-          CondNe, CondUgt, CondUge, CondUlt,
-          CondUle, CondSgt, CondSge, CondSlt,
-          CondSle, FIRST_ICMP_PREDICATE = CondEq, LAST_ICMP_PREDICATE = CondSle, BAD_ICMP_PREDICATE = CondSle + 1
+          CondEq, CondNe, CondUgt, CondUge, CondUlt,
+          CondUle, CondSgt, CondSge, CondSlt, CondSle 
 };
 enum TyFCond {
-          FCMP_FALSE = 0, FCMP_OEQ = 1, FCMP_OGT = 2, FCMP_OGE = 3,
-          FCMP_OLT = 4, FCMP_OLE = 5, FCMP_ONE = 6, FCMP_ORD = 7,
-          FCMP_UNO = 8, FCMP_UEQ = 9, FCMP_UGT = 10, FCMP_UGE = 11,
-          FCMP_ULT = 12, FCMP_ULE = 13, FCMP_UNE = 14, FCMP_TRUE = 15,
-          FIRST_FCMP_PREDICATE = FCMP_FALSE, LAST_FCMP_PREDICATE = FCMP_TRUE, BAD_FCMP_PREDICATE = FCMP_TRUE + 1
+          CondFfalse, CondFoeq, CondFogt, CondFoge,
+          CondFolt, CondFole, CondFone, CondFord, 
+          CondFuno, CondFueq, CondFugt, CondFuge, 
+          CondFult, CondFule, CondFune, CondFtrue
 };
 
 class CoreHint;
-
 
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
@@ -65,7 +61,8 @@ bool name_instructions(llvm::Function &F);
 std::string toString(llvmberry::TyBop bop);
 std::string toString(llvmberry::TyFbop bop);
 std::string toString(llvmberry::TyFloatType bop);
-std::string toString(llvmberry::TyCond icmp);
+std::string toString(llvmberry::TyCond cond);
+std::string toString(llvmberry::TyFCond fcond);
 
 bool isFloatOpcode(llvm::Instruction::BinaryOps ops);
 TyFloatType getFloatType(llvm::Type *typ);
