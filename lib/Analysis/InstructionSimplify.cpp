@@ -1597,8 +1597,8 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
           llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
         //    <src>      |  <tgt>
         // Z = X & undef | (Z equals 0)
-        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+        std::shared_ptr<llvmberry::SimplifyInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyInstArg> >
             (data["SimplifyAndInst.arg"]);
         bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
         
@@ -1633,8 +1633,8 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
           llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
         //    <src>  |  <tgt>
         // Z = X & X | (Z equals X)
-        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+        std::shared_ptr<llvmberry::SimplifyInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyInstArg> >
             (data["SimplifyAndInst.arg"]);
         
         ptr->setHintGenFunc("and_same", [Op0, Op1, &hints](llvm::Instruction *I){
@@ -1659,8 +1659,8 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
           llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
         //    <src>  |  <tgt>
         // Z = X & 0 | (Z equals 0)
-        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+        std::shared_ptr<llvmberry::SimplifyInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyInstArg> >
             (data["SimplifyAndInst.arg"]);
         bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
         
@@ -1689,8 +1689,8 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
           llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
         //    <src>   |  <tgt>
         // Z = X & -1 | (Z equals X)
-        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+        std::shared_ptr<llvmberry::SimplifyInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyInstArg> >
             (data["SimplifyAndInst.arg"]);
         bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
         
@@ -1721,8 +1721,8 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         //    <src>   |  <tgt>
         // Y = X ^ -1 | Y = X ^ -1
         // Z = X & Y  | (Z equals 0)
-        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+        std::shared_ptr<llvmberry::SimplifyInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyInstArg> >
             (data["SimplifyAndInst.arg"]);
         bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
         bool isOp1NotOfOp0 = match(Op1, m_Not(m_Specific(Op0))); // if this is true, (Op0 & Op1) coalesces with and_not inference rule
@@ -1763,8 +1763,8 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         //    <src>  |   <tgt>
         // Y = X | A | Y = X | A
         // Z = X & Y | (Z equals X)
-        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+        std::shared_ptr<llvmberry::SimplifyInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyInstArg> >
             (data["SimplifyAndInst.arg"]);
         bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
         
@@ -1791,8 +1791,8 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         //    <src>  |   <tgt>
         // Y = X | A | Y = X | A
         // Z = X & Y | (Z equals X)
-        std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-            <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+        std::shared_ptr<llvmberry::SimplifyInstArg> ptr = boost::any_cast
+            <std::shared_ptr<llvmberry::SimplifyInstArg> >
             (data["SimplifyAndInst.arg"]);
         bool isSwapped = boost::any_cast<bool>(data["SimplifyAndInst.isSwapped"]);
         
@@ -1925,6 +1925,16 @@ static Value *SimplifyOrOfICmps(ICmpInst *Op0, ICmpInst *Op1) {
 /// fold the result.  If not, this returns null.
 static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
                              unsigned MaxRecurse) {
+  bool llvmberry_doHintGen = llvmberry::ValidationUnit::Exists() &&
+        llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_or_inst";
+  if(llvmberry_doHintGen){
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      assert(data.find("SimplifyOrInst.arg") != data.end());
+      data["SimplifyOrInst.isSwapped"] = false;
+    });
+  }
+
   if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
     if (Constant *CRHS = dyn_cast<Constant>(Op1)) {
       Constant *Ops[] = { CLHS, CRHS };
@@ -1934,6 +1944,12 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
 
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
+    if(llvmberry_doHintGen){
+      llvmberry::ValidationUnit::GetInstance()->intrude([](
+          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        data["SimplifyOrInst.isSwapped"] = true;
+      });
+    }
   }
 
   // X | undef -> -1

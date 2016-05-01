@@ -1219,16 +1219,16 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
   llvmberry::ValidationUnit::GetInstance()->intrude([](
       llvmberry::ValidationUnit::Dictionary &data,
       llvmberry::CoreHint &hints) {
-    data["SimplifyAndInst.arg"] = std::shared_ptr<llvmberry::SimplifyAndInstArg>
-                (new llvmberry::SimplifyAndInstArg());
+    data["SimplifyAndInst.arg"] = std::shared_ptr<llvmberry::SimplifyInstArg>
+                (new llvmberry::SimplifyInstArg());
   });
 
   if (Value *V = SimplifyAndInst(Op0, Op1, DL, TLI, DT, AC)){
     llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
-      std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-          <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
+      std::shared_ptr<llvmberry::SimplifyInstArg> ptr = boost::any_cast
+          <std::shared_ptr<llvmberry::SimplifyInstArg> >
           (data["SimplifyAndInst.arg"]);
       if(ptr->isActivated()){
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
