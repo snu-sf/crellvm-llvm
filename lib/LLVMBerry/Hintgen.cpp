@@ -647,4 +647,16 @@ bool SimplifyAndInstArg::isActivated() const{
   return activated;
 }
 
+StripPointerCastsArgs::StripPointerCastsArgs(){
+  strippedValues = TyStrippedValues(new TyStrippedValuesObj());
+}
+
+FindAvailableLoadedValueArgs::FindAvailableLoadedValueArgs(){
+  orthogonalStores = TyOrthogonalStores(new TyOrthogonalStoresObj());
+  ptr1EquivalentValues = TyPtrEqValues(new TyPtrEqValuesObj());
+  ptr2EquivalentValues = TyPtrEqValues(new TyPtrEqValuesObj());
+  isLoadStore = false;
+  loadstoreStoreInst = nullptr;
+}
+
 }

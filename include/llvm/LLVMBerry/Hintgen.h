@@ -2,6 +2,9 @@
 #define HINTGEN_H
 
 #include "llvm/LLVMBerry/Structure.h"
+#include <string>
+#include <vector>
+#include <memory>
 
 #define PHIPOS(SCOPE, PN, prevI) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), prevI->getParent()->getName()) 
 #define PHIPOSJustPhi(SCOPE, PN) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
@@ -103,6 +106,33 @@ namespace llvmberry{
     bool activated;
     std::string microoptName;
     std::function<void(llvm::Instruction *)> hintGenFunc;
+  };
+
+  // lib/IR/Value.cpp : Value::stripPointerCasts(), stripPointerCastsAndOffsets()
+  struct StripPointerCastsArgs{
+  public:
+    typedef std::vector<llvm::Value *> TyStrippedValuesObj;
+    typedef std::shared_ptr<TyStrippedValuesObj> TyStrippedValues;
+    TyStrippedValues strippedValues;
+
+    StripPointerCastsArgs();
+  };
+  // lib/Analysis/Loads.cpp : FindAvailableLoadedValueArgs
+  struct FindAvailableLoadedValueArgs{
+  public: 
+    typedef std::vector<std::pair<
+        llvmberry::StripPointerCastsArgs::TyStrippedValues, 
+        std::pair<llvm::StoreInst *, std::string> > > TyOrthogonalStoresObj;
+    typedef llvmberry::StripPointerCastsArgs::TyStrippedValuesObj TyPtrEqValuesObj;
+    typedef std::shared_ptr<TyOrthogonalStoresObj> TyOrthogonalStores;
+    typedef std::shared_ptr<TyPtrEqValuesObj> TyPtrEqValues;
+    TyOrthogonalStores orthogonalStores;
+    TyPtrEqValues ptr1EquivalentValues;
+    TyPtrEqValues ptr2EquivalentValues;
+    bool isLoadStore;
+    llvm::StoreInst *loadstoreStoreInst;
+    
+    FindAvailableLoadedValueArgs();
   };
 }
 
