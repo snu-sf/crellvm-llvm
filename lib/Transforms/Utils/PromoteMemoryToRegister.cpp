@@ -41,6 +41,7 @@
 #include <algorithm>
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Dictionary.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "mem2reg"
@@ -403,7 +404,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       }
       
       // propagate noalias
-      auto &allocas = boost::any_cast<const std::vector<llvm::AllocaInst*>&>(data["Allocas"]);
+      auto &allocas = *(data.get<llvmberry::ArgForRewriteSingleStoreAlloca>()->allocas);
+      //auto &allocas = boost::any_cast<const std::vector<llvm::AllocaInst*>&>(data["Allocas"]);
       for (auto i = allocas.begin(); i != allocas.end(); ++i) {
         AllocaInst *AItmp = *i;
 
@@ -814,9 +816,11 @@ void PromoteMem2Reg::run() {
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&AItmp]
                 (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-        data["Allocas"] = std::vector<llvm::AllocaInst*>();
-        auto &allocas = boost::any_cast<std::vector<llvm::AllocaInst*>&>(data["Allocas"]);
-        allocas.push_back(AItmp);
+        //data["Allocas"] = std::vector<llvm::AllocaInst*>();
+        //auto &allocas = boost::any_cast<std::vector<llvm::AllocaInst*>&>(data["Allocas"]);
+        //allocas.push_back(AItmp);
+        data.create<llvmberry::ArgForRewriteSingleStoreAlloca>();
+        data.get<llvmberry::ArgForRewriteSingleStoreAlloca>()->allocas->push_back(AItmp);
       }); 
     }
 

@@ -25,6 +25,7 @@
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/Hintgen.h"
+#include "llvm/LLVMBerry/Dictionary.h"
 #include <vector>
 #include <memory>
 
@@ -760,10 +761,8 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
   AAMDNodes AATags;
   llvmberry::ValidationUnit::Begin("load_load", LI.getParent()->getParent());
   llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-    data["FindAvailableLoadedValue.arg"] = std::make_shared
-        <llvmberry::FindAvailableLoadedValueArgs>
-        (llvmberry::FindAvailableLoadedValueArgs());
+      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    data.create<llvmberry::ArgForFindAvailableLoadedValue>();
   });
 
   if (Value *AvailableVal = FindAvailableLoadedValue(Op, LI.getParent(), BBI,
@@ -780,14 +779,10 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       combineMetadata(NLI, &LI, KnownIDs);
     };
     
-    const llvm::DominatorTree *llvmberry_domtree = this->DT;
-    llvmberry::ValidationUnit::GetInstance()->intrude([&LI, &AvailableVal, &Op, &llvmberry_domtree](
-        llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&LI, &AvailableVal, &Op, this](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       
-      std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> falv_arg = 
-              boost::any_cast<std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> >
-              (data["FindAvailableLoadedValue.arg"]);
-
+      auto falv_arg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
 
       auto &orthogonalStores = falv_arg->orthogonalStores;
       auto &ptr1EquivalentValues = falv_arg->ptr1EquivalentValues;
@@ -798,17 +793,20 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       Value *ptr2 = Op;
       Instruction *v1_inst = nullptr;
       Value *v1 = nullptr;
-      auto DT = llvmberry_domtree;
+      auto DT = this->DT;
 
+      // If isLoadStore is true, then the equivalent value came from `store v1, %ptr1` instruction
+      // If isLoadStore is false, the equivalent value came from `v1 = load %ptr1` instruction
       bool isLoadStore = falv_arg->isLoadStore;
-      if(isLoadStore){
+      if (isLoadStore) {
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName("load_store");
         StoreInst *si = falv_arg->loadstoreStoreInst;
-        assert(si);
+        assert(si && "FindAvailableLoadedValueArgs::loadstoreStoreInst must be set "
+                "after FindAvailableLoadeDvalue() is called");
         v1_inst = si;
         v1 = si->getValueOperand();
         ptr1 = si->getPointerOperand();
-      }else{
+      } else {
         LoadInst *li = dyn_cast<LoadInst>(AvailableVal);
         v1_inst = li;
         v1 = v1_inst;
@@ -816,7 +814,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
         ptr1 = li->getPointerOperand();
       }
       // Step 0. prove ptr1src >= ptr2src && ptr2src >= ptr1src.
-      if(ptr1src == ptr2src){
+      if (ptr1src == ptr2src) {
         // They are equivalent.
         hints.addCommand(llvmberry::ConsInfrule::make(
           llvmberry::TyPosition::make(llvmberry::Source, *v1_inst),
@@ -830,12 +828,12 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
           llvmberry::ConsBounds::make(
               llvmberry::TyPosition::make(llvmberry::Source, *v1_inst),
               llvmberry::TyPosition::make(llvmberry::Source, LI))));
-      }else{
+      } else {
         // They are identical in representation, but distinct
         // ex)
         // %ptr1src = getelementptr %a, 1
         // %ptr2src = getelementptr %a, 1
-        if(Instruction *i1 = dyn_cast<Instruction>(ptr1src)){
+        if (Instruction *i1 = dyn_cast<Instruction>(ptr1src)) {
           Instruction *i2 = dyn_cast<Instruction>(ptr2src);
           assert(i2);
           llvmberry::propagateInstruction(i1, v1_inst, llvmberry::Source, true);
@@ -871,35 +869,12 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                 llvmberry::ConsVar::make(ptr2srcname, llvmberry::Physical),
                 llvmberry::ConsInsn::make(*i1),
                 llvmberry::ConsVar::make(ptr1srcname, llvmberry::Physical)))); 
-        }else{
+        } else {
           assert("load-load optimization : unknown case ; ptr1src and ptr2src are not equivalent, and also not Instruction" && false);
         }
       }
 
-      auto propagateLessdef = [&hints](const Value *lesserv, const Value *greaterv, 
-              Instruction *from, Instruction *to){
-        hints.addCommand(llvmberry::ConsPropagate::make(
-          llvmberry::ConsLessdef::make(
-              llvmberry::TyExpr::make(*greaterv),
-              llvmberry::TyExpr::make(*lesserv),
-              llvmberry::Source),
-          llvmberry::ConsBounds::make(
-              llvmberry::TyPosition::make(llvmberry::Source, *from),
-              llvmberry::TyPosition::make(llvmberry::Source, *to))));
-      };
-      // x1 >= x2 && x2 >= x3 => x1 >= x3
-      auto applyTransitivity = [&hints](const Value *x1, const Value *x2, const Value *x3,
-              Instruction *pos){
-        hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::TyPosition::make(llvmberry::Source, *pos),
-          llvmberry::ConsTransitivity::make(
-              llvmberry::TyExpr::make(*x1),
-              llvmberry::TyExpr::make(*x2),
-              llvmberry::TyExpr::make(*x3))));
-      };
-
-      auto applyGepZeroAndPropagate = [&hints, &LI, &propagateLessdef, 
-              &applyTransitivity, &ptr1src, &ptr2src]
+      auto applyGepZeroAndPropagate = [&hints, &LI, &ptr1src, &ptr2src]
               (GetElementPtrInst *gepinst, bool is_v1, Value *src, Instruction *pos){
         hints.addCommand(llvmberry::ConsInfrule::make(
           llvmberry::TyPosition::make(llvmberry::Source, *gepinst),
@@ -907,18 +882,17 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
               llvmberry::TyValue::make(*gepinst),
               llvmberry::TyValue::make(*gepinst->getPointerOperand()), 
               llvmberry::ConsInsn::make(*gepinst))));
-        if(is_v1){
+        if (is_v1) {
           // src >= gepinst->getPointerOperand() >= gepinst
-          propagateLessdef(gepinst, gepinst->getPointerOperand(), gepinst, &LI);
-          applyTransitivity(src, gepinst->getPointerOperand(), gepinst, pos);
-        }else{
+          llvmberry::propagateLessdef(gepinst, &LI, gepinst, gepinst->getPointerOperand(), llvmberry::Source);
+          llvmberry::applyTransitivity(pos, src, gepinst->getPointerOperand(), gepinst, llvmberry::Source);
+        } else {
           // gepinst >= gepinst->getPointerOperand() >= src
-          propagateLessdef(gepinst->getPointerOperand(), gepinst, gepinst, &LI);
-          applyTransitivity(gepinst, gepinst->getPointerOperand(), src, pos);
+          llvmberry::propagateLessdef(gepinst, &LI, gepinst->getPointerOperand(), &LI, llvmberry::Source);
+          llvmberry::applyTransitivity(pos, gepinst, gepinst->getPointerOperand(), src, llvmberry::Source);
         }
       };
-      auto applyBitcastptrAndPropagate = [&hints, &LI, &propagateLessdef, 
-              &applyTransitivity, &ptr1src, &ptr2src]
+      auto applyBitCastPtrAndPropagate = [&hints, &LI, &ptr1src, &ptr2src]
               (BitCastInst *bi, bool is_v1, Value *src, Instruction *pos){
         hints.addCommand(llvmberry::ConsInfrule::make(
           llvmberry::TyPosition::make(llvmberry::Source, *bi),
@@ -926,18 +900,17 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
               llvmberry::TyValue::make(*bi),
               llvmberry::TyValue::make(*bi->getOperand(0)), 
               llvmberry::ConsInsn::make(*bi))));
-        if(is_v1){
+        if (is_v1) {
           // src >= bi->op(0) >= bi
-          propagateLessdef(bi, bi->getOperand(0), bi, &LI);
-          applyTransitivity(src, bi->getOperand(0), bi, pos);
-        }else{
+          llvmberry::propagateLessdef(bi, &LI, bi, bi->getOperand(0), llvmberry::Source);
+          llvmberry::applyTransitivity(pos, src, bi->getOperand(0), bi, llvmberry::Source);
+        } else {
           // bi>=bi->op(0)>=src
-          propagateLessdef(bi->getOperand(0), bi, bi, &LI);
-          applyTransitivity(bi, bi->getOperand(0), src, pos);
+          llvmberry::propagateLessdef(bi, &LI, bi->getOperand(0), bi, llvmberry::Source);
+          llvmberry::applyTransitivity(pos, bi, bi->getOperand(0), src, llvmberry::Source);
         }
       };
-      auto applyAddrspaceptrAndPropagate = [&hints, &propagateLessdef, 
-              &applyTransitivity, &ptr1src, &ptr2src]
+      auto applyAddrSpacePtrAndPropagate = [&hints, &ptr1src, &ptr2src]
               (AddrSpaceCastInst *bi, bool is_v1, Value *src, Instruction *pos){
         assert("Vellvm currently does not support addrespacecast instruction, hence there's no addrspaceptr inferene rule!" && false);
       };
@@ -948,15 +921,17 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       assert(ptr1EquivalentValues->at(0) == ptr1);
       for(size_t i = 1; i < ptr1EquivalentValues->size(); i++){
         Value *v = ptr1EquivalentValues->at(i);
-        if(GetElementPtrInst *gepinst = dyn_cast<GetElementPtrInst>(v)){
+        if (GetElementPtrInst *gepinst = dyn_cast<GetElementPtrInst>(v)) {
           applyGepZeroAndPropagate(gepinst, true, ptr1src, v1_inst);
-        }else if(BitCastInst *bci = dyn_cast<BitCastInst>(v)){
-          applyBitcastptrAndPropagate(bci, true, ptr1src, v1_inst);
-        }else if(AddrSpaceCastInst *asci = dyn_cast<AddrSpaceCastInst>(v)){
-          applyAddrspaceptrAndPropagate(asci, true, ptr1src, v1_inst);
+        } else if (BitCastInst *bci = dyn_cast<BitCastInst>(v)) {
+          applyBitCastPtrAndPropagate(bci, true, ptr1src, v1_inst);
+        } else if (AddrSpaceCastInst *asci = dyn_cast<AddrSpaceCastInst>(v)) {
+          applyAddrSpacePtrAndPropagate(asci, true, ptr1src, v1_inst);
         }
       }
-      if(ptr1EquivalentValues->size() > 1){
+      if (ptr1EquivalentValues->size() > 1) {
+        // If ptr1EquivalenceValues->size() is equivalent to 0, we cannot propagate ptr1src >= ptr1 from 
+        // the definition of ptr1src to ptr1 because ptr1src == ptr1. 
         hints.addCommand(llvmberry::ConsPropagate::make(
           llvmberry::ConsLessdef::make(
               llvmberry::ConsVar::make(llvmberry::getVariable(*ptr1src), llvmberry::Physical),
@@ -970,17 +945,17 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       assert(ptr2EquivalentValues->at(0) == ptr2);
       for(size_t i = 1; i < ptr2EquivalentValues->size(); i++){
         Value *v = ptr2EquivalentValues->at(i);
-        if(GetElementPtrInst *gepinst = dyn_cast<GetElementPtrInst>(v)){
+        if (GetElementPtrInst *gepinst = dyn_cast<GetElementPtrInst>(v)) {
           applyGepZeroAndPropagate(gepinst, false, ptr2src, &LI);
-        }else if(BitCastInst *bci = dyn_cast<BitCastInst>(v)){
-          applyBitcastptrAndPropagate(bci, false, ptr2src, &LI);
-        }else if(AddrSpaceCastInst *asci = dyn_cast<AddrSpaceCastInst>(v)){
-          applyAddrspaceptrAndPropagate(asci, false, ptr2src, &LI);
+        } else if(BitCastInst *bci = dyn_cast<BitCastInst>(v)) {
+          applyBitCastPtrAndPropagate(bci, false, ptr2src, &LI);
+        } else if(AddrSpaceCastInst *asci = dyn_cast<AddrSpaceCastInst>(v)) {
+          applyAddrSpacePtrAndPropagate(asci, false, ptr2src, &LI);
         }
       }
       // step 1-A-(3). prove %ptr2 >= %ptr1 by transitivity (%ptr2 >= %ptr2src >= %ptr1src >= %ptr1)
-      applyTransitivity(ptr2src, ptr1src, ptr1, &LI);
-      applyTransitivity(ptr2, ptr2src, ptr1, &LI);
+      llvmberry::applyTransitivity(&LI, ptr2src, ptr1src, ptr1, llvmberry::Source);
+      llvmberry::applyTransitivity(&LI, ptr2, ptr2src, ptr1, llvmberry::Source);
 
       // step 1-B. prove %v2 >= *(%ptr2) >= %v1 by transitivity (%v2 >= *(%ptr2), *(%ptr1) >= %v1)
       // step I-B-(1). propagate *(%ptr1) >= %v1.
@@ -1011,8 +986,8 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
    
       
       // step 2. Show orthogonality
-      for(auto itr = orthogonalStores->begin(); itr != orthogonalStores->end(); itr++){
-        llvmberry::StripPointerCastsArgs::TyStrippedValues ptr3EquivalentValues = itr->first;
+      for (auto itr = orthogonalStores->begin(); itr != orthogonalStores->end(); itr++) {
+        llvmberry::StripPointerCastsArg::TyStrippedValues ptr3EquivalentValues = itr->first;
         StoreInst *noalias_si = itr->second.first;
         std::string noalias_source = itr->second.second;
         Value *ptr3src = ptr3EquivalentValues->back();
@@ -1023,33 +998,33 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
         Instruction *diffblock_propagate_end = nullptr;
         
         // step 2-A. make ptr1src _||_ ptr3src
-        if(noalias_source == "alloca_or_global"){
-          if(AllocaInst *ptr3_org_alloca = dyn_cast<AllocaInst>(ptr3)){
+        if (noalias_source == "alloca_or_global") {
+          if (AllocaInst *ptr3_org_alloca = dyn_cast<AllocaInst>(ptr3)) {
             diffblock_propagate_end = ptr3_org_alloca;
           }
-          if(AllocaInst *ptr1_org_alloca = dyn_cast<AllocaInst>(ptr1)){
-            if(diffblock_propagate_end == nullptr ||
+          if (AllocaInst *ptr1_org_alloca = dyn_cast<AllocaInst>(ptr1)) {
+            if (diffblock_propagate_end == nullptr ||
                 // Does sdiffblock_propagate_end precede ptr1_org_alloca?
-                DT->dominates(diffblock_propagate_end, ptr1_org_alloca)){
+                DT->dominates(diffblock_propagate_end, ptr1_org_alloca)) {
               diffblock_propagate_end = ptr1_org_alloca;
             }
           }
           // there must be noalias between ptr1src and noalias_ptrs->back().
-          if(AllocaInst *ptr3_alloca = dyn_cast<AllocaInst>(ptr3src)){
-            if(AllocaInst *ptr1_alloca = dyn_cast<AllocaInst>(ptr1src)){
+          if (AllocaInst *ptr3_alloca = dyn_cast<AllocaInst>(ptr3src)){
+            if (AllocaInst *ptr1_alloca = dyn_cast<AllocaInst>(ptr1src)) {
               // Propagate alloca.
               // Does ptr1_alloca dominate ptr3_alloca ?
               AllocaInst *alloca_ahead = nullptr;
               AllocaInst *alloca_behind = nullptr;
-              if(DT->dominates(ptr1_alloca, ptr3_alloca)){
+              if (DT->dominates(ptr1_alloca, ptr3_alloca)) {
                 alloca_ahead = ptr1_alloca;
                 alloca_behind = ptr3_alloca;
                 diffblock_propagate_beg = ptr3_alloca;
-              }else if(DT->dominates(ptr3_alloca, ptr1_alloca)){
+              } else if (DT->dominates(ptr3_alloca, ptr1_alloca)) {
                 alloca_ahead = ptr3_alloca;
                 alloca_behind = ptr1_alloca;
                 diffblock_propagate_beg = ptr1_alloca;
-              }else{
+              } else {
                 assert("ptr1_alloca or ptr3_alloca must dominate another!" && false);
               }
               hints.addCommand(llvmberry::ConsPropagate::make(
@@ -1060,19 +1035,19 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                 llvmberry::ConsBounds::make(
                     llvmberry::TyPosition::make(llvmberry::Source, *alloca_ahead),
                     llvmberry::TyPosition::make(llvmberry::Source, *alloca_behind))));
-            }else if(GlobalVariable *ptr1_gv = llvm::dyn_cast<GlobalVariable>(ptr1src)){
+            } else if (GlobalVariable *ptr1_gv = llvm::dyn_cast<GlobalVariable>(ptr1src)) {
               hints.addCommand(llvmberry::ConsInfrule::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *ptr3_alloca),
                 llvmberry::ConsDiffblockGlobalAlloca::make(
                     llvmberry::ConsConstGlobalVarAddr::make(*ptr1_gv),
                     llvmberry::TyRegister::make(llvmberry::getVariable(*ptr3_alloca), llvmberry::Physical))));
               diffblock_propagate_beg = ptr3_alloca;
-            }else{
+            } else {
               assert("Noalias store must be (alloca OR global) _||_ (alloca OR global)" && false);
             }
 
-          }else if(GlobalVariable *ptr3_gv = llvm::dyn_cast<GlobalVariable>(ptr3src)){
-            if(AllocaInst *ptr1_alloca = llvm::dyn_cast<AllocaInst>(ptr1src)){
+          } else if (GlobalVariable *ptr3_gv = llvm::dyn_cast<GlobalVariable>(ptr3src)) {
+            if (AllocaInst *ptr1_alloca = llvm::dyn_cast<AllocaInst>(ptr1src)) {
               hints.addCommand(llvmberry::ConsInfrule::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *ptr1_alloca),
                 llvmberry::ConsDiffblockGlobalAlloca::make(
@@ -1080,21 +1055,21 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                     llvmberry::TyRegister::make(llvmberry::getVariable(*ptr1_alloca), llvmberry::Physical))));
               diffblock_propagate_beg = ptr1_alloca;
 
-            }else if(GlobalVariable *ptr1_gv = llvm::dyn_cast<GlobalVariable>(ptr1src)){
+            } else if(GlobalVariable *ptr1_gv = llvm::dyn_cast<GlobalVariable>(ptr1src)) {
               hints.addCommand(llvmberry::ConsInfrule::make(
                 llvmberry::TyPosition::make(llvmberry::Source, *noalias_si),
                 llvmberry::ConsDiffblockGlobalGlobal::make(
                     llvmberry::ConsConstGlobalVarAddr::make(*ptr1_gv),
                     llvmberry::ConsConstGlobalVarAddr::make(*ptr3_gv))));
               diffblock_propagate_beg = diffblock_propagate_end;
-            }else{
+            } else {
               assert("Noalias store must be (alloca OR global) _||_ (alloca OR global)" && false);
             }
-          }else{
+          } else {
             assert("Noalias store must be (alloca OR global) _||_ (alloca OR global)" && false);
           }
           // step 2-B. propagate ptr1src _||_ ptr3src 
-          if(diffblock_propagate_beg != diffblock_propagate_end){
+          if (diffblock_propagate_beg != diffblock_propagate_end) {
             hints.addCommand(llvmberry::ConsPropagate::make(
               llvmberry::ConsDiffblock::make(
                   llvmberry::TyValue::make(*ptr1src),
@@ -1106,20 +1081,20 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
           }
           // ptr1src >= ptr1 is already shown.
           // We have to show ptr3src >= ptr3.
-          if(diffblock_propagate_end == nullptr)
+          if (diffblock_propagate_end == nullptr)
             diffblock_propagate_end = noalias_si;
-          if(ptr3EquivalentValues->size() > 1){
-            for(size_t i = 1; i < ptr3EquivalentValues->size(); i++){
+          if (ptr3EquivalentValues->size() > 1) {
+            for (size_t i = 1; i < ptr3EquivalentValues->size(); i++) {
               Value *v = ptr3EquivalentValues->at(i);
-              if(GetElementPtrInst *gepinst = dyn_cast<GetElementPtrInst>(v)){
+              if (GetElementPtrInst *gepinst = dyn_cast<GetElementPtrInst>(v)) {
                 applyGepZeroAndPropagate(gepinst, true, ptr3src, diffblock_propagate_end);
-              }else if(BitCastInst *bci = dyn_cast<BitCastInst>(v)){
-                applyBitcastptrAndPropagate(bci, true, ptr3src, diffblock_propagate_end);
-              }else if(AddrSpaceCastInst *asci = dyn_cast<AddrSpaceCastInst>(v)){
-                applyAddrspaceptrAndPropagate(asci, true, ptr3src, diffblock_propagate_end);
+              } else if(BitCastInst *bci = dyn_cast<BitCastInst>(v)) {
+                applyBitCastPtrAndPropagate(bci, true, ptr3src, diffblock_propagate_end);
+              } else if(AddrSpaceCastInst *asci = dyn_cast<AddrSpaceCastInst>(v)) {
+                applyAddrSpacePtrAndPropagate(asci, true, ptr3src, diffblock_propagate_end);
               }
             }
-          }else{
+          } else {
             // ptr3src >= ptr3src
             assert(ptr3src == ptr3);
             hints.addCommand(llvmberry::ConsInfrule::make(
@@ -1137,7 +1112,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                 llvmberry::TyValue::make(*ptr3))));
          
           // step 2-C. propagate ptr1 _||_ ptr3.
-          if(diffblock_propagate_end != noalias_si){
+          if (diffblock_propagate_end != noalias_si) {
             hints.addCommand(llvmberry::ConsPropagate::make(
               llvmberry::ConsDiffblock::make(
                   llvmberry::TyValue::make(*ptr1),
@@ -1158,7 +1133,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                 llvmberry::TyPointer::make(*ptr1),
                 llvmberry::TyPointer::make(*ptr3))));
           // Now, propagate ptr1 _|_ ptr3 to the store instruction
-          if(diffblock_propagate_end != noalias_si){
+          if (diffblock_propagate_end != noalias_si) {
             hints.addCommand(llvmberry::ConsPropagate::make(
               llvmberry::ConsNoalias::make(
                   llvmberry::TyPointer::make(*ptr1),
@@ -1168,8 +1143,12 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                   llvmberry::TyPosition::make(llvmberry::Source, *diffblock_propagate_end),
                   llvmberry::TyPosition::make(llvmberry::Source, *noalias_si))));
           }
-        }else if(noalias_source == "aliasanalysis"){
+        } else if(noalias_source == "aliasanalysis") {
           // TODO:Currently we cannot prove noalias based on alias analysis..
+          llvmberry::ValidationUnit::GetInstance()->setDescription("This load-load/load-store optimization is done because"
+                "alias analysis reported that two pointers are equivalent. "
+                "However currently we cannot prove that two pointers are equivalent even if"
+                " alias analysis info is given.");
         }
       }
 
@@ -1180,16 +1159,14 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                                             LI.getName() + ".cast");
 
     llvmberry::ValidationUnit::GetInstance()->intrude([&NewInst, &AvailableVal, &LI](
-        llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-      std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> falv_arg = 
-              boost::any_cast<std::shared_ptr<llvmberry::FindAvailableLoadedValueArgs> >
-              (data["FindAvailableLoadedValue.arg"]);
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      auto falv_arg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
 
-      if(NewInst != AvailableVal){
+      if (NewInst != AvailableVal) {
         Instruction *inst = dyn_cast<Instruction>(NewInst);
         assert(inst);
         llvmberry::insertSrcNopAtTgtI(hints, inst);
-        if(BitCastInst *bi = dyn_cast<BitCastInst>(inst)){
+        if (BitCastInst *bi = dyn_cast<BitCastInst>(inst)) {
           hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Target, *bi),
             llvmberry::ConsBitcastptrTgt::make(
