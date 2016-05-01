@@ -41,10 +41,10 @@ enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl,
 enum TyFbop { BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
 
 enum  TyCond {
-          ICMP_EQ = 32,
-          ICMP_NE = 33, ICMP_UGT = 34, ICMP_UGE = 35, ICMP_ULT = 36,
-          ICMP_ULE = 37, ICMP_SGT = 38, ICMP_SGE = 39, ICMP_SLT = 40,
-          ICMP_SLE = 41, FIRST_ICMP_PREDICATE = ICMP_EQ, LAST_ICMP_PREDICATE = ICMP_SLE, BAD_ICMP_PREDICATE = ICMP_SLE + 1
+          CondEq,
+          CondNe, CondUgt, CondUge, CondUlt,
+          CondUle, CondSgt, CondSge, CondSlt,
+          CondSle, FIRST_ICMP_PREDICATE = CondEq, LAST_ICMP_PREDICATE = CondSle, BAD_ICMP_PREDICATE = CondSle + 1
 };
 enum TyFCond {
           FCMP_FALSE = 0, FCMP_OEQ = 1, FCMP_OGT = 2, FCMP_OGE = 3,
@@ -65,6 +65,7 @@ bool name_instructions(llvm::Function &F);
 std::string toString(llvmberry::TyBop bop);
 std::string toString(llvmberry::TyFbop bop);
 std::string toString(llvmberry::TyFloatType bop);
+std::string toString(llvmberry::TyCond icmp);
 
 bool isFloatOpcode(llvm::Instruction::BinaryOps ops);
 TyFloatType getFloatType(llvm::Type *typ);

@@ -189,6 +189,44 @@ std::string toString(llvmberry::TyFloatType float_type) {
   }
 }
 
+std::string toString(llvmberry::TyCond icmp){
+  switch (icmp) {
+  case llvmberry::CondEq:
+    return std::string("CondEq");
+  case llvmberry::CondNe:
+    return std::string("CondNe");
+  case llvmberry::CondUgt:
+    return std::string("CondUgt");
+  case llvmberry::CondUge:
+    return std::string("CondUge");
+  case llvmberry::CondUlt:
+    return std::string("CondUlt");
+  case llvmberry::CondUle:
+    return std::string("CondUle");
+  case llvmberry::CondSgt:
+    return std::string("CondSgt");
+  case llvmberry::CondSge:
+    return std::string("CondSge");
+  case llvmberry::CondSlt:
+    return std::string("CondSlt");
+  case llvmberry::CondSle:
+    return std::string("CondSle");
+  //case llvmberry::FIRST_ICMP_PREDICATE:
+  //  return std::string("CondEq");
+  //case llvmberry::LAST_ICMP_PREDICATE:
+  //  return std::string("Condsle");
+  default:
+    assert(false && "Cond toString");
+
+ 
+ 
+
+
+  }
+
+
+}
+
 llvmberry::TyFloatType getFloatType(llvm::Type *typ){
   llvmberry::TyFloatType fty;
   if (typ->isHalfTy())
@@ -281,25 +319,25 @@ TyCond predicate;
 
   switch(prd){
     case llvm::ICmpInst::ICMP_EQ:
-      predicate = llvmberry::ICMP_EQ; break;
+      predicate = llvmberry::CondEq; break;
     case llvm::ICmpInst::ICMP_NE:
-      predicate = llvmberry::ICMP_NE; break;
+      predicate = llvmberry::CondNe; break;
     case llvm::ICmpInst::ICMP_UGT:
-      predicate = llvmberry::ICMP_UGT; break;
+      predicate = llvmberry::CondUgt; break;
     case llvm::ICmpInst::ICMP_UGE:
-      predicate = llvmberry::ICMP_UGE; break;
+      predicate = llvmberry::CondUge; break;
     case llvm::ICmpInst::ICMP_ULT:
-      predicate = llvmberry::ICMP_ULT; break;
+      predicate = llvmberry::CondUlt; break;
     case llvm::ICmpInst::ICMP_ULE:
-      predicate = llvmberry::ICMP_ULE; break;
+      predicate = llvmberry::CondUle; break;
     case llvm::ICmpInst::ICMP_SGT:
-      predicate = llvmberry::ICMP_SGT; break;
+      predicate = llvmberry::CondSgt; break;
     case llvm::ICmpInst::ICMP_SGE:
-      predicate = llvmberry::ICMP_SGE; break;
+      predicate = llvmberry::CondSge; break;
     case llvm::ICmpInst::ICMP_SLT:
-      predicate = llvmberry::ICMP_SLT; break;
+      predicate = llvmberry::CondSlt; break;
     case llvm::ICmpInst::ICMP_SLE:
-      predicate = llvmberry::ICMP_SLE; break;
+      predicate = llvmberry::CondSle; break;
     default:
       assert("llvmberry::getIPredicate(llvm::Instruction::BinaryOps) : unknown opcode" && false);
   }
@@ -955,10 +993,10 @@ void TyFloatBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(operand2));
 }
 
-TyICmpInst::TyICmpInst(TyCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+TyICmpInst::TyICmpInst(TyCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(_predicate), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
 }
 void TyICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
-  archive(CEREAL_NVP(predicate));
+  archive(cereal::make_nvp("predicate", toString(predicate)));
   archive(CEREAL_NVP(operandtype));
   archive(CEREAL_NVP(operand1));
   archive(CEREAL_NVP(operand2));
