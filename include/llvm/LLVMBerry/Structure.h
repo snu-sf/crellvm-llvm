@@ -50,11 +50,11 @@ enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl,
 
 enum TyFbop { BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
 
-enum  TyCond {
+enum  TyIcmpPred {
           CondEq, CondNe, CondUgt, CondUge, CondUlt,
           CondUle, CondSgt, CondSge, CondSlt, CondSle 
 };
-enum TyFCond {
+enum TyFcmpPred {
           CondFfalse, CondFoeq, CondFogt, CondFoge,
           CondFolt, CondFole, CondFone, CondFord, 
           CondFuno, CondFueq, CondFugt, CondFuge, 
@@ -71,15 +71,15 @@ bool name_instructions(llvm::Function &F);
 std::string toString(llvmberry::TyBop bop);
 std::string toString(llvmberry::TyFbop bop);
 std::string toString(llvmberry::TyFloatType bop);
-std::string toString(llvmberry::TyCond cond);
-std::string toString(llvmberry::TyFCond fcond);
+std::string toString(llvmberry::TyIcmpPred cond);
+std::string toString(llvmberry::TyFcmpPred fcond);
 
 bool isFloatOpcode(llvm::Instruction::BinaryOps ops);
 TyFloatType getFloatType(llvm::Type *typ);
 TyFbop getFbop(llvm::Instruction::BinaryOps ops);
 TyBop getBop(llvm::Instruction::BinaryOps ops);
-TyCond getIPredicate(llvm::ICmpInst::Predicate prd);
-TyFCond getFPredicate(llvm::FCmpInst::Predicate prd);
+TyIcmpPred getIcmpPred(llvm::ICmpInst::Predicate prd);
+TyFcmpPred getFcmpPred(llvm::FCmpInst::Predicate prd);
 
 /*
  * position 
@@ -482,12 +482,12 @@ private :
 
 struct TyICmpInst{
 public :
-  TyICmpInst(TyCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
+  TyICmpInst(TyIcmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyICmpInst> make(const llvm::ICmpInst &iCmpInst);
 
 private :
-  TyCond predicate;
+  TyIcmpPred predicate;
   std::shared_ptr<TyValueType> operandtype;
   std::shared_ptr<TyValue> operand1;
   std::shared_ptr<TyValue> operand2;
@@ -495,12 +495,12 @@ private :
 
 struct TyFCmpInst{
 public :
-  TyFCmpInst(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
+  TyFCmpInst(TyFcmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyFCmpInst> make(const llvm::FCmpInst &fCmpInst);
 
 private :
-  TyFCond predicate;
+  TyFcmpPred predicate;
   std::shared_ptr<TyValueType> operandtype;
   std::shared_ptr<TyValue> operand1;
   std::shared_ptr<TyValue> operand2;
@@ -576,7 +576,7 @@ private :
 struct ConsICmpInst : public TyInstruction{
 public :
   ConsICmpInst(std::shared_ptr<TyICmpInst> _icmp_inst);
-  static std::shared_ptr<TyInstruction> make(TyCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
+  static std::shared_ptr<TyInstruction> make(TyIcmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   static std::shared_ptr<TyInstruction> make(const llvm::ICmpInst &iCmpInst);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
@@ -587,7 +587,7 @@ private :
 struct ConsFCmpInst : public TyInstruction{
 public :
   ConsFCmpInst(std::shared_ptr<TyFCmpInst> _fcmp_inst);
-  static std::shared_ptr<TyInstruction> make(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::                   shared_ptr<TyValue> _operand2);
+  static std::shared_ptr<TyInstruction> make(TyFcmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   static std::shared_ptr<TyInstruction> make(const llvm::FCmpInst &fCmpInst);
   void serialize(cereal::JSONOutputArchive& archive) const;
 
