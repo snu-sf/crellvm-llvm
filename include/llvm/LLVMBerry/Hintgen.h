@@ -54,6 +54,10 @@ namespace llvmberry{
    */
   void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, const llvm::Value *lesserval, 
         const llvm::Value *greaterval, TyScope scope);
+  /* propagateMaydiffGlobal(var, tag) : 
+   *   Propagates variable (var, tag) globally
+   */
+  void propagateMaydiffGlobal(std::string varname, TyTag tag);
   /* generateHintForNegValue(V, I, Scope) : 
    *   If V is a BinaryOperator (V = 0 - mV), propagate (V >= 0 - mV, 0 - mV >= V) from V to I in Scope
    *   If V is a constant C, add invariants (C >=src 0 - (-C)), ((0 - (-C)) >=tgt C). (It does nothing with scope)
