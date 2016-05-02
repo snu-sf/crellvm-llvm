@@ -53,6 +53,7 @@
 
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
 
 #include <vector>
 using namespace llvm;
@@ -2361,6 +2362,17 @@ bool GVN::processInstruction(Instruction *I) {
 
     std::shared_ptr<llvmberry::TyPropagateObject> repl_inv;
     std::shared_ptr<llvmberry::TyValue> leader_value;
+    std::shared_ptr<llvmberry::TyExpr> leader_expr;
+
+    // make symbolic expression of I
+    SmallVector<uint32_t, 4> op_I;
+    bool I_swapped = false;
+
+    for (Instruction::op_iterator OI = I->op_begin(), OE = I->op_end();
+         OI != OE; ++OI)
+      op_I.push_back(VN.lookup(*OI));
+
+    llvmberry::Expression expr_I = llvmberry::create_expression(I, I_swapped, op_I);
 
     if (llvm::isa<llvm::Instruction>(repl)) {
       Instruction *leaderI = dyn_cast<Instruction>(repl);
@@ -2372,31 +2384,19 @@ bool GVN::processInstruction(Instruction *I) {
       // z = f(y) -> z = f(x)
 
       if (I->getOpcode() == leaderI->getOpcode()) {
-        SmallVector<uint32_t, 4> op_I;
+        // make symbolic expression of leaderI
         SmallVector<uint32_t, 4> op_leaderI;
-        bool I_swapped = false, leaderI_swapped = false;
-
-        for (Instruction::op_iterator OI = I->op_begin(), OE = I->op_end();
-             OI != OE; ++OI)
-          op_I.push_back(VN.lookup(*OI));
+        bool leaderI_swapped = false;
 
         for (Instruction::op_iterator OI = leaderI->op_begin(),
                                       OE = leaderI->op_end();
              OI != OE; ++OI)
           op_leaderI.push_back(VN.lookup(*OI));
 
-        if (I->isCommutative() && (I->getNumOperands() == 2)) {
-          if (op_I[0] > op_I[1]) {
-            std::swap(op_I[0], op_I[1]);
-            I_swapped = true;
-          }
-          if (op_leaderI[0] > op_leaderI[1]) {
-            std::swap(op_leaderI[0], op_leaderI[1]);
-            leaderI_swapped = true;
-          }
-        }
+        llvmberry::Expression expr_leaderI =
+            llvmberry::create_expression(leaderI, leaderI_swapped, op_leaderI);
 
-        if (op_I == op_leaderI) {
+        if (expr_I == expr_leaderI) {
           // propagate [ e1 >= x ] in src until [ y = e2 ]
           hints.addCommand(llvmberry::ConsPropagate::make(
               llvmberry::ConsLessdef::make(
@@ -2429,39 +2429,52 @@ bool GVN::processInstruction(Instruction *I) {
 
           // TODO
           leader_value = llvmberry::ConsId::make(leaderI_id, llvmberry::Physical);
+          // leader_expr = VAR(leaderI_id, Physical);
           
         } // end comparing operands
       }   // end comparing opcode
     } // end [ repl is-a Inst ]
 
     if (!repl_inv) {
-      // TODO: cmp case
+      // TODO: branch case
+
+      // c = e_c
+      // br c b1 b2
+      //
+      // bx: (cond == X)
+      // y = e_y
+      // z = f(y)
 
       // case 1:
-      // c = e_c
-      // br c b_1 b_2
-      //
-      // b_k: # val(c) = B
-      // x = e_c
-      // y = f(x) -> f(B)
+      // y = e_c (modulo comm.)
+      //  => z = f(y) -> z = f(X)
+
+      // TODO: from case 2~5
 
       // case 2:
-      // a = e_a
-      // c = icmp P a b
-      // br c b_1 b_2
-      //
-      // b_k: # val(c) = B
-      // d = icmp ~P a b
-      // y = f(d) -> f(~B)
-      
+      // e_c == a && b, X == True
+      // e_y = e_a <or> e_b
+      //  => z = f(y) -> z = f(X)
+
       // case 3:
-      // a = e_a
-      // c = icmp P a b
-      // br c b_1 b_2
-      //
-      // b_k: # val(c) = B
-      // x = e_a
-      // y = f(x) -> f(b)
+      // e_c == a || b, X == False
+      // e_y = e_a <or> e_b
+      //  => z = f(y) -> z = f(X)
+
+      // case 4:
+      // e_c == icmp eq a b, X == True
+      // e_y == e_a <or> e_b
+      //  => z = f(y) -> z = f(b) <or> f(a)
+
+      // case 5:
+      // e_c == icmp ne a b, X == False
+      // e_y == e_a <or> e_b
+      //  => z = f(y) -> z = f(b) <or> f(a)
+
+      // case 6:
+      // e_c == icmp P a b
+      // e_y == icmp ~P a b
+      //  => z = f(y) -> z = f(~X)
 
       const BasicBlock *leaderBB =
           boost::any_cast<const BasicBlock *>(data["findLeader#BB"]);
@@ -2477,32 +2490,30 @@ bool GVN::processInstruction(Instruction *I) {
         
         // if condition is constant, fail the validation
         if (!condI) return;
+        
         std::string condI_id = llvmberry::getVariable(*condI);
-
-        bool cond_value = false;
-        std::shared_ptr<llvmberry::TyExpr> cond_expr;
-        std::shared_ptr<llvmberry::TyExpr> cond_neg_expr;
+        int cond_value;
 
         std::shared_ptr<llvmberry::TyExpr> true_expr =
-          std::make_shared<llvmberry::ConsConst>(1, 1);
-
+            std::make_shared<llvmberry::ConsConst>(1, 1);
         std::shared_ptr<llvmberry::TyExpr> false_expr =
-          std::make_shared<llvmberry::ConsConst>(0, 1);
+            std::make_shared<llvmberry::ConsConst>(0, 1);
+
+        std::shared_ptr<llvmberry::TyExpr> cond_expr = true_expr;
+        std::shared_ptr<llvmberry::TyExpr> cond_neg_expr = false_expr;
+
+        std::shared_ptr<llvmberry::TyPropagateObject> pre_repl_inv;
 
         // Find out branch condition of current path
-        
-        if (BI->getSuccessor(0) == leaderBB) {
-          // TODO: check if this is really true
-          cond_value = true;
-          cond_expr = true_expr;
-        } else if (BI->getSuccessor(1) == leaderBB) {
-          cond_value = false;
-          cond_expr = false_expr;
-        } else assert("Leader_bb is not a successor of leader_bb_pred");
+        if (BI->getSuccessor(0) == leaderBB)
+          cond_value = 1;
+        else if (BI->getSuccessor(1) == leaderBB) {
+          cond_value = 0;
+          cond_expr.swap(cond_neg_expr);
+        } else
+          assert("Leader_bb is not a successor of leader_bb_pred");
 
-        cond_neg_expr = (cond_expr == true_expr)? false_expr : true_expr;
-
-        // propagate [ e_c >= c ] in src until the end of block
+        // propagate [ e_c >= c ] in src until the end of leaderBB_pred
         hints.addCommand(llvmberry::ConsPropagate::make(
             llvmberry::ConsLessdef::make(
                 llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
@@ -2514,7 +2525,7 @@ bool GVN::processInstruction(Instruction *I) {
                 llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
                                                          *leaderBB_pred))));
 
-        // transitivity [ e_c >= c /\ c >= B ] => [ e_c >= B ] in src at PHI
+        // transitivity [ e_c >= c /\ c >= X ] => [ e_c >= X ] in src at PHI of leaderBB
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(
                 llvmberry::Source, llvmberry::getBasicBlockIndex(leaderBB),
@@ -2524,13 +2535,58 @@ bool GVN::processInstruction(Instruction *I) {
                                          llvmberry::Source),
                 llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
                 cond_expr)));
-        
+
+        // start comparing symbolic expressions in order to determine the case
+        SmallVector<uint32_t, 4> op_condI;
+        bool condI_swapped = false;
+
+        for (Instruction::op_iterator OI = condI->op_begin(),
+                                      OE = condI->op_end();
+             OI != OE; ++OI)
+          op_condI.push_back(VN.lookup(*OI));
+
+        llvmberry::Expression expr_condI =
+          llvmberry::create_expression(condI, condI_swapped, op_condI);
+
+        if (expr_I == expr_condI) {
+          // case 1
+          pre_repl_inv = llvmberry::ConsLessdef::make(
+              llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
+                                       llvmberry::Source),
+              cond_expr, llvmberry::Source);
+
+          repl_inv = llvmberry::ConsLessdef::make(
+              llvmberry::ConsVar::make(I_id, llvmberry::Physical),
+              cond_expr, llvmberry::Source);
+
+          leader_value = std::make_shared<llvmberry::ConsConstVal>(
+              std::make_shared<llvmberry::ConsConstInt>(cond_value, 1));
+          leader_expr = cond_expr;
+
+        } else if (llvmberry::is_inverse_expression(expr_I, expr_condI)) {
+          // TODO
+        } else {
+          // TODO: case 2 to 5
+        }
+
+        if (!pre_repl_inv) return;
+
+        PROPAGATE(pre_repl_inv,
+                  BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                             llvmberry::Source,
+                             llvmberry::getBasicBlockIndex(leaderBB)),
+                         INSTPOS(SRC, I)));
+
+        INFRULE(INSTPOS(SRC, I), llvmberry::ConsTransitivity::make(
+                                     VAR(I_id, Physical),
+                                     RHS(I_id, Physical, SRC), leader_expr));
+
+        //        if (c.opcode = icmp && predicate inverse
+
       } else if (llvm::dyn_cast<llvm::SwitchInst>(TI)) {
         assert("Should not occur, as it is not formalized in vellvm yet.");
       } else
         assert(false && "Should not occur");
-
-      return;
     }
 
     // For each user of I, replace I with repl.
@@ -2538,6 +2594,9 @@ bool GVN::processInstruction(Instruction *I) {
     //  apply replace_rhs if needed
 
     // if we failed to find repl_inv, fail the validation
+        // PROPAGATE(LESSDEF(VAR("x",Physical), VAR("y",Physical), SRC),
+        //       BOUNDS(INSTPOS(SRC,I), INSTPOS(SRC,I)));
+
     if (!repl_inv) return;
     
     for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
@@ -2576,7 +2635,7 @@ bool GVN::processInstruction(Instruction *I) {
         // z = f(y) -> z = f(x)
         // When the name of z is empty, we don't have to apply replaceRhs. (such as void call or store)
         // When 'f' is Call, then z is automatically removed from MayDiff, so we don't care.
-
+        
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, *userI,
                                         prev_block_name),
@@ -2676,6 +2735,14 @@ bool GVN::processBlock(BasicBlock *BB) {
 
   for (BasicBlock::iterator BI = BB->begin(), BE = BB->end();
        BI != BE;) {
+    bool AtStart = BI == BB->begin();
+    BasicBlock::iterator prevBI;
+    
+    if (!AtStart) {
+      prevBI = --BI;
+      ++BI;
+    }
+    
     ChangedFunction |= processInstruction(BI);
     if (InstrsToErase.empty()) {
       ++BI;
@@ -2684,11 +2751,6 @@ bool GVN::processBlock(BasicBlock *BB) {
 
     // If we need some instructions deleted, do it now.
     NumGVNInstr += InstrsToErase.size();
-
-    // Avoid iterator invalidation.
-    bool AtStart = BI == BB->begin();
-    if (!AtStart)
-      --BI;
 
     for (SmallVectorImpl<Instruction *>::iterator I = InstrsToErase.begin(),
          E = InstrsToErase.end(); I != E; ++I) {
@@ -2702,7 +2764,7 @@ bool GVN::processBlock(BasicBlock *BB) {
     if (AtStart)
       BI = BB->begin();
     else
-      ++BI;
+      BI = ++prevBI;
   }
 
   return ChangedFunction;
