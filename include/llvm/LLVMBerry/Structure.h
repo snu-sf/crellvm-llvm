@@ -68,8 +68,8 @@ bool isFloatOpcode(llvm::Instruction::BinaryOps ops);
 TyFloatType getFloatType(llvm::Type *typ);
 TyFbop getFbop(llvm::Instruction::BinaryOps ops);
 TyBop getBop(llvm::Instruction::BinaryOps ops);
-TyIcmpPred getICmpPred(llvm::ICmpInst::Predicate prd);
-TyFcmpPred getFCmpPred(llvm::FCmpInst::Predicate prd);
+TyIcmpPred getIcmpPred(llvm::ICmpInst::Predicate prd);
+TyFcmpPred getFcmpPred(llvm::FCmpInst::Predicate prd);
 
 /* position */
 
