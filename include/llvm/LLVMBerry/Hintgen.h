@@ -79,25 +79,33 @@ namespace llvmberry{
           bool needs_commutativity,
           bool is_leftform);
   void generateHintForOrAnd(llvm::BinaryOperator *Y, llvm::Value *X, llvm::Value *A);
-  void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, 
+  void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0, 
           llvm::Value *op1, bool needsCommutativity);
-  void generateHintForOrXor2(llvm::BinaryOperator &I, 
+  void generateHintForOrXor2(llvm::BinaryOperator *Z, 
           llvm::Value *X1_val, llvm::Value *X2_val,
           llvm::Value *A, llvm::Value *B,
           bool needsY1Commutativity, bool needsY2Commutativity);
-  void generateHintForAddXorAnd(llvm::BinaryOperator &I,
+  void generateHintForOrXor4(llvm::BinaryOperator *Z,
+          llvm::Value *X,
+          llvm::BinaryOperator *Y,
+          llvm::BinaryOperator *A,
+          llvm::Value *B,
+          llvm::BinaryOperator *NB,
+          bool needsYCommutativity,
+          bool needsZCommutativity);
+  void generateHintForAddXorAnd(llvm::BinaryOperator *Z,
           llvm::BinaryOperator *X,
           llvm::BinaryOperator *Y,
           llvm::Value *A,
           llvm::Value *B,
           bool needsYCommutativity, bool needsZCommutativity);
-  void generateHintForAddOrAnd(llvm::BinaryOperator &I,
+  void generateHintForAddOrAnd(llvm::BinaryOperator *Z,
           llvm::BinaryOperator *X,
           llvm::BinaryOperator *Y,
           llvm::Value *A,
           llvm::Value *B,
           bool needsYCommutativity, bool needsZCommutativity);
-  void generateHintForAndOr(llvm::BinaryOperator &I,
+  void generateHintForAndOr(llvm::BinaryOperator *Z,
           llvm::Value *X,
           llvm::BinaryOperator *Y,
           llvm::Value *A,

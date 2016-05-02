@@ -616,6 +616,18 @@ private :
   std::shared_ptr<TySize> sz;
 };
 
+struct TyOrCommutativeTgt{
+public : 
+  TyOrCommutativeTgt(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyOrMone{
 public : 
   TyOrMone(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
@@ -1652,6 +1664,16 @@ public :
 
 private : 
   std::shared_ptr<TyOrCommutative> or_commutative;
+};
+
+struct ConsOrCommutativeTgt : public TyInfrule{
+public : 
+  ConsOrCommutativeTgt(std::shared_ptr<TyOrCommutativeTgt> _or_commutative);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrCommutativeTgt> or_commutative_tgt;
 };
 
 struct ConsOrMone : public TyInfrule{
