@@ -250,7 +250,7 @@ std::string toString(llvmberry::TyFCond fcond) {
     case llvmberry::CondFtrue:
       return std::string("CondFtrue");
     default:
-      assert("llvmberry::getFPredicate(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+      assert("llvmberry::toString(llvmberry::TyFCond fcond) : unknown fcond" && false);
   }
 }
 
@@ -1029,7 +1029,7 @@ void TyICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(operand2));
 }
 
-TyFCmpInst::TyFCmpInst(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::            shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::                  move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)),              operand2(std::move(_operand2)){
+TyFCmpInst::TyFCmpInst(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
 }
 void TyFCmpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("predicate", toString(predicate)));
