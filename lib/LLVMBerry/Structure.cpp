@@ -903,7 +903,7 @@ std::shared_ptr<TyICmpInst> TyICmpInst::make(const llvm::ICmpInst &icmpInst){
 std::shared_ptr<TyFCmpInst> TyFCmpInst::make(const llvm::FCmpInst &fcmpInst){
   llvmberry::TyFCond predicate = llvmberry::getFPredicate(fcmpInst.getPredicate());
   return std::shared_ptr<TyFCmpInst>(new TyFCmpInst(predicate, TyValueType::make(*fcmpInst.getType()),
-                                    TyValue::make(*fcmpInst.getOperand(0)), TyValue::make(*fcmpInst.  getOperand(1))));
+                                    TyValue::make(*fcmpInst.getOperand(0)), TyValue::make(*fcmpInst.getOperand(1))));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
@@ -973,7 +973,7 @@ void ConsICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
 ConsFCmpInst::ConsFCmpInst(std::shared_ptr<TyFCmpInst> _fcmp_inst) : fcmp_inst(std::move(_fcmp_inst)){
 }
 std::shared_ptr<TyInstruction> ConsFCmpInst::make(TyFCond _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue>_operand2){
-  std::shared_ptr<TyFCmpInst> _val(new TyFCmpInst(_predicate, std::move(_operandtype), std::          move(_operand1), std::move(_operand2)));
+  std::shared_ptr<TyFCmpInst> _val(new TyFCmpInst(_predicate, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
   return std::shared_ptr<TyInstruction>(new ConsFCmpInst(std::move(_val)));
 }
 std::shared_ptr<TyInstruction> ConsFCmpInst::make(const llvm::FCmpInst &fCmpInst){
