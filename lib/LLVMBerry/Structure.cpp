@@ -374,7 +374,7 @@ TyICmpPred predicate;
 TyFCmpPred getFCmpPred(llvm::FCmpInst::Predicate prd) {
 TyFCmpPred predicate;
 
-  switch(prd){
+switch(prd){
     case llvm::FCmpInst::FCMP_FALSE:
       predicate = llvmberry::CondFfalse; break;
     case llvm::FCmpInst::FCMP_OEQ:
