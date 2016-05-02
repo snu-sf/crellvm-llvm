@@ -2,6 +2,9 @@
 #define HINTGEN_H
 
 #include "llvm/LLVMBerry/Structure.h"
+#include <string>
+#include <vector>
+#include <memory>
 
 #define PHIPOS(SCOPE, PN, prevI) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), prevI->getParent()->getName()) 
 #define PHIPOSJustPhi(SCOPE, PN) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
@@ -12,8 +15,10 @@
 #define RHS(name, tag, SCOPE) llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
 #define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
 #define LESSDEF(left, right, SCOPE) llvmberry::ConsLessdef::make(left, right, SCOPE)
+#define NOALIAS(ptr1, ptr2, SCOPE) llvmberry::ConsNoalias::make(ptr1, ptr2, SCOPE)
 #define INSN(x) llvmberry::ConsInsn::make(x)
 #define VAL(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
+#define POINTER(v) llvmberry::TyPointer::make(*(v))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
 #define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
 #define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
@@ -42,7 +47,13 @@ namespace llvmberry{
    *   else : 
    *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
    */
-  void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope, bool propagateEquivalence = false);
+  void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to, TyScope scope, 
+        bool propagateEquivalence = false);
+  /* propagateLessdef(I1, I2, v1, v2, scope) : 
+   *   Propagates v1 >= v2 from I1 to I2 in scope
+   */
+  void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to, const llvm::Value *lesserval, 
+        const llvm::Value *greaterval, TyScope scope);
   /* generateHintForNegValue(V, I, Scope) : 
    *   If V is a BinaryOperator (V = 0 - mV), propagate (V >= 0 - mV, 0 - mV >= V) from V to I in Scope
    *   If V is a constant C, add invariants (C >=src 0 - (-C)), ((0 - (-C)) >=tgt C). (It does nothing with scope)
@@ -91,19 +102,6 @@ namespace llvmberry{
   void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
 
-  // Used in InstructionSimplify.cpp : SimplifyAndInst()
-  struct SimplifyAndInstArg{
-  public:
-    SimplifyAndInstArg();
-    void setHintGenFunc(std::string microoptName, std::function<void(llvm::Instruction *)> hintGenFunc);
-    void generateHint(llvm::Instruction *arg) const;
-    bool isActivated() const;
-    std::string getMicroOptName() const;
-  private:
-    bool activated;
-    std::string microoptName;
-    std::function<void(llvm::Instruction *)> hintGenFunc;
-  };
 }
 
 #endif

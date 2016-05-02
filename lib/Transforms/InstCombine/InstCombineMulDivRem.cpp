@@ -423,13 +423,15 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
       BO = BinaryOperator::CreateShl(Op1, Y);
       ShlNSW = cast<ShlOperator>(Op0)->hasNoSignedWrap();
       llvmberry::ValidationUnit::GetInstance()->intrude([](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-        data["needsTransitivity"] = false;
+        data.create<llvmberry::ArgForVisitMul>();
+        data.get<llvmberry::ArgForVisitMul>()->needsTransitivity = false;
       });
     } else if (match(Op1, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op0, Y);
       ShlNSW = cast<ShlOperator>(Op1)->hasNoSignedWrap();
       llvmberry::ValidationUnit::GetInstance()->intrude([](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
-        data["needsTransitivity"] = true;
+        data.create<llvmberry::ArgForVisitMul>();
+        data.get<llvmberry::ArgForVisitMul>()->needsTransitivity = true;
       });
     }
 
@@ -443,8 +445,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
         Value *A = Y;
         BinaryOperator *Y = nullptr;
         Value *X = nullptr;
-        assert(data.find("needsTransitivity") != data.end());
-        bool needsTransitivity = boost::any_cast<bool>(data["needsTransitivity"]);
+        bool needsTransitivity = data.get<llvmberry::ArgForVisitMul>()->needsTransitivity;
         if(needsTransitivity){
           X = Op0;
           Y = dyn_cast<BinaryOperator>(Op1);
@@ -461,14 +462,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
         // propagate Y = 1 << A
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
-                llvmberry::Source),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Source, *Y),
-                llvmberry::TyPosition::make(llvmberry::Source, *Z))));
+        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
         
         if(needsTransitivity){
           // replace Z = X * Y to Z = Y * X
@@ -489,6 +483,8 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
                 llvmberry::TyValue::make(*X),
                 llvmberry::TyValue::make(*A),
                 llvmberry::ConsSize::make(bitwidth))));
+        
+        data.erase<llvmberry::ArgForVisitMul>();
       });
  
       if (I.hasNoUnsignedWrap())

@@ -2022,8 +2022,10 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
     Val = Vals.Val;
     if (llvmberry::ValidationUnit::Exists())
       llvmberry::ValidationUnit::GetInstance()->intrude([&Vals](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) { data["findLeader#BB"] = Vals.BB; });
+          llvmberry::Dictionary &data,
+          llvmberry::CoreHint &hints) 
+          //{ data["findLeader#BB"] = Vals.BB; });
+          { data.get<llvmberry::ArgForFindLeader>()->BB = Vals.BB; });
     if (isa<Constant>(Val)) return Val;
   }
 
@@ -2033,9 +2035,10 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
       if (isa<Constant>(Next->Val)) {
         if (llvmberry::ValidationUnit::Exists())
           llvmberry::ValidationUnit::GetInstance()->intrude(
-              [&Next](llvmberry::ValidationUnit::Dictionary &data,
+              [&Next](llvmberry::Dictionary &data,
                       llvmberry::CoreHint &hints) {
-                data["findLeader#BB"] = Next->BB;
+                data.get<llvmberry::ArgForFindLeader>()->BB = Next->BB;
+                //data["findLeader#BB"] = Next->BB;
               });
         return Next->Val;
       }
@@ -2043,9 +2046,10 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
         Val = Next->Val;
         if (llvmberry::ValidationUnit::Exists())
           llvmberry::ValidationUnit::GetInstance()->intrude(
-              [&Next](llvmberry::ValidationUnit::Dictionary &data,
+              [&Next](llvmberry::Dictionary &data,
                       llvmberry::CoreHint &hints) {
-                data["findLeader#BB"] = Next->BB;
+                data.get<llvmberry::ArgForFindLeader>()->BB = Next->BB;
+                //data["findLeader#BB"] = Next->BB;
               });
       }
     }
@@ -2329,6 +2333,11 @@ bool GVN::processInstruction(Instruction *I) {
   }
 
   llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
+  // added by jylee.
+  llvmberry::ValidationUnit::GetInstance()->intrude([](
+      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    data.create<llvmberry::ArgForFindLeader>();
+  });
 
   // Perform fast-path value-number based elimination of values inherited from
   // dominators.
@@ -2423,9 +2432,10 @@ bool GVN::processInstruction(Instruction *I) {
     } else if (ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(repl)) {
       std::string to_rem = llvmberry::getVariable(*I);
 
-      assert(data.find("findLeader#BB") != data.end());
-      const BasicBlock *leader_bb =
-          boost::any_cast<const BasicBlock *>(data["findLeader#BB"]);
+      //assert(data.find("findLeader#BB") != data.end());
+      //const BasicBlock *leader_bb =
+      //    boost::any_cast<const BasicBlock *>(data["findLeader#BB"]);
+      const BasicBlock *leader_bb = data.get<llvmberry::ArgForFindLeader>()->BB;
       const BasicBlock *leader_bb_pred = leader_bb->getSinglePredecessor();
       assert(leader_bb_pred &&
              "Expect it to be introduced from propagateEquality, and it checks "

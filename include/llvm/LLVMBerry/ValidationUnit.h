@@ -12,6 +12,7 @@
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Dictionary.h"
 
 namespace llvmberry {
 
@@ -19,7 +20,7 @@ extern std::string defaultOutputDir;
 
 class ValidationUnit {
 public:
-  typedef std::map<std::string, boost::any> Dictionary;
+  typedef llvmberry::Dictionary Dictionary;
   enum RETURN_CODE { COMMIT = 0, ABORT };
 
   CoreHint &getHint();
