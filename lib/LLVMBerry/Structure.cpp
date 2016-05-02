@@ -188,7 +188,7 @@ std::string toString(llvmberry::TyFloatType float_type) {
   }
 }
 
-std::string toString(llvmberry::TyICmpPred cond){
+std::string toString(llvmberry::TyIcmpPred cond){
   switch(cond) {
   case llvmberry::CondEq:
     return std::string("CondEq");
@@ -215,7 +215,7 @@ std::string toString(llvmberry::TyICmpPred cond){
   }
 }
 
-std::string toString(llvmberry::TyFCmpPred fcond) {
+std::string toString(llvmberry::TyFcmpPred fcond) {
   switch(fcond){
     case llvmberry::CondFfalse:
       return std::string("CondFfalse");
@@ -341,8 +341,8 @@ TyBop getBop(llvm::Instruction::BinaryOps ops){
   return bop;
 }
 
-TyICmpPred getICmpPred(llvm::ICmpInst::Predicate prd) {
-TyICmpPred predicate;
+TyIcmpPred getICmpPred(llvm::ICmpInst::Predicate prd) {
+TyIcmpPred predicate;
 
   switch(prd){
     case llvm::ICmpInst::ICMP_EQ:
@@ -366,15 +366,15 @@ TyICmpPred predicate;
     case llvm::ICmpInst::ICMP_SLE:
       predicate = llvmberry::CondSle; break;
     default:
-      assert("llvmberry::getIPredicate(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+      assert("llvmberry::getICmpPred(llvm::ICmpInst::Predicate prd) : unknown predicate" && false);
   }
   return predicate;
 }
 
-TyFCmpPred getFCmpPred(llvm::FCmpInst::Predicate prd) {
-TyFCmpPred predicate;
+TyFcmpPred getFCmpPred(llvm::FCmpInst::Predicate prd) {
+TyFcmpPred predicate;
 
-switch(prd){
+  switch(prd){
     case llvm::FCmpInst::FCMP_FALSE:
       predicate = llvmberry::CondFfalse; break;
     case llvm::FCmpInst::FCMP_OEQ:
@@ -408,7 +408,7 @@ switch(prd){
     case llvm::FCmpInst::FCMP_TRUE:
       predicate = llvmberry::CondFtrue; break;
     default:
-      assert("llvmberry::getFPredicate(llvm::Instruction::BinaryOps) : unknown opcode" && false);
+      assert("llvmberry::getFCmpPred(llvm::FCmpInst::Predicate pred) : unknown predicate" && false);
   }
   return predicate;
 }
@@ -895,13 +895,13 @@ std::shared_ptr<TyFloatBinaryOperator> TyFloatBinaryOperator::make(const llvm::B
 }
 
 std::shared_ptr<TyICmpInst> TyICmpInst::make(const llvm::ICmpInst &icmpInst){
-  llvmberry::TyICmpPred predicate = llvmberry::getICmpPred(icmpInst.getPredicate());
+  llvmberry::TyIcmpPred predicate = llvmberry::getICmpPred(icmpInst.getPredicate());
   return std::shared_ptr<TyICmpInst>(new TyICmpInst(predicate, TyValueType::make(*icmpInst.getType()),
                                     TyValue::make(*icmpInst.getOperand(0)), TyValue::make(*icmpInst.getOperand(1))));
 }
 
 std::shared_ptr<TyFCmpInst> TyFCmpInst::make(const llvm::FCmpInst &fcmpInst){
-  llvmberry::TyFCmpPred predicate = llvmberry::getFCmpPred(fcmpInst.getPredicate());
+  llvmberry::TyFcmpPred predicate = llvmberry::getFCmpPred(fcmpInst.getPredicate());
   return std::shared_ptr<TyFCmpInst>(new TyFCmpInst(predicate, TyValueType::make(*fcmpInst.getType()),
                                     TyValue::make(*fcmpInst.getOperand(0)), TyValue::make(*fcmpInst.getOperand(1))));
 }
@@ -956,7 +956,7 @@ void ConsFloatBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
 
 ConsICmpInst::ConsICmpInst(std::shared_ptr<TyICmpInst> _icmp_inst) : icmp_inst(std::move(_icmp_inst)){
 }
-std::shared_ptr<TyInstruction> ConsICmpInst::make(TyICmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2){
+std::shared_ptr<TyInstruction> ConsICmpInst::make(TyIcmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2){
   std::shared_ptr<TyICmpInst> _val(new TyICmpInst(_predicate, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
   return std::shared_ptr<TyInstruction>(new ConsICmpInst(std::move(_val)));
 }
@@ -972,7 +972,7 @@ void ConsICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
 
 ConsFCmpInst::ConsFCmpInst(std::shared_ptr<TyFCmpInst> _fcmp_inst) : fcmp_inst(std::move(_fcmp_inst)){
 }
-std::shared_ptr<TyInstruction> ConsFCmpInst::make(TyFCmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue>_operand2){
+std::shared_ptr<TyInstruction> ConsFCmpInst::make(TyFcmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue>_operand2){
   std::shared_ptr<TyFCmpInst> _val(new TyFCmpInst(_predicate, std::move(_operandtype), std::move(_operand1), std::move(_operand2)));
   return std::shared_ptr<TyInstruction>(new ConsFCmpInst(std::move(_val)));
 }
@@ -1020,7 +1020,7 @@ void TyFloatBinaryOperator::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(operand2));
 }
 
-TyICmpInst::TyICmpInst(TyICmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(_predicate), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+TyICmpInst::TyICmpInst(TyIcmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(_predicate), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
 }
 void TyICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("predicate", toString(predicate)));
@@ -1029,7 +1029,7 @@ void TyICmpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(operand2));
 }
 
-TyFCmpInst::TyFCmpInst(TyFCmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
+TyFCmpInst::TyFCmpInst(TyFcmpPred _predicate, std::shared_ptr<TyValueType> _operandtype, std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2) : predicate(std::move(_predicate)), operandtype(std::move(_operandtype)), operand1(std::move(_operand1)), operand2(std::move(_operand2)){
 }
 void TyFCmpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(cereal::make_nvp("predicate", toString(predicate)));
