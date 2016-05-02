@@ -17,9 +17,11 @@
 #define LESSDEF(left, right, SCOPE) llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define INSN(x) llvmberry::ConsInsn::make(x)
 #define VAL(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
+#define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
 #define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
 #define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
+#define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
 #define BINOP(bop, type, val1, val2) llvmberry::ConsBinaryOp::make(bop, type, val1, val2)
 #define FBINOP(fbop, type, val1, val2) llvmberry::ConsFloatBinaryOp::make(fbop, type, val1, val2)
 #define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
@@ -70,6 +72,7 @@ namespace llvmberry{
           llvm::SelectInst *Y, 
           bool needs_commutativity,
           bool is_leftform);
+  void generateHintForOrAnd(llvm::BinaryOperator *Y, llvm::Value *X, llvm::Value *A);
   void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, 
           llvm::Value *op1, bool needsCommutativity);
   void generateHintForOrXor2(llvm::BinaryOperator &I, 

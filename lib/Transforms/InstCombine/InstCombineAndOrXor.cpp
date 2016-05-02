@@ -2222,8 +2222,30 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  if (Value *V = SimplifyOrInst(Op0, Op1, DL, TLI, DT, AC))
+  llvmberry::ValidationUnit::Begin("simplify_or_inst", I.getParent()->getParent());
+  llvmberry::ValidationUnit::GetInstance()->intrude([](
+      llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    data.create<llvmberry::ArgForSimplifyOrInst>();
+  });
+
+  if (Value *V = SimplifyOrInst(Op0, Op1, DL, TLI, DT, AC)){
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
+      auto ptr = data.get<llvmberry::ArgForSimplifyOrInst>();
+      if(ptr->isActivated()){
+        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
+        ptr->generateHint(&I);
+        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+      }else{
+        llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+      }
+    });
+
     return ReplaceInstUsesWith(I, V);
+  }
+  llvmberry::ValidationUnit::Abort();
 
   // (A&B)|(A&C) -> A&(B|C) etc
   if (Value *V = SimplifyUsingDistributiveLaws(I))

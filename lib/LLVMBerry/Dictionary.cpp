@@ -4,18 +4,18 @@
 
 namespace llvmberry {
 
-SimplifyAndInstArg::SimplifyAndInstArg(){
+SimplifyInstArg::SimplifyInstArg(){
   this->activated = false;
   this->isSwapped = false;
 }
 
-void SimplifyAndInstArg::setHintGenFunc(std::string _microoptName, std::function<void(llvm::Instruction *)> _hintGenFunc){
+void SimplifyInstArg::setHintGenFunc(std::string _microoptName, std::function<void(llvm::Instruction *)> _hintGenFunc){
   this->activated = true;
   this->microoptName = _microoptName;
   this->hintGenFunc = _hintGenFunc;
 }
 
-void SimplifyAndInstArg::generateHint(llvm::Instruction *arg) const{
+void SimplifyInstArg::generateHint(llvm::Instruction *arg) const{
   assert(this->activated);
   auto &func = this->hintGenFunc;
   ValidationUnit::GetInstance()->intrude([&func, &arg]
@@ -24,11 +24,11 @@ void SimplifyAndInstArg::generateHint(llvm::Instruction *arg) const{
   });
 }
 
-std::string SimplifyAndInstArg::getMicroOptName() const{
+std::string SimplifyInstArg::getMicroOptName() const{
   return this->microoptName;
 }
 
-bool SimplifyAndInstArg::isActivated() const{
+bool SimplifyInstArg::isActivated() const{
   return activated;
 }
 

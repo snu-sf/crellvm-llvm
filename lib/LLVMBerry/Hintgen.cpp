@@ -424,6 +424,32 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
   });
 }
 
+void generateHintForOrAnd(llvm::BinaryOperator *Y, llvm::Value *X, llvm::Value *A){
+  assert(llvmberry::ValidationUnit::Exists());
+
+  ValidationUnit::GetInstance()->intrude([Y, X, A](Dictionary &data, CoreHint &hints){
+    auto ptr = data.get<ArgForSimplifyOrInst>();
+    bool isSwapped = ptr->isSwapped;
+    ptr->setHintGenFunc("or_and", [Y, X, A, isSwapped, &hints](llvm::Instruction *I){
+      //   <src>   |   <tgt>
+      // Y = X & A | Y = X & A
+      // Z = Y | X | (Z equals X)
+      llvm::BinaryOperator *Z = llvm::dyn_cast<llvm::BinaryOperator>(I);
+      assert(Z && "Z must be a binary operator in or_and optimization");
+
+      bool Zswapped = Z->getOperand(0) == X;
+      propagateInstruction(Y, Z, SRC);
+      if (Zswapped ^ isSwapped)
+        applyCommutativity(Z, Z, SRC);
+      if (Y->getOperand(0) == A)
+        applyCommutativity(Z, Y, SRC);
+      INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrAnd::make(
+          VAL(Z, Physical), VAL(Y, Physical), VAL(X, Physical), VAL(A, Physical),
+          BITSIZE(Z->getType()->getIntegerBitWidth())));
+    });
+  });
+}
+
 void generateHintForOrXor(llvm::BinaryOperator &I, llvm::Value *op0, llvm::Value *op1, bool needsCommutativity){
   assert(llvmberry::ValidationUnit::Exists());
   
