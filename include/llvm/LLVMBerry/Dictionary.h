@@ -26,13 +26,22 @@ enum DictKeys {
   ArgForFindLeader
 };
 
+/*
+ * Using Traits
+ * DictKeysTraits class defines which type to use for dictionary value
+ * per each key type (in DictKeys)
+ * If you define
+ *   DEFINE_TRAITS(A, B)
+ * then Dictionary will use B as a value type for the key A
+ * (where A must be in DictKeys enum)
+ */
 #define DEFINE_TRAITS(KEYVAL, CLASSNAME) \
     template<> struct DictKeysTraits<KEYVAL> { \
       typedef CLASSNAME ty; \
     }
 template<DictKeys key>
 struct DictKeysTraits {
-  typedef int ty; // To be precise, ty here must be 'unspecified' type
+  // DictKeysTraits class has no member for arbitrary type
 };
 
 

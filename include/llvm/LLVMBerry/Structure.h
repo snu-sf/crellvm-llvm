@@ -50,7 +50,7 @@ enum TyBop { BopAdd, BopSub, BopMul, BopUdiv, BopSdiv, BopUrem, BopSrem, BopShl,
 
 enum TyFbop { BopFadd, BopFsub, BopFmul, BopFdiv, BopFrem };
 
-enum  TyIcmpPred {
+enum TyIcmpPred {
           CondEq, CondNe, CondUgt, CondUge, CondUlt,
           CondUle, CondSgt, CondSge, CondSlt, CondSle 
 };
