@@ -342,7 +342,7 @@ TyBop getBop(llvm::Instruction::BinaryOps ops){
 }
 
 TyCond getIPredicate(llvm::ICmpInst::Predicate prd) {
-TyCond predicate;
+  TyCond predicate;
 
   switch(prd){
     case llvm::ICmpInst::ICMP_EQ:
@@ -372,7 +372,7 @@ TyCond predicate;
 }
 
 TyFCond getFPredicate(llvm::FCmpInst::Predicate prd) {
-TyFCond predicate;
+  TyFCond predicate;
 
   switch(prd){
     case llvm::FCmpInst::FCMP_FALSE:
