@@ -149,7 +149,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 std::string reg = llvmberry::getVariable(*InInst); //reg is x or y
                 Value *CommonOperand = nullptr;
                 Value *SpecialOperand = nullptr;
-                if(NewLHS) { CommonOperand = InInst->getOperand(1); SpecialOperand = InInst->getOperand(0); }
+                if (NewLHS) { CommonOperand = InInst->getOperand(1); SpecialOperand = InInst->getOperand(0); }
                 else       { CommonOperand = InInst->getOperand(0); SpecialOperand = InInst->getOperand(1); }
                 PROPAGATE( //from I to endofblock propagate x or y depend on edge
                         LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
@@ -159,10 +159,10 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                 BinaryOperator *BinOp = dyn_cast<BinaryOperator>(InInst);
                 ICmpInst *CmpInst = dyn_cast<ICmpInst>(InInst);
                 std::shared_ptr<llvmberry::TyExpr> apr_bpr;
-                if(BinOp){
+                if (BinOp) {
                   apr_bpr = INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Previous),
                                                        VAL(BinOp->getOperand(1), Previous)));
-                } else if(CmpInst){             
+                } else if (CmpInst) {             
                   apr_bpr = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()),       
                                                             TYPEOF(CommonOperand),
                                                              VAL(CmpInst->getOperand(0), Previous),
@@ -183,11 +183,11 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                   std::shared_ptr<llvmberry::TyExpr> apr_bph;
 
-                  if(BinOp){
+                  if (BinOp) {
                     apr_bph = INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Previous),
                                               VAL(BinOp->getOperand(1), Physical)));
 
-                  } else if(CmpInst){
+                  } else if (CmpInst) {
                     apr_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
                                                                  VAL(CmpInst->getOperand(0), Previous),
                                                                  VAL(CmpInst->getOperand(1), Physical)));
@@ -210,11 +210,11 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                   std::shared_ptr<llvmberry::TyExpr> kgh_bph;
 
-                  if(BinOp){
+                  if (BinOp) {
                     kgh_bph = INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), ID("K", Ghost),
                                               VAL(BinOp->getOperand(1), Physical)));
 
-                  } else if(CmpInst){
+                  } else if (CmpInst) {
                     kgh_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
                                                                  ID("K", Ghost),
                                                                  VAL(CmpInst->getOperand(1), Physical)));
@@ -247,11 +247,11 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                   //replace_rhs z >= a^ + b^ -> z >= a + b^     //a is common b is physical
                   std::shared_ptr<llvmberry::TyExpr> aph_bpr;
 
-                  if(BinOp){
+                  if (BinOp) {
                     aph_bpr = INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Physical),
                                               VAL(BinOp->getOperand(1), Previous)));
 
-                  } else if(CmpInst){
+                  } else if (CmpInst) {
                     aph_bpr = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
                                                                  VAL(CmpInst->getOperand(0), Physical),
                                                                  VAL(CmpInst->getOperand(1), Previous)));
@@ -275,11 +275,11 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                   std::shared_ptr<llvmberry::TyExpr> aph_kgh;
 
-                  if(BinOp){
+                  if (BinOp) {
                     aph_kgh = INSN(BINARYINSN(*BinOp, TYPEOF(CommonOperand), VAL(BinOp->getOperand(0), Physical),
                                               ID("K", Ghost)));
 
-                  } else if(CmpInst){
+                  } else if (CmpInst) {
                     aph_kgh = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CommonOperand),
                                                                  VAL(CmpInst->getOperand(0), Physical),
                                                                  ID("K",Ghost)));
@@ -327,11 +327,11 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                   std::shared_ptr<llvmberry::TyExpr> aph_bph;
 
-                  if(BinOp){
+                  if (BinOp) {
                     aph_bph = INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
                                               VAL(BinOp->getOperand(1), Physical)));
 
-                  } else if(CmpInst){
+                  } else if (CmpInst) {
                     aph_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()), TYPEOF(CmpInst->getOperand(0)),
                                                                  VAL(CmpInst->getOperand(0), Physical),
                                                                  VAL(CmpInst->getOperand(1), Physical)));
@@ -756,10 +756,10 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                           llvmberry::ConsTransitivity::make(
                                   VAR(oldphi, Physical), VAR(reg, Previous),
                                   VAR(reg, Physical)));
-                  if(BinOp){
+                  if (BinOp) {
                     aph_bph = INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
                                               VAL(BinOp->getOperand(1), Physical)));
-                  } else if(CmpInst){
+                  } else if (CmpInst) {
                     aph_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()),
                                                                  TYPEOF(InInst->getOperand(0)),
                                                                  VAL(CmpInst->getOperand(0), Physical),
@@ -812,10 +812,10 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                           BOUNDS(INSTPOS(SRC, InInst),
                                  llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
 
-                  if(BinOp){
+                  if (BinOp) {
                     apr_con = INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), VAL(SpecialOperand, Previous),
                                               VAL(ConstantOp, Physical)));
-                  } else if(CmpInst){
+                  } else if (CmpInst) {
                     apr_con = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()),
                                                                  TYPEOF(SpecialOperand),
                                                                  VAL(SpecialOperand, Previous),
@@ -838,10 +838,10 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                                                                VAR(newphi, Physical)));
 
                   std::shared_ptr<llvmberry::TyExpr> kgh_con;
-                  if(BinOp){
+                  if (BinOp) {
                     kgh_con = INSN(BINARYINSN(*BinOp, TYPEOF(SpecialOperand), ID("K", Ghost),
                                               VAL(ConstantOp, Physical)));
-                  } else if(CmpInst){
+                  } else if (CmpInst) {
                     kgh_con = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIPredicate(CmpInst->getPredicate()),
                                                                  TYPEOF(SpecialOperand),
                                                                  ID("K",Ghost),
