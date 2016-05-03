@@ -2412,34 +2412,18 @@ bool GVN::processInstruction(Instruction *I) {
                       VAR(I_id, Physical), RHS(leaderI_id, Physical, SRC),
                       VAR(leaderI_id, Physical)));
 
-          // hints.addCommand(llvmberry::ConsInfrule::make(
-          //     llvmberry::TyPosition::make(llvmberry::Source, *I),
-          //     llvmberry::ConsTransitivity::make(
-          //         llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-          //         llvmberry::ConsRhs::make(leaderI_id, llvmberry::Physical,
-          //                                  llvmberry::Source),
-          //         llvmberry::ConsVar::make(leaderI_id, llvmberry::Physical))));
-
           // make replacing lessdef relation
           repl_inv =
               LESSDEF(VAR(I_id, Physical), VAR(leaderI_id, Physical), SRC);
 
-          // repl_inv = llvmberry::ConsLessdef::make(
-          //     llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-          //     llvmberry::ConsVar::make(leaderI_id, llvmberry::Physical),
-          //     llvmberry::Source);
-
-          // TODO
           leader_value = ID(leaderI_id, Physical);
-          // leader_value = llvmberry::ConsId::make(leaderI_id, llvmberry::Physical);
-
           
-        } // end comparing operands
-      }   // end comparing opcode
-    } // end [ repl is-a Inst ]
+        }
+      }
+    }
 
     if (!repl_inv) {
-      // TODO: branch case
+      // branch case
 
       // c = e_c
       // br c b1 b2
@@ -2452,29 +2436,7 @@ bool GVN::processInstruction(Instruction *I) {
       // y = e_c (modulo comm.)
       //  => z = f(y) -> z = f(X)
 
-      // TODO: from case 2~5
-
       // case 2:
-      // e_c == a && b, X == True
-      // e_y = e_a <or> e_b
-      //  => z = f(y) -> z = f(X)
-
-      // case 3:
-      // e_c == a || b, X == False
-      // e_y = e_a <or> e_b
-      //  => z = f(y) -> z = f(X)
-
-      // case 4:
-      // e_c == icmp eq a b, X == True
-      // e_y == e_a <or> e_b
-      //  => z = f(y) -> z = f(b) <or> f(a)
-
-      // case 5:
-      // e_c == icmp ne a b, X == False
-      // e_y == e_a <or> e_b
-      //  => z = f(y) -> z = f(b) <or> f(a)
-
-      // case 6:
       // e_c == icmp P a b
       // e_y == icmp ~P a b
       //  => z = f(y) -> z = f(~X)
@@ -2523,35 +2485,13 @@ bool GVN::processInstruction(Instruction *I) {
                    llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
                                                             *leaderBB_pred)));
 
-        // hints.addCommand(llvmberry::ConsPropagate::make(
-        //     llvmberry::ConsLessdef::make(
-        //         llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
-        //                                  llvmberry::Source),
-        //         llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
-        //         llvmberry::Source),
-        //     llvmberry::ConsBounds::make(
-        //         llvmberry::TyPosition::make(llvmberry::Source, *condI),
-        //         llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
-        //                                                  *leaderBB_pred))));
-
         // transitivity [ e_c >= c /\ c >= X ] => [ e_c >= X ] in src at PHI of leaderBB
-
         INFRULE(llvmberry::TyPosition::make(
                     llvmberry::Source, llvmberry::getBasicBlockIndex(leaderBB),
                     llvmberry::getBasicBlockIndex(leaderBB_pred)),
                 llvmberry::ConsTransitivity::make(RHS(condI_id, Physical, SRC),
                                                   VAR(condI_id, Physical),
                                                   cond_expr));
-
-        // hints.addCommand(llvmberry::ConsInfrule::make(
-        //     llvmberry::TyPosition::make(
-        //         llvmberry::Source, llvmberry::getBasicBlockIndex(leaderBB),
-        //         llvmberry::getBasicBlockIndex(leaderBB_pred)),
-        //     llvmberry::ConsTransitivity::make(
-        //         llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
-        //                                  llvmberry::Source),
-        //         llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
-        //         cond_expr)));
 
         // start comparing symbolic expressions in order to determine the case
         SmallVector<uint32_t, 4> op_condI;
@@ -2569,23 +2509,13 @@ bool GVN::processInstruction(Instruction *I) {
           // case 1
           pre_repl_inv = LESSDEF(RHS(condI_id, Physical, SRC), cond_expr, SRC);
 
-          // pre_repl_inv = llvmberry::ConsLessdef::make(
-          //     llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
-          //                              llvmberry::Source),
-          //     cond_expr, llvmberry::Source);
-
           repl_inv = LESSDEF(VAR(I_id, Physical), cond_expr, SRC);
-          
-          // repl_inv = llvmberry::ConsLessdef::make(
-          //     llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-          //     cond_expr, llvmberry::Source);
 
           leader_value = std::make_shared<llvmberry::ConsConstVal>(
               std::make_shared<llvmberry::ConsConstInt>(cond_value, 1));
           leader_expr = cond_expr;
 
         } else if (llvmberry::is_inverse_expression(expr_I, expr_condI)) {
-          // TODO
           ICmpInst *condCI = dyn_cast<ICmpInst>(condI);
           assert (condCI && "Branch condition not ICmpInst");
 
@@ -2597,22 +2527,13 @@ bool GVN::processInstruction(Instruction *I) {
 
           pre_repl_inv = LESSDEF(RHS(I_id, Physical, SRC), cond_neg_expr, SRC);
           
-          // pre_repl_inv = llvmberry::ConsLessdef::make(
-          //     llvmberry::ConsRhs::make(I_id, llvmberry::Physical,
-          //                              llvmberry::Source),
-          //     cond_neg_expr, llvmberry::Source);
-
           repl_inv = LESSDEF(VAR(I_id, Physical), cond_neg_expr, SRC);
-
-          // repl_inv = llvmberry::ConsLessdef::make(
-          //     llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-          //     cond_neg_expr, llvmberry::Source);
 
           leader_value = std::make_shared<llvmberry::ConsConstVal>(
               std::make_shared<llvmberry::ConsConstInt>(1-cond_value, 1));
           leader_expr = cond_neg_expr;
         } else {
-          // TODO: case 2 to 5
+          // TODO: several cases left (such as [((A==B) = True) => A = B])
         }
 
         if (!pre_repl_inv) return;
@@ -2627,24 +2548,15 @@ bool GVN::processInstruction(Instruction *I) {
                                      VAR(I_id, Physical),
                                      RHS(I_id, Physical, SRC), leader_expr));
 
-        //        if (c.opcode = icmp && predicate inverse
-
       } else if (llvm::dyn_cast<llvm::SwitchInst>(TI)) {
         assert("Should not occur, as it is not formalized in vellvm yet.");
       } else
         assert(false && "Should not occur");
     }
 
-    // For each user of I, replace I with repl.
-    // Propagate repl_inv from I to each use, and
-    //  apply replace_rhs if needed
-
-    // if we failed to find repl_inv, fail the validation
-        // PROPAGATE(LESSDEF(VAR("x",Physical), VAR("y",Physical), SRC),
-        //       BOUNDS(INSTPOS(SRC,I), INSTPOS(SRC,I)));
-
     if (!repl_inv) return;
     
+    // Propagate repl_inv from I to each use, and replace will be done automatically
     for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
       if (!isa<Instruction>(UI->getUser())) {
         // let the validation fail when the user is not an instruction
@@ -2660,45 +2572,10 @@ bool GVN::processInstruction(Instruction *I) {
         prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
       }
 
-      // Propagate repl_inv in src, until each use
-
       PROPAGATE(repl_inv, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(
                                                       llvmberry::Source, *userI,
                                                       prev_block_name)));
 
-      // hints.addCommand(llvmberry::ConsPropagate::make(
-      //     repl_inv, llvmberry::ConsBounds::make(
-      //                   llvmberry::TyPosition::make(llvmberry::Source, *I),
-      //                   llvmberry::TyPosition::make(llvmberry::Source, *userI,
-      //                                               prev_block_name))));
-
-      if (isa<PHINode>(userI)) {
-        // TODO: maybe not needed due to our reduce_maydiff
-        // hints.addCommand(llvmberry::ConsInfrule::make(
-        //     llvmberry::TyPosition::make(llvmberry::Source, *user_I,
-        //                                 prev_block_name),
-        //     llvmberry::ConsTransitivity::make(
-        //         llvmberry::ConsVar::make(userI_id, llvmberry::Physical),
-        //         llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-        //         llvmberry::ConsVar::make(leaderI_id, llvmberry::Physical))));
-      } else if (!userI_id.empty() && !isa<CallInst>(userI)) {
-        // insert replaceRhs
-        // z = f(y) -> z = f(x)
-        // When the name of z is empty, we don't have to apply replaceRhs. (such as void call or store)
-        // When 'f' is Call, then z is automatically removed from MayDiff, so we don't care.
-
-        // hints.addCommand(llvmberry::ConsInfrule::make(
-        //     llvmberry::TyPosition::make(llvmberry::Source, *userI,
-        //                                 prev_block_name),
-        //     llvmberry::ConsReplaceRhs::make(
-        //         llvmberry::TyRegister::make(I_id, llvmberry::Physical),
-        //         leader_value,
-        //         llvmberry::ConsVar::make(userI_id, llvmberry::Physical),
-        //         llvmberry::ConsRhs::make(userI_id, llvmberry::Physical,
-        //                                  llvmberry::Source),
-        //         llvmberry::ConsRhs::make(userI_id, llvmberry::Physical,
-        //                                  llvmberry::Target))));
-      }
     }
   });
 
