@@ -2476,8 +2476,7 @@ bool GVN::processInstruction(Instruction *I) {
       // e_y == icmp ~P a b
       //  => z = f(y) -> z = f(~X)
 
-      const BasicBlock *leaderBB =
-          boost::any_cast<const BasicBlock *>(data["findLeader#BB"]);
+      const BasicBlock *leaderBB = data.get<llvmberry::ArgForFindLeader>()->BB;
       const BasicBlock *leaderBB_pred = leaderBB->getSinglePredecessor();
       assert(leaderBB_pred &&
              "Expect it to be introduced from propagateEquality, and it checks "
