@@ -2564,6 +2564,27 @@ bool GVN::processInstruction(Instruction *I) {
 
         } else if (llvmberry::is_inverse_expression(expr_I, expr_condI)) {
           // TODO
+          ICmpInst *condCI = dyn_cast<ICmpInst>(condI);
+          assert (condCI && "Branch condition not ICmpInst");
+
+          INFRULE(llvmberry::TyPosition::make(
+                      llvmberry::Source,
+                      llvmberry::getBasicBlockIndex(leaderBB),
+                      llvmberry::getBasicBlockIndex(leaderBB_pred)),
+                  llvmberry::ConsIcmpInverse::make(*condCI, cond_value));
+
+          pre_repl_inv = llvmberry::ConsLessdef::make(
+              llvmberry::ConsRhs::make(I_id, llvmberry::Physical,
+                                       llvmberry::Source),
+              cond_neg_expr, llvmberry::Source);
+
+          repl_inv = llvmberry::ConsLessdef::make(
+              llvmberry::ConsVar::make(I_id, llvmberry::Physical),
+              cond_neg_expr, llvmberry::Source);
+
+          leader_value = std::make_shared<llvmberry::ConsConstVal>(
+              std::make_shared<llvmberry::ConsConstInt>(1-cond_value, 1));
+          leader_expr = cond_neg_expr;
         } else {
           // TODO: case 2 to 5
         }
