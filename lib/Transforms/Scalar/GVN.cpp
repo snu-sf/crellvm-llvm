@@ -2398,38 +2398,41 @@ bool GVN::processInstruction(Instruction *I) {
 
         if (expr_I == expr_leaderI) {
           // propagate [ e1 >= x ] in src until [ y = e2 ]
-          hints.addCommand(llvmberry::ConsPropagate::make(
-              llvmberry::ConsLessdef::make(
-                  llvmberry::ConsRhs::make(leaderI_id, llvmberry::Physical,
-                                           llvmberry::Source),
-                  llvmberry::ConsVar::make(leaderI_id, llvmberry::Physical),
-                  llvmberry::Source),
-              llvmberry::ConsBounds::make(
-                  llvmberry::TyPosition::make(llvmberry::Source, *leaderI),
-                  llvmberry::TyPosition::make(llvmberry::Source, *I))));
+          PROPAGATE(LESSDEF(RHS(leaderI_id, Physical, SRC),
+                            VAR(leaderI_id, Physical), SRC),
+                    BOUNDS(INSTPOS(SRC, leaderI), INSTPOS(SRC, I)));
 
           // TODO: if e1 != e2 due to commutativity,
           // insert [e2 >= e1] and
           // insert transitivity to get [ y >= e1 ]
 
           // transitivity: [ y >= e2 /\ e1 >= x] => [ y >= x] in src
-          hints.addCommand(llvmberry::ConsInfrule::make(
-              llvmberry::TyPosition::make(llvmberry::Source, *I),
-              llvmberry::ConsTransitivity::make(
-                  llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-                  llvmberry::ConsRhs::make(leaderI_id, llvmberry::Physical,
-                                           llvmberry::Source),
-                  llvmberry::ConsVar::make(leaderI_id, llvmberry::Physical))));
+          INFRULE(INSTPOS(SRC, I),
+                  llvmberry::ConsTransitivity::make(
+                      VAR(I_id, Physical), RHS(leaderI_id, Physical, SRC),
+                      VAR(leaderI_id, Physical)));
+
+          // hints.addCommand(llvmberry::ConsInfrule::make(
+          //     llvmberry::TyPosition::make(llvmberry::Source, *I),
+          //     llvmberry::ConsTransitivity::make(
+          //         llvmberry::ConsVar::make(I_id, llvmberry::Physical),
+          //         llvmberry::ConsRhs::make(leaderI_id, llvmberry::Physical,
+          //                                  llvmberry::Source),
+          //         llvmberry::ConsVar::make(leaderI_id, llvmberry::Physical))));
 
           // make replacing lessdef relation
-          repl_inv = llvmberry::ConsLessdef::make(
-              llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-              llvmberry::ConsVar::make(leaderI_id, llvmberry::Physical),
-              llvmberry::Source);
+          repl_inv =
+              LESSDEF(VAR(I_id, Physical), VAR(leaderI_id, Physical), SRC);
+
+          // repl_inv = llvmberry::ConsLessdef::make(
+          //     llvmberry::ConsVar::make(I_id, llvmberry::Physical),
+          //     llvmberry::ConsVar::make(leaderI_id, llvmberry::Physical),
+          //     llvmberry::Source);
 
           // TODO
-          leader_value = llvmberry::ConsId::make(leaderI_id, llvmberry::Physical);
-          // leader_expr = VAR(leaderI_id, Physical);
+          leader_value = ID(leaderI_id, Physical);
+          // leader_value = llvmberry::ConsId::make(leaderI_id, llvmberry::Physical);
+
           
         } // end comparing operands
       }   // end comparing opcode
@@ -2513,27 +2516,42 @@ bool GVN::processInstruction(Instruction *I) {
           assert("Leader_bb is not a successor of leader_bb_pred");
 
         // propagate [ e_c >= c ] in src until the end of leaderBB_pred
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
-                                         llvmberry::Source),
-                llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
-                llvmberry::Source),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Source, *condI),
-                llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
-                                                         *leaderBB_pred))));
+
+        PROPAGATE(
+            LESSDEF(RHS(condI_id, Physical, SRC), VAR(condI_id, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, condI),
+                   llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
+                                                            *leaderBB_pred)));
+
+        // hints.addCommand(llvmberry::ConsPropagate::make(
+        //     llvmberry::ConsLessdef::make(
+        //         llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
+        //                                  llvmberry::Source),
+        //         llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
+        //         llvmberry::Source),
+        //     llvmberry::ConsBounds::make(
+        //         llvmberry::TyPosition::make(llvmberry::Source, *condI),
+        //         llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
+        //                                                  *leaderBB_pred))));
 
         // transitivity [ e_c >= c /\ c >= X ] => [ e_c >= X ] in src at PHI of leaderBB
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(
-                llvmberry::Source, llvmberry::getBasicBlockIndex(leaderBB),
-                llvmberry::getBasicBlockIndex(leaderBB_pred)),
-            llvmberry::ConsTransitivity::make(
-                llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
-                                         llvmberry::Source),
-                llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
-                cond_expr)));
+
+        INFRULE(llvmberry::TyPosition::make(
+                    llvmberry::Source, llvmberry::getBasicBlockIndex(leaderBB),
+                    llvmberry::getBasicBlockIndex(leaderBB_pred)),
+                llvmberry::ConsTransitivity::make(RHS(condI_id, Physical, SRC),
+                                                  VAR(condI_id, Physical),
+                                                  cond_expr));
+
+        // hints.addCommand(llvmberry::ConsInfrule::make(
+        //     llvmberry::TyPosition::make(
+        //         llvmberry::Source, llvmberry::getBasicBlockIndex(leaderBB),
+        //         llvmberry::getBasicBlockIndex(leaderBB_pred)),
+        //     llvmberry::ConsTransitivity::make(
+        //         llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
+        //                                  llvmberry::Source),
+        //         llvmberry::ConsVar::make(condI_id, llvmberry::Physical),
+        //         cond_expr)));
 
         // start comparing symbolic expressions in order to determine the case
         SmallVector<uint32_t, 4> op_condI;
@@ -2549,14 +2567,18 @@ bool GVN::processInstruction(Instruction *I) {
 
         if (expr_I == expr_condI) {
           // case 1
-          pre_repl_inv = llvmberry::ConsLessdef::make(
-              llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
-                                       llvmberry::Source),
-              cond_expr, llvmberry::Source);
+          pre_repl_inv = LESSDEF(RHS(condI_id, Physical, SRC), cond_expr, SRC);
 
-          repl_inv = llvmberry::ConsLessdef::make(
-              llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-              cond_expr, llvmberry::Source);
+          // pre_repl_inv = llvmberry::ConsLessdef::make(
+          //     llvmberry::ConsRhs::make(condI_id, llvmberry::Physical,
+          //                              llvmberry::Source),
+          //     cond_expr, llvmberry::Source);
+
+          repl_inv = LESSDEF(VAR(I_id, Physical), cond_expr, SRC);
+          
+          // repl_inv = llvmberry::ConsLessdef::make(
+          //     llvmberry::ConsVar::make(I_id, llvmberry::Physical),
+          //     cond_expr, llvmberry::Source);
 
           leader_value = std::make_shared<llvmberry::ConsConstVal>(
               std::make_shared<llvmberry::ConsConstInt>(cond_value, 1));
@@ -2573,14 +2595,18 @@ bool GVN::processInstruction(Instruction *I) {
                       llvmberry::getBasicBlockIndex(leaderBB_pred)),
                   llvmberry::ConsIcmpInverse::make(*condCI, cond_value));
 
-          pre_repl_inv = llvmberry::ConsLessdef::make(
-              llvmberry::ConsRhs::make(I_id, llvmberry::Physical,
-                                       llvmberry::Source),
-              cond_neg_expr, llvmberry::Source);
+          pre_repl_inv = LESSDEF(RHS(I_id, Physical, SRC), cond_neg_expr, SRC);
+          
+          // pre_repl_inv = llvmberry::ConsLessdef::make(
+          //     llvmberry::ConsRhs::make(I_id, llvmberry::Physical,
+          //                              llvmberry::Source),
+          //     cond_neg_expr, llvmberry::Source);
 
-          repl_inv = llvmberry::ConsLessdef::make(
-              llvmberry::ConsVar::make(I_id, llvmberry::Physical),
-              cond_neg_expr, llvmberry::Source);
+          repl_inv = LESSDEF(VAR(I_id, Physical), cond_neg_expr, SRC);
+
+          // repl_inv = llvmberry::ConsLessdef::make(
+          //     llvmberry::ConsVar::make(I_id, llvmberry::Physical),
+          //     cond_neg_expr, llvmberry::Source);
 
           leader_value = std::make_shared<llvmberry::ConsConstVal>(
               std::make_shared<llvmberry::ConsConstInt>(1-cond_value, 1));
@@ -2635,11 +2661,16 @@ bool GVN::processInstruction(Instruction *I) {
       }
 
       // Propagate repl_inv in src, until each use
-      hints.addCommand(llvmberry::ConsPropagate::make(
-          repl_inv, llvmberry::ConsBounds::make(
-                        llvmberry::TyPosition::make(llvmberry::Source, *I),
-                        llvmberry::TyPosition::make(llvmberry::Source, *userI,
-                                                    prev_block_name))));
+
+      PROPAGATE(repl_inv, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(
+                                                      llvmberry::Source, *userI,
+                                                      prev_block_name)));
+
+      // hints.addCommand(llvmberry::ConsPropagate::make(
+      //     repl_inv, llvmberry::ConsBounds::make(
+      //                   llvmberry::TyPosition::make(llvmberry::Source, *I),
+      //                   llvmberry::TyPosition::make(llvmberry::Source, *userI,
+      //                                               prev_block_name))));
 
       if (isa<PHINode>(userI)) {
         // TODO: maybe not needed due to our reduce_maydiff
@@ -2655,18 +2686,18 @@ bool GVN::processInstruction(Instruction *I) {
         // z = f(y) -> z = f(x)
         // When the name of z is empty, we don't have to apply replaceRhs. (such as void call or store)
         // When 'f' is Call, then z is automatically removed from MayDiff, so we don't care.
-        
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Source, *userI,
-                                        prev_block_name),
-            llvmberry::ConsReplaceRhs::make(
-                llvmberry::TyRegister::make(I_id, llvmberry::Physical),
-                leader_value,
-                llvmberry::ConsVar::make(userI_id, llvmberry::Physical),
-                llvmberry::ConsRhs::make(userI_id, llvmberry::Physical,
-                                         llvmberry::Source),
-                llvmberry::ConsRhs::make(userI_id, llvmberry::Physical,
-                                         llvmberry::Target))));
+
+        // hints.addCommand(llvmberry::ConsInfrule::make(
+        //     llvmberry::TyPosition::make(llvmberry::Source, *userI,
+        //                                 prev_block_name),
+        //     llvmberry::ConsReplaceRhs::make(
+        //         llvmberry::TyRegister::make(I_id, llvmberry::Physical),
+        //         leader_value,
+        //         llvmberry::ConsVar::make(userI_id, llvmberry::Physical),
+        //         llvmberry::ConsRhs::make(userI_id, llvmberry::Physical,
+        //                                  llvmberry::Source),
+        //         llvmberry::ConsRhs::make(userI_id, llvmberry::Physical,
+        //                                  llvmberry::Target))));
       }
     }
   });
