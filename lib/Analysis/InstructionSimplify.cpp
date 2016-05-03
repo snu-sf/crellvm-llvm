@@ -1761,7 +1761,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
           BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
           assert(Z);
           assert(Y);
-          llvmberry::generateHintForAndOr(*Z, X, Y, 
+          llvmberry::generateHintForAndOr(Z, X, Y, 
               (Y->getOperand(0) == X ? Y->getOperand(1) : Y->getOperand(0)), !isSwapped);
         });
       });
@@ -1786,7 +1786,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
           Value *X = Op0;
           BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
           assert(Y);
-          llvmberry::generateHintForAndOr(*Z, X, Y, 
+          llvmberry::generateHintForAndOr(Z, X, Y, 
               (Y->getOperand(0) == X ? Y->getOperand(1) : Y->getOperand(0)), isSwapped);
         });
       });
