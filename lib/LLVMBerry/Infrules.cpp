@@ -1367,6 +1367,53 @@ std::shared_ptr<TyInfrule> ConsNegVal::make
   return std::shared_ptr<TyInfrule>(new ConsNegVal(std::move(_neg_val)));
 }
 
+TyOrAnd::TyOrAnd(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), a(std::move(_a)), sz(std::move(_sz)){
+}
+void TyOrAnd::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrAnd::ConsOrAnd(std::shared_ptr<TyOrAnd> _or_and) : or_and(std::move(_or_and)){
+}
+std::shared_ptr<TyInfrule> ConsOrAnd::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrAnd> _val(new TyOrAnd(std::move(_z), std::move(_y), std::move(_x), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrAnd(std::move(_val)));
+}
+void ConsOrAnd::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrAnd");
+  archive(CEREAL_NVP(or_and));
+}
+
+TyOrAndXor::TyOrAndXor(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
+}
+void TyOrAndXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrAndXor::ConsOrAndXor(std::shared_ptr<TyOrAndXor> _or_and_xor) : or_and_xor(std::move(_or_and_xor)){
+}
+std::shared_ptr<TyInfrule> ConsOrAndXor::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrAndXor> _val(new TyOrAndXor(std::move(_z), std::move(_x), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrAndXor(std::move(_val)));
+}
+void ConsOrAndXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrAndXor");
+  archive(CEREAL_NVP(or_and_xor));
+}
+
 TyOrCommutative::TyOrCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
 }
 void TyOrCommutative::serialize(cereal::JSONOutputArchive& archive) const{
@@ -1387,6 +1434,28 @@ void ConsOrCommutative::serialize(cereal::JSONOutputArchive& archive) const{
   archive.writeName();
   archive.saveValue("OrCommutative");
   archive(CEREAL_NVP(or_commutative));
+}
+
+TyOrCommutativeTgt::TyOrCommutativeTgt(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)){
+}
+void TyOrCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrCommutativeTgt::ConsOrCommutativeTgt(std::shared_ptr<TyOrCommutativeTgt> _or_commutative_tgt) : or_commutative_tgt(std::move(_or_commutative_tgt)){
+}
+std::shared_ptr<TyInfrule> ConsOrCommutativeTgt::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrCommutativeTgt> _val(new TyOrCommutativeTgt(std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrCommutativeTgt(std::move(_val)));
+}
+void ConsOrCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrCommutativeTgt");
+  archive(CEREAL_NVP(or_commutative_tgt));
 }
 
 TyOrOr::TyOrOr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
@@ -1436,6 +1505,91 @@ void ConsOrOr2::serialize(cereal::JSONOutputArchive& archive) const{
   archive.writeName();
   archive.saveValue("OrOr2");
   archive(CEREAL_NVP(or_or2));
+}
+
+TyOrMone::TyOrMone(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), a(std::move(_a)), sz(std::move(_sz)){
+}
+void TyOrMone::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrMone::ConsOrMone(std::shared_ptr<TyOrMone> _or_mone) : or_mone(std::move(_or_mone)){
+}
+std::shared_ptr<TyInfrule> ConsOrMone::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrMone> _val(new TyOrMone(std::move(_z), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrMone(std::move(_val)));
+}
+void ConsOrMone::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrMone");
+  archive(CEREAL_NVP(or_mone));
+}
+
+TyOrNot::TyOrNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), x(std::move(_x)), sz(std::move(_sz)){
+}
+void TyOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrNot::ConsOrNot(std::shared_ptr<TyOrNot> _or_not) : or_not(std::move(_or_not)){
+}
+std::shared_ptr<TyInfrule> ConsOrNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrNot> _val(new TyOrNot(std::move(_z), std::move(_y), std::move(_x), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrNot(std::move(_val)));
+}
+void ConsOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrNot");
+  archive(CEREAL_NVP(or_not));
+}
+
+TyOrUndef::TyOrUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), a(std::move(_a)), sz(std::move(_sz)){
+}
+void TyOrUndef::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrUndef::ConsOrUndef(std::shared_ptr<TyOrUndef> _or_undef) : or_undef(std::move(_or_undef)){
+}
+std::shared_ptr<TyInfrule> ConsOrUndef::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrUndef> _val(new TyOrUndef(std::move(_z), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrUndef(std::move(_val)));
+}
+void ConsOrUndef::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrUndef");
+  archive(CEREAL_NVP(or_undef));
+}
+
+TyOrSame::TyOrSame(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), a(std::move(_a)), sz(std::move(_sz)){
+}
+void TyOrSame::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrSame::ConsOrSame(std::shared_ptr<TyOrSame> _or_same) : or_same(std::move(_or_same)){
+}
+std::shared_ptr<TyInfrule> ConsOrSame::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrSame> _val(new TyOrSame(std::move(_z), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrSame(std::move(_val)));
+}
+void ConsOrSame::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrSame");
+  archive(CEREAL_NVP(or_same));
 }
 
 TyOrXor::TyOrXor(std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : w(std::move(_w)), z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
@@ -1488,6 +1642,75 @@ void ConsOrXor2::serialize(cereal::JSONOutputArchive& archive) const{
   archive.writeName();
   archive.saveValue("OrXor2");
   archive(CEREAL_NVP(or_xor2));
+}
+
+TyOrXor3::TyOrXor3(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz) : z(std::move(_z)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), sz(std::move(_sz)){
+}
+void TyOrXor3::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrXor3::ConsOrXor3(std::shared_ptr<TyOrXor3> _or_xor3) : or_xor3(std::move(_or_xor3)){
+}
+std::shared_ptr<TyInfrule> ConsOrXor3::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrXor3> _val(new TyOrXor3(std::move(_z), std::move(_y), std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrXor3(std::move(_val)));
+}
+void ConsOrXor3::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrXor3");
+  archive(CEREAL_NVP(or_xor3));
+}
+
+TyOrXor4::TyOrXor4(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyValue> _nb, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)), b(std::move(_b)), nb(std::move(_nb)), sz(std::move(_sz)){
+}
+void TyOrXor4::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(nb));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrXor4::ConsOrXor4(std::shared_ptr<TyOrXor4> _or_xor4) : or_xor4(std::move(_or_xor4)){
+}
+std::shared_ptr<TyInfrule> ConsOrXor4::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyValue> _nb, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrXor4> _val(new TyOrXor4(std::move(_z), std::move(_x), std::move(_y), std::move(_a), std::move(_b), std::move(_nb), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrXor4(std::move(_val)));
+}
+void ConsOrXor4::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrXor4");
+  archive(CEREAL_NVP(or_xor4));
+}
+
+TyOrZero::TyOrZero(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz) : z(std::move(_z)), a(std::move(_a)), sz(std::move(_sz)){
+}
+void TyOrZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrZero::ConsOrZero(std::shared_ptr<TyOrZero> _or_zero) : or_zero(std::move(_or_zero)){
+}
+std::shared_ptr<TyInfrule> ConsOrZero::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz){
+  std::shared_ptr<TyOrZero> _val(new TyOrZero(std::move(_z), std::move(_a), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrZero(std::move(_val)));
+}
+void ConsOrZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrZero");
+  archive(CEREAL_NVP(or_zero));
 }
 
 TySubRemove::TySubRemove(std::shared_ptr<TyRegister> _z,

@@ -577,6 +577,33 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyOrAnd{
+public : 
+  TyOrAnd(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrAndXor{
+public : 
+  TyOrAndXor(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyOrCommutative{
 public : 
   TyOrCommutative(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
@@ -586,6 +613,41 @@ private :
   std::shared_ptr<TyRegister> z;
   std::shared_ptr<TyValue> x;
   std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrCommutativeTgt{
+public : 
+  TyOrCommutativeTgt(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrMone{
+public : 
+  TyOrMone(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrNot{
+public : 
+  TyOrNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> x;
   std::shared_ptr<TySize> sz;
 };
 
@@ -618,6 +680,28 @@ private :
   std::shared_ptr<TySize> sz;
 };
 
+struct TyOrSame{
+public : 
+  TyOrSame(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrUndef{
+public : 
+  TyOrUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyOrXor{
 public : 
   TyOrXor(std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
@@ -646,6 +730,45 @@ private :
   std::shared_ptr<TyValue> y2;
   std::shared_ptr<TyValue> a;
   std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrXor3{
+public : 
+  TyOrXor3(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrXor4{
+public : 
+  TyOrXor4(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyValue> _nb, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyValue> nb;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrZero{
+public : 
+  TyOrZero(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> a;
   std::shared_ptr<TySize> sz;
 };
 
@@ -685,6 +808,38 @@ private :
   std::shared_ptr<TyValue> x;
   std::shared_ptr<TyValue> y;
   std::shared_ptr<TySize> sz;
+};
+
+struct TySextAshr{
+public : 
+  TySextAshr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _x0, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> zprime;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> x0;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> w;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TySize> sz1;
+  std::shared_ptr<TySize> sz2;
+};
+
+struct TySextTrunc{
+public : 
+  TySextTrunc(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyConstInt> c;
+  std::shared_ptr<TySize> sz1;
+  std::shared_ptr<TySize> sz2;
 };
 
 struct TySubAdd {
@@ -1471,16 +1626,6 @@ private :
   std::shared_ptr<TyAddZextBool> add_zext_bool;
 };
 
-struct ConsSdivMone : public TyInfrule{
-public : 
-  ConsSdivMone(std::shared_ptr<TySdivMone> _div_mone);
-  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private : 
-  std::shared_ptr<TySdivMone> div_mone;
-};
-
 struct ConsMulShl : public TyInfrule{
 public : 
   ConsMulShl(std::shared_ptr<TyMulShl> _mul_shl);
@@ -1491,6 +1636,26 @@ private :
   std::shared_ptr<TyMulShl> mul_shl;
 };
 
+struct ConsOrAnd : public TyInfrule{
+public : 
+  ConsOrAnd(std::shared_ptr<TyOrAnd> _or_and);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrAnd> or_and;
+};
+
+struct ConsOrAndXor : public TyInfrule{
+public : 
+  ConsOrAndXor(std::shared_ptr<TyOrAndXor> _or_and_xor);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrAndXor> or_and_xor;
+};
+
 struct ConsOrCommutative : public TyInfrule{
 public : 
   ConsOrCommutative(std::shared_ptr<TyOrCommutative> _or_commutative);
@@ -1499,6 +1664,36 @@ public :
 
 private : 
   std::shared_ptr<TyOrCommutative> or_commutative;
+};
+
+struct ConsOrCommutativeTgt : public TyInfrule{
+public : 
+  ConsOrCommutativeTgt(std::shared_ptr<TyOrCommutativeTgt> _or_commutative);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrCommutativeTgt> or_commutative_tgt;
+};
+
+struct ConsOrMone : public TyInfrule{
+public : 
+  ConsOrMone(std::shared_ptr<TyOrMone> _or_mone);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrMone> or_mone;
+};
+
+struct ConsOrNot : public TyInfrule{
+public : 
+  ConsOrNot(std::shared_ptr<TyOrNot> _or_not);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrNot> or_not;
 };
 
 struct ConsOrOr : public TyInfrule{
@@ -1521,6 +1716,26 @@ private :
   std::shared_ptr<TyOrOr2> or_or2;
 };
 
+struct ConsOrUndef : public TyInfrule{
+public : 
+  ConsOrUndef(std::shared_ptr<TyOrUndef> _or_undef);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrUndef> or_undef;
+};
+
+struct ConsOrSame : public TyInfrule{
+public : 
+  ConsOrSame(std::shared_ptr<TyOrSame> _or_same);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrSame> or_same;
+};
+
 struct ConsOrXor : public TyInfrule{
 public : 
   ConsOrXor(std::shared_ptr<TyOrXor> _or_xor);
@@ -1541,6 +1756,36 @@ private :
   std::shared_ptr<TyOrXor2> or_xor2;
 };
 
+struct ConsOrXor3 : public TyInfrule{
+public : 
+  ConsOrXor3(std::shared_ptr<TyOrXor3> _or_xor3);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrXor3> or_xor3;
+};
+
+struct ConsOrXor4 : public TyInfrule{
+public : 
+  ConsOrXor4(std::shared_ptr<TyOrXor4> _or_xor4);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TyValue> _nb, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrXor4> or_xor4;
+};
+
+struct ConsOrZero : public TyInfrule{
+public : 
+  ConsOrZero(std::shared_ptr<TyOrZero> _or_zero);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyOrZero> or_zero;
+};
+
 struct ConsRemNeg : public TyInfrule{
 public : 
   ConsRemNeg(std::shared_ptr<TyRemNeg> _rem_neg);
@@ -1549,6 +1794,36 @@ public :
 
 private : 
   std::shared_ptr<TyRemNeg> rem_neg;
+};
+
+struct ConsSdivMone : public TyInfrule{
+public : 
+  ConsSdivMone(std::shared_ptr<TySdivMone> _div_mone);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TySdivMone> div_mone;
+};
+
+struct ConsSextAshr : public TyInfrule{
+public : 
+  ConsSextAshr(std::shared_ptr<TySextAshr> _sext_ashr);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _x0, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TySextAshr> sext_ashr;
+};
+
+struct ConsSextTrunc : public TyInfrule{
+public : 
+  ConsSextTrunc(std::shared_ptr<TySextTrunc> _sext_trunc);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TySextTrunc> sext_trunc;
 };
 
 struct ConsSubAdd : TyInfrule {

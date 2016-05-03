@@ -16,6 +16,7 @@ enum DictKeys {
   ArgForFindAvailableLoadedValue,
   // InstSimplify
   ArgForSimplifyAndInst,
+  ArgForSimplifyOrInst,
   // InstCombine
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
@@ -44,10 +45,10 @@ struct DictKeysTraits {
 };
 
 
-// Used in InstructionSimplify.cpp : SimplifyAndInst()
-struct SimplifyAndInstArg {
+// Used in InstructionSimplify.cpp : SimplifyAndInst(), SimplifyOrInst()
+struct SimplifyInstArg {
 public:
-  SimplifyAndInstArg();
+  SimplifyInstArg();
   void setHintGenFunc(std::string microoptName, std::function<void(llvm::Instruction *)> hintGenFunc);
   void generateHint(llvm::Instruction *arg) const;
   bool isActivated() const;
@@ -58,7 +59,8 @@ private:
   std::string microoptName;
   std::function<void(llvm::Instruction *)> hintGenFunc;
 };
-DEFINE_TRAITS(ArgForSimplifyAndInst, SimplifyAndInstArg);
+DEFINE_TRAITS(ArgForSimplifyAndInst, SimplifyInstArg);
+DEFINE_TRAITS(ArgForSimplifyOrInst, SimplifyInstArg);
 
 // lib/IR/Value.cpp : Value::stripPointerCasts(), stripPointerCastsAndOffsets()
 struct StripPointerCastsArg {
