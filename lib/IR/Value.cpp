@@ -34,6 +34,11 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Hintgen.h"
+#include "llvm/LLVMBerry/Dictionary.h"
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -412,8 +417,19 @@ enum PointerStripKind {
 
 template <PointerStripKind StripKind>
 static Value *stripPointerCastsAndOffsets(Value *V) {
-  if (!V->getType()->isPointerTy())
+  bool llvmberry_isActive = llvmberry::ValidationUnit::Exists() && 
+        llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
+  if(llvmberry_isActive){
+    llvmberry::ValidationUnit::GetInstance()->intrude([V](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+      auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
+      ptr->strippedValues->push_back(V);
+    });
+  }
+
+  if (!V->getType()->isPointerTy()){
     return V;
+  }
 
   // Even though we don't look through PHI nodes, we could be called on an
   // instruction in an unreachable block, which may be on a cycle.
@@ -449,6 +465,14 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
       return V;
     }
     assert(V->getType()->isPointerTy() && "Unexpected operand type!");
+
+    if(llvmberry_isActive){
+      llvmberry::ValidationUnit::GetInstance()->intrude([V](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
+        ptr->strippedValues->push_back(V);
+      });
+    }
   } while (Visited.insert(V).second);
 
   return V;
@@ -456,6 +480,14 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
 } // namespace
 
 Value *Value::stripPointerCasts() {
+  bool llvmberry_isActive = llvmberry::ValidationUnit::Exists() && 
+        llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
+  if(llvmberry_isActive){
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+      data.assertExists<llvmberry::ArgForStripPointerCasts>();
+    });
+  }
   return stripPointerCastsAndOffsets<PSK_ZeroIndicesAndAliases>(this);
 }
 
