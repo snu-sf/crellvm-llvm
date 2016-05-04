@@ -724,7 +724,7 @@ void generateHintForTrivialDCE(llvm::Instruction &I) {
   llvmberry::ValidationUnit::GetInstance()->intrude([&I](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
     generateHintForDCE(hints, I);
-    if (llvm::CallInst *CI = llvm::dyn_cast<llvm::CallInst>(&I)) {
+    if (llvm::dyn_cast<llvm::CallInst>(&I)) {
       hints.setDescription("DCE on call "
                            "instruction.\n\"isInstructionTriviallyDead\" "
                            "should give enough power to validate.");
@@ -738,7 +738,7 @@ void generateHintForGVNDCE(llvm::Instruction &I) {
   llvmberry::ValidationUnit::GetInstance()->intrude([&I](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
     generateHintForDCE(hints, I);
-    if (llvm::CallInst *CI = llvm::dyn_cast<llvm::CallInst>(&I)) {
+    if (llvm::dyn_cast<llvm::CallInst>(&I)) {
       hints.setDescription("DCE on call instruction inside GVN.\nIt might be "
                            "introduced from SimplifyInstruction or "
                            "lookup_or_add_call.");
