@@ -41,6 +41,7 @@
 #include <algorithm>
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
 #include "llvm/LLVMBerry/Dictionary.h"
 using namespace llvm;
 
@@ -348,7 +349,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
   // Clear out UsingBlocks.  We will reconstruct it here if needed.
   Info.UsingBlocks.clear();
-
   for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
     Instruction *UserInst = cast<Instruction>(*UI++);
     if (!isa<LoadInst>(UserInst)) {
@@ -389,259 +389,267 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     Value *ReplVal = OnlyStore->getOperand(0);
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AI, &OnlyStore, &LI, &ReplVal]
+            ([&AI, &OnlyStore, &LI, &LBI, &DT]
               (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-      // prepare variables
-      std::string reg_store = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
-      std::string reg_load = llvmberry::getVariable(*LI);
-      std::string reg_alloca = llvmberry::getVariable(*AI);
-      llvm::Value::use_iterator UI = LI->use_begin(), E = LI->use_end();
+      // find end user of load
+      llvm::Value::use_iterator UItmp = LI->use_begin(), Etmp = LI->use_end();
       llvm::Instruction *end;
-      for (; UI != E;) {
-        llvm::Use &U = *UI;
-        ++UI;
-        end = llvm::dyn_cast<Instruction>(U.getUser());
+      if (UItmp == Etmp) {
+        if (OnlyStore->user_empty()) end = OnlyStore;
+        else end = LI;
       }
-      
+
+      for (; UItmp != Etmp;) {
+        llvm::Use &U2 = *UItmp;
+        ++UItmp;
+        end = dyn_cast<Instruction>(U2.getUser());
+      }
+
+      // prepare variables
+      auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
+      auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+      auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+      auto &storeVal = *(data.get<llvmberry::ArgForMem2RegStoreVal>()->storeVal);
+      auto &storeExpr = *(data.get<llvmberry::ArgForMem2RegStoreExpr>()->storeExpr);
+      auto &storeOp0 = *(data.get<llvmberry::ArgForMem2RegStoreOp0>()->storeOp0);
+      std::string Ralloca = llvmberry::getVariable(*AI);
+      std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
+      std::string Rload = llvmberry::getVariable(*LI);
+
+      // set index of end user
+      int endIndex = -1;
+      if (isa<TerminatorInst>(*end)) {
+        endIndex = termIndex[llvmberry::getBasicBlockIndex(end->getParent())];
+      } else {
+        endIndex = instrIndex[end];
+      }
+
       // propagate noalias
-      auto &allocas = *(data.get<llvmberry::ArgForRewriteSingleStoreAlloca>()->allocas);
-      //auto &allocas = boost::any_cast<const std::vector<llvm::AllocaInst*>&>(data["Allocas"]);
       for (auto i = allocas.begin(); i != allocas.end(); ++i) {
         AllocaInst *AItmp = *i;
 
         if (AI==AItmp) continue;
 
-        //Instruction *UserInsttmp = cast<Instruction>(*UItmp++);
-        //if (!isa<StoreInst>(UserInsttmp) && UserInsttmp == OnlyStore) continue;
-        //StoreInst *SItmp = cast<StoreInst>(UserInsttmp);
-        std::string reg_name_tmp = llvmberry::getVariable(*AItmp);
-        
+        std::string Rtmp = llvmberry::getVariable(*AItmp);
+
+        if (instrIndex[AI]<instrIndex[AItmp]) {
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *AItmp, instrIndex[AItmp], ""),
+               llvmberry::ConsDiffblockNoalias::make
+                (llvmberry::TyValue::make(*AI),
+                 llvmberry::TyValue::make(*AItmp),
+                 llvmberry::TyPointer::make(*AI),
+                 llvmberry::TyPointer::make(*AItmp))));
+
+          hints.addCommand
+            (llvmberry::ConsPropagate::make
+              (llvmberry::ConsNoalias::make
+                (llvmberry::TyPointer::make(*AI),
+                 llvmberry::TyPointer::make(*AItmp),
+                 llvmberry::Source),
+               llvmberry::ConsBounds::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *AItmp, instrIndex[AItmp], ""),
+                 llvmberry::TyPosition::make
+                  (llvmberry::Source, *end, endIndex, ""))));
+        } else {
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *AI, instrIndex[AI], ""),
+               llvmberry::ConsDiffblockNoalias::make
+                (llvmberry::TyValue::make(*AItmp),
+                 llvmberry::TyValue::make(*AI),
+                 llvmberry::TyPointer::make(*AItmp),
+                 llvmberry::TyPointer::make(*AI))));
+
+          hints.addCommand
+            (llvmberry::ConsPropagate::make
+              (llvmberry::ConsNoalias::make
+                (llvmberry::TyPointer::make(*AItmp),
+                 llvmberry::TyPointer::make(*AI),
+                 llvmberry::Source),
+               llvmberry::ConsBounds::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *AI, instrIndex[AI], ""),
+                 llvmberry::TyPosition::make
+                  (llvmberry::Source, *end, endIndex, ""))));
+        }
+      }
+
+      // propagate store instruction
+      if ((LI->getParent() == OnlyStore->getParent() && 
+           instrIndex[OnlyStore] < instrIndex[LI]) ||
+          (LI->getParent() != OnlyStore->getParent() &&
+           DT.dominates(OnlyStore->getParent(), LI->getParent()))) {
+
         hints.addCommand
           (llvmberry::ConsPropagate::make
-           (llvmberry::ConsNoalias::make(
-              llvmberry::TyPointer::make(*(OnlyStore->getOperand(1))),
-              llvmberry::TyPointer::make(*AItmp),
+            (llvmberry::ConsLessdef::make
+             (llvmberry::ConsInsn::make(*OnlyStore),
+              llvmberry::ConsVar::make
+               (Rstore, llvmberry::Ghost),
               llvmberry::Source),
-           //std::unique_ptr<llvmberry::TyPropagateObject>
-           //(new llvmberry::ConsNoalias
-           // (reg_store, llvmberry::Physical,
-           //   reg_name_tmp, llvmberry::Physical,
-           //   llvmberry::Source)),
-            llvmberry::ConsBounds::make
-             (llvmberry::TyPosition::make
-               (llvmberry::Source, *AItmp),
-              llvmberry::TyPosition::make
-               (llvmberry::Source, *end))));
+             llvmberry::ConsBounds::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *OnlyStore, instrIndex[OnlyStore], ""),
+               llvmberry::TyPosition::make
+                (llvmberry::Source, *LI, instrIndex[LI], ""))));
 
         hints.addCommand
           (llvmberry::ConsPropagate::make
-           (llvmberry::ConsNoalias::make(
-             llvmberry::TyPointer::make(*(OnlyStore->getOperand(1))),
-             llvmberry::TyPointer::make(*AItmp),
-             llvmberry::Target),
-            //std::unique_ptr<llvmberry::TyPropagateObject>
-            //  (new llvmberry::ConsNoalias
-            //    (reg_store, llvmberry::Physical,
-            //     reg_name_tmp, llvmberry::Physical,
-            //     llvmberry::Target)),
-            llvmberry::ConsBounds::make
-             (llvmberry::TyPosition::make
-               (llvmberry::Source, *AItmp),
-              llvmberry::TyPosition::make
-               (llvmberry::Source, *end))));
+            (llvmberry::ConsLessdef::make
+             (llvmberry::ConsVar::make
+               (Rstore, llvmberry::Ghost),
+              llvmberry::makeExpr_fromStoreInst(OnlyStore),
+              llvmberry::Target),
+             llvmberry::ConsBounds::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *OnlyStore, instrIndex[OnlyStore], ""),
+               llvmberry::TyPosition::make
+                (llvmberry::Source, *LI, instrIndex[LI], ""))));
+
+        if (storeOp0[OnlyStore] == "%") {
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *OnlyStore, instrIndex[OnlyStore], ""),
+              (llvmberry::ConsIntroGhost::make
+                (storeVal[OnlyStore],
+                 llvmberry::TyRegister::make(Rstore, llvmberry::Ghost)))));
+
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *OnlyStore, instrIndex[OnlyStore], ""), 
+              (llvmberry::ConsTransitivity::make
+                (llvmberry::ConsInsn::make(*OnlyStore),
+                 storeExpr[OnlyStore],
+                 llvmberry::ConsVar::make(Rstore, llvmberry::Ghost)))));
+
+        } else {
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *OnlyStore, instrIndex[OnlyStore], ""),
+              (llvmberry::ConsIntroGhost::make
+                (std::shared_ptr<llvmberry::TyValue>
+                  (new llvmberry::ConsId(llvmberry::TyRegister::make
+                                          (storeOp0[OnlyStore], 
+                                           llvmberry::Ghost))),
+                 llvmberry::TyRegister::make(Rstore, llvmberry::Ghost)))));
+
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *OnlyStore, instrIndex[OnlyStore], ""), 
+              (llvmberry::ConsTransitivity::make
+                (llvmberry::ConsInsn::make(*OnlyStore),
+                 storeExpr[OnlyStore],
+                 llvmberry::ConsVar::make(storeOp0[OnlyStore], llvmberry::Ghost)))));
+
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *OnlyStore, instrIndex[OnlyStore], ""), 
+              (llvmberry::ConsTransitivity::make
+                (llvmberry::ConsInsn::make(*OnlyStore),
+                 llvmberry::ConsVar::make(storeOp0[OnlyStore], llvmberry::Ghost),
+                 llvmberry::ConsVar::make(Rstore, llvmberry::Ghost)))));
+
+          hints.addCommand
+            (llvmberry::ConsInfrule::make
+              (llvmberry::TyPosition::make
+                (llvmberry::Source, *OnlyStore, instrIndex[OnlyStore], ""), 
+              (llvmberry::ConsTransitivityTgt::make
+                (llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+                 llvmberry::ConsVar::make(storeOp0[OnlyStore], llvmberry::Ghost),
+                 llvmberry::makeExpr_fromStoreInst(OnlyStore)))));
+        }
 
         hints.addCommand
           (llvmberry::ConsPropagate::make
-           (llvmberry::ConsNoalias::make(
-             llvmberry::TyPointer::make(*AItmp),
-             llvmberry::TyPointer::make(*(OnlyStore->getOperand(1))),
-             llvmberry::Source),
-            //std::unique_ptr<llvmberry::TyPropagateObject>
-            //  (new llvmberry::ConsNoalias
-            //    (reg_name_tmp, llvmberry::Physical,
-            //     reg_store, llvmberry::Physical,
-            //     llvmberry::Source)),
-            llvmberry::ConsBounds::make
-             (llvmberry::TyPosition::make
-               (llvmberry::Source, *AItmp),
-              llvmberry::TyPosition::make
-               (llvmberry::Source, *end))));
-
-        hints.addCommand
-          (llvmberry::ConsPropagate::make
-           (llvmberry::ConsNoalias::make(
-             llvmberry::TyPointer::make(*AItmp),
-             llvmberry::TyPointer::make(*(OnlyStore->getOperand(1))),
-             llvmberry::Source),
-            //std::unique_ptr<llvmberry::TyPropagateObject>
-            //  (new llvmberry::ConsNoalias
-            //    (reg_name_tmp, llvmberry::Physical,
-            //     reg_store, llvmberry::Physical,
-            //     llvmberry::Target)),
-            llvmberry::ConsBounds::make
-             (llvmberry::TyPosition::make
-               (llvmberry::Source, *AItmp),
-              llvmberry::TyPosition::make
-               (llvmberry::Source, *end))));
-        
-        hints.addCommand
-          (llvmberry::ConsPropagate::make
-            (llvmberry::ConsAlloca::make
-              (llvmberry::TyRegister::make
-                (reg_name_tmp, llvmberry::Physical),
+            (llvmberry::ConsLessdef::make
+              (llvmberry::ConsVar::make
+                (Rload, llvmberry::Physical),
+               llvmberry::ConsVar::make
+                (Rload, llvmberry::Ghost),
                llvmberry::Source),
              llvmberry::ConsBounds::make
               (llvmberry::TyPosition::make
-                (llvmberry::Source, *AItmp),
+                (llvmberry::Source, *LI, instrIndex[LI], ""),
                llvmberry::TyPosition::make
-                (llvmberry::Source, *end))));
+                (llvmberry::Source, *end, endIndex, ""))));
 
         hints.addCommand
           (llvmberry::ConsPropagate::make
-            (llvmberry::ConsAlloca::make
-              (llvmberry::TyRegister::make
-                (reg_name_tmp, llvmberry::Physical),
+            (llvmberry::ConsLessdef::make
+              (llvmberry::ConsVar::make
+                (Rload, llvmberry::Ghost),
+               llvmberry::makeExpr_fromStoreInst(OnlyStore),
                llvmberry::Target),
              llvmberry::ConsBounds::make
               (llvmberry::TyPosition::make
-                (llvmberry::Source, *AItmp),
+                (llvmberry::Source, *LI, instrIndex[LI], ""),
                llvmberry::TyPosition::make
-                (llvmberry::Source, *end))));
+                (llvmberry::Source, *end, endIndex, ""))));
+
+        hints.addCommand
+          (llvmberry::ConsInfrule::make
+            (llvmberry::TyPosition::make
+              (llvmberry::Source, *LI, instrIndex[LI], ""),
+            (llvmberry::ConsIntroGhost::make
+              (std::shared_ptr<llvmberry::TyValue>
+                (new llvmberry::ConsId(llvmberry::TyRegister::make
+                                        (Rstore, llvmberry::Ghost))),
+               llvmberry::TyRegister::make(Rload, llvmberry::Ghost)))));
+
+        hints.addCommand
+          (llvmberry::ConsInfrule::make
+            (llvmberry::TyPosition::make
+              (llvmberry::Source, *LI, instrIndex[LI], ""), 
+            (llvmberry::ConsTransitivity::make
+              (llvmberry::ConsInsn::make(*OnlyStore),
+               llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+               llvmberry::ConsVar::make(Rload, llvmberry::Ghost)))));
+
+        hints.addCommand
+          (llvmberry::ConsInfrule::make
+            (llvmberry::TyPosition::make
+              (llvmberry::Source, *LI, instrIndex[LI], ""), 
+            (llvmberry::ConsTransitivity::make
+              (llvmberry::ConsVar::make(Rload, llvmberry::Physical),
+               llvmberry::ConsInsn::make(*OnlyStore),
+               llvmberry::ConsVar::make(Rload, llvmberry::Ghost)))));
+
+        hints.addCommand
+          (llvmberry::ConsInfrule::make
+            (llvmberry::TyPosition::make
+              (llvmberry::Source, *LI, instrIndex[LI], ""), 
+            (llvmberry::ConsTransitivityTgt::make
+              (llvmberry::ConsVar::make(Rload, llvmberry::Ghost),
+               llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+               llvmberry::makeExpr_fromStoreInst(OnlyStore)))));
       }
 
-      // propagate alloca
+      // propagate maydiff
+      hints.addCommand
+        (llvmberry::ConsPropagate::make
+          (llvmberry::ConsMaydiff::make
+            (Rload, llvmberry::Physical),
+           llvmberry::ConsGlobal::make()));
 
       hints.addCommand
         (llvmberry::ConsPropagate::make
-          (llvmberry::ConsAlloca::make
-            (llvmberry::TyRegister::make
-              (reg_alloca, llvmberry::Physical),
-             llvmberry::Source),
-           llvmberry::ConsBounds::make
-            (llvmberry::TyPosition::make
-              (llvmberry::Source, *AI),
-             llvmberry::TyPosition::make
-              (llvmberry::Source, *end))));
+          (llvmberry::ConsMaydiff::make
+            (Rload, llvmberry::Previous),
+           llvmberry::ConsGlobal::make()));
 
-      hints.addCommand
-        (llvmberry::ConsPropagate::make
-          (llvmberry::ConsAlloca::make
-            (llvmberry::TyRegister::make
-              (reg_alloca, llvmberry::Physical),
-             llvmberry::Target),
-           llvmberry::ConsBounds::make
-            (llvmberry::TyPosition::make
-              (llvmberry::Source, *AI),
-             llvmberry::TyPosition::make
-              (llvmberry::Source, *end))));
-
-      // propagate store instruction
-      hints.addCommand
-        (llvmberry::ConsPropagate::make
-          (llvmberry::ConsLessdef::make
-           (llvmberry::ConsInsn::make(*OnlyStore),
-            llvmberry::ConsVar::make
-             (reg_store, llvmberry::Ghost),
-            llvmberry::Source),
-           llvmberry::ConsBounds::make
-            (llvmberry::TyPosition::make
-              (llvmberry::Source, *OnlyStore),
-             llvmberry::TyPosition::make
-              (llvmberry::Source, *LI))));
-
-      hints.addCommand
-        (llvmberry::ConsPropagate::make
-          (llvmberry::ConsLessdef::make
-           (llvmberry::ConsVar::make
-             (reg_store, llvmberry::Ghost),
-            llvmberry::makeExpr_fromStoreInst(OnlyStore),
-            llvmberry::Target),
-           llvmberry::ConsBounds::make
-            (llvmberry::TyPosition::make
-              (llvmberry::Target, *OnlyStore),
-             llvmberry::TyPosition::make
-              (llvmberry::Target, *LI))));
-
-      hints.addCommand
-        (llvmberry::ConsInfrule::make
-          (llvmberry::TyPosition::make
-            (llvmberry::Source, *OnlyStore),
-          (llvmberry::ConsIntroGhost::make
-            (llvmberry::TyValue::make(*(OnlyStore->getOperand(0))),
-             llvmberry::TyRegister::make(reg_store, llvmberry::Ghost)))));
-
-      hints.addCommand
-        (llvmberry::ConsInfrule::make
-          (llvmberry::TyPosition::make
-            (llvmberry::Source, *OnlyStore), 
-          (llvmberry::ConsTransitivity::make
-            (llvmberry::ConsInsn::make(*OnlyStore),
-             llvmberry::makeExpr_fromStoreInst(OnlyStore),
-             llvmberry::ConsVar::make(reg_store, llvmberry::Ghost)))));
-
-      hints.addCommand
-        (llvmberry::ConsPropagate::make
-          (llvmberry::ConsLessdef::make
-           (llvmberry::ConsVar::make
-             (reg_load, llvmberry::Physical),
-            llvmberry::ConsVar::make
-             (reg_store+"."+reg_load, llvmberry::Ghost),
-            llvmberry::Source),
-           llvmberry::ConsBounds::make
-            (llvmberry::TyPosition::make
-              (llvmberry::Source, *LI),
-             llvmberry::TyPosition::make
-              (llvmberry::Source, *end))));
-
-      hints.addCommand
-        (llvmberry::ConsPropagate::make
-          (llvmberry::ConsLessdef::make
-           (llvmberry::ConsVar::make
-             (reg_store+"."+reg_load, llvmberry::Ghost),
-            llvmberry::makeExpr_fromStoreInst(OnlyStore),
-            llvmberry::Target),
-           llvmberry::ConsBounds::make
-            (llvmberry::TyPosition::make
-              (llvmberry::Source, *LI),
-             llvmberry::TyPosition::make
-              (llvmberry::Source, *end))));
-
-      hints.addCommand
-        (llvmberry::ConsInfrule::make
-          (llvmberry::TyPosition::make
-            (llvmberry::Source, *LI),
-          (llvmberry::ConsIntroGhost::make
-            (std::unique_ptr<llvmberry::TyValue>
-              (new llvmberry::ConsId(llvmberry::TyRegister::make
-                                      (reg_store, llvmberry::Ghost))),
-             llvmberry::TyRegister::make(reg_store+"."+reg_load, llvmberry::Ghost)))));
-
-      hints.addCommand
-        (llvmberry::ConsInfrule::make
-          (llvmberry::TyPosition::make
-            (llvmberry::Source, *LI), 
-          (llvmberry::ConsTransitivity::make
-            (llvmberry::ConsInsn::make(*OnlyStore),
-             llvmberry::ConsVar::make(reg_store, llvmberry::Ghost),
-             llvmberry::ConsVar::make(reg_store+"."+reg_load, llvmberry::Ghost)))));
-
-      hints.addCommand
-        (llvmberry::ConsInfrule::make
-          (llvmberry::TyPosition::make
-            (llvmberry::Source, *LI), 
-          (llvmberry::ConsTransitivity::make
-            (llvmberry::ConsVar::make(reg_load, llvmberry::Physical),
-             llvmberry::ConsInsn::make(*OnlyStore),
-             llvmberry::ConsVar::make(reg_store+"."+reg_load, llvmberry::Ghost)))));
-
-      hints.addCommand
-        (llvmberry::ConsInfrule::make
-          (llvmberry::TyPosition::make
-            (llvmberry::Target, *LI), 
-          (llvmberry::ConsTransitivityTgt::make
-            (llvmberry::ConsVar::make(reg_store+"."+reg_load, llvmberry::Ghost),
-             llvmberry::ConsVar::make(reg_store, llvmberry::Ghost),
-             llvmberry::makeExpr_fromStoreInst(OnlyStore)))));
+      hints.addNopPosition
+        (llvmberry::TyPosition::make
+          (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
     });
 
     // If the replacement value is the load, this must occur in unreachable
@@ -650,10 +658,9 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       ReplVal = UndefValue::get(LI->getType());
     LI->replaceAllUsesWith(ReplVal);
 
-    llvmberry::ValidationUnit::End();
-
     if (AST && LI->getType()->isPointerTy())
       AST->deleteValue(LI);
+
     LI->eraseFromParent();
     LBI.deleteValue(LI);
   }
@@ -671,6 +678,41 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     DDI->eraseFromParent();
     LBI.deleteValue(DDI);
   }
+
+  // add alloca and store into maydiff
+  llvmberry::ValidationUnit::GetInstance()->intrude
+         ([&AI, &OnlyStore]
+            (llvmberry::ValidationUnit::Dictionary &data, 
+             llvmberry::CoreHint &hints) {
+    auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
+    auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+    std::string Ralloca = llvmberry::getVariable(*AI);
+
+    hints.addCommand
+      (llvmberry::ConsPropagate::make
+        (llvmberry::ConsMaydiff::make
+          (Ralloca, llvmberry::Physical),
+         llvmberry::ConsGlobal::make()));
+
+    hints.addCommand
+      (llvmberry::ConsPropagate::make
+        (llvmberry::ConsMaydiff::make
+          (Ralloca, llvmberry::Previous),
+         llvmberry::ConsGlobal::make()));
+
+    hints.addNopPosition
+      (llvmberry::TyPosition::make
+        (llvmberry::Target, *AI, instrIndex[AI]-1, ""));
+
+    hints.addNopPosition
+      (llvmberry::TyPosition::make
+        (llvmberry::Target, *OnlyStore, instrIndex[OnlyStore]-1, ""));
+
+    std::vector<AllocaInst*>::iterator position = std::find(allocas.begin(), allocas.end(), AI);
+    if (position != allocas.end()) 
+      allocas.erase(position);
+  });
+
   // Remove the (now dead) store and alloca.
   Info.OnlyStore->eraseFromParent();
   LBI.deleteValue(Info.OnlyStore);
@@ -708,8 +750,293 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   StoresByIndexTy StoresByIndex;
 
   for (User *U : AI->users())
-    if (StoreInst *SI = dyn_cast<StoreInst>(U))
+    if (StoreInst *SI = dyn_cast<StoreInst>(U)) {
       StoresByIndex.push_back(std::make_pair(LBI.getInstructionIndex(SI), SI));
+
+      llvmberry::ValidationUnit::GetInstance()->intrude
+         ([&AI, &SI]
+           (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        // prepare variables
+        auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+        auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+        auto &storeVal = *(data.get<llvmberry::ArgForMem2RegStoreVal>()->storeVal);
+        auto &storeExpr = *(data.get<llvmberry::ArgForMem2RegStoreExpr>()->storeExpr);
+        auto &storeOp0 = *(data.get<llvmberry::ArgForMem2RegStoreOp0>()->storeOp0);
+        auto &values = *(data.get<llvmberry::ArgForMem2RegValues>()->values);
+        std::string Ralloca = llvmberry::getVariable(*AI);
+        std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
+        std::string keySI = std::to_string(instrIndex[SI])+Rstore;
+
+        // find next store, and end user of alloca
+        llvm::Instruction* next;
+        llvm::Instruction* end = AI; 
+
+        int checkNext = 1;
+        for (auto UItmp = AI->user_begin(), Etmp = AI->user_end(); UItmp != Etmp;) {
+          Instruction *tmpInst = cast<Instruction>(*UItmp++);
+          if (isa<StoreInst>(tmpInst) && (instrIndex[tmpInst]>instrIndex[SI] || 
+              (instrIndex[tmpInst]>instrIndex[SI] && instrIndex[next]>instrIndex[tmpInst]))) {
+            checkNext = 0;
+            next = tmpInst;
+          } else if (instrIndex[end] < instrIndex[tmpInst]) end = tmpInst;
+        }
+        if (checkNext == 1) next = end;
+
+        // set index of next store
+        int nextIndex;
+        if (isa<TerminatorInst>(*next)) {
+          nextIndex = termIndex[llvmberry::getBasicBlockIndex(next->getParent())];
+        } else {
+          nextIndex = instrIndex[next];
+          if (isa<StoreInst>(end)) nextIndex = -1;
+        }
+
+        // set index of end user
+        int endIndex;
+        if (isa<TerminatorInst>(*end)) {
+          endIndex = termIndex[llvmberry::getBasicBlockIndex(end->getParent())];
+        } else {
+          endIndex = instrIndex[end];
+        }
+
+        // propagate noalias
+        for (auto i = allocas.begin(); i != allocas.end(); ++i) {
+          AllocaInst *AItmp = *i;
+
+          if (AI==AItmp) continue;
+
+          if (instrIndex[AI]<instrIndex[AItmp]) {
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *AItmp, instrIndex[AItmp], ""),
+                 llvmberry::ConsDiffblockNoalias::make
+                  (llvmberry::TyValue::make(*AI),
+                   llvmberry::TyValue::make(*AItmp),
+                   llvmberry::TyPointer::make(*AI),
+                   llvmberry::TyPointer::make(*AItmp))));
+
+            hints.addCommand
+              (llvmberry::ConsPropagate::make
+                (llvmberry::ConsNoalias::make
+                  (llvmberry::TyPointer::make(*AI),
+                   llvmberry::TyPointer::make(*AItmp),
+                   llvmberry::Source),
+                 llvmberry::ConsBounds::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *AItmp, instrIndex[AItmp], ""),
+                   llvmberry::TyPosition::make
+                    (llvmberry::Source, *end, endIndex, ""))));
+          } else {
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *AI, instrIndex[AI], ""),
+                 llvmberry::ConsDiffblockNoalias::make
+                  (llvmberry::TyValue::make(*AItmp),
+                   llvmberry::TyValue::make(*AI),
+                   llvmberry::TyPointer::make(*AItmp),
+                   llvmberry::TyPointer::make(*AI))));
+
+            hints.addCommand
+              (llvmberry::ConsPropagate::make
+                (llvmberry::ConsNoalias::make
+                  (llvmberry::TyPointer::make(*AItmp),
+                   llvmberry::TyPointer::make(*AI),
+                   llvmberry::Source),
+                 llvmberry::ConsBounds::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *AI, instrIndex[AI], ""),
+                   llvmberry::TyPosition::make
+                    (llvmberry::Source, *end, endIndex, ""))));
+          }
+        }
+
+        // propagate store instruction
+        if (nextIndex != -1) {
+          if (storeOp0[SI] == "%"+std::string(SI->getOperand(0)->getName())) {
+            if (storeExpr[SI] == values[keySI]) {
+              hints.addCommand
+                (llvmberry::ConsPropagate::make
+                  (llvmberry::ConsLessdef::make
+                   (llvmberry::ConsInsn::make(*SI),
+                    llvmberry::ConsVar::make
+                     (Rstore, llvmberry::Ghost),
+                    llvmberry::Source),
+                   llvmberry::ConsBounds::make
+                    (llvmberry::TyPosition::make
+                      (llvmberry::Source, *SI, instrIndex[SI], ""),
+                     llvmberry::TyPosition::make
+                      (llvmberry::Source, *next, nextIndex, ""))));
+
+              hints.addCommand
+                (llvmberry::ConsPropagate::make
+                  (llvmberry::ConsLessdef::make
+                   (llvmberry::ConsVar::make
+                     (Rstore, llvmberry::Ghost),
+                    storeExpr[SI],
+                    llvmberry::Target),
+                   llvmberry::ConsBounds::make
+                    (llvmberry::TyPosition::make
+                      (llvmberry::Source, *SI, instrIndex[SI], ""),
+                     llvmberry::TyPosition::make
+                      (llvmberry::Source, *next, nextIndex, ""))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsIntroGhost::make
+                    (storeVal[SI],
+                     llvmberry::TyRegister::make(Rstore, llvmberry::Ghost)))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsTransitivity::make
+                    (llvmberry::ConsInsn::make(*SI),
+                     storeExpr[SI],
+                     llvmberry::ConsVar::make(Rstore, llvmberry::Ghost)))));
+            } else {
+              hints.addCommand
+                (llvmberry::ConsPropagate::make
+                  (llvmberry::ConsLessdef::make
+                   (llvmberry::ConsInsn::make(*SI),
+                    llvmberry::ConsVar::make
+                     (Rstore, llvmberry::Ghost),
+                    llvmberry::Source),
+                   llvmberry::ConsBounds::make
+                    (llvmberry::TyPosition::make
+                      (llvmberry::Source, *SI, instrIndex[SI], ""),
+                     llvmberry::TyPosition::make
+                      (llvmberry::Source, *next, nextIndex, ""))));
+
+              hints.addCommand
+                (llvmberry::ConsPropagate::make
+                  (llvmberry::ConsLessdef::make
+                   (llvmberry::ConsVar::make
+                     (Rstore, llvmberry::Ghost),
+                    values[keySI],
+                    llvmberry::Target),
+                   llvmberry::ConsBounds::make
+                    (llvmberry::TyPosition::make
+                      (llvmberry::Source, *SI, instrIndex[SI], ""),
+                     llvmberry::TyPosition::make
+                      (llvmberry::Source, *next, nextIndex, ""))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsIntroGhost::make
+                    (std::shared_ptr<llvmberry::TyValue>
+                      (new llvmberry::ConsId(llvmberry::TyRegister::make
+                                              (storeOp0[SI], 
+                                               llvmberry::Ghost))),
+                     llvmberry::TyRegister::make(Rstore, llvmberry::Ghost)))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsTransitivity::make
+                    (llvmberry::ConsInsn::make(*SI),
+                     llvmberry::ConsVar::make(storeOp0[SI], llvmberry::Physical),
+                     llvmberry::ConsVar::make(storeOp0[SI], llvmberry::Ghost)))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsTransitivity::make
+                    (llvmberry::ConsInsn::make(*SI),
+                     llvmberry::ConsVar::make(storeOp0[SI], llvmberry::Ghost),
+                     llvmberry::ConsVar::make(Rstore, llvmberry::Ghost)))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsTransitivityTgt::make
+                    (llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+                     llvmberry::ConsVar::make(storeOp0[SI], llvmberry::Ghost),
+                     values[keySI]))));
+            }
+          } else {
+            if (storeOp0[SI] != "%"+std::string(SI->getOperand(0)->getName())) {
+              hints.addCommand
+                (llvmberry::ConsPropagate::make
+                  (llvmberry::ConsLessdef::make
+                   (llvmberry::ConsInsn::make(*SI),
+                    llvmberry::ConsVar::make
+                     (Rstore, llvmberry::Ghost),
+                    llvmberry::Source),
+                   llvmberry::ConsBounds::make
+                    (llvmberry::TyPosition::make
+                      (llvmberry::Source, *SI, instrIndex[SI], ""),
+                     llvmberry::TyPosition::make
+                      (llvmberry::Source, *next, nextIndex, ""))));
+
+              hints.addCommand
+                (llvmberry::ConsPropagate::make
+                  (llvmberry::ConsLessdef::make
+                   (llvmberry::ConsVar::make
+                     (Rstore, llvmberry::Ghost),
+                    llvmberry::makeExpr_fromStoreInst(SI),
+                    llvmberry::Target),
+                   llvmberry::ConsBounds::make
+                    (llvmberry::TyPosition::make
+                      (llvmberry::Source, *SI, instrIndex[SI], ""),
+                     llvmberry::TyPosition::make
+                      (llvmberry::Source, *next, nextIndex, ""))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsTransitivity::make
+                    (llvmberry::ConsInsn::make(*SI),
+                     llvmberry::ConsVar::make
+                      (storeOp0[SI], llvmberry::Physical),
+                     llvmberry::ConsVar::make(storeOp0[SI], llvmberry::Ghost)))));
+              
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsIntroGhost::make
+                    (std::shared_ptr<llvmberry::TyValue>
+                      (new llvmberry::ConsId(llvmberry::TyRegister::make
+                                              (storeOp0[SI], 
+                                               llvmberry::Ghost))),
+                     llvmberry::TyRegister::make(Rstore, llvmberry::Ghost)))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsTransitivity::make
+                    (llvmberry::ConsInsn::make(*SI),
+                     llvmberry::ConsVar::make
+                      (storeOp0[SI], llvmberry::Ghost),
+                     llvmberry::ConsVar::make(Rstore, llvmberry::Ghost)))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *SI, instrIndex[SI], ""),
+                  (llvmberry::ConsTransitivityTgt::make
+                    (llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+                     llvmberry::ConsVar::make
+                      (storeOp0[SI], llvmberry::Ghost),
+                     llvmberry::makeExpr_fromStoreInst(SI)))));
+            }
+          }
+        }
+      });     
+    }
 
   // Sort the stores by their index, making it efficient to do a lookup with a
   // binary search.
@@ -734,9 +1061,219 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
     if (I == StoresByIndex.begin())
       // If there is no store before this load, the load takes the undef value.
       LI->replaceAllUsesWith(UndefValue::get(LI->getType()));
-    else
+    else {
+      llvmberry::ValidationUnit::GetInstance()->intrude
+         ([&AI, &LI, &I]
+           (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+        // prepare variables
+        StoreInst* SI = std::prev(I)->second;
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+        auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+        auto &storeExpr = *(data.get<llvmberry::ArgForMem2RegStoreExpr>()->storeExpr);
+        auto &storeOp0 = *(data.get<llvmberry::ArgForMem2RegStoreOp0>()->storeOp0);
+        auto &values = *(data.get<llvmberry::ArgForMem2RegValues>()->values);
+        std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
+        std::string Rload = llvmberry::getVariable(*LI);
+
+        // find end user of load
+        llvm::Value::use_iterator UItmp = LI->use_begin(), Etmp = LI->use_end();
+        llvm::Instruction *end;
+
+        end = LI;
+        for (; UItmp != Etmp;) {
+          llvm::Use &U = *UItmp;
+          ++UItmp;
+          end = dyn_cast<Instruction>(U.getUser());
+        }
+
+        // set index of end user
+        int endIndex = -1;
+        if (isa<TerminatorInst>(*end)) {
+          endIndex = termIndex[llvmberry::getBasicBlockIndex(end->getParent())];
+        } else if (end == LI) {
+          endIndex = -1;
+        } else {
+          endIndex = instrIndex[end];
+        }
+
+        // add hints when at least one user of load is exists
+        if (endIndex != -1) {
+          // propagate load instruction
+          if (storeOp0[SI] == "%") {
+            // propagate this when the stored value is constant 
+            hints.addCommand
+              (llvmberry::ConsPropagate::make
+                (llvmberry::ConsLessdef::make
+                  (llvmberry::ConsVar::make
+                    (Rload, llvmberry::Physical),
+                   llvmberry::ConsVar::make
+                    (Rload, llvmberry::Ghost),
+                   llvmberry::Source),
+                 llvmberry::ConsBounds::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *LI, instrIndex[LI], ""),
+                   llvmberry::TyPosition::make
+                    (llvmberry::Source, *end, endIndex, ""))));
+
+            hints.addCommand
+              (llvmberry::ConsPropagate::make
+                (llvmberry::ConsLessdef::make
+                  (llvmberry::ConsVar::make
+                    (Rload, llvmberry::Ghost),
+                   storeExpr[SI],
+                   llvmberry::Target),
+                 llvmberry::ConsBounds::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *LI, instrIndex[LI], ""),
+                   llvmberry::TyPosition::make
+                    (llvmberry::Source, *end, endIndex, ""))));
+
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *LI, instrIndex[LI], ""),
+                (llvmberry::ConsIntroGhost::make
+                  (std::shared_ptr<llvmberry::TyValue>
+                    (new llvmberry::ConsId(llvmberry::TyRegister::make
+                                            (Rstore, llvmberry::Ghost))),
+                   llvmberry::TyRegister::make(Rload, llvmberry::Ghost)))));
+
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *LI, instrIndex[LI], ""),
+                (llvmberry::ConsTransitivity::make
+                  (llvmberry::ConsVar::make(Rload, llvmberry::Physical),
+                   llvmberry::ConsInsn::make(*SI),
+                   llvmberry::ConsVar::make(Rstore, llvmberry::Ghost)))));
+
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *LI, instrIndex[LI], ""),
+                (llvmberry::ConsTransitivity::make
+                  (llvmberry::ConsVar::make(Rload, llvmberry::Physical),
+                   llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+                   llvmberry::ConsVar::make(Rload, llvmberry::Ghost)))));
+
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *LI, instrIndex[LI], ""),
+                (llvmberry::ConsTransitivityTgt::make
+                  (llvmberry::ConsVar::make(Rload, llvmberry::Ghost),
+                   llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+                   storeExpr[SI]))));
+          } else {
+            hints.addCommand
+              (llvmberry::ConsPropagate::make
+                (llvmberry::ConsLessdef::make
+                  (llvmberry::ConsVar::make(Rload, llvmberry::Physical),
+                   llvmberry::ConsVar::make(Rload, llvmberry::Ghost),
+                   llvmberry::Source),
+                 llvmberry::ConsBounds::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *LI, instrIndex[LI], ""),
+                   llvmberry::TyPosition::make
+                    (llvmberry::Source, *end, endIndex, ""))));
+
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *LI, instrIndex[LI], ""),
+                (llvmberry::ConsIntroGhost::make
+                  (std::shared_ptr<llvmberry::TyValue>
+                    (new llvmberry::ConsId(llvmberry::TyRegister::make
+                                            (Rstore, llvmberry::Ghost))),
+                   llvmberry::TyRegister::make(Rload, llvmberry::Ghost)))));
+
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *LI, instrIndex[LI], ""),
+                (llvmberry::ConsTransitivity::make
+                  (llvmberry::ConsVar::make(Rload, llvmberry::Physical),
+                   llvmberry::ConsInsn::make(*SI),
+                   llvmberry::ConsVar::make(Rstore, llvmberry::Ghost)))));
+
+            hints.addCommand
+              (llvmberry::ConsInfrule::make
+                (llvmberry::TyPosition::make
+                  (llvmberry::Source, *LI, instrIndex[LI], ""),
+                (llvmberry::ConsTransitivity::make
+                  (llvmberry::ConsVar::make(Rload, llvmberry::Physical),
+                   llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+                   llvmberry::ConsVar::make(Rload, llvmberry::Ghost)))));
+            
+            if (values[Rload] != NULL) {
+              hints.addCommand
+                (llvmberry::ConsPropagate::make
+                  (llvmberry::ConsLessdef::make
+                    (llvmberry::ConsVar::make
+                      (Rload, llvmberry::Ghost),
+                     values[Rload],
+                     llvmberry::Target),
+                   llvmberry::ConsBounds::make
+                    (llvmberry::TyPosition::make
+                      (llvmberry::Source, *LI, instrIndex[LI], ""),
+                     llvmberry::TyPosition::make
+                      (llvmberry::Source, *end, endIndex, ""))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *LI, instrIndex[LI], ""),
+                  (llvmberry::ConsTransitivityTgt::make
+                    (llvmberry::ConsVar::make(Rload, llvmberry::Ghost),
+                     llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+                     values[Rload]))));
+            } else {
+              hints.addCommand
+                (llvmberry::ConsPropagate::make
+                  (llvmberry::ConsLessdef::make
+                    (llvmberry::ConsVar::make
+                      (Rload, llvmberry::Ghost),
+                     llvmberry::makeExpr_fromStoreInst(SI),
+                     llvmberry::Target),
+                   llvmberry::ConsBounds::make
+                    (llvmberry::TyPosition::make
+                      (llvmberry::Source, *LI, instrIndex[LI], ""),
+                     llvmberry::TyPosition::make
+                      (llvmberry::Source, *end, endIndex, ""))));
+
+              hints.addCommand
+                (llvmberry::ConsInfrule::make
+                  (llvmberry::TyPosition::make
+                    (llvmberry::Source, *LI, instrIndex[LI], ""),
+                  (llvmberry::ConsTransitivityTgt::make
+                    (llvmberry::ConsVar::make(Rload, llvmberry::Ghost),
+                     llvmberry::ConsVar::make(Rstore, llvmberry::Ghost),
+                     llvmberry::makeExpr_fromStoreInst(SI)))));
+            }
+          }
+        }
+
+        // propagate maydiff
+        hints.addCommand
+          (llvmberry::ConsPropagate::make
+            (llvmberry::ConsMaydiff::make
+              (Rload, llvmberry::Physical),
+             llvmberry::ConsGlobal::make()));
+
+        hints.addCommand
+          (llvmberry::ConsPropagate::make
+            (llvmberry::ConsMaydiff::make
+              (Rload, llvmberry::Previous),
+             llvmberry::ConsGlobal::make()));
+
+        hints.addNopPosition
+          (llvmberry::TyPosition::make
+            (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
+      });
+
       // Otherwise, there was a store before this load, the load takes its value.
       LI->replaceAllUsesWith(std::prev(I)->second->getOperand(0));
+    }
 
     if (AST && LI->getType()->isPointerTy())
       AST->deleteValue(LI);
@@ -747,15 +1284,59 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   // Remove the (now dead) stores and alloca.
   while (!AI->use_empty()) {
     StoreInst *SI = cast<StoreInst>(AI->user_back());
+
     // Record debuginfo for the store before removing it.
     if (DbgDeclareInst *DDI = Info.DbgDeclare) {
       DIBuilder DIB(*AI->getParent()->getParent()->getParent(),
                     /*AllowUnresolved*/ false);
       ConvertDebugDeclareToDebugValue(DDI, SI, DIB);
     }
+
+    llvmberry::ValidationUnit::GetInstance()->intrude
+           ([&SI]
+              (llvmberry::ValidationUnit::Dictionary &data,
+               llvmberry::CoreHint &hints) {
+      auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+      std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
+
+      hints.addNopPosition
+        (llvmberry::TyPosition::make
+          (llvmberry::Target, *SI, instrIndex[SI]-1, ""));
+    });
+
     SI->eraseFromParent();
     LBI.deleteValue(SI);
   }
+
+  llvmberry::ValidationUnit::GetInstance()->intrude
+         ([&AI]
+            (llvmberry::ValidationUnit::Dictionary &data,
+             llvmberry::CoreHint &hints) {
+    auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
+    auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+    std::string Ralloca = llvmberry::getVariable(*AI);
+
+    hints.addCommand
+      (llvmberry::ConsPropagate::make
+        (llvmberry::ConsMaydiff::make
+          (Ralloca, llvmberry::Physical),
+         llvmberry::ConsGlobal::make()));
+
+    hints.addCommand
+      (llvmberry::ConsPropagate::make
+        (llvmberry::ConsMaydiff::make
+          (Ralloca, llvmberry::Previous),
+         llvmberry::ConsGlobal::make()));
+
+    hints.addNopPosition
+      (llvmberry::TyPosition::make
+        (llvmberry::Target, *AI, instrIndex[AI]-1, ""));
+
+    std::vector<AllocaInst*>::iterator position = std::find(allocas.begin(), allocas.end(), AI);
+    if (position != allocas.end()) {
+      allocas.erase(position);
+    }
+  });
 
   if (AST)
     AST->deleteValue(AI);
@@ -782,6 +1363,130 @@ void PromoteMem2Reg::run() {
   LargeBlockInfo LBI;
   IDFCalculator IDF(DT);
 
+  llvmberry::name_instructions(F);
+  llvmberry::ValidationUnit::Begin("mem2reg", &F);
+  llvmberry::ValidationUnit::GetInstance()->intrude
+          ([]
+            (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      data.create<llvmberry::ArgForMem2RegAlloca>();
+      data.create<llvmberry::ArgForMem2RegInstrIndex>();
+      data.create<llvmberry::ArgForMem2RegTermIndex>();
+      data.create<llvmberry::ArgForMem2RegStoreVal>();
+      data.create<llvmberry::ArgForMem2RegStoreExpr>();
+      data.create<llvmberry::ArgForMem2RegStoreOp0>();
+      data.create<llvmberry::ArgForMem2RegValues>();
+  });
+
+  // memorize indices of alloca, store, load instructions
+  for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
+    AllocaInst *AItmp = Allocas[tmpNum];
+
+    llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&AItmp, &LBI]
+              (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
+      auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+      auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+      auto &storeVal = *(data.get<llvmberry::ArgForMem2RegStoreVal>()->storeVal);
+      auto &storeExpr = *(data.get<llvmberry::ArgForMem2RegStoreExpr>()->storeExpr);
+      auto &storeOp0 = *(data.get<llvmberry::ArgForMem2RegStoreOp0>()->storeOp0);
+      auto &values = *(data.get<llvmberry::ArgForMem2RegValues>()->values);
+      std::string bname = llvmberry::getBasicBlockIndex(AItmp->getParent());
+      
+      allocas.push_back(AItmp);
+      instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
+      termIndex[bname] = llvmberry::getTerminatorIndex(AItmp->getParent()->getTerminator());
+
+      for (auto UItmp = AItmp->user_begin(), Etmp = AItmp->user_end(); UItmp != Etmp;) {
+        Instruction *tmpInst = cast<Instruction>(*UItmp++);
+
+        if (!(isa<LoadInst>(tmpInst) || isa<StoreInst>(tmpInst))) 
+          continue;
+
+        instrIndex[tmpInst] = llvmberry::getCommandIndex(*tmpInst);
+
+        if (isa<StoreInst>(tmpInst)) {
+          StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
+          std::string keySI = std::to_string(instrIndex[SI])+"%"+
+                              std::string(SI->getOperand(1)->getName());
+
+          storeVal[SI] = std::move(llvmberry::TyValue::make(*(SI->getOperand(0))));
+          storeExpr[SI] = std::move(llvmberry::makeExpr_fromStoreInst(SI));
+          storeOp0[SI] = "%" + std::string(SI->getOperand(0)->getName());
+          if (storeOp0[SI] == "%")
+            values[keySI] = storeExpr[SI];
+          else 
+            values[keySI] = NULL;
+        }
+
+        llvm::Value::use_iterator UItmp2 = tmpInst->use_begin(), Etmp2 = tmpInst->use_end();
+        Instruction *tmpUseinst;
+
+        for (; UItmp2 != Etmp2;) {
+          llvm::Use &U = *UItmp2;
+          ++UItmp2;
+
+          if ((tmpUseinst = dyn_cast<Instruction>(U.getUser())))
+            instrIndex[tmpUseinst] = llvmberry::getCommandIndex(*tmpUseinst);
+        }
+      }
+
+      bool hasChanged = true;
+      while (hasChanged) {
+        hasChanged = false;
+
+        std::map<const Instruction*, unsigned>::const_iterator it;
+        for (it = instrIndex.begin(); it != instrIndex.end(); ++it) {
+          const Instruction *tmpInst = it->first;
+
+          if (!(isa<LoadInst>(tmpInst) || isa<StoreInst>(tmpInst)))
+            continue;
+
+          if (isa<LoadInst>(tmpInst)) {
+            const LoadInst* LI = dyn_cast<LoadInst>(tmpInst);
+            std::string keyLI = "%"+std::string(LI->getName());
+            int nearestStore = -1;
+
+            if (values[keyLI] == NULL) {
+              std::map<const Instruction*, unsigned>::const_iterator it2;
+              for (unsigned i=instrIndex[LI]-1; i>0; i--) {
+                for (it2=instrIndex.begin(); it2!=instrIndex.end(); ++it2) {
+                  if (it2->second == i && isa<StoreInst>(it2->first) && 
+                      LI->getOperand(0) == it2->first->getOperand(1))
+                    nearestStore = i;
+                }
+                if (nearestStore != -1)
+                  break;
+              }
+
+              values[keyLI]
+                = values[std::to_string(nearestStore)+"%"+std::string(LI->getOperand(0)->getName())];
+
+              hasChanged = true;
+            }
+
+            if (values[keyLI] == NULL) 
+              hasChanged = false;
+          } else {
+            const StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
+            std::string keySI = std::to_string(instrIndex[SI])+"%"+
+                                std::string(SI->getOperand(1)->getName());
+
+            if (values[keySI] == NULL) {
+              values[keySI]
+                = values["%"+std::string(SI->getOperand(0)->getName())];
+
+              hasChanged = true;
+            }
+
+            if (values[keySI] == NULL)
+              hasChanged = false;
+          }
+        }
+      }
+    }); 
+  }
+
   for (unsigned AllocaNum = 0; AllocaNum != Allocas.size(); ++AllocaNum) {
     AllocaInst *AI = Allocas[AllocaNum];
 
@@ -791,10 +1496,79 @@ void PromoteMem2Reg::run() {
 
     removeLifetimeIntrinsicUsers(AI);
 
-    llvmberry::ValidationUnit::Begin("mem2reg",
-                                     AI->getParent()->getParent());
+    // hints to propagate alloca, private for every alloca
+    llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&AI]
+              (llvmberry::ValidationUnit::Dictionary &data, 
+               llvmberry::CoreHint &hints) {
+      std::string Ralloca = llvmberry::getVariable(*AI);
+      auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+      auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+
+      llvm::Value::use_iterator UItmp = AI->use_begin(), Etmp = AI->use_end();
+      llvm::Instruction *userEnd;
+
+      // find block name of alloca's end user
+      userEnd = AI;
+      for (; UItmp != Etmp;) {
+        llvm::Use &U = *UItmp;
+        ++UItmp;
+        userEnd = dyn_cast<Instruction>(U.getUser());
+      }
+      std::string endBname = llvmberry::getBasicBlockIndex(userEnd->getParent());
+
+      // propagate alloca, private
+      hints.addCommand
+        (llvmberry::ConsPropagate::make
+          (llvmberry::ConsAlloca::make
+            (llvmberry::TyRegister::make
+              (Ralloca, llvmberry::Physical),
+             llvmberry::Source),
+           llvmberry::ConsBounds::make
+            (llvmberry::TyPosition::make
+              (llvmberry::Source, *AI, instrIndex[AI], ""),
+             llvmberry::TyPosition::make
+              (llvmberry::Source, *userEnd, termIndex[endBname], ""))));
+
+      hints.addCommand
+        (llvmberry::ConsPropagate::make
+          (llvmberry::ConsPrivate::make
+            (llvmberry::TyRegister::make
+              (Ralloca, llvmberry::Physical),
+             llvmberry::Source),
+           llvmberry::ConsBounds::make
+            (llvmberry::TyPosition::make
+              (llvmberry::Source, *AI, instrIndex[AI], ""),
+             llvmberry::TyPosition::make
+              (llvmberry::Source, *userEnd, termIndex[endBname], ""))));
+    });
 
     if (AI->use_empty()) {
+      // hints when alloca has no use
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&AI]
+                (llvmberry::ValidationUnit::Dictionary &data, 
+                 llvmberry::CoreHint &hints) {
+        auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+        std::string Ralloca = llvmberry::getVariable(*AI);
+
+        hints.addCommand
+          (llvmberry::ConsPropagate::make
+            (llvmberry::ConsMaydiff::make
+              (Ralloca, llvmberry::Physical),
+             llvmberry::ConsGlobal::make()));
+
+        hints.addNopPosition
+          (llvmberry::TyPosition::make
+            (llvmberry::Target, *AI, instrIndex[AI]-1, ""));
+
+        std::vector<AllocaInst*>::iterator position = std::find(allocas.begin(), allocas.end(), AI);
+        if (position != allocas.end()) {
+          allocas.erase(position);
+        }
+      });
+
       // If there are no uses of the alloca, just delete it now.
       if (AST)
         AST->deleteValue(AI);
@@ -803,26 +1577,13 @@ void PromoteMem2Reg::run() {
       // Remove the alloca from the Allocas list, since it has been processed
       RemoveFromAllocasList(AllocaNum);
       ++NumDeadAlloca;
+
       continue;
     }
 
     // Calculate the set of read and write-locations for each alloca.  This is
     // analogous to finding the 'uses' and 'definitions' of each variable.
     Info.AnalyzeAlloca(AI);
-
-    for (unsigned tmpNum = AllocaNum; tmpNum != Allocas.size(); ++tmpNum) {
-      AllocaInst *AItmp = Allocas[tmpNum];
-
-      llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&AItmp]
-                (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-        //data["Allocas"] = std::vector<llvm::AllocaInst*>();
-        //auto &allocas = boost::any_cast<std::vector<llvm::AllocaInst*>&>(data["Allocas"]);
-        //allocas.push_back(AItmp);
-        data.create<llvmberry::ArgForRewriteSingleStoreAlloca>();
-        data.get<llvmberry::ArgForRewriteSingleStoreAlloca>()->allocas->push_back(AItmp);
-      }); 
-    }
 
     // If there is only a single store to this value, replace any loads of
     // it that are directly dominated by the definition with the value stored.
@@ -831,6 +1592,7 @@ void PromoteMem2Reg::run() {
         // The alloca has been processed, move on.
         RemoveFromAllocasList(AllocaNum);
         ++NumSingleStore;
+
         continue;
       }
     }
@@ -899,8 +1661,11 @@ void PromoteMem2Reg::run() {
       QueuePhiNode(PHIBlocks[i], AllocaNum, CurrentVersion);
   }
 
-  if (Allocas.empty())
+  if (Allocas.empty()) {
+    llvmberry::ValidationUnit::End();
+
     return; // All of the allocas must have been trivial!
+  }
 
   LBI.clear();
 
@@ -1040,6 +1805,8 @@ void PromoteMem2Reg::run() {
   }
 
   NewPhiNodes.clear();
+  
+  llvmberry::ValidationUnit::End();
 }
 
 /// \brief Determine which blocks the value is live in.
