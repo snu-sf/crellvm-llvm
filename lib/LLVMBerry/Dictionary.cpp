@@ -44,9 +44,31 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg(){
   loadstoreStoreInst = nullptr;
 }
 
-RewriteSingleStoreAllocaArg::RewriteSingleStoreAllocaArg() {
+Mem2RegAllocaArg::Mem2RegAllocaArg() {
   allocas = TyAllocas(new TyAllocasObj());
 }
 
+Mem2RegInstrIndexArg::Mem2RegInstrIndexArg() {
+  instrIndex = TyInstrIndex(new TyInstrIndexObj());
+}
 
+Mem2RegTermIndexArg::Mem2RegTermIndexArg() {
+  termIndex = TyTermIndex(new TyTermIndexObj());
+}
+
+Mem2RegStoreValArg::Mem2RegStoreValArg() {
+  storeVal = TyStoreVal(new TyStoreValObj());
+}
+
+Mem2RegStoreExprArg::Mem2RegStoreExprArg() {
+  storeExpr = TyStoreExpr(new TyStoreExprObj());
+}
+
+Mem2RegStoreOp0Arg::Mem2RegStoreOp0Arg() {
+  storeOp0 = TyStoreOp0(new TyStoreOp0Obj());
+}
+
+Mem2RegValuesArg::Mem2RegValuesArg() {
+  values  = TyValues(new TyValuesObj());
+}
 }
