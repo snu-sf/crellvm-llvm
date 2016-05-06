@@ -660,7 +660,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
     if (AST && LI->getType()->isPointerTy())
       AST->deleteValue(LI);
-
     LI->eraseFromParent();
     LBI.deleteValue(LI);
   }
@@ -1284,7 +1283,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   // Remove the (now dead) stores and alloca.
   while (!AI->use_empty()) {
     StoreInst *SI = cast<StoreInst>(AI->user_back());
-
     // Record debuginfo for the store before removing it.
     if (DbgDeclareInst *DDI = Info.DbgDeclare) {
       DIBuilder DIB(*AI->getParent()->getParent()->getParent(),
@@ -1380,9 +1378,10 @@ void PromoteMem2Reg::run() {
   // memorize indices of alloca, store, load instructions
   for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
     AllocaInst *AItmp = Allocas[tmpNum];
+    DominatorTree &Domtree = DT;
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AItmp, &LBI]
+            ([&AItmp, &Domtree]
               (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
       auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
@@ -1445,42 +1444,49 @@ void PromoteMem2Reg::run() {
           if (isa<LoadInst>(tmpInst)) {
             const LoadInst* LI = dyn_cast<LoadInst>(tmpInst);
             std::string keyLI = "%"+std::string(LI->getName());
-            int nearestStore = -1;
+            unsigned nearestStore = 0;
+            const BasicBlock *SB = NULL;
 
             if (values[keyLI] == NULL) {
               std::map<const Instruction*, unsigned>::const_iterator it2;
-              for (unsigned i=instrIndex[LI]-1; i>0; i--) {
-                for (it2=instrIndex.begin(); it2!=instrIndex.end(); ++it2) {
-                  if (it2->second == i && isa<StoreInst>(it2->first) && 
-                      LI->getOperand(0) == it2->first->getOperand(1))
-                    nearestStore = i;
+              for (it2=instrIndex.begin(); it2!=instrIndex.end(); ++it2) {
+                if (isa<StoreInst>(it2->first) && 
+                    LI->getOperand(0) == it2->first->getOperand(1)) {
+                  const StoreInst* SI = dyn_cast<StoreInst>(it2->first);
+
+                  if ((LI->getParent() == SI->getParent()) &&
+                      instrIndex[SI] < instrIndex[LI] &&
+                      instrIndex[SI] > nearestStore) {
+                    nearestStore = instrIndex[SI];
+                    SB = SI->getParent();
+                  } else if ((LI->getParent() != SI->getParent()) &&
+                             Domtree.dominates(SI->getParent(), LI->getParent())) {
+                    if ((SB == SI->getParent()) && instrIndex[SI] > nearestStore)
+                      nearestStore = instrIndex[SI];
+                    else if (Domtree.dominates(SB, SI->getParent())) {
+                      nearestStore = instrIndex[SI];
+                      SB = SI->getParent();
+                    }
+                  }
                 }
-                if (nearestStore != -1)
-                  break;
               }
 
-              values[keyLI]
-                = values[std::to_string(nearestStore)+"%"+std::string(LI->getOperand(0)->getName())];
-
-              hasChanged = true;
-            }
-
-            if (values[keyLI] == NULL) 
-              hasChanged = false;
+              std::string keyNew = std::to_string(nearestStore)+"%"+
+                                   std::string(LI->getOperand(0)->getName());
+              values[keyLI] = values[keyNew];
+              if (values[keyLI] != NULL) hasChanged = true;
+            } 
           } else {
             const StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
             std::string keySI = std::to_string(instrIndex[SI])+"%"+
                                 std::string(SI->getOperand(1)->getName());
 
             if (values[keySI] == NULL) {
-              values[keySI]
-                = values["%"+std::string(SI->getOperand(0)->getName())];
+              std::string keyNew = "%"+std::string(SI->getOperand(0)->getName());
 
-              hasChanged = true;
+              values[keySI] = values[keyNew];
+              if (values[keySI] != NULL) hasChanged = true;
             }
-
-            if (values[keySI] == NULL)
-              hasChanged = false;
           }
         }
       }
@@ -1568,7 +1574,6 @@ void PromoteMem2Reg::run() {
           allocas.erase(position);
         }
       });
-
       // If there are no uses of the alloca, just delete it now.
       if (AST)
         AST->deleteValue(AI);
@@ -1577,7 +1582,6 @@ void PromoteMem2Reg::run() {
       // Remove the alloca from the Allocas list, since it has been processed
       RemoveFromAllocasList(AllocaNum);
       ++NumDeadAlloca;
-
       continue;
     }
 
@@ -1592,7 +1596,6 @@ void PromoteMem2Reg::run() {
         // The alloca has been processed, move on.
         RemoveFromAllocasList(AllocaNum);
         ++NumSingleStore;
-
         continue;
       }
     }
