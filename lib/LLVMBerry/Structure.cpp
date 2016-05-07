@@ -117,16 +117,16 @@ std::string getVariable(const llvm::Value &value) {
   } else if (llvm::isa<llvm::Instruction>(value) ||
              llvm::isa<llvm::Argument>(value) ||
              llvm::isa<llvm::ConstantExpr>(value)) {
+    assert(value.hasName() && "value must have a name");
     val = std::string("%");
   } else {
     assert("value must be a global value or an instruction" && false);
   }
 
-  std::string tempstr;
-  llvm::raw_string_ostream rso(tempstr);
+  llvm::raw_string_ostream rso(val2);
   value.printAsOperand(rso, /*PrintType=*/false);
+  rso.str();
 
-  val2 = rso.str();
   if(val2.compare("<badref>") != 0)
     return val2;
 
