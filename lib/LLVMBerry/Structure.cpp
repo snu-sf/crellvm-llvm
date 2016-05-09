@@ -815,6 +815,22 @@ void ConsConstUndef::serialize(cereal::JSONOutputArchive& archive) const {
   archive(CEREAL_NVP(value_type));
 }
 
+ConsConstNull::ConsConstNull(int _address_space,
+                             std::shared_ptr<TyValueType> _value_type)
+    : address_space(_address_space), value_type(std::move(_value_type)) {}
+
+void ConsConstNull::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstNull");
+
+  archive.startNode();
+  archive.makeArray();
+  archive(cereal::make_nvp("address_space", address_space));
+  archive(CEREAL_NVP(value_type));
+  archive.finishNode();
+}
+  
 // values
 
 ConsId::ConsId(std::shared_ptr<TyRegister> _register)
