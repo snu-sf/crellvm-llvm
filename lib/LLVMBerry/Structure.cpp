@@ -912,6 +912,13 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
   } else if (llvm::isa<llvm::UndefValue>(value)) {
     return std::shared_ptr<TyConstant>(new ConsConstUndef
           (TyValueType::make(*value.getType())));
+  } else if (llvm::isa<llvm::ConstantPointerNull>(value)) {
+    const llvm::ConstantPointerNull *null_val = llvm::dyn_cast<llvm::ConstantPointerNull>(&value);
+    const llvm::PointerType *ptype = null_val->getType();
+
+    return std::shared_ptr<TyConstant>(
+        new ConsConstNull(ptype->getAddressSpace(),
+                          TyValueType::make(*ptype->getPointerElementType())));
   }
   assert("TyConstant::make() : unsupported value" && false);
 }
