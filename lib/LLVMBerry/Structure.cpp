@@ -117,7 +117,6 @@ std::string getVariable(const llvm::Value &value) {
   } else if (llvm::isa<llvm::Instruction>(value) ||
              llvm::isa<llvm::Argument>(value) ||
              llvm::isa<llvm::ConstantExpr>(value)) {
-    assert(value.hasName() && "value must have a name");
     val = std::string("%");
   } else {
     assert("value must be a global value or an instruction" && false);
