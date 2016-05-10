@@ -832,6 +832,22 @@ void ConsConstUndef::serialize(cereal::JSONOutputArchive& archive) const {
   archive(CEREAL_NVP(value_type));
 }
 
+ConsConstNull::ConsConstNull(int _address_space,
+                             std::shared_ptr<TyValueType> _value_type)
+    : address_space(_address_space), value_type(std::move(_value_type)) {}
+
+void ConsConstNull::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstNull");
+
+  archive.startNode();
+  archive.makeArray();
+  archive(cereal::make_nvp("address_space", address_space));
+  archive(CEREAL_NVP(value_type));
+  archive.finishNode();
+}
+  
 // values
 
 ConsId::ConsId(std::shared_ptr<TyRegister> _register)
@@ -913,6 +929,13 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
   } else if (llvm::isa<llvm::UndefValue>(value)) {
     return std::shared_ptr<TyConstant>(new ConsConstUndef
           (TyValueType::make(*value.getType())));
+  } else if (llvm::isa<llvm::ConstantPointerNull>(value)) {
+    const llvm::ConstantPointerNull *null_val = llvm::dyn_cast<llvm::ConstantPointerNull>(&value);
+    const llvm::PointerType *ptype = null_val->getType();
+
+    return std::shared_ptr<TyConstant>(
+        new ConsConstNull(ptype->getAddressSpace(),
+                          TyValueType::make(*ptype->getPointerElementType())));
   }
   assert("TyConstant::make() : unsupported value" && false);
 }
