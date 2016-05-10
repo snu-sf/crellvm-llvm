@@ -2026,8 +2026,7 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
           [&Vals](llvmberry::Dictionary &data, llvmberry::CoreHint &hints)
           //{ data["findLeader#BB"] = Vals.BB; });
           { data.get<llvmberry::ArgForFindLeader>()->BB = Vals.BB; });
-    if (isa<Constant>(Val))
-      return Val;
+    if (isa<Constant>(Val)) return Val;
   }
 
   LeaderTableEntry* Next = Vals.Next;
@@ -2534,6 +2533,7 @@ bool GVN::processInstruction(Instruction *I) {
           leader_expr = cond_neg_expr;
         } else {
           // TODO: several cases left (such as [((A==B) = True) => A = B])
+          assert(false && "Hint generation not implemented yet");
         }
 
         if (!pre_repl_inv) return;
@@ -2560,7 +2560,7 @@ bool GVN::processInstruction(Instruction *I) {
     for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
       if (!isa<Instruction>(UI->getUser())) {
         // let the validation fail when the user is not an instruction
-        return;
+        assert(false && "User is not an instruction");
       }
 
       Instruction *userI = dyn_cast<Instruction>(UI->getUser());

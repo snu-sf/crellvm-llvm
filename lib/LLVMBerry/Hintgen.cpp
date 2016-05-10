@@ -709,7 +709,21 @@ void generateHintForAndOr(llvm::BinaryOperator *Z,
   });
 }
 
-// copy & modified from GVN's create_expression
+// Copied from ValueTable::create_expression() in GVN.cpp
+  
+// This function generates a symbolic expressions from an
+// instruction that is used to decide the equivalence of values
+
+// We copied this function because this is a private member
+// function of the ValueTable class, so we cannot access it
+// while generating hint.
+  
+// We modified this function to take the vector of value numbers
+// of I's operands. The original function can obtain the value
+// numbers from the ValueTable instance, but there's no way to
+// see the ValueTable class here, since its definition is in an
+// anonymous namespace in GVN.cpp
+  
 Expression create_expression(llvm::Instruction *I, bool &swapped,
                              llvm::SmallVector<uint32_t, 4> va) {
   swapped = false;
