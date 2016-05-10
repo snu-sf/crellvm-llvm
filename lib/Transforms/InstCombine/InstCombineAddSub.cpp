@@ -1640,7 +1640,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         (match(LHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(LHS, m_And(m_Specific(B), m_Specific(A))))){
       llvmberry::ValidationUnit::Begin("add_xor_and", I.getParent()->getParent());
-      llvmberry::generateHintForAddXorAnd(I, 
+      llvmberry::generateHintForAddXorAnd(&I, 
           dyn_cast<BinaryOperator>(RHS), 
           dyn_cast<BinaryOperator>(LHS), 
           A, B, 
@@ -1653,7 +1653,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         (match(RHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(RHS, m_And(m_Specific(B), m_Specific(A))))){
       llvmberry::ValidationUnit::Begin("add_xor_and", I.getParent()->getParent());
-      llvmberry::generateHintForAddXorAnd(I, 
+      llvmberry::generateHintForAddXorAnd(&I, 
           dyn_cast<BinaryOperator>(LHS), 
           dyn_cast<BinaryOperator>(RHS), 
           A, B, 
@@ -1673,7 +1673,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       auto *New = BinaryOperator::CreateAdd(A, B);
       New->setHasNoSignedWrap(I.hasNoSignedWrap());
       New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
-      llvmberry::generateHintForAddOrAnd(I, 
+      llvmberry::generateHintForAddOrAnd(&I, 
           dyn_cast<BinaryOperator>(RHS), 
           dyn_cast<BinaryOperator>(LHS), 
           A, B, 
@@ -1689,7 +1689,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       auto *New = BinaryOperator::CreateAdd(A, B);
       New->setHasNoSignedWrap(I.hasNoSignedWrap());
       New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
-      llvmberry::generateHintForAddOrAnd(I, 
+      llvmberry::generateHintForAddOrAnd(&I, 
           dyn_cast<BinaryOperator>(LHS), 
           dyn_cast<BinaryOperator>(RHS), 
           A, B, 

@@ -1219,17 +1219,14 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
   llvmberry::ValidationUnit::GetInstance()->intrude([](
       llvmberry::ValidationUnit::Dictionary &data,
       llvmberry::CoreHint &hints) {
-    data["SimplifyAndInst.arg"] = std::shared_ptr<llvmberry::SimplifyAndInstArg>
-                (new llvmberry::SimplifyAndInstArg());
+    data.create<llvmberry::ArgForSimplifyAndInst>();
   });
 
   if (Value *V = SimplifyAndInst(Op0, Op1, DL, TLI, DT, AC)){
     llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
-      std::shared_ptr<llvmberry::SimplifyAndInstArg> ptr = boost::any_cast
-          <std::shared_ptr<llvmberry::SimplifyAndInstArg> >
-          (data["SimplifyAndInst.arg"]);
+      auto ptr = data.get<llvmberry::ArgForSimplifyAndInst>();
       if(ptr->isActivated()){
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
         ptr->generateHint(&I);
@@ -2225,8 +2222,30 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  if (Value *V = SimplifyOrInst(Op0, Op1, DL, TLI, DT, AC))
+  llvmberry::ValidationUnit::Begin("simplify_or_inst", I.getParent()->getParent());
+  llvmberry::ValidationUnit::GetInstance()->intrude([](
+      llvmberry::ValidationUnit::Dictionary &data,
+      llvmberry::CoreHint &hints) {
+    data.create<llvmberry::ArgForSimplifyOrInst>();
+  });
+
+  if (Value *V = SimplifyOrInst(Op0, Op1, DL, TLI, DT, AC)){
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hints) {
+      auto ptr = data.get<llvmberry::ArgForSimplifyOrInst>();
+      if(ptr->isActivated()){
+        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
+        ptr->generateHint(&I);
+        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+      }else{
+        llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+      }
+    });
+
     return ReplaceInstUsesWith(I, V);
+  }
+  llvmberry::ValidationUnit::Abort();
 
   // (A&B)|(A&C) -> A&(B|C) etc
   if (Value *V = SimplifyUsingDistributiveLaws(I))
@@ -2308,8 +2327,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       match(Op1, m_Specific(A))){
     llvmberry::ValidationUnit::Begin("or_or", I.getParent()->getParent());
     llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       //    <src>   |   <tgt>
       // X = A ^ -1 | X = A ^ -1
       // Y = X & B  | Y = X & B
@@ -2331,15 +2349,9 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
         llvmberry::applyCommutativity(Z, X, llvmberry::Source);
       }
 
-      hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::TyPosition::make(llvmberry::Source, *Z),
-          llvmberry::ConsOrOr::make(
-              llvmberry::TyValue::make(*Z), 
-              llvmberry::TyValue::make(*X), 
-              llvmberry::TyValue::make(*Y), 
-              llvmberry::TyValue::make(*A), 
-              llvmberry::TyValue::make(*B), 
-              llvmberry::ConsSize::make(bitwidth))));
+      INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrOr::make(
+          VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical),
+          VAL(A, Physical), VAL(B, Physical), BITSIZE(bitwidth)));
     });
 
     return BinaryOperator::CreateOr(A, B);
@@ -2354,7 +2366,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
 
     llvmberry::name_instructions(*I.getParent()->getParent());
     llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &NotA](
-        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::Dictionary &data,
         llvmberry::CoreHint &hints) {
       //    <src>    |   <tgt>
       // X = A & B   | X = A & B
@@ -2373,10 +2385,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       int bitwidth = Z->getType()->getIntegerBitWidth();
 
       llvmberry::insertSrcNopAtTgtI(hints, Yprime);
-          
-      hints.addCommand(llvmberry::ConsPropagate::make(
-             llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Yprime), llvmberry::Physical),
-             llvmberry::ConsGlobal::make()));
+      llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Yprime), llvmberry::Physical);
  
       llvmberry::propagateInstruction(X, Z, llvmberry::Target);
       llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
@@ -2388,16 +2397,10 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
         llvmberry::applyCommutativity(Z, Yprime, llvmberry::Target);
       }
       
-      hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::TyPosition::make(llvmberry::Target, *Z),
-          llvmberry::ConsOrOr2::make(
-              llvmberry::TyValue::make(*Z), 
-              llvmberry::TyValue::make(*X), 
-              llvmberry::TyValue::make(*Y), 
-              llvmberry::TyValue::make(*Yprime), 
-              llvmberry::TyValue::make(*A), 
-              llvmberry::TyValue::make(*B), 
-              llvmberry::ConsSize::make(bitwidth))));
+      INFRULE(INSTPOS(TGT, Z), llvmberry::ConsOrOr2::make(
+          VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical),
+          VAL(Yprime, Physical), VAL(A, Physical), VAL(B, Physical),
+          BITSIZE(bitwidth)));
     });
  
     return BinaryOperator::CreateOr(NotA, B);
@@ -2407,7 +2410,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   if (match(Op0, m_And(m_Value(A), m_Not(m_Value(B)))) &&
       match(Op1, m_Xor(m_Specific(A), m_Specific(B)))){
     llvmberry::ValidationUnit::Begin("or_xor", I.getParent()->getParent());
-    llvmberry::generateHintForOrXor(I, Op0, Op1, false);
+    llvmberry::generateHintForOrXor(&I, Op0, Op1, false);
 
     return BinaryOperator::CreateXor(A, B);
   }
@@ -2416,7 +2419,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   if (match(Op0, m_Xor(m_Value(A), m_Value(B))) &&
       match(Op1, m_And(m_Specific(A), m_Not(m_Specific(B))))){
     llvmberry::ValidationUnit::Begin("or_xor", I.getParent()->getParent());
-    llvmberry::generateHintForOrXor(I, Op1, Op0, true);
+    llvmberry::generateHintForOrXor(&I, Op1, Op0, true);
     
     return BinaryOperator::CreateXor(A, B);
   }
@@ -2480,7 +2483,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     if ((match(C, m_Not(m_Specific(D))) &&
          match(B, m_Not(m_Specific(A))))){
       llvmberry::ValidationUnit::Begin("or_xor2", I.getParent()->getParent());
-      llvmberry::generateHintForOrXor2(I, C, B, A, D, false, false);
+      llvmberry::generateHintForOrXor2(&I, C, B, A, D, false, false);
 
       return BinaryOperator::CreateXor(A, D);
     }
@@ -2488,7 +2491,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     if ((match(A, m_Not(m_Specific(D))) &&
          match(B, m_Not(m_Specific(C))))){
       llvmberry::ValidationUnit::Begin("or_xor2", I.getParent()->getParent());
-      llvmberry::generateHintForOrXor2(I, A, B, C, D, true, false);
+      llvmberry::generateHintForOrXor2(&I, A, B, C, D, true, false);
       
       return BinaryOperator::CreateXor(C, D);
     }
@@ -2496,7 +2499,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     if ((match(C, m_Not(m_Specific(B))) &&
          match(D, m_Not(m_Specific(A))))){
       llvmberry::ValidationUnit::Begin("or_xor2", I.getParent()->getParent());
-      llvmberry::generateHintForOrXor2(I, C, D, A, B, false, true);
+      llvmberry::generateHintForOrXor2(&I, C, D, A, B, false, true);
  
       return BinaryOperator::CreateXor(A, B);
     }
@@ -2504,7 +2507,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     if ((match(A, m_Not(m_Specific(B))) &&
          match(D, m_Not(m_Specific(C))))){
       llvmberry::ValidationUnit::Begin("or_xor2", I.getParent()->getParent());
-      llvmberry::generateHintForOrXor2(I, A, D, C, B, true, true);
+      llvmberry::generateHintForOrXor2(&I, A, D, C, B, true, true);
       
       return BinaryOperator::CreateXor(C, B);
     }
@@ -2571,19 +2574,75 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   // A | (~A ^ B) -> A | ~B
   // (A & B) | (A ^ B)
   if (match(Op1, m_Xor(m_Value(A), m_Value(B)))) {
-    if (Op0 == A || Op0 == B)
+    if (Op0 == A || Op0 == B) {
+      llvmberry::ValidationUnit::Begin("or_xor3", I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A, &B, SwappedForXor](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        //   <src>   |   <tgt>
+        // Y = A ^ B | Y = A ^ B
+        // Z = A | Y | Z = A | B
+        BinaryOperator *Z = &I;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+        if (Op0 == B)
+          llvmberry::applyCommutativity(Z, Y, llvmberry::Source);
+        if (SwappedForXor)
+          llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
+        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrXor3::make(
+            VAL(Z, Physical), VAL(Y, Physical), 
+            Op0 == B ? VAL(B, Physical) : VAL(A, Physical), 
+            Op0 == B ? VAL(A, Physical) : VAL(B, Physical), 
+            BITSIZE(bitwidth)));
+        if (Op0 == B) {
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrCommutative::make(
+            REGISTER(llvmberry::getVariable(*Z), Physical), VAL(B, Physical), VAL(A, Physical), BITSIZE(bitwidth)));
+        }
+      });
+
       return BinaryOperator::CreateOr(A, B);
+    }
 
     if (match(Op0, m_And(m_Specific(A), m_Specific(B))) ||
-        match(Op0, m_And(m_Specific(B), m_Specific(A))))
+        match(Op0, m_And(m_Specific(B), m_Specific(A)))) {
+      llvmberry::ValidationUnit::Begin("or_and_xor", I.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A, &B, SwappedForXor](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        //   <src>   |   <tgt>
+        // X = A & B | X = A & B
+        // Y = A ^ B | Y = A ^ B
+        // Z = X | Y | Z = A | B
+        BinaryOperator *Z = &I;
+        BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(X, Z, llvmberry::Source);
+        if (match(Op0, m_And(m_Specific(B), m_Specific(A))))
+          llvmberry::applyCommutativity(Z, X, llvmberry::Source);
+        if (SwappedForXor)
+          llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
+        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrAndXor::make(
+            VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), VAL(A, Physical), VAL(B, Physical), BITSIZE(bitwidth)));
+      });
+     
       return BinaryOperator::CreateOr(A, B);
+    }
 
     if (Op1->hasOneUse() && match(A, m_Not(m_Specific(Op0)))) {
+      llvmberry::ValidationUnit::Begin("or_xor4", I.getParent()->getParent());
       Value *Not = Builder->CreateNot(B, B->getName()+".not");
+      llvmberry::generateHintForOrXor4(&I, Op0, dyn_cast<BinaryOperator>(Op1), 
+          dyn_cast<BinaryOperator>(A), B, dyn_cast<BinaryOperator>(Not), false, SwappedForXor);
       return BinaryOperator::CreateOr(Not, Op0);
     }
     if (Op1->hasOneUse() && match(B, m_Not(m_Specific(Op0)))) {
+      llvmberry::ValidationUnit::Begin("or_xor4", I.getParent()->getParent());
       Value *Not = Builder->CreateNot(A, A->getName()+".not");
+      llvmberry::generateHintForOrXor4(&I, Op0, dyn_cast<BinaryOperator>(Op1), 
+          dyn_cast<BinaryOperator>(B), A, dyn_cast<BinaryOperator>(Not), true, SwappedForXor);
       return BinaryOperator::CreateOr(Not, Op0);
     }
   }
