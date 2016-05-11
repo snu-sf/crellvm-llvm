@@ -1183,6 +1183,19 @@ private :
   std::shared_ptr<TySize> sz;
 };
 
+struct TyIcmpInverse{
+public : 
+  TyIcmpInverse(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyConstInt> _boolean);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  enum TyIcmpPred predicate;
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyConstInt> boolean;
+};
+
 
 
 struct ConsAddConstNot : public TyInfrule{
@@ -2096,8 +2109,15 @@ private :
   std::shared_ptr<TyXorCommutativeTgt> xor_commutative_tgt;
 };
 
+struct ConsIcmpInverse : public TyInfrule{
+public : 
+  ConsIcmpInverse(std::shared_ptr<TyIcmpInverse> _icmp_inverse);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI, int boolean);
+  void serialize(cereal::JSONOutputArchive& archive) const;
 
-
+private : 
+  std::shared_ptr<TyIcmpInverse> icmp_inverse;
+};
 
 } // llvmberry
 

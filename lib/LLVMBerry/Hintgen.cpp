@@ -746,4 +746,66 @@ void generateHintForGVNDCE(llvm::Instruction &I) {
     }
   });
 }
+// Copied from ValueTable::create_expression() in GVN.cpp
+  
+// This function generates a symbolic expressions from an
+// instruction that is used to decide the equivalence of values
+
+// We copied this function because this is a private member
+// function of the ValueTable class, so we cannot access it
+// while generating hint.
+  
+// We modified this function to take the vector of value numbers
+// of I's operands. The original function can obtain the value
+// numbers from the ValueTable instance, but there's no way to
+// see the ValueTable class here, since its definition is in an
+// anonymous namespace in GVN.cpp
+  
+Expression create_expression(llvm::Instruction *I, bool &swapped,
+                             llvm::SmallVector<uint32_t, 4> va) {
+  swapped = false;
+  Expression e;
+  e.type = I->getType();
+  e.opcode = I->getOpcode();
+  e.varargs = va;
+
+  if (I->isCommutative()) {
+    assert(I->getNumOperands() == 2 && "Unsupported commutative instruction!");
+    if (e.varargs[0] > e.varargs[1]) {
+      swapped = true;
+      std::swap(e.varargs[0], e.varargs[1]);
+    }
+  }
+
+  if (llvm::CmpInst *C = llvm::dyn_cast<llvm::CmpInst>(I)) {
+    llvm::CmpInst::Predicate Predicate = C->getPredicate();
+    if (e.varargs[0] > e.varargs[1]) {
+      std::swap(e.varargs[0], e.varargs[1]);
+      Predicate = llvm::CmpInst::getSwappedPredicate(Predicate);
+    }
+    e.opcode = (C->getOpcode() << 8) | Predicate;
+  } else if (llvm::InsertValueInst *E =
+                 llvm::dyn_cast<llvm::InsertValueInst>(I)) {
+    for (llvm::InsertValueInst::idx_iterator II = E->idx_begin(),
+                                             IE = E->idx_end();
+         II != IE; ++II)
+      e.varargs.push_back(*II);
+  }
+
+  return e;
+}
+
+bool is_inverse_expression(Expression e1, Expression e2) {
+  if (e1.varargs == e2.varargs) {
+    uint32_t orig_opcode1 = e1.opcode >> 8;
+    uint32_t orig_opcode2 = e2.opcode >> 8;
+    llvm::CmpInst::Predicate p1 = (llvm::CmpInst::Predicate)(e1.opcode & 255U);
+    llvm::CmpInst::Predicate p2 = (llvm::CmpInst::Predicate)(e2.opcode & 255U);
+    if ((orig_opcode1 == orig_opcode2) &&
+        (orig_opcode1 == llvm::Instruction::ICmp) &&
+        (llvm::CmpInst::getInversePredicate(p1) == p2))
+      return true;
+  }
+  return false;
+}
 }
