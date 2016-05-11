@@ -1644,7 +1644,12 @@ bool GVN::PerformLoadPRE(LoadInst *LI, AvailValInBlkVect &ValuesPerBlock,
     while (!NewInsts.empty()) {
       Instruction *I = NewInsts.pop_back_val();
       if (MD) MD->removeInstruction(I);
+      llvmberry::name_instructions(*(I->getParent()->getParent()));
+      llvmberry::ValidationUnit::Begin("GVN_dead_code_elim2",
+                                       I->getParent()->getParent());
+      llvmberry::generateHintForGVNDCE(*I);
       I->eraseFromParent();
+      llvmberry::ValidationUnit::End();
     }
     // HINT: Don't revert the edge-splitting as following transformation may
     // also need to split these critical edges.
@@ -2685,7 +2690,12 @@ bool GVN::processBlock(BasicBlock *BB) {
       DEBUG(dbgs() << "GVN removed: " << **I << '\n');
       if (MD) MD->removeInstruction(*I);
       DEBUG(verifyRemoved(*I));
+      llvmberry::name_instructions(*((*I)->getParent()->getParent()));
+      llvmberry::ValidationUnit::Begin("GVN_dead_code_elim1",
+                                       (*I)->getParent()->getParent());
+      llvmberry::generateHintForGVNDCE(**I);
       (*I)->eraseFromParent();
+      llvmberry::ValidationUnit::End();
     }
     InstrsToErase.clear();
 
@@ -2872,7 +2882,12 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   if (MD)
     MD->removeInstruction(CurInst);
   DEBUG(verifyRemoved(CurInst));
+  llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
+  llvmberry::ValidationUnit::Begin("GVN_dead_code_elim3",
+                                   CurInst->getParent()->getParent());
+  llvmberry::generateHintForGVNDCE(*CurInst);
   CurInst->eraseFromParent();
+  llvmberry::ValidationUnit::End();
   ++NumGVNInstr;
   
   return true;
