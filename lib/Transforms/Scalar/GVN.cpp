@@ -2402,11 +2402,12 @@ bool GVN::processInstruction(Instruction *I) {
                             VAR(leaderI_id, Physical), SRC),
                     BOUNDS(INSTPOS(SRC, leaderI), INSTPOS(SRC, I)));
 
-          // TODO: if e1 != e2 due to commutativity,
-          // insert [e2 >= e1] and
-          // insert transitivity to get [ y >= e1 ]
+          // if e1 != e2 due to commutativity,
+          // apply commutative infrule to get [ y >= e1 ]
+          if (I_swapped != leaderI_swapped)
+            applyCommutativity(I, dyn_cast<BinaryOperator>(I), SRC);
 
-          // transitivity: [ y >= e2 /\ e1 >= x] => [ y >= x] in src
+          // transitivity: [ y >= e1 /\ e1 >= x] => [ y >= x] in src
           INFRULE(INSTPOS(SRC, I),
                   llvmberry::ConsTransitivity::make(
                       VAR(I_id, Physical), RHS(leaderI_id, Physical, SRC),
@@ -2467,6 +2468,7 @@ bool GVN::processInstruction(Instruction *I) {
         std::shared_ptr<llvmberry::TyExpr> cond_neg_expr = false_expr;
 
         std::shared_ptr<llvmberry::TyPropagateObject> pre_repl_inv;
+        bool do_swap = false;
 
         // Find out branch condition of current path
         if (BI->getSuccessor(0) == leaderBB)
@@ -2513,9 +2515,13 @@ bool GVN::processInstruction(Instruction *I) {
 
         if ((expr_I == expr_condI) && dyn_cast<ConstantInt>(repl)) {
           // case 1
+          // TODO: I, condI comm
           leader_value = std::make_shared<llvmberry::ConsConstVal>(
               std::make_shared<llvmberry::ConsConstInt>(cond_value, 1));
           leader_expr = cond_expr;
+
+          pre_repl_inv = LESSDEF(RHS(condI_id, Physical, SRC), leader_expr, SRC);
+          do_swap = (I_swapped != condI_swapped);
 
         } else if (llvmberry::is_inverse_expression(expr_I, expr_condI) &&
                    dyn_cast<ConstantInt>(repl)) {
@@ -2531,6 +2537,9 @@ bool GVN::processInstruction(Instruction *I) {
           leader_value = std::make_shared<llvmberry::ConsConstVal>(
               std::make_shared<llvmberry::ConsConstInt>(1-cond_value, 1));
           leader_expr = cond_neg_expr;
+
+          pre_repl_inv = LESSDEF(RHS(I_id, Physical, SRC), leader_expr, SRC);
+          // TODO: maybe we need swap here
         } else if (ICmpInst *condCI = dyn_cast<ICmpInst>(condI)) {
           Value *CI_op0 = condCI->getOperand(0), *CI_op1 = condCI->getOperand(1);
 
@@ -2557,6 +2566,7 @@ bool GVN::processInstruction(Instruction *I) {
                   llvmberry::create_expression(equiv_opI, equiv_opI_swapped, op_equiv_opI);
 
               if (expr_equiv_opI == expr_I) {
+                // TODO: equiv_opI, I comm
                 std::shared_ptr<llvmberry::TyInfrule> icmp_infrule;
                 if (cond_value == 1)
                   icmp_infrule = llvmberry::ConsIcmpEqSame::make(*condCI);
@@ -2596,6 +2606,10 @@ bool GVN::processInstruction(Instruction *I) {
                             RHS(equiv_opI_id, Physical, SRC),
                             VAR(equiv_opI_id, Physical), leader_expr));
 
+                pre_repl_inv =
+                    LESSDEF(RHS(equiv_opI_id, Physical, SRC), leader_expr, SRC);
+                do_swap = (I_swapped != equiv_opI_swapped);
+
               } else
                 assert(false && "same numbering, different expression");
 
@@ -2613,13 +2627,16 @@ bool GVN::processInstruction(Instruction *I) {
           assert(false && "No leader expression");
         }
 
-        pre_repl_inv = LESSDEF(RHS(I_id, Physical, SRC), leader_expr, SRC);
+        // pre_repl_inv = LESSDEF(RHS(I_id, Physical, SRC), leader_expr, SRC);
 
         PROPAGATE(pre_repl_inv,
                   BOUNDS(llvmberry::TyPosition::make_start_of_block(
                              llvmberry::Source,
                              llvmberry::getBasicBlockIndex(leaderBB)),
                          INSTPOS(SRC, I)));
+
+        if (do_swap)
+          applyCommutativity(I, dyn_cast<BinaryOperator>(I), SRC);
 
         INFRULE(INSTPOS(SRC, I), llvmberry::ConsTransitivity::make(
                                      VAR(I_id, Physical),
