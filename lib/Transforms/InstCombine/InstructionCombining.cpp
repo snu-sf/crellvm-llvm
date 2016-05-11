@@ -3092,6 +3092,8 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
 static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
                                           TargetLibraryInfo *TLI,
                                           InstCombineWorklist &ICWorklist) {
+  llvmberry::ValidationUnit::Begin("dead_block_remove", &F);
+
   bool MadeIRChange = false;
 
   // Do a depth-first traversal of the function, populate the worklist with
@@ -3128,6 +3130,11 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
       Inst->eraseFromParent();
     }
   }
+
+  if (!MadeIRChange)
+    llvmberry::ValidationUnit::GetInstance()->setReturnCode(
+        llvmberry::ValidationUnit::ABORT);
+  llvmberry::ValidationUnit::End();
 
   return MadeIRChange;
 }
