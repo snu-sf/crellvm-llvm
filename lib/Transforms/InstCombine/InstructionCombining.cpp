@@ -3092,7 +3092,6 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
 static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
                                           TargetLibraryInfo *TLI,
                                           InstCombineWorklist &ICWorklist) {
-  llvmberry::ValidationUnit::Begin("dead_block_remove", &F);
 
   bool MadeIRChange = false;
 
@@ -3102,6 +3101,8 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
   SmallPtrSet<BasicBlock *, 64> Visited;
   MadeIRChange |=
       AddReachableCodeToWorklist(F.begin(), DL, Visited, ICWorklist, TLI);
+
+  llvmberry::ValidationUnit::Begin("dead_block_remove", &F);
 
   // Do a quick scan over the function.  If we find any blocks that are
   // unreachable, remove any instructions inside of them.  This prevents
