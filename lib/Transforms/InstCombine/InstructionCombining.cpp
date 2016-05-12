@@ -3128,6 +3128,10 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
         ++NumDeadInst;
         MadeIRChange = true;
       }
+      llvmberry::ValidationUnit::GetInstance()->intrude([&Inst](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) { insertTgtNopAtSrcI(hints, Inst); });
+
       Inst->eraseFromParent();
     }
   }
