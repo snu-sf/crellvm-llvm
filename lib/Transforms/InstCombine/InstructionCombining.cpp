@@ -3128,9 +3128,18 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
         ++NumDeadInst;
         MadeIRChange = true;
       }
-      llvmberry::ValidationUnit::GetInstance()->intrude([&Inst](
+      llvmberry::ValidationUnit::GetInstance()->intrude([&Inst, &BB](
           llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) { insertTgtNopAtSrcI(hints, Inst); });
+          llvmberry::CoreHint &hints) {
+
+        insertTgtNopAtSrcI(hints, Inst);
+        PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
+                          llvmberry::false_encoding.second, SRC),
+                  BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                             SRC, llvmberry::getBasicBlockIndex(BB)),
+                         llvmberry::TyPosition::make_end_of_block(SRC, *BB)));
+
+      });
 
       Inst->eraseFromParent();
     }

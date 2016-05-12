@@ -709,4 +709,7 @@ void generateHintForAndOr(llvm::BinaryOperator *Z,
   });
 }
 
+std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>> false_encoding =
+    std::make_pair(llvmberry::ConsConst::make(0, 64),
+                   llvmberry::ConsConst::make(42, 64));
 }

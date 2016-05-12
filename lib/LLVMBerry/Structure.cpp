@@ -1391,6 +1391,10 @@ void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(constant));
 }
 
+std::shared_ptr<TyExpr> ConsConst::make(int _int_value, int _bitwidth) {
+  return std::shared_ptr<TyExpr>(new ConsConst(_int_value, _bitwidth));
+}
+
 ConsInsn::ConsInsn(std::shared_ptr<TyInstruction> _instruction) : instruction(std::move(_instruction)){
 }
 std::shared_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i){

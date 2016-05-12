@@ -116,7 +116,8 @@ namespace llvmberry{
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
   void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
-
+  extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
+      false_encoding;
 }
 
 #endif
