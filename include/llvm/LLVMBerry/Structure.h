@@ -151,7 +151,7 @@ public:
                                           std::string _prev_block_name);
   static std::shared_ptr<TyPosition> make (enum TyScope _scope,
                                            const llvm::Instruction &I,
-                                           int _prev,
+                                           int index,
                                            std::string _prev_block_name);
 
 private:

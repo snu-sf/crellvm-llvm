@@ -583,7 +583,7 @@ std::shared_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
 
 std::shared_ptr<TyPosition> TyPosition::make
   (enum TyScope _scope, const llvm::Instruction &I, 
-   int _index, std::string _prev_block_name) {
+   int index, std::string _prev_block_name) {
   std::string _block_name = getBasicBlockIndex(I.getParent());
   std::string _register_name = getVariable(I);
 
@@ -593,11 +593,12 @@ std::shared_ptr<TyPosition> TyPosition::make
     std::shared_ptr<TyPositionPhinode> _pos_phi(new TyPositionPhinode(_prev_block_name));
     std::shared_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
     _instr_index = std::move(_phi);
-  } else if (_index < 0) {
-    return TyPosition::make(TyScope::Target, _block_name, "");
+  } else if (index < 0) {
+    // if index is less than 0, it means start of block
+    return TyPosition::make_start_of_block(_scope, _block_name);
   } else {
     std::shared_ptr<TyPositionCommand> _pos_cmd
-        (new TyPositionCommand(_index, _register_name));
+        (new TyPositionCommand(index, _register_name));
     std::shared_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
 
     _instr_index = std::move(_cmd);
