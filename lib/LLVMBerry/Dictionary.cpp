@@ -44,31 +44,24 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg(){
   loadstoreStoreInst = nullptr;
 }
 
-Mem2RegAllocaArg::Mem2RegAllocaArg() {
-  allocas = TyAllocas(new TyAllocasObj());
-}
+Mem2RegAllocaArg::Mem2RegAllocaArg()
+  : allocas(new TyAllocasObj()) {}
 
-Mem2RegInstrIndexArg::Mem2RegInstrIndexArg() {
-  instrIndex = TyInstrIndex(new TyInstrIndexObj());
-}
+Mem2RegInstrIndexArg::Mem2RegInstrIndexArg()
+  : instrIndex(new TyInstrIndexObj()) {}
 
-Mem2RegTermIndexArg::Mem2RegTermIndexArg() {
-  termIndex = TyTermIndex(new TyTermIndexObj());
-}
+Mem2RegTermIndexArg::Mem2RegTermIndexArg()
+  : termIndex(new TyTermIndexObj()) {}
 
-Mem2RegStoreValArg::Mem2RegStoreValArg() {
-  storeVal = TyStoreVal(new TyStoreValObj());
-}
+Mem2RegStoreValArg::Mem2RegStoreValArg()
+  : storeVal(new TyStoreValObj()) {}
 
-Mem2RegStoreExprArg::Mem2RegStoreExprArg() {
-  storeExpr = TyStoreExpr(new TyStoreExprObj());
-}
+Mem2RegStoreExprArg::Mem2RegStoreExprArg()
+  : storeExpr(new TyStoreExprObj()) {}
 
-Mem2RegStoreOp0Arg::Mem2RegStoreOp0Arg() {
-  storeOp0 = TyStoreOp0(new TyStoreOp0Obj());
-}
+Mem2RegStoreOp0Arg::Mem2RegStoreOp0Arg()
+  : storeOp0(new TyStoreOp0Obj()) {}
 
-Mem2RegValuesArg::Mem2RegValuesArg() {
-  values  = TyValues(new TyValuesObj());
-}
-}
+Mem2RegValuesArg::Mem2RegValuesArg()
+  : values(new TyValuesObj()) {}
+} // llvmberry

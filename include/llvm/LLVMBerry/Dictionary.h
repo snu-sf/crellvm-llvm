@@ -22,13 +22,13 @@ enum DictKeys {
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
   // Mem2Reg
-  ArgForMem2RegAlloca, 
-  ArgForMem2RegInstrIndex, 
-  ArgForMem2RegTermIndex, 
-  ArgForMem2RegStoreVal, 
-  ArgForMem2RegStoreExpr, 
+  ArgForMem2RegAlloca,
+  ArgForMem2RegInstrIndex,
+  ArgForMem2RegTermIndex,
+  ArgForMem2RegStoreVal,
+  ArgForMem2RegStoreExpr,
   ArgForMem2RegStoreOp0, 
-  ArgForMem2RegValues, 
+  ArgForMem2RegValues,
   // GVN
   ArgForFindLeader
 };
