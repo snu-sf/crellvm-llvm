@@ -1219,6 +1219,7 @@ void PromoteMem2Reg::run() {
     llvmberry::ValidationUnit::GetInstance()->intrude
             ([&AItmp, &Domtree]
               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      // initialize dictionaries
       auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
       auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
@@ -1232,9 +1233,11 @@ void PromoteMem2Reg::run() {
       instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
       termIndex[bname] = llvmberry::getTerminatorIndex(AItmp->getParent()->getTerminator());
 
+      // initialize with information of each alloca's store and alloca
       for (auto UI = AItmp->user_begin(), E = AItmp->user_end(); UI != E;) {
         Instruction *tmpInst = cast<Instruction>(*UI++);
 
+        // ignore if user of alloca is not load or store
         if (!(isa<LoadInst>(tmpInst) || isa<StoreInst>(tmpInst))) 
           continue;
 
@@ -1254,6 +1257,7 @@ void PromoteMem2Reg::run() {
         llvm::Value::use_iterator UI2 = tmpInst->use_begin(), E2 = tmpInst->use_end();
         Instruction *tmpUseinst;
 
+        // save information of store's user
         for (; UI2 != E2; UI2++) {
           llvm::Use &U = *UI2;
 
@@ -1262,10 +1266,12 @@ void PromoteMem2Reg::run() {
         }
       }
 
+      // update dictionary named "values" until there is no more change
       bool hasChanged = true;
       while (hasChanged) {
         hasChanged = false;
 
+        // check every saved information
         std::map<const Instruction*, unsigned>::const_iterator it;
         for (it = instrIndex.begin(); it != instrIndex.end(); ++it) {
           const Instruction *tmpInst = it->first;
@@ -1273,6 +1279,9 @@ void PromoteMem2Reg::run() {
           if (!(isa<LoadInst>(tmpInst) || isa<StoreInst>(tmpInst)))
             continue;
 
+          // if instruction store/load other register,
+          // data in dictionary can be changed 
+          // to the stored/loaded value of that register
           if (isa<LoadInst>(tmpInst)) {
             const LoadInst* LI = dyn_cast<LoadInst>(tmpInst);
             std::string keyLI = "%"+std::string(LI->getName());
@@ -1288,10 +1297,14 @@ void PromoteMem2Reg::run() {
                 if ((LI->getParent() == SI->getParent()) &&
                     instrIndex[SI] < instrIndex[LI] &&
                     instrIndex[SI] > nearestStore) {
+                  // if store and load is in the same block,
+                  // find nearest store of load
                   nearestStore = instrIndex[SI];
                   SB = SI->getParent();
                 } else if ((LI->getParent() != SI->getParent()) &&
                            Domtree.dominates(SI->getParent(), LI->getParent())) {
+                  // if store and load is not in the same block,
+                  // store block should dominate load block
                   if ((SB == SI->getParent()) && instrIndex[SI] > nearestStore)
                     nearestStore = instrIndex[SI];
                   else if (Domtree.dominates(SB, SI->getParent())) {
@@ -1302,6 +1315,8 @@ void PromoteMem2Reg::run() {
               }
             }
 
+            // update dictionary if previous value is different with
+            // current value
             std::string keyNew = std::to_string(nearestStore)+"%"+
                                  std::string(LI->getOperand(0)->getName());
             if (values[keyLI] != values[keyNew] &&
@@ -1309,9 +1324,8 @@ void PromoteMem2Reg::run() {
               values[keyLI] = values[keyNew];
               hasChanged = true;
             }
-          ///std::cout << keyNew << ": " << values[keyNew] << std::endl;
-          ///std::cout << keyLI << ": " << values[keyLI] << std::endl;
           } else {
+            // the case of store is same as load
             const StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
             std::string keySI = std::to_string(instrIndex[SI])+"%"+
                                 std::string(SI->getOperand(1)->getName());
@@ -1322,8 +1336,6 @@ void PromoteMem2Reg::run() {
               values[keySI] = values[keyNew];
               hasChanged = true;
             }
-          ///std::cout << keyNew << ": " << values[keyNew] << std::endl;
-          ///std::cout << keySI << ": " << values[keySI] << std::endl;
           }
         }
       }

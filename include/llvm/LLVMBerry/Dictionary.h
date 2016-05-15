@@ -111,6 +111,7 @@ public:
 DEFINE_TRAITS(ArgForMem2RegAlloca, Mem2RegAllocaArg);
 
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : InstrIndex
+// save instruction indices regardless of nop positions
 struct Mem2RegInstrIndexArg {
 public:
   typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndexObj;
@@ -122,6 +123,7 @@ public:
 DEFINE_TRAITS(ArgForMem2RegInstrIndex, Mem2RegInstrIndexArg);
 
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : TermIndex
+// save terminator indices regardless of nop positions
 struct Mem2RegTermIndexArg {
 public:
   typedef std::map<std::string, unsigned> TyTermIndexObj;
@@ -169,6 +171,7 @@ public:
 DEFINE_TRAITS(ArgForMem2RegStoreOp0, Mem2RegStoreOp0Arg);
 
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Values
+// save final value (after all optimization) of LLVM register
 struct Mem2RegValuesArg {
 public:
   typedef std::map<std::string,
