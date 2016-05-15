@@ -6,6 +6,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "cereal/archives/json.hpp"
 #include "cereal/types/vector.hpp"
@@ -377,6 +378,16 @@ public:
   void serialize(cereal::JSONOutputArchive& archive) const;
 
 private:
+  std::shared_ptr<TyValueType> value_type;
+};
+
+struct ConsConstNull : public TyConstant {
+public:
+  ConsConstNull(int _address_space, std::shared_ptr<TyValueType> _value_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private:
+  int address_space;
   std::shared_ptr<TyValueType> value_type;
 };
 
@@ -957,6 +968,7 @@ public:
            std::string _opt_name, std::string _description = "");
   const std::string &getDescription() const;
   void setDescription(const std::string &desc);
+  void appendAdmittedToDescription();
   void addCommand(std::shared_ptr<TyCommand> c);
   void setOptimizationName(const std::string &name);
   void addNopPosition(std::shared_ptr<TyPosition> position);

@@ -75,7 +75,16 @@ std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
 
   // If a block has its own name, just return it.
   if (block->hasName()) {
-    return block->getName();
+    std::string tempstr;
+    llvm::raw_string_ostream rso(tempstr);
+    block->printAsOperand(rso);
+
+    std::string name = rso.str();
+    std::string label("label %");
+    if(name.compare(0, label.length(), label) != 0) {
+      assert(false && "if we get block name by printAsOperand(), it should begin with \"label %\"");
+    }
+    return name.substr(label.length());
   }
 
   // If else, calculate the index and return it.
@@ -101,6 +110,7 @@ std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
 
 std::string getVariable(const llvm::Value &value) {
   std::string val;
+  std::string val2;
 
   if (llvm::isa<llvm::GlobalValue>(value)) {
     val = std::string("@");
@@ -111,6 +121,13 @@ std::string getVariable(const llvm::Value &value) {
   } else {
     assert("value must be a global value or an instruction" && false);
   }
+
+  llvm::raw_string_ostream rso(val2);
+  value.printAsOperand(rso, /*PrintType=*/false);
+  rso.str();
+
+  if(val2.compare("<badref>") != 0)
+    return val2;
 
   val += std::string(value.getName().data());
 
@@ -841,6 +858,22 @@ void ConsConstUndef::serialize(cereal::JSONOutputArchive& archive) const {
   archive(CEREAL_NVP(value_type));
 }
 
+ConsConstNull::ConsConstNull(int _address_space,
+                             std::shared_ptr<TyValueType> _value_type)
+    : address_space(_address_space), value_type(std::move(_value_type)) {}
+
+void ConsConstNull::serialize(cereal::JSONOutputArchive& archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstNull");
+
+  archive.startNode();
+  archive.makeArray();
+  archive(cereal::make_nvp("address_space", address_space));
+  archive(CEREAL_NVP(value_type));
+  archive.finishNode();
+}
+  
 // values
 
 ConsId::ConsId(std::shared_ptr<TyRegister> _register)
@@ -922,6 +955,13 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
   } else if (llvm::isa<llvm::UndefValue>(value)) {
     return std::shared_ptr<TyConstant>(new ConsConstUndef
           (TyValueType::make(*value.getType())));
+  } else if (llvm::isa<llvm::ConstantPointerNull>(value)) {
+    const llvm::ConstantPointerNull *null_val = llvm::dyn_cast<llvm::ConstantPointerNull>(&value);
+    const llvm::PointerType *ptype = null_val->getType();
+
+    return std::shared_ptr<TyConstant>(
+        new ConsConstNull(ptype->getAddressSpace(),
+                          TyValueType::make(*ptype->getPointerElementType())));
   }
   assert("TyConstant::make() : unsupported value" && false);
 }
@@ -1730,6 +1770,13 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(description));
   archive(CEREAL_NVP(commands));
   archive(CEREAL_NVP(nop_positions));
+}
+
+void CoreHint::appendAdmittedToDescription() {
+  this->description += "This validation unit is ADMITTED, which means it "
+                       "should fail, but it is intended. These cases might "
+                       "include: validations that can clearly be done with "
+                       "some effort, but does not fit cost-efficiency.\n";
 }
 
 void CoreHint::setOptimizationName(const std::string &name){
