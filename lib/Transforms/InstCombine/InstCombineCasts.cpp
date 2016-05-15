@@ -16,6 +16,10 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -296,6 +300,111 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
             isEliminableCastPair(CSrc, CI.getOpcode(), CI.getType(), DL)) {
       // The first cast (CSrc) is eliminable so we need to fix up or replace
       // the second cast (CI). CSrc will then have a good chance of being dead.
+      
+      llvmberry::ValidationUnit::Begin("cast_cast", CI.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &CSrc]
+          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        //     <src>                          |    <tgt>
+        // mid = <opcode1> srcty src to midty | mod = <opcode1> srcty src to midty
+        // dst = <opcode2> midty mid to dstty | dst = <opcode'> srcty src to dstty
+        Value *src = CSrc->getOperand(0);
+        CastInst *mid = CSrc;
+        CastInst *dst = &CI;
+        Type *srcty = src->getType();
+        Type *midty = mid->getType();
+        Type *dstty = dst->getType();
+        
+        std::function<std::shared_ptr<llvmberry::TyInfrule>(std::shared_ptr<llvmberry::TyValue>, 
+            std::shared_ptr<llvmberry::TyValue>, std::shared_ptr<llvmberry::TyValue>,
+            std::shared_ptr<llvmberry::TyValueType>, std::shared_ptr<llvmberry::TyValueType>, 
+            std::shared_ptr<llvmberry::TyValueType>) >
+            makeInfruleFunc;
+        std::string new_optname;
+
+        llvmberry::propagateInstruction(mid, dst, llvmberry::Source);
+        bool isValidatedOpt = false;
+
+        if (llvm::isa<BitCastInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "bitcast_bitcast";
+            makeInfruleFunc = llvmberry::ConsBitcastBitcast::make;
+          } else if (llvm::isa<PtrToIntInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "ptrtoint_bitcast";
+            makeInfruleFunc = llvmberry::ConsPtrtointBitcast::make;
+          }
+        } else if (llvm::isa<FPExtInst>(mid)) {
+          if (llvm::isa<FPExtInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "fpext_fpext";
+            makeInfruleFunc = llvmberry::ConsFpextFpext::make;
+          } else if (llvm::isa<FPToSIInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "fptosi_fpext";
+            makeInfruleFunc = llvmberry::ConsFptosiFpext::make;
+          } else if (llvm::isa<FPToUIInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "fptoui_fpext";
+            makeInfruleFunc = llvmberry::ConsFptouiFpext::make;
+          }
+        } else if (llvm::isa<IntToPtrInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "bitcast_inttoptr";
+            makeInfruleFunc = llvmberry::ConsBitcastInttoptr::make;
+          }
+        } else if (llvm::isa<PtrToIntInst>(mid)) {
+          if (llvm::isa<TruncInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "trunc_ptrtoint";
+            makeInfruleFunc = llvmberry::ConsTruncPtrtoint::make;
+          }
+        } else if (llvm::isa<SExtInst>(mid)) {
+          if (llvm::isa<SExtInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "sext_sext";
+            makeInfruleFunc = llvmberry::ConsSextSext::make;
+          } else if (llvm::isa<SIToFPInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "sitofp_sext";
+            makeInfruleFunc = llvmberry::ConsSitofpSext::make;
+          }
+        } else if (llvm::isa<TruncInst>(mid)) {
+          if (llvm::isa<TruncInst>(mid)) {
+            isValidatedOpt = true;
+            new_optname = "trunc_trunc";
+            makeInfruleFunc = llvmberry::ConsTruncTrunc::make;
+          }
+        } else if (llvm::isa<ZExtInst>(mid)) {
+          if (llvm::isa<IntToPtrInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "inttoptr_zext";
+            makeInfruleFunc = llvmberry::ConsInttoptrZext::make;
+          } else if (llvm::isa<SExtInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "sext_zext";
+            makeInfruleFunc = llvmberry::ConsSextZext::make;
+          } else if (llvm::isa<UIToFPInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "uitofp_zext";
+            makeInfruleFunc = llvmberry::ConsUitofpZext::make;
+          } else if (llvm::isa<ZExtInst>(dst)) {
+            isValidatedOpt = true;
+            new_optname = "zext_zext";
+            makeInfruleFunc = llvmberry::ConsZextZext::make;
+          }
+        }
+        if (isValidatedOpt) {
+          llvmberry::ValidationUnit::GetInstance()->setOptimizationName(new_optname);
+          INFRULE(INSTPOS(SRC, dst), makeInfruleFunc(
+                  VAL(src, Physical), VAL(mid, Physical), VAL(dst, Physical),
+                  VALTYPE(srcty), VALTYPE(midty), VALTYPE(dstty)));
+        } else {
+          llvmberry::ValidationUnit::Abort();
+        }
+      });
+
       return CastInst::Create(opc, CSrc->getOperand(0), CI.getType());
     }
   }
