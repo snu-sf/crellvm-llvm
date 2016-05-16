@@ -29,6 +29,7 @@ enum DictKeys {
   ArgForMem2RegStoreExpr,
   ArgForMem2RegStoreOp0, 
   ArgForMem2RegValues,
+  ArgForMem2RegStoreItem,
   // GVN
   ArgForFindLeader
 };
@@ -134,41 +135,23 @@ public:
 };
 DEFINE_TRAITS(ArgForMem2RegTermIndex, Mem2RegTermIndexArg);
 
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : StoreVal
-struct Mem2RegStoreValArg {
+// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : StoreItem
+struct Mem2RegStoreItemArg {
 public:
+  struct Triple {
+    std::shared_ptr<TyValue> value;
+    std::shared_ptr<TyExpr> expr;
+    std::string op0;
+  };
+
   typedef std::map<const llvm::Instruction*,
-                   std::shared_ptr<TyValue>> TyStoreValObj;
-  typedef std::shared_ptr<TyStoreValObj> TyStoreVal;
-  TyStoreVal storeVal;
+                   Triple> TyStoreItemObj;
+  typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
+  TyStoreItem storeItem;
 
-  Mem2RegStoreValArg();
+  Mem2RegStoreItemArg();
 };
-DEFINE_TRAITS(ArgForMem2RegStoreVal, Mem2RegStoreValArg);
-
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : StoreExpr
-struct Mem2RegStoreExprArg {
-public:
-  typedef std::map<const llvm::Instruction*,
-                   std::shared_ptr<TyExpr>> TyStoreExprObj;
-  typedef std::shared_ptr<TyStoreExprObj> TyStoreExpr;
-  TyStoreExpr storeExpr;
-
-  Mem2RegStoreExprArg();
-};
-DEFINE_TRAITS(ArgForMem2RegStoreExpr, Mem2RegStoreExprArg);
-
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : StoreOp0
-struct Mem2RegStoreOp0Arg {
-public:
-  typedef std::map<const llvm::Instruction*,
-                   std::string> TyStoreOp0Obj;
-  typedef std::shared_ptr<TyStoreOp0Obj> TyStoreOp0;
-  TyStoreOp0 storeOp0;
-
-  Mem2RegStoreOp0Arg();
-};
-DEFINE_TRAITS(ArgForMem2RegStoreOp0, Mem2RegStoreOp0Arg);
+DEFINE_TRAITS(ArgForMem2RegStoreItem, Mem2RegStoreItemArg);
 
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Values
 // save final value (after all optimization) of LLVM register

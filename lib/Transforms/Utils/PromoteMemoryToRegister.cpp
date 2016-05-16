@@ -403,10 +403,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
       auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
-      auto &storeVal = *(data.get<llvmberry::ArgForMem2RegStoreVal>()->storeVal);
-      auto &storeExpr = *(data.get<llvmberry::ArgForMem2RegStoreExpr>()->storeExpr);
-      auto &storeOp0 = *(data.get<llvmberry::ArgForMem2RegStoreOp0>()->storeOp0);
       auto &values = *(data.get<llvmberry::ArgForMem2RegValues>()->values);
+      auto &storeItem = *(data.get<llvmberry::ArgForMem2RegStoreItem>()->storeItem);
       std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
       std::string Rload = llvmberry::getVariable(*LI);
@@ -514,47 +512,47 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                          llvmberry::TyPosition::make
                           (SRC, *LI, instrIndex[LI], "")));
 
-        if (storeOp0[OnlyStore] == "%") {
+        if (storeItem[OnlyStore].op0 == "%") {
           // stored value is constant (hasName() is NULL)
           INFRULE(llvmberry::TyPosition::make
                    (SRC, *OnlyStore, instrIndex[OnlyStore], ""),
                   llvmberry::ConsIntroGhost::make
-                   (storeVal[OnlyStore],
+                   (storeItem[OnlyStore].value,
                     REGISTER(Rstore, Ghost)));
 
           INFRULE(llvmberry::TyPosition::make
                    (SRC, *OnlyStore, instrIndex[OnlyStore], ""),
                   llvmberry::ConsTransitivity::make
                    (INSN(*OnlyStore),
-                    storeExpr[OnlyStore],
+                    storeItem[OnlyStore].expr,
                     VAR(Rstore, Ghost)));
         } else {
           // stored value is another register
           INFRULE(llvmberry::TyPosition::make
                    (SRC, *OnlyStore, instrIndex[OnlyStore], ""),
                   llvmberry::ConsIntroGhost::make
-                   (ID(storeOp0[OnlyStore], Ghost),
+                   (ID(storeItem[OnlyStore].op0, Ghost),
                     REGISTER(Rstore, Ghost)));
 
           INFRULE(llvmberry::TyPosition::make
                    (SRC, *OnlyStore, instrIndex[OnlyStore], ""),
                   llvmberry::ConsTransitivity::make
                    (INSN(*OnlyStore),
-                    storeExpr[OnlyStore],
-                    VAR(storeOp0[OnlyStore], Ghost)));
+                    storeItem[OnlyStore].expr,
+                    VAR(storeItem[OnlyStore].op0, Ghost)));
                     
           INFRULE(llvmberry::TyPosition::make
                    (SRC, *OnlyStore, instrIndex[OnlyStore], ""),
                   llvmberry::ConsTransitivity::make
                    (INSN(*OnlyStore),
-                    VAR(storeOp0[OnlyStore], Ghost),
+                    VAR(storeItem[OnlyStore].op0, Ghost),
                     VAR(Rstore, Ghost)));
                     
           INFRULE(llvmberry::TyPosition::make
                    (SRC, *OnlyStore, instrIndex[OnlyStore], ""),
                   llvmberry::ConsTransitivityTgt::make
                    (VAR(Rstore, Ghost),
-                    VAR(storeOp0[OnlyStore], Ghost),
+                    VAR(storeItem[OnlyStore].op0, Ghost),
                     values[keySI]));
         }
 
@@ -730,10 +728,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
         auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
-        auto &storeVal = *(data.get<llvmberry::ArgForMem2RegStoreVal>()->storeVal);
-        auto &storeExpr = *(data.get<llvmberry::ArgForMem2RegStoreExpr>()->storeExpr);
-        auto &storeOp0 = *(data.get<llvmberry::ArgForMem2RegStoreOp0>()->storeOp0);
         auto &values = *(data.get<llvmberry::ArgForMem2RegValues>()->values);
+        auto &storeItem = *(data.get<llvmberry::ArgForMem2RegStoreItem>()->storeItem);
         std::string Ralloca = llvmberry::getVariable(*AI);
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
         std::string keySI = std::to_string(instrIndex[SI])+Rstore;
@@ -827,8 +823,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         // ret i32 %c             | ret i32 %c
         if (nextIndex != -1) {
           // stored value is register
-          if (storeOp0[SI] != "%") {
-            if (storeExpr[SI] == values[keySI]) {
+          if (storeItem[SI].op0 != "%") {
+            if (storeItem[SI].expr == values[keySI]) {
               // stored value will not be changed in another iteration
               PROPAGATE(LESSDEF(INSN(*SI),
                                 VAR(Rstore, Ghost),
@@ -839,7 +835,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                 (SRC, *next, nextIndex, "")));
 
               PROPAGATE(LESSDEF(VAR(Rstore, Ghost),
-                                storeExpr[SI],
+                                storeItem[SI].expr,
                                 TGT),
                         BOUNDS(llvmberry::TyPosition::make
                                 (SRC, *SI, instrIndex[SI], ""),
@@ -849,14 +845,14 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               INFRULE(llvmberry::TyPosition::make
                        (SRC, *SI, instrIndex[SI], ""),
                       llvmberry::ConsIntroGhost::make
-                       (storeVal[SI],
+                       (storeItem[SI].value,
                         REGISTER(Rstore, Ghost)));
 
               INFRULE(llvmberry::TyPosition::make
                        (SRC, *SI, instrIndex[SI], ""),
                       llvmberry::ConsTransitivity::make
                        (INSN(*SI),
-                        storeExpr[SI],
+                        storeItem[SI].expr,
                         VAR(Rstore, Ghost)));
             } else {
               // stored value will be changed in another iteration
@@ -879,28 +875,28 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               INFRULE(llvmberry::TyPosition::make
                        (SRC, *SI, instrIndex[SI], ""),
                       llvmberry::ConsIntroGhost::make
-                       (ID(storeOp0[SI], Ghost),
+                       (ID(storeItem[SI].op0, Ghost),
                         REGISTER(Rstore, Ghost)));
 
               INFRULE(llvmberry::TyPosition::make
                        (SRC, *SI, instrIndex[SI], ""),
                       llvmberry::ConsTransitivity::make
                        (INSN(*SI),
-                        VAR(storeOp0[SI], Physical),
-                        VAR(storeOp0[SI], Ghost)));
+                        VAR(storeItem[SI].op0, Physical),
+                        VAR(storeItem[SI].op0, Ghost)));
                         
               INFRULE(llvmberry::TyPosition::make
                        (SRC, *SI, instrIndex[SI], ""),
                       llvmberry::ConsTransitivity::make
                        (INSN(*SI),
-                        VAR(storeOp0[SI], Ghost),
+                        VAR(storeItem[SI].op0, Ghost),
                         VAR(Rstore, Ghost)));
                         
               INFRULE(llvmberry::TyPosition::make
                        (SRC, *SI, instrIndex[SI], ""),
                       llvmberry::ConsTransitivityTgt::make
                        (VAR(Rstore, Ghost),
-                        VAR(storeOp0[SI], Ghost),
+                        VAR(storeItem[SI].op0, Ghost),
                         values[keySI]));
             }
           } else {
@@ -924,7 +920,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
             INFRULE(llvmberry::TyPosition::make
                      (SRC, *SI, instrIndex[SI], ""),
                     llvmberry::ConsIntroGhost::make
-                     (storeVal[SI],
+                     (storeItem[SI].value,
                       REGISTER(Rstore, Ghost)));
 
             INFRULE(llvmberry::TyPosition::make
@@ -969,9 +965,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         StoreInst* SI = std::prev(I)->second;
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
         auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
-        auto &storeExpr = *(data.get<llvmberry::ArgForMem2RegStoreExpr>()->storeExpr);
-        auto &storeOp0 = *(data.get<llvmberry::ArgForMem2RegStoreOp0>()->storeOp0);
         auto &values = *(data.get<llvmberry::ArgForMem2RegValues>()->values);
+        auto &storeItem = *(data.get<llvmberry::ArgForMem2RegStoreItem>()->storeItem);
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
         std::string Rload = llvmberry::getVariable(*LI);
 
@@ -1014,7 +1009,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
         // add hints when at least one user of load is exists
         if (endIndex != -1) {
-          if (storeOp0[SI] == "%") {
+          if (storeItem[SI].op0 == "%") {
             // stored value is constant
             PROPAGATE(LESSDEF(VAR(Rload, Physical),
                               VAR(Rload, Ghost),
@@ -1025,7 +1020,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                               (SRC, *end, endIndex, "")));
 
             PROPAGATE(LESSDEF(VAR(Rload, Ghost),
-                              storeExpr[SI],
+                              storeItem[SI].expr,
                               TGT),
                       BOUNDS(llvmberry::TyPosition::make
                               (SRC, *LI, instrIndex[LI], ""),
@@ -1057,7 +1052,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                     llvmberry::ConsTransitivityTgt::make
                      (VAR(Rload, Ghost),
                       VAR(Rstore, Ghost),
-                      storeExpr[SI]));
+                      storeItem[SI].expr));
           } else {
             // stored value is register
             PROPAGATE(LESSDEF(VAR(Rload, Physical),
@@ -1205,10 +1200,8 @@ void PromoteMem2Reg::run() {
       data.create<llvmberry::ArgForMem2RegAlloca>();
       data.create<llvmberry::ArgForMem2RegInstrIndex>();
       data.create<llvmberry::ArgForMem2RegTermIndex>();
-      data.create<llvmberry::ArgForMem2RegStoreVal>();
-      data.create<llvmberry::ArgForMem2RegStoreExpr>();
-      data.create<llvmberry::ArgForMem2RegStoreOp0>();
       data.create<llvmberry::ArgForMem2RegValues>();
+      data.create<llvmberry::ArgForMem2RegStoreItem>();
   });
 
   // memorize indices of alloca, store, load, and terminator instructions
@@ -1223,10 +1216,8 @@ void PromoteMem2Reg::run() {
       auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
       auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
-      auto &storeVal = *(data.get<llvmberry::ArgForMem2RegStoreVal>()->storeVal);
-      auto &storeExpr = *(data.get<llvmberry::ArgForMem2RegStoreExpr>()->storeExpr);
-      auto &storeOp0 = *(data.get<llvmberry::ArgForMem2RegStoreOp0>()->storeOp0);
       auto &values = *(data.get<llvmberry::ArgForMem2RegValues>()->values);
+      auto &storeItem = *(data.get<llvmberry::ArgForMem2RegStoreItem>()->storeItem);
       std::string bname = llvmberry::getBasicBlockIndex(AItmp->getParent());
       
       allocas.push_back(AItmp);
@@ -1248,10 +1239,10 @@ void PromoteMem2Reg::run() {
           std::string keySI = std::to_string(instrIndex[SI])+"%"+
                               std::string(SI->getOperand(1)->getName());
 
-          storeVal[SI] = std::move(llvmberry::TyValue::make(*(SI->getOperand(0))));
-          storeExpr[SI] = std::move(llvmberry::makeExpr_fromStoreInst(SI));
-          storeOp0[SI] = "%" + std::string(SI->getOperand(0)->getName());
-          values[keySI] = storeExpr[SI];
+          storeItem[SI].value = std::move(llvmberry::TyValue::make(*(SI->getOperand(0))));
+          storeItem[SI].expr = std::move(llvmberry::makeExpr_fromStoreInst(SI));
+          storeItem[SI].op0 = "%" + std::string(SI->getOperand(0)->getName());
+          values[keySI] = storeItem[SI].expr;
         }
 
         llvm::Value::use_iterator UI2 = tmpInst->use_begin(), E2 = tmpInst->use_end();

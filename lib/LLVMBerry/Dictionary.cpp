@@ -53,15 +53,9 @@ Mem2RegInstrIndexArg::Mem2RegInstrIndexArg()
 Mem2RegTermIndexArg::Mem2RegTermIndexArg()
   : termIndex(new TyTermIndexObj()) {}
 
-Mem2RegStoreValArg::Mem2RegStoreValArg()
-  : storeVal(new TyStoreValObj()) {}
-
-Mem2RegStoreExprArg::Mem2RegStoreExprArg()
-  : storeExpr(new TyStoreExprObj()) {}
-
-Mem2RegStoreOp0Arg::Mem2RegStoreOp0Arg()
-  : storeOp0(new TyStoreOp0Obj()) {}
-
 Mem2RegValuesArg::Mem2RegValuesArg()
   : values(new TyValuesObj()) {}
+
+Mem2RegStoreItemArg::Mem2RegStoreItemArg()
+  : storeItem(new TyStoreItemObj()) {}
 } // llvmberry
