@@ -132,7 +132,7 @@ void ValidationUnit::commit() {
   src_ofs.close();
   if(src_ofs.fail() || src_ofs.bad()){
     std::cerr << "LLVMBerry : ValidationUnit::commit() : Fail to write source file" << std::endl;
-    std::exit(-1);
+    std::exit(-10);
   }
 
   // print tgt
@@ -145,7 +145,7 @@ void ValidationUnit::commit() {
   tgt_ofs.close();
   if(tgt_ofs.fail() || tgt_ofs.bad()){
     std::cerr << "LLVMBerry : ValidationUnit::commit() : Fail to write target file" << std::endl;
-    std::exit(-1);
+    std::exit(-11);
   }
 
   // print corehints
@@ -155,7 +155,7 @@ void ValidationUnit::commit() {
   ofs << std::endl;
   if(ofs.fail() || ofs.bad()){
     std::cerr << "LLVMBerry : ValidationUnit::commit() : Fail to write core hint file" << std::endl;
-    std::exit(-1);
+    std::exit(-12);
   }
 }
 
