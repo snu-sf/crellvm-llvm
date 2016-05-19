@@ -2360,8 +2360,6 @@ bool GVN::processInstruction(Instruction *I) {
     std::string I_id = llvmberry::getVariable(*I);
 
     std::shared_ptr<llvmberry::TyPropagateObject> repl_inv;
-    // TODO: leader_value may be not needed
-    std::shared_ptr<llvmberry::TyValue> leader_value;
     std::shared_ptr<llvmberry::TyExpr> leader_expr;
 
     // make symbolic expression of I
@@ -2416,9 +2414,6 @@ bool GVN::processInstruction(Instruction *I) {
           // make replacing lessdef relation
           repl_inv =
               LESSDEF(VAR(I_id, Physical), VAR(leaderI_id, Physical), SRC);
-
-          leader_value = ID(leaderI_id, Physical);
-          
         }
       }
     }
@@ -2516,8 +2511,6 @@ bool GVN::processInstruction(Instruction *I) {
         if ((expr_I == expr_condI) && dyn_cast<ConstantInt>(repl)) {
           // case 1
           // TODO: I, condI comm
-          leader_value = std::make_shared<llvmberry::ConsConstVal>(
-              std::make_shared<llvmberry::ConsConstInt>(cond_value, 1));
           leader_expr = cond_expr;
 
           pre_repl_inv = LESSDEF(RHS(condI_id, Physical, SRC), leader_expr, SRC);
@@ -2534,8 +2527,6 @@ bool GVN::processInstruction(Instruction *I) {
                       llvmberry::getBasicBlockIndex(leaderBB_pred)),
                   llvmberry::ConsIcmpInverse::make(*condCI, cond_value));
 
-          leader_value = std::make_shared<llvmberry::ConsConstVal>(
-              std::make_shared<llvmberry::ConsConstInt>(1-cond_value, 1));
           leader_expr = cond_neg_expr;
 
           pre_repl_inv = LESSDEF(RHS(I_id, Physical, SRC), leader_expr, SRC);
@@ -2550,7 +2541,9 @@ bool GVN::processInstruction(Instruction *I) {
           else if (repl == CI_op1)
             equiv_op = CI_op0;
 
-          if (equiv_op) {
+          if (!equiv_op)
+            assert(false && "repl doesn't match with either operand");
+          else {
             if (Instruction *equiv_opI = dyn_cast<Instruction>(equiv_op)) {
               std::string equiv_opI_id = llvmberry::getVariable(*equiv_opI);
               // expression for equiv_opI
@@ -2565,8 +2558,9 @@ bool GVN::processInstruction(Instruction *I) {
               llvmberry::Expression expr_equiv_opI =
                   llvmberry::create_expression(equiv_opI, equiv_opI_swapped, op_equiv_opI);
 
-              if (expr_equiv_opI == expr_I) {
-                // TODO: equiv_opI, I comm
+              if (!(expr_equiv_opI == expr_I))
+                assert(false && "same numbering, different expression");
+              else {
                 std::shared_ptr<llvmberry::TyInfrule> icmp_infrule;
                 if (cond_value == 1)
                   icmp_infrule = llvmberry::ConsIcmpEqSame::make(*condCI);
@@ -2609,25 +2603,16 @@ bool GVN::processInstruction(Instruction *I) {
                 pre_repl_inv =
                     LESSDEF(RHS(equiv_opI_id, Physical, SRC), leader_expr, SRC);
                 do_swap = (I_swapped != equiv_opI_swapped);
-
-              } else
-                assert(false && "same numbering, different expression");
-
+              }
             } else
               assert(false && "In icmp-eq case, leader should be an instruction");
-            
-          } else 
-            assert(false && "repl doesn't match with either operand");
-
+          }
         } else {
           assert(false && "GVN case not yet covered");
         }
 
-        if (!leader_expr) {
+        if (!leader_expr)
           assert(false && "No leader expression");
-        }
-
-        // pre_repl_inv = LESSDEF(RHS(I_id, Physical, SRC), leader_expr, SRC);
 
         PROPAGATE(pre_repl_inv,
                   BOUNDS(llvmberry::TyPosition::make_start_of_block(
