@@ -3101,9 +3101,6 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
     if (Visited.count(BB))
       continue;
 
-    auto desc = llvmberry::ValidationUnit::GetInstance()->getDescription();
-    llvmberry::ValidationUnit::GetInstance()->setDescription(
-        desc + "not-visited: " + BB->getName().str() + "\n");
     llvmberry::ValidationUnit::GetInstance()->intrude(
         [&BB](llvmberry::ValidationUnit::Dictionary &data,
               llvmberry::CoreHint &hints) {
