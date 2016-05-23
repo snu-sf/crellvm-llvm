@@ -110,7 +110,8 @@ namespace llvmberry{
           llvm::BinaryOperator *Y,
           llvm::Value *A,
           bool needsZCommutativity);
-
+  void generateHintForTrivialDCE(llvm::Instruction &I);
+  void generateHintForGVNDCE(llvm::Instruction &I);
 
   // inserting nop
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
@@ -118,6 +119,35 @@ namespace llvmberry{
 
   extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
       false_encoding;
+
+  /* Generating symbolic expressions from instructions
+   * for GVN
+   */
+
+  struct Expression {
+    uint32_t opcode;
+    llvm::Type *type;
+    llvm::SmallVector<uint32_t, 4> varargs;
+
+    Expression(uint32_t o = ~2U) : opcode(o) {}
+
+    bool operator==(const Expression &other) const {
+      if (opcode != other.opcode)
+        return false;
+      if (opcode == ~0U || opcode == ~1U)
+        return true;
+      if (type != other.type)
+        return false;
+      if (varargs != other.varargs)
+        return false;
+      return true;
+    }
+  };
+
+  Expression create_expression(llvm::Instruction *I, bool &swapped,
+                               llvm::SmallVector<uint32_t, 4> va);
+
+  bool is_inverse_expression(Expression e1, Expression e2);
 }
 
 #endif

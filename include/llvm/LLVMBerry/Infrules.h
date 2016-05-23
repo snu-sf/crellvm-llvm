@@ -1183,7 +1183,55 @@ private :
   std::shared_ptr<TySize> sz;
 };
 
+struct TyImpliesFalse {
+public:
+  TyImpliesFalse(std::shared_ptr<TyConstant> _c1,
+                 std::shared_ptr<TyConstant> _c2);
+  void serialize(cereal::JSONOutputArchive &archive) const;
 
+private:
+  std::shared_ptr<TyConstant> c1;
+  std::shared_ptr<TyConstant> c2;
+};
+
+struct TyIcmpInverse {
+public:
+  TyIcmpInverse(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
+                std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                std::shared_ptr<TyConstInt> _boolean);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyIcmpPred predicate;
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyConstInt> boolean;
+};
+
+struct TyIcmpEqSame {
+public:
+  TyIcmpEqSame(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x,
+               std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+};
+
+struct TyIcmpNeqSame {
+public:
+  TyIcmpNeqSame(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x,
+                std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+};
 
 struct ConsAddConstNot : public TyInfrule{
 public : 
@@ -2096,17 +2144,6 @@ private :
   std::shared_ptr<TyXorCommutativeTgt> xor_commutative_tgt;
 };
 
-struct TyImpliesFalse {
-public:
-  TyImpliesFalse(std::shared_ptr<TyConstant> _c1,
-                 std::shared_ptr<TyConstant> _c2);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  std::shared_ptr<TyConstant> c1;
-  std::shared_ptr<TyConstant> c2;
-};
-
 struct ConsImpliesFalse : public TyInfrule {
 public:
   ConsImpliesFalse(std::shared_ptr<TyImpliesFalse> _implies_false);
@@ -2116,6 +2153,36 @@ public:
 
 private:
   std::shared_ptr<TyImpliesFalse> implies_false;
+};
+
+struct ConsIcmpInverse : public TyInfrule {
+public:
+  ConsIcmpInverse(std::shared_ptr<TyIcmpInverse> _icmp_inverse);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI, int boolean);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpInverse> icmp_inverse;
+};
+
+struct ConsIcmpEqSame : public TyInfrule {
+public:
+  ConsIcmpEqSame(std::shared_ptr<TyIcmpEqSame> _icmp_eq_same);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpEqSame> icmp_eq_same;
+};
+
+struct ConsIcmpNeqSame : public TyInfrule {
+public:
+  ConsIcmpNeqSame(std::shared_ptr<TyIcmpNeqSame> _icmp_neq_same);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpNeqSame> icmp_neq_same;
 };
 
 } // llvmberry

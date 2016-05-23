@@ -2133,4 +2133,110 @@ void ConsImpliesFalse::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(implies_false));
 }
 
+TyIcmpInverse::TyIcmpInverse(enum TyIcmpPred _predicate,
+                             std::shared_ptr<TyValueType> _ty,
+                             std::shared_ptr<TyValue> _x,
+                             std::shared_ptr<TyValue> _y,
+                             std::shared_ptr<TyConstInt> _boolean)
+    : predicate(_predicate), ty(std::move(_ty)), x(std::move(_x)),
+      y(std::move(_y)), boolean(std::move(_boolean)) {}
+
+void TyIcmpInverse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(cereal::make_nvp("predicate", toString(predicate)));
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(boolean));
+}
+
+ConsIcmpInverse::ConsIcmpInverse(std::shared_ptr<TyIcmpInverse> _icmp_inverse)
+    : icmp_inverse(std::move(_icmp_inverse)) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpInverse::make(llvm::ICmpInst &CI,
+                                                 int bool_val) {
+  enum TyIcmpPred pred = getIcmpPred(CI.getPredicate());
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+  std::shared_ptr<TyConstInt> boolean = TyConstInt::make(bool_val, 1);
+
+  std::shared_ptr<TyIcmpInverse> _icmp_inv =
+      std::make_shared<TyIcmpInverse>(pred, ty, x, y, boolean);
+
+  return std::make_shared<ConsIcmpInverse>(_icmp_inv);
+}
+
+void ConsIcmpInverse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpInverse");
+  archive(CEREAL_NVP(icmp_inverse));
+}
+
+TyIcmpEqSame::TyIcmpEqSame(std::shared_ptr<TyValueType> _ty,
+                           std::shared_ptr<TyValue> _x,
+                           std::shared_ptr<TyValue> _y)
+    : ty(std::move(_ty)), x(std::move(_x)), y(std::move(_y)) {}
+
+void TyIcmpEqSame::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsIcmpEqSame::ConsIcmpEqSame(std::shared_ptr<TyIcmpEqSame> _icmp_eq_same)
+    : icmp_eq_same(_icmp_eq_same) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpEqSame::make(llvm::ICmpInst &CI) {
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+  std::shared_ptr<TyIcmpEqSame> _icmp_eq_same =
+      std::make_shared<TyIcmpEqSame>(ty, x, y);
+
+  return std::make_shared<ConsIcmpEqSame>(_icmp_eq_same);
+}
+
+void ConsIcmpEqSame::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpEqSame");
+  archive(CEREAL_NVP(icmp_eq_same));
+}
+
+TyIcmpNeqSame::TyIcmpNeqSame(std::shared_ptr<TyValueType> _ty,
+                             std::shared_ptr<TyValue> _x,
+                             std::shared_ptr<TyValue> _y)
+    : ty(std::move(_ty)), x(std::move(_x)), y(std::move(_y)) {}
+
+void TyIcmpNeqSame::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsIcmpNeqSame::ConsIcmpNeqSame(std::shared_ptr<TyIcmpNeqSame> _icmp_neq_same)
+    : icmp_neq_same(_icmp_neq_same) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpNeqSame::make(llvm::ICmpInst &CI) {
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+
+  std::shared_ptr<TyIcmpNeqSame> _icmp_neq_same =
+      std::make_shared<TyIcmpNeqSame>(ty, x, y);
+
+  return std::make_shared<ConsIcmpNeqSame>(_icmp_neq_same);
+}
+
+void ConsIcmpNeqSame::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpNeqSame");
+  archive(CEREAL_NVP(icmp_neq_same));
+}
+
 } // llvmberry
