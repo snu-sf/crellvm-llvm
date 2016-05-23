@@ -2109,6 +2109,28 @@ void ConsXorCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(xor_commutative_tgt));
 }
 
+TyImpliesFalse::TyImpliesFalse(std::shared_ptr<TyConstant> _c1,
+                               std::shared_ptr<TyConstant> _c2)
+    : c1(_c1), c2(_c2) {}
+void TyImpliesFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(c1));
+  archive(CEREAL_NVP(c2));
+}
 
+ConsImpliesFalse::ConsImpliesFalse(
+    std::shared_ptr<TyImpliesFalse> _implies_false)
+    : implies_false(_implies_false) {}
+std::shared_ptr<TyInfrule>
+ConsImpliesFalse::make(std::shared_ptr<TyConstant> _c1,
+                       std::shared_ptr<TyConstant> _c2) {
+  std::shared_ptr<TyImpliesFalse> _val(new TyImpliesFalse(_c1, _c2));
+  return std::shared_ptr<TyInfrule>(new ConsImpliesFalse(_val));
+}
+void ConsImpliesFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ImpliesFalse");
+  archive(CEREAL_NVP(implies_false));
+}
 
 } // llvmberry

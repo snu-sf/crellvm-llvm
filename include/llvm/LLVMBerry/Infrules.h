@@ -2096,8 +2096,27 @@ private :
   std::shared_ptr<TyXorCommutativeTgt> xor_commutative_tgt;
 };
 
+struct TyImpliesFalse {
+public:
+  TyImpliesFalse(std::shared_ptr<TyConstant> _c1,
+                 std::shared_ptr<TyConstant> _c2);
+  void serialize(cereal::JSONOutputArchive &archive) const;
 
+private:
+  std::shared_ptr<TyConstant> c1;
+  std::shared_ptr<TyConstant> c2;
+};
 
+struct ConsImpliesFalse : public TyInfrule {
+public:
+  ConsImpliesFalse(std::shared_ptr<TyImpliesFalse> _implies_false);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyConstant> _c1,
+                                         std::shared_ptr<TyConstant> _c2);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyImpliesFalse> implies_false;
+};
 
 } // llvmberry
 
