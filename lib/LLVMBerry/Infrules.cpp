@@ -2339,6 +2339,87 @@ void ConsXorCommutativeTgt::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(xor_commutative_tgt));
 }
 
+TyXorNot::TyXorNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _s) : z(_z), y(_y), x(_x), s(_s){
+}
+void TyXorNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(s));
+}
+ConsXorNot::ConsXorNot(std::shared_ptr<TyXorNot> _xor_not) : xor_not(_xor_not){
+}
+std::shared_ptr<TyInfrule> ConsXorNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyXorNot> _val(new TyXorNot(_z, _y, _x, _s));
+  return std::shared_ptr<TyInfrule>(new ConsXorNot(_val));
+}
+void ConsXorNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("XorNot");
+  archive(CEREAL_NVP(xor_not));
+}
+
+TyXorSame::TyXorSame(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _s) : z(_z), a(_a), s(_s){
+}
+void TyXorSame::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(s));
+}
+ConsXorSame::ConsXorSame(std::shared_ptr<TyXorSame> _xor_same) : xor_same(_xor_same){
+}
+std::shared_ptr<TyInfrule> ConsXorSame::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyXorSame> _val(new TyXorSame(_z, _a, _s));
+  return std::shared_ptr<TyInfrule>(new ConsXorSame(_val));
+}
+void ConsXorSame::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("XorSame");
+  archive(CEREAL_NVP(xor_same));
+}
+
+TyXorUndef::TyXorUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _s) : z(_z), a(_a), s(_s){
+}
+void TyXorUndef::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(s));
+}
+ConsXorUndef::ConsXorUndef(std::shared_ptr<TyXorUndef> _xor_undef) : xor_undef(_xor_undef){
+}
+std::shared_ptr<TyInfrule> ConsXorUndef::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyXorUndef> _val(new TyXorUndef(_z, _a, _s));
+  return std::shared_ptr<TyInfrule>(new ConsXorUndef(_val));
+}
+void ConsXorUndef::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("XorUndef");
+  archive(CEREAL_NVP(xor_undef));
+}
+
+TyXorZero::TyXorZero(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _s) : z(_z), a(_a), s(_s){
+}
+void TyXorZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(s));
+}
+ConsXorZero::ConsXorZero(std::shared_ptr<TyXorZero> _xor_zero) : xor_zero(_xor_zero){
+}
+std::shared_ptr<TyInfrule> ConsXorZero::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyXorZero> _val(new TyXorZero(_z, _a, _s));
+  return std::shared_ptr<TyInfrule>(new ConsXorZero(_val));
+}
+void ConsXorZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("XorZero");
+  archive(CEREAL_NVP(xor_zero));
+}
+
 TyInttoptrZext::TyInttoptrZext(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty) : src(_src), mid(_mid), dst(_dst), srcty(_srcty), midty(_midty), dstty(_dstty){
 }
 void TyInttoptrZext::serialize(cereal::JSONOutputArchive& archive) const{
