@@ -1196,6 +1196,27 @@ private :
   std::shared_ptr<TyConstInt> boolean;
 };
 
+struct TyIcmpEqSame {
+public : 
+  TyIcmpEqSame(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+};
+
+struct TyIcmpNeqSame {
+public : 
+  TyIcmpNeqSame(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+};
 
 
 struct ConsAddConstNot : public TyInfrule{
@@ -2117,6 +2138,26 @@ public :
 
 private : 
   std::shared_ptr<TyIcmpInverse> icmp_inverse;
+};
+
+struct ConsIcmpEqSame : public TyInfrule {
+public : 
+  ConsIcmpEqSame(std::shared_ptr<TyIcmpEqSame> _icmp_eq_same);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyIcmpEqSame> icmp_eq_same;
+};
+
+struct ConsIcmpNeqSame : public TyInfrule {
+public : 
+  ConsIcmpNeqSame(std::shared_ptr<TyIcmpNeqSame> _icmp_neq_same);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyIcmpNeqSame> icmp_neq_same;
 };
 
 } // llvmberry
