@@ -816,8 +816,8 @@ void generateHintForMem2RegPropagateNoalias
   ValidationUnit::GetInstance()->intrude
     ([&AI, &useInst, &useIndex]
       (Dictionary &data, CoreHint &hints) {
-    auto &allocas = *(data.get<ArgForMem2RegAlloca>()->allocas);
-    auto &instrIndex = *(data.get<ArgForMem2RegInstrIndex>()->instrIndex);
+    auto &allocas = *(data.get<ArgForMem2Reg>()->allocas);
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
 
     for (auto i = allocas.begin(); i != allocas.end(); ++i) {
       llvm::AllocaInst *AItmp = *i;
@@ -866,9 +866,9 @@ void generateHintForMem2RegPropagateStore
   ValidationUnit::GetInstance()->intrude
     ([&SI, &next, &nextIndex]
       (Dictionary &data, CoreHint &hints) {
-    auto &instrIndex = *(data.get<ArgForMem2RegInstrIndex>()->instrIndex);
-    auto &storeItem = *(data.get<ArgForMem2RegStoreItem>()->storeItem);
-    auto &values = *(data.get<ArgForMem2RegValues>()->values);
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
+    auto &values = *(data.get<ArgForMem2Reg>()->values);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
     std::string keySI = std::to_string(instrIndex[SI])+Rstore;
 
@@ -942,8 +942,8 @@ void generateHintForMem2RegPropagateLoad
   ValidationUnit::GetInstance()->intrude
     ([&SI, &LI, &use, &useIndex]
       (Dictionary &data, CoreHint &hints) {
-    auto &instrIndex = *(data.get<ArgForMem2RegInstrIndex>()->instrIndex);
-    auto &values = *(data.get<ArgForMem2RegValues>()->values);
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &values = *(data.get<ArgForMem2Reg>()->values);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
     std::string Rload = getVariable(*LI);
 

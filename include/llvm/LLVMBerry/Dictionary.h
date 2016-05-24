@@ -22,14 +22,7 @@ enum DictKeys {
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
   // Mem2Reg
-  ArgForMem2RegAlloca,
-  ArgForMem2RegInstrIndex,
-  ArgForMem2RegTermIndex,
-  ArgForMem2RegStoreVal,
-  ArgForMem2RegStoreExpr,
-  ArgForMem2RegStoreOp0, 
-  ArgForMem2RegValues,
-  ArgForMem2RegStoreItem,
+  ArgForMem2Reg,
   // GVN
   ArgForFindLeader
 };
@@ -100,44 +93,26 @@ public:
 };
 DEFINE_TRAITS(ArgForFindAvailableLoadedValue, FindAvailableLoadedValueArg);
 
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Alloca
-struct Mem2RegAllocaArg {
+// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Mem2RegArg
+struct Mem2RegArg {
 public:
   typedef std::vector<llvm::AllocaInst *> TyAllocasObj;
   typedef std::shared_ptr<TyAllocasObj> TyAllocas;
   TyAllocas allocas;
 
-  Mem2RegAllocaArg();
-};
-DEFINE_TRAITS(ArgForMem2RegAlloca, Mem2RegAllocaArg);
-
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : InstrIndex
-// save instruction indices regardless of nop positions
-struct Mem2RegInstrIndexArg {
-public:
   typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndexObj;
   typedef std::shared_ptr<TyInstrIndexObj> TyInstrIndex;
   TyInstrIndex instrIndex;
 
-  Mem2RegInstrIndexArg();
-};
-DEFINE_TRAITS(ArgForMem2RegInstrIndex, Mem2RegInstrIndexArg);
-
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : TermIndex
-// save terminator indices regardless of nop positions
-struct Mem2RegTermIndexArg {
-public:
   typedef std::map<std::string, unsigned> TyTermIndexObj;
   typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
   TyTermIndex termIndex;
 
-  Mem2RegTermIndexArg();
-};
-DEFINE_TRAITS(ArgForMem2RegTermIndex, Mem2RegTermIndexArg);
+  typedef std::map<std::string,
+                   std::shared_ptr<TyExpr>> TyValuesObj;
+  typedef std::shared_ptr<TyValuesObj> TyValues;
+  TyValues values;
 
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : StoreItem
-struct Mem2RegStoreItemArg {
-public:
   struct Triple {
     std::shared_ptr<TyValue> value;
     std::shared_ptr<TyExpr> expr;
@@ -149,22 +124,9 @@ public:
   typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
   TyStoreItem storeItem;
 
-  Mem2RegStoreItemArg();
+  Mem2RegArg();
 };
-DEFINE_TRAITS(ArgForMem2RegStoreItem, Mem2RegStoreItemArg);
-
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Values
-// save final value (after all optimization) of LLVM register
-struct Mem2RegValuesArg {
-public:
-  typedef std::map<std::string,
-                   std::shared_ptr<TyExpr>> TyValuesObj;
-  typedef std::shared_ptr<TyValuesObj> TyValues;
-  TyValues values;
-
-  Mem2RegValuesArg();
-};
-DEFINE_TRAITS(ArgForMem2RegValues, Mem2RegValuesArg);
+DEFINE_TRAITS(ArgForMem2Reg, Mem2RegArg);
 
 // lib/Transforms/InstCombine/InstCombineMulDivRem.cpp : visitMul
 struct VisitMulArg {

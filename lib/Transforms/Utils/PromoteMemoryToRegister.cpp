@@ -400,8 +400,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       // ret i32 %c            | ret i32 %c
 
       // prepare variables
-      auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
-      auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+      auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+      auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
       std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
       std::string Rload = llvmberry::getVariable(*LI);
@@ -501,8 +501,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
          ([&AI, &OnlyStore]
             (llvmberry::Dictionary &data, 
              llvmberry::CoreHint &hints) {
-    auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
-    auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+    auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
+    auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
     std::string Ralloca = llvmberry::getVariable(*AI);
 
     // propagate maydiff
@@ -580,8 +580,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         // ret i32 %c             | ret i32 3
 
         // prepare variables
-        auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
-        auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+        auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
         std::string Ralloca = llvmberry::getVariable(*AI);
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
         std::string keySI = std::to_string(instrIndex[SI])+Rstore;
@@ -669,8 +669,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
            (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         // prepare variables
         StoreInst* SI = std::prev(I)->second;
-        auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
-        auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+        auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
         std::string Rload = llvmberry::getVariable(*LI);
 
@@ -730,7 +730,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
            ([&SI]
               (llvmberry::Dictionary &data,
                llvmberry::CoreHint &hints) {
-      auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+      auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
       std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
 
       hints.addNopPosition
@@ -746,8 +746,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
          ([&AI]
             (llvmberry::Dictionary &data,
              llvmberry::CoreHint &hints) {
-    auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
-    auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+    auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
+    auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
     std::string Ralloca = llvmberry::getVariable(*AI);
 
     // propagate maydiff
@@ -794,11 +794,7 @@ void PromoteMem2Reg::run() {
   llvmberry::ValidationUnit::GetInstance()->intrude
           ([]
             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-      data.create<llvmberry::ArgForMem2RegAlloca>();
-      data.create<llvmberry::ArgForMem2RegInstrIndex>();
-      data.create<llvmberry::ArgForMem2RegTermIndex>();
-      data.create<llvmberry::ArgForMem2RegValues>();
-      data.create<llvmberry::ArgForMem2RegStoreItem>();
+      data.create<llvmberry::ArgForMem2Reg>();
   });
 
   // memorize indices of alloca, store, load, and terminator instructions
@@ -810,11 +806,11 @@ void PromoteMem2Reg::run() {
             ([&AItmp, &Domtree]
               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       // initialize dictionaries
-      auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
-      auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
-      auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
-      auto &values = *(data.get<llvmberry::ArgForMem2RegValues>()->values);
-      auto &storeItem = *(data.get<llvmberry::ArgForMem2RegStoreItem>()->storeItem);
+      auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
+      auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+      auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+      auto &values = *(data.get<llvmberry::ArgForMem2Reg>()->values);
+      auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
       std::string bname = llvmberry::getBasicBlockIndex(AItmp->getParent());
       
       allocas.push_back(AItmp);
@@ -972,8 +968,8 @@ void PromoteMem2Reg::run() {
               (llvmberry::Dictionary &data, 
                llvmberry::CoreHint &hints) {
       std::string Ralloca = llvmberry::getVariable(*AI);
-      auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
-      auto &termIndex = *(data.get<llvmberry::ArgForMem2RegTermIndex>()->termIndex);
+      auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+      auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
 
       // find block name of alloca's end user
       llvm::Instruction *userEnd = AI;
@@ -1005,8 +1001,8 @@ void PromoteMem2Reg::run() {
               ([&AI]
                 (llvmberry::Dictionary &data, 
                  llvmberry::CoreHint &hints) {
-        auto &allocas = *(data.get<llvmberry::ArgForMem2RegAlloca>()->allocas);
-        auto &instrIndex = *(data.get<llvmberry::ArgForMem2RegInstrIndex>()->instrIndex);
+        auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
         std::string Ralloca = llvmberry::getVariable(*AI);
 
         // propagate maydiff

@@ -44,18 +44,9 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg(){
   loadstoreStoreInst = nullptr;
 }
 
-Mem2RegAllocaArg::Mem2RegAllocaArg()
-  : allocas(new TyAllocasObj()) {}
+Mem2RegArg::Mem2RegArg()
+  : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
+    termIndex(new TyTermIndexObj()), values(new TyValuesObj()),
+    storeItem(new TyStoreItemObj()) {}
 
-Mem2RegInstrIndexArg::Mem2RegInstrIndexArg()
-  : instrIndex(new TyInstrIndexObj()) {}
-
-Mem2RegTermIndexArg::Mem2RegTermIndexArg()
-  : termIndex(new TyTermIndexObj()) {}
-
-Mem2RegValuesArg::Mem2RegValuesArg()
-  : values(new TyValuesObj()) {}
-
-Mem2RegStoreItemArg::Mem2RegStoreItemArg()
-  : storeItem(new TyStoreItemObj()) {}
 } // llvmberry
