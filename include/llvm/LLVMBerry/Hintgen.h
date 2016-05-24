@@ -147,6 +147,19 @@ namespace llvmberry{
   Expression create_expression(llvm::Instruction *I, bool &swapped, llvm::SmallVector<uint32_t, 4> va);
 
   bool is_inverse_expression(Expression e1, Expression e2);
+
+  void generateHintForMem2RegPropagateNoalias
+          (llvm::AllocaInst *AI, llvm::Instruction *useInst, int useIndex);
+   
+  void generateHintForMem2RegPropagateStore
+          (llvm::StoreInst *SI, llvm::Instruction *next, int nextIndex);
+
+  void generateHintForMem2RegPropagateLoad
+          (llvm::StoreInst *SI, llvm::LoadInst *LI,
+           llvm::Instruction *use, int useIndex);
+
+  int getIndexofMem2Reg(llvm::Instruction *instr, 
+                        int instrIndex, int termIndex);
 }
 
 #endif
