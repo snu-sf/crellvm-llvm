@@ -117,6 +117,9 @@ namespace llvmberry{
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
   void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
+  extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
+      false_encoding;
+
   /* Generating symbolic expressions from instructions
    * for GVN
    */
@@ -141,7 +144,8 @@ namespace llvmberry{
     }
   };
 
-  Expression create_expression(llvm::Instruction *I, bool &swapped, llvm::SmallVector<uint32_t, 4> va);
+  Expression create_expression(llvm::Instruction *I, bool &swapped,
+                               llvm::SmallVector<uint32_t, 4> va);
 
   bool is_inverse_expression(Expression e1, Expression e2);
 }

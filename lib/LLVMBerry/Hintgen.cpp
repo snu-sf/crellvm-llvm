@@ -709,6 +709,10 @@ void generateHintForAndOr(llvm::BinaryOperator *Z,
   });
 }
 
+std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>> false_encoding =
+    std::make_pair(llvmberry::ConsConst::make(0, 64),
+                   llvmberry::ConsConst::make(42, 64));
+
 void generateHintForDCE(llvmberry::CoreHint &hints, llvm::Instruction &I) {
   std::string reg = llvmberry::getVariable(I);
 
@@ -747,20 +751,20 @@ void generateHintForGVNDCE(llvm::Instruction &I) {
   });
 }
 // Copied from ValueTable::create_expression() in GVN.cpp
-  
+
 // This function generates a symbolic expressions from an
 // instruction that is used to decide the equivalence of values
 
 // We copied this function because this is a private member
 // function of the ValueTable class, so we cannot access it
 // while generating hint.
-  
+
 // We modified this function to take the vector of value numbers
 // of I's operands. The original function can obtain the value
 // numbers from the ValueTable instance, but there's no way to
 // see the ValueTable class here, since its definition is in an
 // anonymous namespace in GVN.cpp
-  
+
 Expression create_expression(llvm::Instruction *I, bool &swapped,
                              llvm::SmallVector<uint32_t, 4> va) {
   swapped = false;

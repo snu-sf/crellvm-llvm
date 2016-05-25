@@ -686,10 +686,12 @@ struct ConsConst : public TyExpr {
 public:
   ConsConst(std::shared_ptr<TyConstant> _constant);
 
-  ConsConst(int _int_value, int _value);
+  ConsConst(int _int_value, int _bitwidth);
   ConsConst(float _float_value, enum TyFloatType _float_type);
 
   void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyExpr> make(int _int_value, int _bitwidth);
 
 private:
   std::shared_ptr<TyConstant> constant;
