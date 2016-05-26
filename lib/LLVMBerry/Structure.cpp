@@ -81,8 +81,9 @@ std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
 
     std::string name = rso.str();
     std::string label("label %");
-    if(name.compare(0, label.length(), label) != 0) {
-      assert(false && "if we get block name by printAsOperand(), it should begin with \"label %\"");
+    if (name.compare(0, label.length(), label) != 0) {
+      assert(false && "if we get block name by printAsOperand(), it should "
+                      "begin with \"label %\"");
     }
     return name.substr(label.length());
   }
@@ -126,7 +127,7 @@ std::string getVariable(const llvm::Value &value) {
   value.printAsOperand(rso, /*PrintType=*/false);
   rso.str();
 
-  if(val2.compare("<badref>") != 0)
+  if (val2.compare("<badref>") != 0)
     return val2;
 
   val += std::string(value.getName().data());
@@ -1433,6 +1434,10 @@ void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Const");
   archive(CEREAL_NVP(constant));
+}
+
+std::shared_ptr<TyExpr> ConsConst::make(int _int_value, int _bitwidth) {
+  return std::shared_ptr<TyExpr>(new ConsConst(_int_value, _bitwidth));
 }
 
 ConsInsn::ConsInsn(std::shared_ptr<TyInstruction> _instruction) : instruction(std::move(_instruction)){
