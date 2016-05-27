@@ -1,6 +1,7 @@
 #include "llvm/LLVMBerry/Hintgen.h"
 #include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Dictionary.h"
 
 namespace llvmberry{
 // insert nop at tgt where I is at src
@@ -812,4 +813,195 @@ bool is_inverse_expression(Expression e1, Expression e2) {
   }
   return false;
 }
+
+void generateHintForMem2RegPropagateNoalias
+        (llvm::AllocaInst *AI, llvm::Instruction *useInst,
+         int useIndex) {
+  ValidationUnit::GetInstance()->intrude
+    ([&AI, &useInst, &useIndex]
+      (Dictionary &data, CoreHint &hints) {
+    auto &allocas = *(data.get<ArgForMem2Reg>()->allocas);
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+
+    for (auto i = allocas.begin(); i != allocas.end(); ++i) {
+      llvm::AllocaInst *AItmp = *i;
+
+      if (AI==AItmp) continue;
+      
+      if (instrIndex[AI]<instrIndex[AItmp]) {
+        PROPAGATE(NOALIAS(POINTER(AI),
+                          POINTER(AItmp),
+                          SRC),
+                  BOUNDS(TyPosition::make
+                          (SRC, *AItmp, instrIndex[AItmp], ""), 
+                         TyPosition::make
+                          (SRC, *useInst, useIndex, "")));
+
+        INFRULE(TyPosition::make
+                 (SRC, *AItmp, instrIndex[AItmp], ""), 
+                ConsDiffblockNoalias::make
+                 (VAL(AI, Physical),
+                  VAL(AItmp, Physical),
+                  POINTER(AI),
+                  POINTER(AItmp)));
+      } else {
+        PROPAGATE(NOALIAS(POINTER(AItmp),
+                          POINTER(AI),
+                          SRC),
+                  BOUNDS(TyPosition::make
+                          (SRC, *AI, instrIndex[AI], ""), 
+                         TyPosition::make
+                          (SRC, *useInst, useIndex, "")));
+
+        INFRULE(TyPosition::make
+                 (SRC, *AI, instrIndex[AI], ""), 
+                ConsDiffblockNoalias::make
+                 (VAL(AItmp, Physical),
+                  VAL(AI, Physical),
+                  POINTER(AItmp),
+                  POINTER(AI)));
+      }
+    }
+  });
 }
+
+void generateHintForMem2RegPropagateStore
+        (llvm::StoreInst *SI, llvm::Instruction *next, int nextIndex) {
+  ValidationUnit::GetInstance()->intrude
+    ([&SI, &next, &nextIndex]
+      (Dictionary &data, CoreHint &hints) {
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
+    auto &values = *(data.get<ArgForMem2Reg>()->values);
+    std::string Rstore = getVariable(*(SI->getOperand(1)));
+    std::string keySI = std::to_string(instrIndex[SI])+Rstore;
+
+    // propagate instruction
+    PROPAGATE(LESSDEF(INSN(*SI),
+                      VAR(Rstore, Ghost),
+                      SRC),
+              BOUNDS(TyPosition::make
+                      (SRC, *SI, instrIndex[SI], ""),
+                     TyPosition::make
+                      (SRC, *next, nextIndex, "")));
+
+    PROPAGATE(LESSDEF(VAR(Rstore, Ghost),
+                      values[keySI],
+                      TGT),
+              BOUNDS(TyPosition::make
+                      (SRC, *SI, instrIndex[SI], ""),
+                     TyPosition::make
+                      (SRC, *next, nextIndex, "")));
+
+
+    if (storeItem[SI].expr == values[keySI]) {
+      // stored value will not be changed in another iteration
+      INFRULE(TyPosition::make
+               (SRC, *SI, instrIndex[SI], ""),
+              ConsIntroGhost::make
+               (storeItem[SI].value,
+                REGISTER(Rstore, Ghost)));
+
+      INFRULE(TyPosition::make
+               (SRC, *SI, instrIndex[SI], ""),
+              ConsTransitivity::make
+               (INSN(*SI),
+                storeItem[SI].expr,
+                VAR(Rstore, Ghost)));
+    } else {
+      // stored value will be changed in another iteration
+      INFRULE(TyPosition::make
+               (SRC, *SI, instrIndex[SI], ""),
+              ConsIntroGhost::make
+               (ID(storeItem[SI].op0, Ghost),
+                REGISTER(Rstore, Ghost)));
+
+      INFRULE(TyPosition::make
+               (SRC, *SI, instrIndex[SI], ""),
+              ConsTransitivity::make
+               (INSN(*SI),
+                VAR(storeItem[SI].op0, Physical),
+                VAR(storeItem[SI].op0, Ghost)));
+
+      INFRULE(TyPosition::make
+               (SRC, *SI, instrIndex[SI], ""),
+              ConsTransitivity::make
+               (INSN(*SI),
+                VAR(storeItem[SI].op0, Ghost),
+                VAR(Rstore, Ghost)));
+
+      INFRULE(TyPosition::make
+               (SRC, *SI, instrIndex[SI], ""),
+              ConsTransitivityTgt::make
+               (VAR(Rstore, Ghost),
+                VAR(storeItem[SI].op0, Ghost),
+                values[keySI]));
+    }
+  });
+}
+
+void generateHintForMem2RegPropagateLoad
+        (llvm::StoreInst *SI, llvm::LoadInst *LI,
+         llvm::Instruction *use, int useIndex) {
+  ValidationUnit::GetInstance()->intrude
+    ([&SI, &LI, &use, &useIndex]
+      (Dictionary &data, CoreHint &hints) {
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &values = *(data.get<ArgForMem2Reg>()->values);
+    std::string Rstore = getVariable(*(SI->getOperand(1)));
+    std::string Rload = getVariable(*LI);
+
+    PROPAGATE(LESSDEF(VAR(Rload, Physical),
+                      VAR(Rload, Ghost),
+                      SRC),
+              BOUNDS(TyPosition::make
+                      (SRC, *LI, instrIndex[LI], ""),
+                     TyPosition::make
+                      (SRC, *use, useIndex, "")));
+
+    PROPAGATE(LESSDEF(VAR(Rload, Ghost),
+                      values[Rload],
+                      TGT),
+              BOUNDS(TyPosition::make
+                      (SRC, *LI, instrIndex[LI], ""),
+                     TyPosition::make
+                      (SRC, *use, useIndex, "")));
+
+    INFRULE(TyPosition::make
+             (SRC, *LI, instrIndex[LI], ""),
+            ConsIntroGhost::make
+             (ID(Rstore, Ghost),
+              REGISTER(Rload, Ghost)));
+
+    INFRULE(TyPosition::make
+             (SRC, *LI, instrIndex[LI], ""),
+            ConsTransitivity::make
+             (VAR(Rload, Physical),
+              INSN(*SI),
+              VAR(Rstore, Ghost)));
+
+    INFRULE(TyPosition::make
+             (SRC, *LI, instrIndex[LI], ""),
+            ConsTransitivity::make
+             (VAR(Rload, Physical),
+              VAR(Rstore, Ghost),
+              VAR(Rload, Ghost)));
+
+    INFRULE(TyPosition::make
+             (SRC, *LI, instrIndex[LI], ""),
+            ConsTransitivityTgt::make
+             (VAR(Rload, Ghost),
+              VAR(Rstore, Ghost),
+              values[Rload]));
+  });
+}
+
+int getIndexofMem2Reg(llvm::Instruction *instr,
+                      int instrIndex, int termIndex) {
+  if (llvm::isa<llvm::TerminatorInst>(*instr))
+    return termIndex;
+  else
+    return instrIndex;
+}
+
+} // llvmberry

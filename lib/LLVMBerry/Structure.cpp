@@ -599,6 +599,33 @@ std::shared_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
       new TyPosition(_scope, _block_name, std::move(_instr_index)));
 }
 
+std::shared_ptr<TyPosition> TyPosition::make
+  (enum TyScope _scope, const llvm::Instruction &I, 
+   int index, std::string _prev_block_name) {
+  std::string _block_name = getBasicBlockIndex(I.getParent());
+  std::string _register_name = getVariable(I);
+
+  std::shared_ptr<TyInstrIndex> _instr_index;
+
+  if (llvm::isa<llvm::PHINode>(I)) {
+    std::shared_ptr<TyPositionPhinode> _pos_phi(new TyPositionPhinode(_prev_block_name));
+    std::shared_ptr<TyInstrIndex> _phi(new ConsPhinode(std::move(_pos_phi)));
+    _instr_index = std::move(_phi);
+  } else if (index < 0) {
+    // if index is less than 0, it means start of block
+    return TyPosition::make_start_of_block(_scope, _block_name);
+  } else {
+    std::shared_ptr<TyPositionCommand> _pos_cmd
+        (new TyPositionCommand(index, _register_name));
+    std::shared_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+    _instr_index = std::move(_cmd);
+  }
+
+  return std::shared_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_instr_index)));
+}
+
 std::shared_ptr<TyPosition>
 TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
@@ -616,7 +643,6 @@ TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
 
   return std::shared_ptr<TyPosition>(
       new TyPosition(_scope, _block_name, std::move(_cmd)));
-
 }
 
 /* value */
@@ -1308,6 +1334,7 @@ void TyFCmpInst::serialize(cereal::JSONOutputArchive& archive) const{
 
 TyLoadInst::TyLoadInst(std::shared_ptr<TyValueType> _pointertype, std::shared_ptr<TyValueType> _valtype, std::shared_ptr<TyValue> _ptrvalue, int _align) : pointertype(std::move(_pointertype)), valtype(std::move(_valtype)), ptrvalue(std::move(_ptrvalue)), align(std::move(_align)){
 }
+
 void TyLoadInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(pointertype));
   archive(CEREAL_NVP(valtype));
@@ -1486,8 +1513,7 @@ std::shared_ptr<TyPropagateDiffblock> TyPropagateDiffblock::make(
 
 TyPropagateAlloca::TyPropagateAlloca(std::shared_ptr<TyRegister> _p, 
                                      enum TyScope _scope) 
-    : p(std::move(_p)), scope(std::move(_scope)) {
-}
+    : p(std::move(_p)), scope(_scope) {}
 
 void TyPropagateAlloca::serialize(cereal::JSONOutputArchive& archive) const {
   archive(CEREAL_NVP(p));
@@ -1496,8 +1522,7 @@ void TyPropagateAlloca::serialize(cereal::JSONOutputArchive& archive) const {
 
 TyPropagatePrivate::TyPropagatePrivate(std::shared_ptr<TyRegister> _p, 
                                        enum TyScope _scope) 
-    : p(std::move(_p)), scope(std::move(_scope)) {
-}
+    : p(std::move(_p)), scope(_scope) {}
 
 void TyPropagatePrivate::serialize(cereal::JSONOutputArchive& archive) const {
   archive(CEREAL_NVP(p));

@@ -4,6 +4,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/LLVMBerry/Structure.h"
 
 #include <memory>
 
@@ -21,7 +22,7 @@ enum DictKeys {
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
   // Mem2Reg
-  ArgForRewriteSingleStoreAlloca, 
+  ArgForMem2Reg,
   // GVN
   ArgForFindLeader
 };
@@ -92,16 +93,40 @@ public:
 };
 DEFINE_TRAITS(ArgForFindAvailableLoadedValue, FindAvailableLoadedValueArg);
 
-// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : rewriteSingleStoreAlloca
-struct RewriteSingleStoreAllocaArg {
+// lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Mem2RegArg
+struct Mem2RegArg {
 public:
   typedef std::vector<llvm::AllocaInst *> TyAllocasObj;
   typedef std::shared_ptr<TyAllocasObj> TyAllocas;
   TyAllocas allocas;
 
-  RewriteSingleStoreAllocaArg();
+  typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndexObj;
+  typedef std::shared_ptr<TyInstrIndexObj> TyInstrIndex;
+  TyInstrIndex instrIndex;
+
+  typedef std::map<std::string, unsigned> TyTermIndexObj;
+  typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
+  TyTermIndex termIndex;
+
+  typedef std::map<std::string,
+                   std::shared_ptr<TyExpr>> TyValuesObj;
+  typedef std::shared_ptr<TyValuesObj> TyValues;
+  TyValues values;
+
+  struct Triple {
+    std::shared_ptr<TyValue> value;
+    std::shared_ptr<TyExpr> expr;
+    std::string op0;
+  };
+
+  typedef std::map<const llvm::Instruction*,
+                   Triple> TyStoreItemObj;
+  typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
+  TyStoreItem storeItem;
+
+  Mem2RegArg();
 };
-DEFINE_TRAITS(ArgForRewriteSingleStoreAlloca, RewriteSingleStoreAllocaArg);
+DEFINE_TRAITS(ArgForMem2Reg, Mem2RegArg);
 
 // lib/Transforms/InstCombine/InstCombineMulDivRem.cpp : visitMul
 struct VisitMulArg {

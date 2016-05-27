@@ -67,6 +67,7 @@ class CoreHint;
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 int getCommandIndex(const llvm::Value &value);
+int getTerminatorIndex(const llvm::TerminatorInst *instr);
 bool name_instructions(llvm::Function &F);
 
 std::string toString(llvmberry::TyBop bop);
@@ -149,6 +150,10 @@ public:
   static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           const llvm::Instruction &I,
                                           std::string _prev_block_name);
+  static std::shared_ptr<TyPosition> make (enum TyScope _scope,
+                                           const llvm::Instruction &I,
+                                           int index,
+                                           std::string _prev_block_name);
 
 private:
   enum TyScope scope;
