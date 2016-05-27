@@ -44,9 +44,9 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg(){
   loadstoreStoreInst = nullptr;
 }
 
-RewriteSingleStoreAllocaArg::RewriteSingleStoreAllocaArg() {
-  allocas = TyAllocas(new TyAllocasObj());
-}
+Mem2RegArg::Mem2RegArg()
+  : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
+    termIndex(new TyTermIndexObj()), values(new TyValuesObj()),
+    storeItem(new TyStoreItemObj()) {}
 
-
-}
+} // llvmberry

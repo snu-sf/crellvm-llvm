@@ -16,6 +16,9 @@
 #define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
 #define LESSDEF(left, right, SCOPE) llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE) llvmberry::ConsNoalias::make(ptr1, ptr2, SCOPE)
+#define ALLOCA(reg, SCOPE) llvmberry::ConsAlloca::make(reg, SCOPE)
+#define PRIVATE(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
+#define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, tag)
 #define INSN(x) llvmberry::ConsInsn::make(x)
 #define VAL(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
 #define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
@@ -117,6 +120,9 @@ namespace llvmberry{
   void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
   void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 
+  extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
+      false_encoding;
+
   /* Generating symbolic expressions from instructions
    * for GVN
    */
@@ -141,9 +147,23 @@ namespace llvmberry{
     }
   };
 
-  Expression create_expression(llvm::Instruction *I, bool &swapped, llvm::SmallVector<uint32_t, 4> va);
+  Expression create_expression(llvm::Instruction *I, bool &swapped,
+                               llvm::SmallVector<uint32_t, 4> va);
 
   bool is_inverse_expression(Expression e1, Expression e2);
+
+  void generateHintForMem2RegPropagateNoalias
+          (llvm::AllocaInst *AI, llvm::Instruction *useInst, int useIndex);
+   
+  void generateHintForMem2RegPropagateStore
+          (llvm::StoreInst *SI, llvm::Instruction *next, int nextIndex);
+
+  void generateHintForMem2RegPropagateLoad
+          (llvm::StoreInst *SI, llvm::LoadInst *LI,
+           llvm::Instruction *use, int useIndex);
+
+  int getIndexofMem2Reg(llvm::Instruction *instr, 
+                        int instrIndex, int termIndex);
 }
 
 #endif
