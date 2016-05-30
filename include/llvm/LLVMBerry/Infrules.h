@@ -1405,16 +1405,6 @@ private :
   std::shared_ptr<TySize> s;
 };
 
-struct TyIcmpInverse{
-public : 
-  TyIcmpInverse(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyConstInt> _boolean);
-  void serialize(cereal::JSONOutputArchive& archive) const;
-
-private:
-  std::shared_ptr<TyConstant> c1;
-  std::shared_ptr<TyConstant> c2;
-};
-
 struct TyImpliesFalse {
 public:
   TyImpliesFalse(std::shared_ptr<TyConstant> _c1,
