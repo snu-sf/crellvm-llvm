@@ -2511,6 +2511,29 @@ void ConsZextZext::serialize(cereal::JSONOutputArchive& archive) const{
   archive.saveValue("ZextZext");
   archive(CEREAL_NVP(zext_zext));
 }
+TyImpliesFalse::TyImpliesFalse(std::shared_ptr<TyConstant> _c1,
+                               std::shared_ptr<TyConstant> _c2)
+    : c1(_c1), c2(_c2) {}
+void TyImpliesFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(c1));
+  archive(CEREAL_NVP(c2));
+}
+
+ConsImpliesFalse::ConsImpliesFalse(
+    std::shared_ptr<TyImpliesFalse> _implies_false)
+    : implies_false(_implies_false) {}
+std::shared_ptr<TyInfrule>
+ConsImpliesFalse::make(std::shared_ptr<TyConstant> _c1,
+                       std::shared_ptr<TyConstant> _c2) {
+  std::shared_ptr<TyImpliesFalse> _val(new TyImpliesFalse(_c1, _c2));
+  return std::shared_ptr<TyInfrule>(new ConsImpliesFalse(_val));
+}
+void ConsImpliesFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ImpliesFalse");
+  archive(CEREAL_NVP(implies_false));
+}
 
 TyIcmpInverse::TyIcmpInverse(enum TyIcmpPred _predicate,
                              std::shared_ptr<TyValueType> _ty,
@@ -2520,7 +2543,7 @@ TyIcmpInverse::TyIcmpInverse(enum TyIcmpPred _predicate,
     : predicate(_predicate), ty(std::move(_ty)), x(std::move(_x)),
       y(std::move(_y)), boolean(std::move(_boolean)) {}
 
-void TyIcmpInverse::serialize(cereal::JSONOutputArchive& archive) const{
+void TyIcmpInverse::serialize(cereal::JSONOutputArchive &archive) const {
   archive(cereal::make_nvp("predicate", toString(predicate)));
   archive(CEREAL_NVP(ty));
   archive(CEREAL_NVP(x));
@@ -2534,13 +2557,14 @@ ConsIcmpInverse::ConsIcmpInverse(std::shared_ptr<TyIcmpInverse> _icmp_inverse)
 std::shared_ptr<TyInfrule> ConsIcmpInverse::make(llvm::ICmpInst &CI,
                                                  int bool_val) {
   enum TyIcmpPred pred = getIcmpPred(CI.getPredicate());
-  std::shared_ptr<TyValueType> ty = TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
   std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
   std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
   std::shared_ptr<TyConstInt> boolean = TyConstInt::make(bool_val, 1);
 
   std::shared_ptr<TyIcmpInverse> _icmp_inv =
-    std::make_shared<TyIcmpInverse>(pred, ty, x, y, boolean);
+      std::make_shared<TyIcmpInverse>(pred, ty, x, y, boolean);
 
   return std::make_shared<ConsIcmpInverse>(_icmp_inv);
 }
@@ -2557,7 +2581,7 @@ TyIcmpEqSame::TyIcmpEqSame(std::shared_ptr<TyValueType> _ty,
                            std::shared_ptr<TyValue> _y)
     : ty(std::move(_ty)), x(std::move(_x)), y(std::move(_y)) {}
 
-void TyIcmpEqSame::serialize(cereal::JSONOutputArchive& archive) const{
+void TyIcmpEqSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(ty));
   archive(CEREAL_NVP(x));
   archive(CEREAL_NVP(y));
@@ -2571,7 +2595,6 @@ std::shared_ptr<TyInfrule> ConsIcmpEqSame::make(llvm::ICmpInst &CI) {
       TyValueType::make(*CI.getOperand(0)->getType());
   std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
   std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
-
   std::shared_ptr<TyIcmpEqSame> _icmp_eq_same =
       std::make_shared<TyIcmpEqSame>(ty, x, y);
 
@@ -2586,11 +2609,11 @@ void ConsIcmpEqSame::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 TyIcmpNeqSame::TyIcmpNeqSame(std::shared_ptr<TyValueType> _ty,
-                           std::shared_ptr<TyValue> _x,
-                           std::shared_ptr<TyValue> _y)
+                             std::shared_ptr<TyValue> _x,
+                             std::shared_ptr<TyValue> _y)
     : ty(std::move(_ty)), x(std::move(_x)), y(std::move(_y)) {}
 
-void TyIcmpNeqSame::serialize(cereal::JSONOutputArchive& archive) const{
+void TyIcmpNeqSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(ty));
   archive(CEREAL_NVP(x));
   archive(CEREAL_NVP(y));

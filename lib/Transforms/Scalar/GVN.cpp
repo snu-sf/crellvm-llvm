@@ -2375,7 +2375,8 @@ bool GVN::processInstruction(Instruction *I) {
          OI != OE; ++OI)
       op_I.push_back(VN.lookup(*OI));
 
-    llvmberry::Expression expr_I = llvmberry::create_expression(I, I_swapped, op_I);
+    llvmberry::Expression expr_I =
+        llvmberry::create_expression(I, I_swapped, op_I);
 
     if (llvm::isa<llvm::Instruction>(repl)) {
       Instruction *leaderI = dyn_cast<Instruction>(repl);
@@ -2452,10 +2453,11 @@ bool GVN::processInstruction(Instruction *I) {
 
       if (BranchInst *BI = llvm::dyn_cast<llvm::BranchInst>(TI)) {
         Instruction *condI = llvm::dyn_cast<Instruction>(BI->getCondition());
-        
+
         // if condition is constant, fail the validation
-        if (!condI) return;
-        
+        if (!condI)
+          return;
+
         std::string condI_id = llvmberry::getVariable(*condI);
         int cond_value;
 
@@ -2479,21 +2481,23 @@ bool GVN::processInstruction(Instruction *I) {
         } else
           assert("Leader_bb is not a successor of leader_bb_pred");
 
-        // propagate [ e_c >= c ] and [ c >= e_c] in src until the end of leaderBB_pred
+        // propagate [ e_c >= c ] and [ c >= e_c] in src until the end of
+        // leaderBB_pred
 
         PROPAGATE(
             LESSDEF(RHS(condI_id, Physical, SRC), VAR(condI_id, Physical), SRC),
             BOUNDS(INSTPOS(SRC, condI),
                    llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
                                                             *leaderBB_pred)));
-        
+
         PROPAGATE(
             LESSDEF(VAR(condI_id, Physical), RHS(condI_id, Physical, SRC), SRC),
             BOUNDS(INSTPOS(SRC, condI),
                    llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
                                                             *leaderBB_pred)));
 
-        // transitivity [ e_c >= c /\ c >= X ] => [ e_c >= X ] in src at PHI of leaderBB
+        // transitivity [ e_c >= c /\ c >= X ] => [ e_c >= X ] in src at PHI of
+        // leaderBB
         INFRULE(llvmberry::TyPosition::make(
                     llvmberry::Source, llvmberry::getBasicBlockIndex(leaderBB),
                     llvmberry::getBasicBlockIndex(leaderBB_pred)),
@@ -2511,20 +2515,21 @@ bool GVN::processInstruction(Instruction *I) {
           op_condI.push_back(VN.lookup(*OI));
 
         llvmberry::Expression expr_condI =
-          llvmberry::create_expression(condI, condI_swapped, op_condI);
+            llvmberry::create_expression(condI, condI_swapped, op_condI);
 
         if ((expr_I == expr_condI) && dyn_cast<ConstantInt>(repl)) {
           // case 1
           // TODO: I, condI comm
           leader_expr = cond_expr;
 
-          pre_repl_inv = LESSDEF(RHS(condI_id, Physical, SRC), leader_expr, SRC);
+          pre_repl_inv =
+              LESSDEF(RHS(condI_id, Physical, SRC), leader_expr, SRC);
           do_swap = (I_swapped != condI_swapped);
 
         } else if (llvmberry::is_inverse_expression(expr_I, expr_condI) &&
                    dyn_cast<ConstantInt>(repl)) {
           ICmpInst *condCI = dyn_cast<ICmpInst>(condI);
-          assert (condCI && "Branch condition not ICmpInst");
+          assert(condCI && "Branch condition not ICmpInst");
 
           INFRULE(llvmberry::TyPosition::make(
                       llvmberry::Source,
@@ -2537,10 +2542,11 @@ bool GVN::processInstruction(Instruction *I) {
           pre_repl_inv = LESSDEF(RHS(I_id, Physical, SRC), leader_expr, SRC);
           // TODO: maybe we need swap here
         } else if (ICmpInst *condCI = dyn_cast<ICmpInst>(condI)) {
-          Value *CI_op0 = condCI->getOperand(0), *CI_op1 = condCI->getOperand(1);
+          Value *CI_op0 = condCI->getOperand(0),
+                *CI_op1 = condCI->getOperand(1);
 
           Value *equiv_op = NULL;
-          
+
           if (repl == CI_op0)
             equiv_op = CI_op1;
           else if (repl == CI_op1)
@@ -2561,7 +2567,8 @@ bool GVN::processInstruction(Instruction *I) {
                 op_equiv_opI.push_back(VN.lookup(*OI));
 
               llvmberry::Expression expr_equiv_opI =
-                  llvmberry::create_expression(equiv_opI, equiv_opI_swapped, op_equiv_opI);
+                  llvmberry::create_expression(equiv_opI, equiv_opI_swapped,
+                                               op_equiv_opI);
 
               if (!(expr_equiv_opI == expr_I))
                 assert(false && "same numbering, different expression");
@@ -2610,7 +2617,8 @@ bool GVN::processInstruction(Instruction *I) {
                 do_swap = (I_swapped != equiv_opI_swapped);
               }
             } else
-              assert(false && "In icmp-eq case, leader should be an instruction");
+              assert(false &&
+                     "In icmp-eq case, leader should be an instruction");
           }
         } else {
           assert(false && "GVN case not yet covered");
@@ -2640,9 +2648,11 @@ bool GVN::processInstruction(Instruction *I) {
         assert(false && "Should not occur");
     }
 
-    if (!repl_inv) return;
-    
-    // Propagate repl_inv from I to each use, and replace will be done automatically
+    if (!repl_inv)
+      return;
+
+    // Propagate repl_inv from I to each use, and replace will be done
+    // automatically
     for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
       if (!isa<Instruction>(UI->getUser())) {
         // let the validation fail when the user is not an instruction
@@ -2661,7 +2671,6 @@ bool GVN::processInstruction(Instruction *I) {
       PROPAGATE(repl_inv, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(
                                                       llvmberry::Source, *userI,
                                                       prev_block_name)));
-
     }
   });
 
@@ -2751,12 +2760,12 @@ bool GVN::processBlock(BasicBlock *BB) {
        BI != BE;) {
     bool AtStart = BI == BB->begin();
     BasicBlock::iterator prevBI;
-    
+
     if (!AtStart) {
       prevBI = --BI;
       ++BI;
     }
-    
+
     ChangedFunction |= processInstruction(BI);
     if (InstrsToErase.empty()) {
       ++BI;

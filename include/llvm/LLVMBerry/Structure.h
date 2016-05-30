@@ -67,6 +67,7 @@ class CoreHint;
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
 int getCommandIndex(const llvm::Value &value);
+int getTerminatorIndex(const llvm::TerminatorInst *instr);
 bool name_instructions(llvm::Function &F);
 
 std::string toString(llvmberry::TyBop bop);
@@ -149,6 +150,10 @@ public:
   static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           const llvm::Instruction &I,
                                           std::string _prev_block_name);
+  static std::shared_ptr<TyPosition> make (enum TyScope _scope,
+                                           const llvm::Instruction &I,
+                                           int index,
+                                           std::string _prev_block_name);
 
 private:
   enum TyScope scope;
@@ -686,10 +691,12 @@ struct ConsConst : public TyExpr {
 public:
   ConsConst(std::shared_ptr<TyConstant> _constant);
 
-  ConsConst(int _int_value, int _value);
+  ConsConst(int _int_value, int _bitwidth);
   ConsConst(float _float_value, enum TyFloatType _float_type);
 
   void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyExpr> make(int _int_value, int _bitwidth);
 
 private:
   std::shared_ptr<TyConstant> constant;
