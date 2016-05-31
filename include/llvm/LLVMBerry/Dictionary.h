@@ -18,6 +18,7 @@ enum DictKeys {
   // InstSimplify
   ArgForSimplifyAndInst,
   ArgForSimplifyOrInst,
+  ArgForSimplifyXorInst,
   // InstCombine
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
@@ -62,6 +63,7 @@ private:
 };
 DEFINE_TRAITS(ArgForSimplifyAndInst, SimplifyInstArg);
 DEFINE_TRAITS(ArgForSimplifyOrInst, SimplifyInstArg);
+DEFINE_TRAITS(ArgForSimplifyXorInst, SimplifyInstArg);
 
 // lib/IR/Value.cpp : Value::stripPointerCasts(), stripPointerCastsAndOffsets()
 struct StripPointerCastsArg {

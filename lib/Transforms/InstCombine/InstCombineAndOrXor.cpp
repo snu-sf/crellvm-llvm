@@ -2785,8 +2785,27 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  if (Value *V = SimplifyXorInst(Op0, Op1, DL, TLI, DT, AC))
+  llvmberry::ValidationUnit::Begin("simplify_xor_inst", I.getParent()->getParent());
+  llvmberry::ValidationUnit::GetInstance()->intrude([](
+      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    data.create<llvmberry::ArgForSimplifyXorInst>();
+  });
+
+  if (Value *V = SimplifyXorInst(Op0, Op1, DL, TLI, DT, AC)) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      auto ptr = data.get<llvmberry::ArgForSimplifyXorInst>();
+      if(ptr->isActivated()){
+        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
+        ptr->generateHint(&I);
+        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+      }else{
+        llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+      }
+    });
     return ReplaceInstUsesWith(I, V);
+  }
+  llvmberry::ValidationUnit::Abort();
 
   // (A&B)^(A&C) -> A&(B^C) etc
   if (Value *V = SimplifyUsingDistributiveLaws(I))
