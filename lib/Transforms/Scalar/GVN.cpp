@@ -2986,8 +2986,66 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   // Validation hint generation for PRE
   llvmberry::ValidationUnit::Begin("GVN_PRE", CurInst->getParent()->getParent());
 
-  llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &CurrentBlock, &predMap, &PREInstr, &Phi, this](
+  llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &CurrentBlock,
+                                                     &predMap, &PREInstr, &Phi,
+                                                     this](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    // SmallVector<uint32_t, 4> op_CurInst;
+    // bool CurInst_swapped = false;
+    // for (Instruction::op_iterator OI = CurInst->op_begin(), OE =
+    // CurInst->op_end(); OI != OE; ++OI)
+    //   op_CurInst.push_back(VN.lookup(*OI));
+    // llvmberry::Expression expr_CurInst =
+    // llvmberry::create_expression(CurInst, CurInst_swapped, op_CurInst);
+    std::vector<Instruction *> op_CurInst;
+    bool isSameForAll = true;
+    for (Instruction::op_iterator OI = CurInst->op_begin(),
+                                  OE = CurInst->op_end();
+         OI != OE; ++OI) {
+      op_CurInst.push_back(dyn_cast<Instruction>(OI));
+    }
+    for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
+      BasicBlock *PB = predMap[i].second;
+      Value *V = nullptr;
+      if (!(V = predMap[i].first))
+        V = PREInstr;
+      assert(isa<Instruction>(V) &&
+             "Value not an instruction: not yet handled.");
+      Instruction *VI = dyn_cast<Instruction>(V);
+      // SmallVector<uint32_t, 4> op_VI;
+      // bool VI_swapped = false;
+      // for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
+      // OI != OE; ++OI)
+      //   op_VI.push_back(VN.lookup(*OI));
+      // llvmberry::Expression expr_VI = llvmberry::create_expression(VI,
+      // VI_swapped, op_VI);
+      std::vector<Instruction *> op_VI;
+      for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
+           OI != OE; ++OI)
+        op_VI.push_back(dyn_cast<Instruction>(OI));
+
+      bool isSame = true;
+      if (op_CurInst.size() != op_VI.size())
+        isSame = false;
+      for (int i = 0; i < op_CurInst.size(); i++)
+        isSame &= (op_CurInst[i] == op_VI[i]);
+      hints.appendToDescription("VI: " + (*VI).getName().str());
+
+      std::string tmp = "";
+      if (isSame)
+        tmp += "true";
+      else
+        tmp += "false";
+      hints.appendToDescription("RHS of CurInst and VI is same: " + tmp);
+      // hints.appendToDescription("expr_CurInst == expr_VI: " +
+      // (int)(expr_CurInst == expr_VI));
+      isSameForAll &= isSame;
+    }
+
+    if (!isSameForAll) {
+      return;
+    }
+
     // For each pred block, propagate the chain of involved values until the end
     // of the pred block
     std::string CurInst_id = llvmberry::getVariable(*CurInst);
@@ -2998,6 +3056,9 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       if (!(V = predMap[i].first))
         V = PREInstr;
 
+      hints.setDescription(
+          (hints.getDescription() + "\nV is: " + (*V).getName()).str());
+      hints.appendToDescription("CurInst is: " + ((*CurInst).getName()).str());
       dbgs() << "my test :" << *V << "\n";
       propagateInstrUntilBlockEnd_rec(hints, V, PB);
 
