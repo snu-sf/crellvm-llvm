@@ -970,6 +970,7 @@ public:
            std::string _opt_name, std::string _description = "");
   const std::string &getDescription() const;
   void setDescription(const std::string &desc);
+  void appendToDescription(const std::string &desc);
   void appendAdmittedToDescription();
   void addCommand(std::shared_ptr<TyCommand> c);
   void setOptimizationName(const std::string &name);

@@ -1759,6 +1759,10 @@ void CoreHint::setDescription(const std::string &desc) {
   this->description = desc;
 }
 
+void CoreHint::appendToDescription(const std::string &desc) {
+  this->description += "\n" + desc;
+}
+
 void CoreHint::addCommand(std::shared_ptr<TyCommand> c) {
   commands.push_back(std::move(c));
 }
