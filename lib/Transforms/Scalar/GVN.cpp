@@ -3148,22 +3148,15 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           //                                                 _e2,
           //                                                 std::shared_ptr<TyExpr>
           //                                                 _e2_p) {
-          Instruction *VI_evolving_next = (*VI_evolving).clone();
-          (*VI_evolving_next).setOperand(idx, PrevPhi);
           INFRULE(llvmberry::TyPosition::make(SRC, (*CurrentBlock).getName(),
                                               (*PB).getName()),
-                  llvmberry::ConsReplaceRhs::make(
-                      REGISTER(VI_op_id, Physical),
-                      // llvmberry::ConsId::make((*PrevPhi).getName(),
-                      //                         llvmberry::Physical),
-                      VAL(PrevPhi, Physical),
-                      llvmberry::ConsInsn::make(*VI_evolving),
-                      llvmberry::ConsInsn::make(*VI_evolving),
-                      llvmberry::ConsInsn::make(*VI_evolving_next)));
+                  llvmberry::ConsSubstitute::make(
+                      REGISTER(VI_op_id, Physical), VAL(PrevPhi, Physical),
+                      llvmberry::ConsInsn::make(*VI_evolving)));
           // RHS((*VI_evolving).getName(), Physical, SRC),
           // RHS((*VI_evolving).getName(), Physical, SRC),
           // RHS((*VI_evolving_next).getName(), Physical, SRC)));
-          VI_evolving = VI_evolving_next;
+          (*VI_evolving).setOperand(idx, PrevPhi);
         }
 
         // if (Instruction *Inst = dyn_cast<Instruction>(V)) {
