@@ -1181,6 +1181,18 @@ private :
   std::shared_ptr<TyValueType> dstty;
 };
 
+struct TySubstitute {
+public:
+  TySubstitute(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyValue> _y,
+               std::shared_ptr<TyExpr> _e);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e;
+};
+
 struct TyReplaceRhs {
 public:
   TyReplaceRhs(std::shared_ptr<TyRegister> _x,
@@ -2333,6 +2345,18 @@ public :
 
 private : 
   std::shared_ptr<TyTruncTrunc> trunc_trunc;
+};
+
+struct ConsSubstitute : public TyInfrule {
+public:
+  ConsSubstitute(std::shared_ptr<TySubstitute> _substitute);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TyExpr> _e);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TySubstitute> substitute;
 };
 
 struct ConsReplaceRhs : TyInfrule {

@@ -2128,6 +2128,31 @@ void ConsTruncTrunc::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(trunc_trunc));
 }
 
+TySubstitute::TySubstitute(std::shared_ptr<TyRegister> _x,
+                           std::shared_ptr<TyValue> _y,
+                           std::shared_ptr<TyExpr> _e)
+    : x(_x), y(_y), e(_e) {}
+void TySubstitute::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(e));
+}
+
+ConsSubstitute::ConsSubstitute(std::shared_ptr<TySubstitute> _substitute)
+    : substitute(_substitute) {}
+std::shared_ptr<TyInfrule> ConsSubstitute::make(std::shared_ptr<TyRegister> _x,
+                                                std::shared_ptr<TyValue> _y,
+                                                std::shared_ptr<TyExpr> _e) {
+  std::shared_ptr<TySubstitute> _val(new TySubstitute(_x, _y, _e));
+  return std::shared_ptr<TyInfrule>(new ConsSubstitute(_val));
+}
+void ConsSubstitute::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("Substitute");
+  archive(CEREAL_NVP(substitute));
+}
+
 TyReplaceRhs::TyReplaceRhs(std::shared_ptr<TyRegister> _x,
                            std::shared_ptr<TyValue> _y,
                            std::shared_ptr<TyExpr> _e1,
