@@ -3153,11 +3153,35 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                   llvmberry::ConsSubstitute::make(
                       REGISTER(VI_op_id, Physical), VAL(PrevPhi, Physical),
                       llvmberry::ConsInsn::make(*VI_evolving)));
+
+          Instruction *VI_evolving_next = (*VI_evolving).clone();
+          (*VI_evolving_next).setOperand(idx, PrevPhi);
+          INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                              PB->getName()),
+                  llvmberry::ConsTransitivity::make(
+                      VAR(VI_id, Physical), INSN(*VI_evolving),
+                      INSN(*VI_evolving_next)
+                      // EXPR(VI_evolving, Physical),
+                      // EXPR(VI_evolving, Physical)
+                      ));
+
           // RHS((*VI_evolving).getName(), Physical, SRC),
           // RHS((*VI_evolving).getName(), Physical, SRC),
           // RHS((*VI_evolving_next).getName(), Physical, SRC)));
-          (*VI_evolving).setOperand(idx, PrevPhi);
+          VI_evolving = VI_evolving_next;
         }
+
+        // propagate VI >= VI_evolving (evolve ended)
+        // PROPAGATE(LESSDEF(VAR(VI_id, Physical), INSN(*VI_evolving), SRC),
+        //           BOUNDS(
+        //                  llvmberry::TyPosition::make(SRC,
+        //                                              (*CurrentBlock).getName(),
+        //                                              (*PB).getName()),
+        //                  // INSTPOS(SRC, VI),
+        //                  llvmberry::TyPosition::make(SRC,
+        //                                              (*CurrentBlock).getName(),
+        //                                              (*PB).getName())
+        //                  ));
 
         // if (Instruction *Inst = dyn_cast<Instruction>(V)) {
         //   std::string Inst_id = llvmberry::getVariable(*Inst);
@@ -3174,7 +3198,26 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         //             llvmberry::TyPosition::make_end_of_block
         //             (llvmberry::Source, *PB)));
         // }
+
+        INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                            PB->getName()),
+                llvmberry::ConsTransitivity::make(VAR(Phi_id, Physical),
+                                                  VAR(VI_id, Previous),
+                                                  VAR(VI_id, Physical)));
+
+        INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                            PB->getName()),
+                llvmberry::ConsTransitivity::make(VAR(Phi_id, Physical),
+                                                  VAR(VI_id, Physical),
+                                                  INSN(*VI_evolving)));
       }
+
+      PROPAGATE(
+          LESSDEF(VAR(Phi_id, Physical), RHS(CurInst_id, Physical, SRC), SRC),
+          BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                     llvmberry::Source,
+                     llvmberry::getBasicBlockIndex(CurrentBlock)),
+                 INSTPOS(SRC, CurInst)));
 
       for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
         if (!isa<Instruction>(UI->getUser())) {
