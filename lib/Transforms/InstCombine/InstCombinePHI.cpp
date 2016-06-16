@@ -714,9 +714,9 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
       llvmberry::ValidationUnit::Begin("fold_phi_bin_const",
                                    FirstInst->getParent()->getParent());
 
-      llvmberry::ValidationUnit::GetInstance()->intrude(
-              [&PN](llvmberry::ValidationUnit::Dictionary &data,
-                    llvmberry::CoreHint &hints) {
+    llvmberry::ValidationUnit::GetInstance()->intrude(
+            [&PN](llvmberry::ValidationUnit::Dictionary &data,
+                  llvmberry::CoreHint &hints) {
               std::string oldphi = llvmberry::getVariable(PN);
               BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
               llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
