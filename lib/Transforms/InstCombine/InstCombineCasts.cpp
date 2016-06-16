@@ -314,93 +314,157 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
         Type *midty = mid->getType();
         Type *dstty = dst->getType();
         
+        auto _to_str_func = [](llvm::CastInst *ci) {
+          std::string str;
+          if (llvm::isa<BitCastInst>(ci))
+            str = "bitcast";
+          else if (llvm::isa<SExtInst>(ci))
+            str = "sext";
+          else if (llvm::isa<ZExtInst>(ci))
+            str = "zext";
+          else if (llvm::isa<TruncInst>(ci))
+            str = "trunc";
+          else if (llvm::isa<FPExtInst>(ci))
+            str = "fpext";
+          else if (llvm::isa<FPTruncInst>(ci))
+            str = "fptrunc";
+          else if (llvm::isa<FPToSIInst>(ci))
+            str = "fptosi";
+          else if (llvm::isa<FPToUIInst>(ci))
+            str = "fptoui";
+          else if (llvm::isa<SIToFPInst>(ci))
+            str = "sitofp";
+          else if (llvm::isa<UIToFPInst>(ci))
+            str = "uitofp";
+          else if (llvm::isa<IntToPtrInst>(ci))
+            str = "inttoptr";
+          else if (llvm::isa<PtrToIntInst>(ci))
+            str = "ptrtoint";
+          else if (llvm::isa<AddrSpaceCastInst>(ci))
+            str = "addrspacecast";
+          return str;
+        };
+
         std::function<std::shared_ptr<llvmberry::TyInfrule>(std::shared_ptr<llvmberry::TyValue>, 
             std::shared_ptr<llvmberry::TyValue>, std::shared_ptr<llvmberry::TyValue>,
             std::shared_ptr<llvmberry::TyValueType>, std::shared_ptr<llvmberry::TyValueType>, 
             std::shared_ptr<llvmberry::TyValueType>) >
-            makeInfruleFunc;
+            makeInfruleFunc = nullptr;
         std::string new_optname;
 
         llvmberry::propagateInstruction(mid, dst, llvmberry::Source);
-        bool isValidatedOpt = false;
 
         if (llvm::isa<BitCastInst>(mid)) {
-          if (llvm::isa<BitCastInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "bitcast_bitcast";
+          if (llvm::isa<BitCastInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsBitcastBitcast::make;
-          } else if (llvm::isa<PtrToIntInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "ptrtoint_bitcast";
+          else if (llvm::isa<FPExtInst>(dst))
+            makeInfruleFunc = llvmberry::ConsFpextBitcast::make;
+          else if (llvm::isa<FPToSIInst>(dst))
+            makeInfruleFunc = llvmberry::ConsFptosiBitcast::make;
+          else if (llvm::isa<FPToUIInst>(dst))
+            makeInfruleFunc = llvmberry::ConsFptouiBitcast::make;
+          else if (llvm::isa<FPTruncInst>(dst))
+            makeInfruleFunc = llvmberry::ConsFptruncBitcast::make;
+          else if (llvm::isa<IntToPtrInst>(dst))
+            makeInfruleFunc = llvmberry::ConsInttoptrBitcast::make;
+          else if (llvm::isa<PtrToIntInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsPtrtointBitcast::make;
-          }
+          else if (llvm::isa<SExtInst>(dst))
+            makeInfruleFunc = llvmberry::ConsSextBitcast::make;
+          else if (llvm::isa<SIToFPInst>(dst))
+            makeInfruleFunc = llvmberry::ConsSitofpBitcast::make;
+          else if (llvm::isa<TruncInst>(dst))
+            makeInfruleFunc = llvmberry::ConsTruncBitcast::make;
+          else if (llvm::isa<UIToFPInst>(dst))
+            makeInfruleFunc = llvmberry::ConsUitofpBitcast::make;
+          else if (llvm::isa<ZExtInst>(dst))
+            makeInfruleFunc = llvmberry::ConsZextBitcast::make;
+          
         } else if (llvm::isa<FPExtInst>(mid)) {
-          if (llvm::isa<FPExtInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "fpext_fpext";
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = llvmberry::ConsBitcastFpext::make;
+          else if (llvm::isa<FPExtInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsFpextFpext::make;
-          } else if (llvm::isa<FPToSIInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "fptosi_fpext";
+          else if (llvm::isa<FPToSIInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsFptosiFpext::make;
-          } else if (llvm::isa<FPToUIInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "fptoui_fpext";
+          else if (llvm::isa<FPToUIInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsFptouiFpext::make;
-          }
+          else if (llvm::isa<FPTruncInst>(dst))
+            makeInfruleFunc = llvmberry::ConsFptruncFpext::make;
+        
+        } else if (llvm::isa<FPToSIInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst)) 
+            makeInfruleFunc = llvmberry::ConsBitcastFptosi::make;
+
+        } else if (llvm::isa<FPToUIInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = llvmberry::ConsBitcastFptoui::make;
+
+        } else if (llvm::isa<FPTruncInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst)) 
+            makeInfruleFunc = llvmberry::ConsBitcastFptrunc::make;
+
         } else if (llvm::isa<IntToPtrInst>(mid)) {
-          if (llvm::isa<BitCastInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "bitcast_inttoptr";
+          if (llvm::isa<BitCastInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsBitcastInttoptr::make;
-          }
+            
         } else if (llvm::isa<PtrToIntInst>(mid)) {
-          if (llvm::isa<TruncInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "trunc_ptrtoint";
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = llvmberry::ConsBitcastPtrtoint::make;
+          else if (llvm::isa<IntToPtrInst>(dst)) 
+            makeInfruleFunc = llvmberry::ConsInttoptrPtrtoint::make;
+          else if (llvm::isa<TruncInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsTruncPtrtoint::make;
-          }
+
         } else if (llvm::isa<SExtInst>(mid)) {
-          if (llvm::isa<SExtInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "sext_sext";
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = llvmberry::ConsBitcastSext::make;
+          else if (llvm::isa<SExtInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsSextSext::make;
-          } else if (llvm::isa<SIToFPInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "sitofp_sext";
+          else if (llvm::isa<SIToFPInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsSitofpSext::make;
-          }
+          else if (llvm::isa<TruncInst>(dst))
+            makeInfruleFunc = llvmberry::ConsTruncSext::make;
+        
+        } else if (llvm::isa<SIToFPInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = llvmberry::ConsBitcastSitofp::make;
+
         } else if (llvm::isa<TruncInst>(mid)) {
-          if (llvm::isa<TruncInst>(mid)) {
-            isValidatedOpt = true;
-            new_optname = "trunc_trunc";
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = llvmberry::ConsBitcastTrunc::make;
+          else if (llvm::isa<TruncInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsTruncTrunc::make;
-          }
+
+        } else if (llvm::isa<UIToFPInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = llvmberry::ConsBitcastUitofp::make;
+
         } else if (llvm::isa<ZExtInst>(mid)) {
-          if (llvm::isa<IntToPtrInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "inttoptr_zext";
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = llvmberry::ConsBitcastZext::make;
+          else if (llvm::isa<IntToPtrInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsInttoptrZext::make;
-          } else if (llvm::isa<SExtInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "sext_zext";
+          else if (llvm::isa<SExtInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsSextZext::make;
-          } else if (llvm::isa<UIToFPInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "uitofp_zext";
+          else if (llvm::isa<SIToFPInst>(dst))
+            makeInfruleFunc = llvmberry::ConsSitofpZext::make;
+          else if (llvm::isa<TruncInst>(dst))
+            makeInfruleFunc = llvmberry::ConsTruncZext::make;
+          else if (llvm::isa<UIToFPInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsUitofpZext::make;
-          } else if (llvm::isa<ZExtInst>(dst)) {
-            isValidatedOpt = true;
-            new_optname = "zext_zext";
+          else if (llvm::isa<ZExtInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsZextZext::make;
-          }
+
         }
-        if (isValidatedOpt) {
+        if (!(makeInfruleFunc == nullptr)) {
+          new_optname = _to_str_func(dst) + "_" + _to_str_func(mid);
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName(new_optname);
           INFRULE(INSTPOS(SRC, dst), makeInfruleFunc(
                   VAL(src, Physical), VAL(mid, Physical), VAL(dst, Physical),
                   VALTYPE(srcty), VALTYPE(midty), VALTYPE(dstty)));
         } else {
+          assert(false && "Unknown cast-cast optimization");
           llvmberry::ValidationUnit::Abort();
         }
       });
@@ -1869,8 +1933,17 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
 
   // Get rid of casts from one type to the same type. These are useless and can
   // be replaced by the operand.
-  if (DestTy == Src->getType())
+  if (DestTy == Src->getType()) {
+    llvmberry::ValidationUnit::Begin("bitcast_sametype", CI.getParent()->getParent());
+    llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &Src]
+          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INFRULE(INSTPOS(SRC, &CI), llvmberry::ConsBitcastSametype::make(
+                  VAL(Src, Physical), VAL(&CI, Physical),
+                  VALTYPE(Src->getType())));
+      llvmberry::generateHintForReplaceAllUsesWith(&CI, Src);
+    });
     return ReplaceInstUsesWith(CI, Src);
+  }
 
   if (PointerType *DstPTy = dyn_cast<PointerType>(DestTy)) {
     PointerType *SrcPTy = cast<PointerType>(SrcTy);
