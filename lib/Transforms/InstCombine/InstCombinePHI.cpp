@@ -710,12 +710,13 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
 
   Value *PhiVal;
 
-  llvmberry::ValidationUnit::Begin("fold_phi_bin",
+ if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) { //in this function cast op does optimization too
+      llvmberry::ValidationUnit::Begin("fold_phi_bin_const",
                                    FirstInst->getParent()->getParent());
-  if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) { //in this function cast op does optimization too
-    llvmberry::ValidationUnit::GetInstance()->intrude(
-            [&PN](llvmberry::ValidationUnit::Dictionary &data,
-                  llvmberry::CoreHint &hints) {
+
+      llvmberry::ValidationUnit::GetInstance()->intrude(
+              [&PN](llvmberry::ValidationUnit::Dictionary &data,
+                    llvmberry::CoreHint &hints) {
               std::string oldphi = llvmberry::getVariable(PN);
               BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
               llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
