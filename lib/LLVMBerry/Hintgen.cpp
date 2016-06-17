@@ -874,7 +874,8 @@ void generateHintForMem2RegPropagateStore
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
-    std::string keySI = std::to_string(instrIndex[SI])+Rstore;
+    std::string bname = getBasicBlockIndex(SI->getParent());
+    std::string keySI = bname+std::to_string(instrIndex[SI])+Rstore;
 
     // propagate instruction
     PROPAGATE(LESSDEF(INSN(*SI),
