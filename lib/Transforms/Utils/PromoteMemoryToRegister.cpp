@@ -405,7 +405,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
       std::string Rload = llvmberry::getVariable(*LI);
-      std::string keySI = std::to_string(instrIndex[OnlyStore])+Rstore;
+      std::string bname = llvmberry::getBasicBlockIndex(OnlyStore->getParent());
+      std::string keySI = bname+std::to_string(instrIndex[OnlyStore])+Rstore;
 
       // - store and loads are in the same block
       //   and store exists before loads
@@ -584,7 +585,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
         std::string Ralloca = llvmberry::getVariable(*AI);
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
-        std::string keySI = std::to_string(instrIndex[SI])+Rstore;
+        std::string bname = llvmberry::getBasicBlockIndex(SI->getParent());
+        std::string keySI = bname+std::to_string(instrIndex[SI])+Rstore;
 
         // find next store, and use of alloca
         llvm::Instruction* next;
@@ -833,7 +835,7 @@ void PromoteMem2Reg::run() {
 
         if (isa<StoreInst>(tmpInst)) {
           StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
-          std::string keySI = std::to_string(instrIndex[SI])+"%"+
+          std::string keySI = bname+std::to_string(instrIndex[SI])+"%"+
                               std::string(SI->getOperand(1)->getName());
 
           storeItem[SI].value = std::move(llvmberry::TyValue::make(*(SI->getOperand(0))));
@@ -875,6 +877,7 @@ void PromoteMem2Reg::run() {
           if (isa<LoadInst>(tmpInst)) {
             const LoadInst* LI = dyn_cast<LoadInst>(tmpInst);
             std::string keyLI = "%"+std::string(LI->getName());
+            std::string bname = "";
             unsigned nearestStore = 0;
             const BasicBlock *SB = NULL;
             bool isSameBlock = false;
@@ -892,11 +895,13 @@ void PromoteMem2Reg::run() {
                      (instrIndex[SI] < instrIndex[LI]) &&
                      (instrIndex[SI] > nearestStore)) {
                     // previous nearestStore is in the same block
+                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
                     nearestStore = instrIndex[SI];
                     SB = SI->getParent();
                     isChanged = true;
                   } else if (!isSameBlock) {
                     // previous nearestStore is in different block
+                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
                     nearestStore = instrIndex[SI];
                     isSameBlock = true;
                     isChanged = true;
@@ -907,17 +912,20 @@ void PromoteMem2Reg::run() {
                   // store block should dominate load block
                   if (!isChanged) {
                     // initial state
+                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
                     nearestStore = instrIndex[SI];
                     isChanged = true;
                   } else if ((SB == SI->getParent()) && 
                            (instrIndex[SI] > nearestStore)) {
                     // previous nearestStore is further from load
                     // than current store in the same block
+                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
                     nearestStore = instrIndex[SI];
                     isChanged = true;
                   } else if (Domtree.dominates(SB, SI->getParent())) {
                     // previous nearestStore is further from load
                     // than current store in different block
+                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
                     nearestStore = instrIndex[SI];
                     SB = SI->getParent();
                     isChanged = true;
@@ -928,8 +936,9 @@ void PromoteMem2Reg::run() {
 
             // update dictionary if previous value is different with
             // current value
-            std::string keyNew = std::to_string(nearestStore)+"%"+
+            std::string keyNew = bname+std::to_string(nearestStore)+"%"+
                                  std::string(LI->getOperand(0)->getName());
+
             if (values[keyLI] != values[keyNew] &&
                 values[keyNew] != NULL) {
               values[keyLI] = values[keyNew];
@@ -938,7 +947,8 @@ void PromoteMem2Reg::run() {
           } else {
             // the case of store is same as load
             const StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
-            std::string keySI = std::to_string(instrIndex[SI])+"%"+
+            std::string bname = llvmberry::getBasicBlockIndex(SI->getParent());
+            std::string keySI = bname+std::to_string(instrIndex[SI])+"%"+
                                 std::string(SI->getOperand(1)->getName());
             std::string keyNew = "%"+std::string(SI->getOperand(0)->getName());
 
