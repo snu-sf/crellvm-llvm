@@ -47,6 +47,6 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg(){
 Mem2RegArg::Mem2RegArg()
   : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
     termIndex(new TyTermIndexObj()), values(new TyValuesObj()),
-    storeItem(new TyStoreItemObj()) {}
+    storeItem(new TyStoreItemObj()), storeMap(new TyStoreMapObj()) {}
 
 } // llvmberry

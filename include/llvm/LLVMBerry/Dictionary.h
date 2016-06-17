@@ -124,6 +124,11 @@ public:
   typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
   TyStoreItem storeItem;
 
+  typedef std::map<const llvm::AllocaInst*, 
+                   llvm::StoreInst*> TyStoreMapObj;
+  typedef std::shared_ptr<TyStoreMapObj> TyStoreMap;
+  TyStoreMap storeMap;
+
   Mem2RegArg();
 };
 DEFINE_TRAITS(ArgForMem2Reg, Mem2RegArg);

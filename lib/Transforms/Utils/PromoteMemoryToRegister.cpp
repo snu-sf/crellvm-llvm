@@ -1141,6 +1141,8 @@ void PromoteMem2Reg::run() {
   // The renamer uses the Visited set to avoid infinite loops.  Clear it now.
   Visited.clear();
 
+  llvmberry::ValidationUnit::End();
+
   // Remove the allocas themselves from the function.
   for (unsigned i = 0, e = Allocas.size(); i != e; ++i) {
     Instruction *A = Allocas[i];
@@ -1254,7 +1256,7 @@ void PromoteMem2Reg::run() {
 
   NewPhiNodes.clear();
   
-  llvmberry::ValidationUnit::End();
+  //llvmberry::ValidationUnit::End();
 }
 
 /// \brief Determine which blocks the value is live in.
@@ -1350,7 +1352,7 @@ bool PromoteMem2Reg::QueuePhiNode(BasicBlock *BB, unsigned AllocaNo,
   PN = PHINode::Create(Allocas[AllocaNo]->getAllocatedType(), getNumPreds(BB),
                        Allocas[AllocaNo]->getName() + "." + Twine(Version++),
                        BB->begin());
-  ++NumPHIInsert;
+
   PhiToAllocaMap[PN] = AllocaNo;
 
   if (AST && PN->getType()->isPointerTy())
@@ -1382,17 +1384,28 @@ NextIteration:
       // operands so far.  Remember this count.
       unsigned NewPHINumOperands = APN->getNumOperands();
 
+      std::cout << "Init: " << std::string(BB->getName()) << ", " << std::string(Pred->getName()) <<  std::endl;
+      std::cout << "NewPHINumOperands: " << std::string(APN->getName()) << "(" << NewPHINumOperands << ")" << std::endl;
+
       unsigned NumEdges = std::count(succ_begin(Pred), succ_end(Pred), BB);
       assert(NumEdges && "Must be at least one edge from Pred to BB!");
+
+      std::cout << "NumEdges: " << std::string(BB->getName()) << "(" << NumEdges << ")" << std::endl;
 
       // Add entries for all the phis.
       BasicBlock::iterator PNI = BB->begin();
       do {
         unsigned AllocaNo = PhiToAllocaMap[APN];
 
+      std::cout << "AllocaNo: " << AllocaNo << std::endl;
+      
         // Add N incoming values to the PHI node.
         for (unsigned i = 0; i != NumEdges; ++i)
           APN->addIncoming(IncomingVals[AllocaNo], Pred);
+
+      //std::cout << "IncomingVals: " << std::string(IncomingVals[AllocaNo]->getName()) << std::endl;
+      std::cout << "IncomingVals(check): " << isa<UndefValue>(IncomingVals[AllocaNo]) << std::endl;
+      std::cout << "IncomingVals(value): " << IncomingVals[AllocaNo] << std::endl;
 
         // The currently active variable for this block is now the PHI.
         IncomingVals[AllocaNo] = APN;
@@ -1425,7 +1438,100 @@ NextIteration:
       if (AI == AllocaLookup.end())
         continue;
 
+      std::cout<<"unsigned: "<<AI->second<<std::endl;
+
       Value *V = IncomingVals[AI->second];
+
+///working
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&Src, &LI]
+                (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        //        <src>          |     <tgt>
+        // %x = alloca i32       | nop
+        // store i32 1, %x       | nop
+        // %a = load i32 %x      | nop
+        // %b = load i32 %x      | nop
+        // %c = add i32 %a, %b   | %c = add i32 1, 1
+        // ret i32 %c            | ret i32 %c
+
+        // prepare variables
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+        auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+        auto &storeMap = *(data.get<llvmberry::ArgForMem2Reg>()->storeMap);
+        assert(storeMap.find(Src) != storeMap.end());
+        std::cout<<"-------------------"<<std::endl;
+        StoreInst *SI = storeMap[Src];
+        std::cout<<"-------------------"<<std::endl;
+        Instruction *keyInst = dyn_cast<Instruction>(SI->getOperand(1));
+
+        std::cout<<"keymap: "<<Src<<","<<keyInst<<std::endl;
+        std::string Ralloca = llvmberry::getVariable(*Src); std::cout<<"alloc: "<<Ralloca<<std::endl;
+        std::string Rstore = llvmberry::getVariable(*keyInst); std::cout<<"store: "<<Rstore<<std::endl;
+        std::string Rload = llvmberry::getVariable(*LI); std::cout<<"load: "<<Rload<<std::endl;
+        std::string keySI = std::to_string(instrIndex[SI])+Rstore; std::cout<<"key: "<<keySI<<std::endl;
+
+        // - store and loads are in the same block
+        //   and store exists before loads
+        // - store and loads are not in the same block
+        //   and store block domindates load block
+        if ((LI->getParent() == SI->getParent() && 
+             instrIndex[SI] < instrIndex[LI]) /*||
+            (LI->getParent() != SI->getParent() &&
+             DT.dominates(SI->getParent(), LI->getParent()))*/) {
+          // Step1: propagate store instruction
+          //        <src>          |     <tgt>
+          // %x = alloca i32       | nop
+          // store i32 1, %x       | nop
+          // %a = load i32 %x      | %a = load i32 1
+          // %b = load i32 %x      | %b = load i32 1
+          // %c = add i32 %a, %b   | %c = add i32 %a, %b
+          // ret i32 %c            | ret i32 %c
+          llvmberry::generateHintForMem2RegPropagateStore
+            (SI, LI, instrIndex[LI]);
+        }
+
+        // add hints per every use of LI
+        for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
+          llvm::Use &U = *(UI++);
+          llvm::Instruction *use = dyn_cast<Instruction>(U.getUser());
+
+          // set index of use
+          int useIndex = 
+                llvmberry::getIndexofMem2Reg
+                  (use, instrIndex[use],
+                   termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
+
+          llvmberry::generateHintForMem2RegPropagateNoalias
+            (Src, use, useIndex);
+
+          // - store and loads are in the same block
+          //   and store exists before loads
+          // - store and loads are not in the same block
+          //   and store block domindates load block
+          if ((LI->getParent() == SI->getParent() && 
+               instrIndex[SI] < instrIndex[LI]) /*||
+              (LI->getParent() != SI->getParent() &&
+               DT.dominates(SI->getParent(), LI->getParent()))*/) {
+            // Step2: propagate load instruction
+            //        <src>          |     <tgt>
+            // %a = load i32 1       | nop
+            // %b = load i32 1       | nop
+            // %c = add i32 %a, %b   | %c = add i32 1, 1
+            // ret i32 %c            | ret i32 %c
+            llvmberry::generateHintForMem2RegPropagateLoad
+              (SI, LI, use, useIndex);
+          }
+        }
+
+        // propagate maydiff
+        llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
+
+        // add nop
+        hints.addNopPosition
+          (llvmberry::TyPosition::make
+            (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
+      });
 
       // Anything using the load now uses the current value.
       LI->replaceAllUsesWith(V);
@@ -1442,6 +1548,17 @@ NextIteration:
       DenseMap<AllocaInst *, unsigned>::iterator ai = AllocaLookup.find(Dest);
       if (ai == AllocaLookup.end())
         continue;
+
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&Dest, &SI]
+                (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        // prepare variables
+        auto &storeMap = *(data.get<llvmberry::ArgForMem2Reg>()->storeMap);
+
+        storeMap[Dest] = SI;
+        std::cout << "destalloca: " << llvmberry::getVariable(*Dest)<<","<<Dest<<std::endl;
+        std::cout << "input store: " << llvmberry::getVariable(*(SI->getOperand(1))) << std::endl;
+      });
 
       // what value were we writing?
       IncomingVals[ai->second] = SI->getOperand(0);
