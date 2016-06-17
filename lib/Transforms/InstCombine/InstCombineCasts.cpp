@@ -314,35 +314,8 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
         Type *midty = mid->getType();
         Type *dstty = dst->getType();
         
-        auto _to_str_func = [](llvm::CastInst *ci) {
-          std::string str;
-          if (llvm::isa<BitCastInst>(ci))
-            str = "bitcast";
-          else if (llvm::isa<SExtInst>(ci))
-            str = "sext";
-          else if (llvm::isa<ZExtInst>(ci))
-            str = "zext";
-          else if (llvm::isa<TruncInst>(ci))
-            str = "trunc";
-          else if (llvm::isa<FPExtInst>(ci))
-            str = "fpext";
-          else if (llvm::isa<FPTruncInst>(ci))
-            str = "fptrunc";
-          else if (llvm::isa<FPToSIInst>(ci))
-            str = "fptosi";
-          else if (llvm::isa<FPToUIInst>(ci))
-            str = "fptoui";
-          else if (llvm::isa<SIToFPInst>(ci))
-            str = "sitofp";
-          else if (llvm::isa<UIToFPInst>(ci))
-            str = "uitofp";
-          else if (llvm::isa<IntToPtrInst>(ci))
-            str = "inttoptr";
-          else if (llvm::isa<PtrToIntInst>(ci))
-            str = "ptrtoint";
-          else if (llvm::isa<AddrSpaceCastInst>(ci))
-            str = "addrspacecast";
-          return str;
+        auto _create_infrule_name = [](CastInst *fst, CastInst *snd){
+          return std::string(snd->getOpcodeName()) + "_" + fst->getOpcodeName();
         };
 
         std::function<std::shared_ptr<llvmberry::TyInfrule>(std::shared_ptr<llvmberry::TyValue>, 
@@ -458,13 +431,12 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
 
         }
         if (!(makeInfruleFunc == nullptr)) {
-          new_optname = _to_str_func(dst) + "_" + _to_str_func(mid);
+          new_optname = _create_infrule_name(mid, dst);
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName(new_optname);
           INFRULE(INSTPOS(SRC, dst), makeInfruleFunc(
                   VAL(src, Physical), VAL(mid, Physical), VAL(dst, Physical),
                   VALTYPE(srcty), VALTYPE(midty), VALTYPE(dstty)));
         } else {
-          assert(false && "Unknown cast-cast optimization");
           llvmberry::ValidationUnit::Abort();
         }
       });
