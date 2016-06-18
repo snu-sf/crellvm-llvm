@@ -10,26 +10,31 @@
 #define PHIPOSJustPhi(SCOPE, PN) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
 #define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
+#define POINTER(v) llvmberry::TyPointer::make(*(v))
+#define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
+#define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
 #define PROPAGATE(what, where) hints.addCommand(llvmberry::ConsPropagate::make(what, where))
+#define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
+// EXPR, VAR, RHS, INSN macros make TyExpr object
 #define VAR(name, tag) llvmberry::ConsVar::make(name, llvmberry::tag)
 #define RHS(name, tag, SCOPE) llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
-#define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
+#define INSN(x) llvmberry::ConsInsn::make((x))
+#define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
+// LESSDEF, NOALIAS, ALLOCA, PRIVATE, MAYDIFF make TyPropagateObject instance
 #define LESSDEF(left, right, SCOPE) llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE) llvmberry::ConsNoalias::make(ptr1, ptr2, SCOPE)
 #define ALLOCA(reg, SCOPE) llvmberry::ConsAlloca::make(reg, SCOPE)
 #define PRIVATE(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
 #define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, tag)
-#define INSN(x) llvmberry::ConsInsn::make(x)
+// VAL, ID macros make TyValue object
 #define VAL(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
-#define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
-#define POINTER(v) llvmberry::TyPointer::make(*(v))
-#define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
-#define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
 #define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
-#define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
+// VALTYPE, TYPEOF macros make TyValueType object
+#define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
+#define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
+// BINOP, FBINOP, BINARYINSN make TyInstruction object
 #define BINOP(bop, type, val1, val2) llvmberry::ConsBinaryOp::make(bop, type, val1, val2)
 #define FBINOP(fbop, type, val1, val2) llvmberry::ConsFloatBinaryOp::make(fbop, type, val1, val2)
-#define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
 #define BINARYINSN(binop, type, val1, val2) llvmberry::isFloatOpcode((binop).getOpcode()) ? FBINOP(llvmberry::getFbop((binop).getOpcode()), type, val1, val2) : BINOP(llvmberry::getBop((binop).getOpcode()), type, val1, val2)
 
 #define SRC llvmberry::Source
@@ -69,9 +74,13 @@ namespace llvmberry{
    */
   void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope scope = Source);
   /* generateHintForReplaceAllUsesWith(v1, v2) : 
-   *   for each use U of v1, propagates hints that prove replacing v1 with v2 in U is safe
+   *   For each use U of v1, propagates hints to prove replacing v1 with v2 in U is safe
+   *   Invariant { v1 >=src v2 } must be given at definition of v1 
+   * generateHintForReplaceAllUsesWith(v1, v2, gv) : 
+   *   Invariant { v1 >=src gv } and { gv >=tgt v2 } must be given at definition of v1
    */
-  void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *replaceTo);
+  void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *replaceTo,
+      std::string ghost_var = "");
 
   /* Hint generation functions for instcombine/instsimplify micro-optimizations
    * that appear multiple times

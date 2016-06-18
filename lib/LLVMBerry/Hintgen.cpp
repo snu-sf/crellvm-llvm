@@ -291,13 +291,13 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope sc
   //  }
 }
 
-void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *replaceTo){
+void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *replaceTo,
+    std::string ghostvar){
   assert(ValidationUnit::Exists());
   
-  ValidationUnit::GetInstance()->intrude([&source, &replaceTo](
+  ValidationUnit::GetInstance()->intrude([&source, &replaceTo, &ghostvar](
       ValidationUnit::Dictionary &data, CoreHint &hints) {
     llvm::Instruction *I = source;
-    llvm::Value *repl = replaceTo;
 
     std::string to_rem = getVariable(*I);
 
@@ -315,35 +315,42 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *r
             llvm::dyn_cast<llvm::PHINode>(user_I)->getIncomingBlock(*UI);
         prev_block_name = getBasicBlockIndex(bb_from);
       }
+      
+      if(ghostvar == "") {
+        PROPAGATE(LESSDEF(VAR(to_rem, Physical), EXPR(replaceTo, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, I), TyPosition::make(SRC, *user_I, prev_block_name)));
+        if (llvm::isa<llvm::PHINode>(user_I)) {
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+              ConsTransitivity::make(VAR(user, Physical), 
+                  VAR(to_rem, Previous), 
+                  EXPR(replaceTo, Previous)));
+        } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+          INFRULE(TyPosition::make(Source, *user_I, prev_block_name),
+              ConsReplaceRhs::make(
+                  REGISTER(to_rem, Physical),
+                  VAL(replaceTo, Physical),
+                  VAR(user, Physical),
+                  RHS(user, Physical, Source),
+                  RHS(user, Physical, Target)));
+        }
+      } else {
+        PROPAGATE(LESSDEF(VAR(to_rem, Physical), VAR(ghostvar, Ghost), SRC),
+            BOUNDS(INSTPOS(SRC, I), TyPosition::make(SRC, *user_I, prev_block_name)));
+        PROPAGATE(LESSDEF(VAR(ghostvar, Ghost), EXPR(replaceTo, Physical), TGT),
+            BOUNDS(INSTPOS(TGT, I), TyPosition::make(TGT, *user_I, prev_block_name)));
 
-      hints.addCommand(ConsPropagate::make(
-          ConsLessdef::make(
-              ConsVar::make(to_rem, Physical),
-              TyExpr::make(*repl, Physical),
-              Source),
-          ConsBounds::make(
-              TyPosition::make(Source, *I),
-              TyPosition::make(Source, *user_I, prev_block_name))));
-      if (llvm::isa<llvm::PHINode>(user_I)) {
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *user_I,
-                                        prev_block_name),
-            ConsTransitivity::make(
-                ConsVar::make(user, Physical),
-                ConsVar::make(to_rem, Previous),
-                TyExpr::make(*repl, Previous))));
-      } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *user_I,
-                                        prev_block_name),
-            ConsReplaceRhs::make(
-                TyRegister::make(to_rem, Physical),
-                TyValue::make(*repl, Physical),
-                ConsVar::make(user, Physical),
-                ConsRhs::make(user, Physical,
-                                         Source),
-                ConsRhs::make(user, Physical,
-                                         Target))));
+        if (llvm::isa<llvm::PHINode>(user_I)) {
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+              ConsTransitivity::make(VAR(user, Physical), 
+                  VAR(to_rem, Physical), 
+                  VAR(ghostvar, Ghost)));
+          INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
+              ConsTransitivity::make(VAR(user, Physical),
+                  VAR(ghostvar, Ghost),
+                  EXPR(replaceTo, Physical)));
+        } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+          assert(false);
+        }
       }
     }
   });
@@ -899,7 +906,7 @@ void generateHintForMem2RegPropagateStore
       INFRULE(TyPosition::make
                (SRC, *SI, instrIndex[SI], ""),
               ConsIntroGhost::make
-               (storeItem[SI].value,
+               (TyExpr::make(storeItem[SI].value),
                 REGISTER(Rstore, Ghost)));
 
       INFRULE(TyPosition::make
@@ -913,7 +920,7 @@ void generateHintForMem2RegPropagateStore
       INFRULE(TyPosition::make
                (SRC, *SI, instrIndex[SI], ""),
               ConsIntroGhost::make
-               (ID(storeItem[SI].op0, Ghost),
+               (VAR(storeItem[SI].op0, Ghost),
                 REGISTER(Rstore, Ghost)));
 
       INFRULE(TyPosition::make
@@ -970,7 +977,7 @@ void generateHintForMem2RegPropagateLoad
     INFRULE(TyPosition::make
              (SRC, *LI, instrIndex[LI], ""),
             ConsIntroGhost::make
-             (ID(Rstore, Ghost),
+             (VAR(Rstore, Ghost),
               REGISTER(Rload, Ghost)));
 
     INFRULE(TyPosition::make
