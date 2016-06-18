@@ -1364,8 +1364,7 @@ void TyGetElementPtrInst::serialize(cereal::JSONOutputArchive& archive) const{
 // propagate expr
 // ConsVar or ConsConst
 
-std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value, enum TyTag _tag) {
-  std::shared_ptr<TyValue> vptr = TyValue::make(value, _tag);
+std::shared_ptr<TyExpr> TyExpr::make(const std::shared_ptr<TyValue> vptr) {
   TyValue *v = vptr.get();
   if(ConsId *cid = dynamic_cast<ConsId *>(v)){
     return std::shared_ptr<TyExpr>(new ConsVar(cid->reg));
@@ -1374,6 +1373,10 @@ std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value, enum TyTag _tag) 
   }else{
     assert("Unknown value type" && false);
   }
+}
+
+std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value, enum TyTag _tag) {
+  return make(TyValue::make(value, _tag));
 }
 
 ConsVar::ConsVar(std::shared_ptr<TyRegister> _register_name)

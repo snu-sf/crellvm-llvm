@@ -656,6 +656,7 @@ struct TyExpr {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 
+  static std::shared_ptr<TyExpr> make(const std::shared_ptr<TyValue> tyval);
   static std::shared_ptr<TyExpr> make(const llvm::Value &value, enum TyTag _tag=llvmberry::Physical);
 };
 
