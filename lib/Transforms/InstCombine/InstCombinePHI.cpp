@@ -201,7 +201,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
                   // introduce a^ >= k && k >= a^
                   INFRULE(PHIPOS(TGT, PN, InInst),
-                          llvmberry::ConsIntroGhost::make(VAL(SpecialOperand, Previous), REGISTER("K", Ghost)));
+                          llvmberry::ConsIntroGhost::make(EXPR(SpecialOperand, Previous), REGISTER("K", Ghost)));
 
                   // infer k >= a^ && a^ >= t -> k >= t in tgt
                   INFRULE(PHIPOS(TGT, PN, InInst),
@@ -264,7 +264,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                                   aph_bpr));
 
                   // introduce k >= b^ && b^ >= k in src and tgt
-                  INFRULE(PHIPOS(SRC, PN, InInst), llvmberry::ConsIntroGhost::make(VAL(SpecialOperand, Previous), REGISTER("K", Ghost)));
+                  INFRULE(PHIPOS(SRC, PN, InInst), llvmberry::ConsIntroGhost::make(EXPR(SpecialOperand, Previous), REGISTER("K", Ghost)));
 
                   // infer k >= b^ && b^ >= t -> k >= t in tgt
                   INFRULE(PHIPOS(TGT, PN, InInst),
@@ -830,7 +830,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
 
                   // introduce a^ >= k && k >= a^
                   INFRULE(PHIPOS(TGT, PN, InInst),
-                          llvmberry::ConsIntroGhost::make(VAL(SpecialOperand, Previous), REGISTER("K", Ghost)));
+                          llvmberry::ConsIntroGhost::make(EXPR(SpecialOperand, Previous), REGISTER("K", Ghost)));
 
                   // infer k >= a^ && a^ >= t -> k >= t in tgt
                   INFRULE(PHIPOS(TGT, PN, InInst),
