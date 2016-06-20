@@ -3024,7 +3024,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         isSame &= tmp;
       }
       hints.appendToDescription("VI: " + (*VI).getName().str());
-
       hints.appendToDescription("RHS of CurInst and VI is same: " +
                                 std::to_string(isSame));
       isSameForAll &= isSame;
@@ -3088,6 +3087,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           }
         }
 
+      Instruction *VI_evolving_merged;
       for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
         BasicBlock *PB = predMap[i].second;
         Value *V = nullptr;
@@ -3111,13 +3111,13 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
 
           INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
                                               PB->getName()),
-                  llvmberry::ConsTransitivity::make(VAR(VI_op_id, Physical),
+                  llvmberry::ConsTransitivity::make(VAR(PrevPhi_id, Physical),
                                                     VAR(VI_op_id, Previous),
-                                                    VAR(PrevPhi_id, Physical)));
+                                                    VAR(VI_op_id, Physical)));
 
           INFRULE(llvmberry::TyPosition::make(SRC, (*CurrentBlock).getName(),
                                               (*PB).getName()),
-                  llvmberry::ConsSubstitute::make(
+                  llvmberry::ConsSubstituteRev::make(
                       REGISTER(VI_op_id, Physical), VAL(PrevPhi, Physical),
                       llvmberry::ConsInsn::make(*VI_evolving)));
 
@@ -3125,12 +3125,9 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           (*VI_evolving_next).setOperand(idx, PrevPhi);
           INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
                                               PB->getName()),
-                  llvmberry::ConsTransitivity::make(
-                      VAR(VI_id, Physical), INSN(*VI_evolving),
-                      INSN(*VI_evolving_next)
-                      // EXPR(VI_evolving, Physical),
-                      // EXPR(VI_evolving, Physical)
-                      ));
+                  llvmberry::ConsTransitivity::make(INSN(*VI_evolving_next),
+                                                    INSN(*VI_evolving),
+                                                    VAR(VI_id, Physical)));
 
           (*VI_evolving).eraseFromParent();
           VI_evolving = VI_evolving_next;
@@ -3139,24 +3136,38 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
 
         INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
                                             PB->getName()),
-                llvmberry::ConsTransitivity::make(VAR(Phi_id, Physical),
+                llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
                                                   VAR(VI_id, Previous),
-                                                  VAR(VI_id, Physical)));
+                                                  VAR(Phi_id, Physical)));
 
         INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
                                             PB->getName()),
-                llvmberry::ConsTransitivity::make(VAR(Phi_id, Physical),
+                llvmberry::ConsTransitivity::make(INSN(*VI_evolving),
                                                   VAR(VI_id, Physical),
-                                                  INSN(*VI_evolving)));
+                                                  VAR(Phi_id, Physical)));
+        if (i == 0)
+          VI_evolving_merged = VI_evolving;
+        else {
+          if ((*VI_evolving_merged).isIdenticalTo(VI_evolving)) {
+          } else {
+            hints.appendToDescription(
+                "VI_evolving_merged != VI_evolving. Fail here");
+            return;
+          }
+        }
         (*VI_evolving).eraseFromParent();
       }
 
-      PROPAGATE(
-          LESSDEF(VAR(Phi_id, Physical), RHS(CurInst_id, Physical, SRC), SRC),
-          BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                     llvmberry::Source,
-                     llvmberry::getBasicBlockIndex(CurrentBlock)),
-                 INSTPOS(SRC, CurInst)));
+      PROPAGATE(LESSDEF(INSN(*VI_evolving_merged), VAR(Phi_id, Physical), SRC),
+                BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                           llvmberry::Source,
+                           llvmberry::getBasicBlockIndex(CurrentBlock)),
+                       INSTPOS(SRC, CurInst)));
+
+      INFRULE(INSTPOS(SRC, CurInst),
+              llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
+                                                INSN(*VI_evolving_merged),
+                                                VAR(Phi_id, Physical)));
 
       for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
         if (!isa<Instruction>(UI->getUser())) {
