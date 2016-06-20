@@ -292,10 +292,13 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I, TyScope sc
 }
 
 void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *replaceTo,
-    std::string ghostvar){
+    std::string ghostvar, std::shared_ptr<TyPosition> source_pos){
   assert(ValidationUnit::Exists());
+  if (!source_pos) {
+    source_pos = INSTPOS(SRC, source);
+  }
   
-  ValidationUnit::GetInstance()->intrude([&source, &replaceTo, &ghostvar](
+  ValidationUnit::GetInstance()->intrude([&source, &replaceTo, &ghostvar, &source_pos](
       ValidationUnit::Dictionary &data, CoreHint &hints) {
     llvm::Instruction *I = source;
 
@@ -318,7 +321,7 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *r
       
       if(ghostvar == "") {
         PROPAGATE(LESSDEF(VAR(to_rem, Physical), EXPR(replaceTo, Physical), SRC),
-            BOUNDS(INSTPOS(SRC, I), TyPosition::make(SRC, *user_I, prev_block_name)));
+            BOUNDS(source_pos, TyPosition::make(SRC, *user_I, prev_block_name)));
         if (llvm::isa<llvm::PHINode>(user_I)) {
           INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
               ConsTransitivity::make(VAR(user, Physical), 
@@ -335,7 +338,7 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *r
         }
       } else {
         PROPAGATE(LESSDEF(VAR(to_rem, Physical), VAR(ghostvar, Ghost), SRC),
-            BOUNDS(INSTPOS(SRC, I), TyPosition::make(SRC, *user_I, prev_block_name)));
+            BOUNDS(source_pos, TyPosition::make(SRC, *user_I, prev_block_name)));
         PROPAGATE(LESSDEF(VAR(ghostvar, Ghost), EXPR(replaceTo, Physical), TGT),
             BOUNDS(INSTPOS(TGT, I), TyPosition::make(TGT, *user_I, prev_block_name)));
 
@@ -349,7 +352,22 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *r
                   VAR(ghostvar, Ghost),
                   EXPR(replaceTo, Physical)));
         } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
-          assert(false);
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+              ConsSubstitute::make(REGISTER(to_rem,Physical),
+                  ID(ghostvar, Ghost),
+                  INSN(*user_I)));
+          llvm::Instruction *user_I_copy = user_I->clone();
+          
+          for(unsigned i = 0; i < user_I_copy->getNumOperands(); i++){
+            if(user_I->getOperand(i) == source)
+              user_I_copy->setOperand(i, replaceTo);
+          }
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+              ConsTransitivity::make(
+                  EXPR(user_I, Physical),
+                  INSN(*user_I),
+                  INSN(*user_I_copy)));
+          delete user_I_copy;
         }
       }
     }

@@ -548,10 +548,34 @@ private :
   std::shared_ptr<TyValueType> toty;
 };
 
+struct TyIntToPtrInst{
+public : 
+  TyIntToPtrInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyIntToPtrInst> make(const llvm::IntToPtrInst &li);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
+struct TyPtrToIntInst{
+public : 
+  TyPtrToIntInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyPtrToIntInst> make(const llvm::PtrToIntInst &li);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
 struct TyGetElementPtrInst{
 public : 
   TyGetElementPtrInst(std::shared_ptr<TyValueType> _ty, 
-                std::shared_ptr<TyValueType> _ptrty,
+                std::shared_ptr<TyValueType> _retty,
                 std::shared_ptr<TyValue> _ptr,
                 std::vector<std::pair<std::shared_ptr<TySize>, std::shared_ptr<TyValue> > > &_indexes,
                 bool is_inbounds);
@@ -560,7 +584,7 @@ public :
 
 private : 
   std::shared_ptr<TyValueType> ty;
-  std::shared_ptr<TyValueType> ptrty;
+  std::shared_ptr<TyValueType> retty;
   std::shared_ptr<TyValue> ptr;
   std::vector<std::pair<std::shared_ptr<TySize>, std::shared_ptr<TyValue> > > indexes;
   bool is_inbounds;
@@ -631,6 +655,28 @@ public:
 
 private :
   std::shared_ptr<TyBitCastInst> bit_cast_inst;
+};
+
+struct ConsIntToPtrInst : public TyInstruction{
+public:
+  ConsIntToPtrInst(std::shared_ptr<TyIntToPtrInst> _bit_cast_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::IntToPtrInst &itpi);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private :
+  std::shared_ptr<TyIntToPtrInst> int_to_ptr_inst;
+};
+
+struct ConsPtrToIntInst : public TyInstruction{
+public:
+  ConsPtrToIntInst(std::shared_ptr<TyPtrToIntInst> _ptr_to_int_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::PtrToIntInst &ptii);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private :
+  std::shared_ptr<TyPtrToIntInst> ptr_to_int_inst;
 };
 
 struct ConsGetElementPtrInst : public TyInstruction{

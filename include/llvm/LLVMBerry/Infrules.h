@@ -572,6 +572,15 @@ private :
   std::shared_ptr<TyExpr> gepinst;
 };
 
+struct TyGepInboundsRemove{
+public : 
+  TyGepInboundsRemove(std::shared_ptr<TyExpr> _gepinst);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyExpr> gepinst;
+};
+
 struct TyPtrtointBitcast{
 public : 
   TyPtrtointBitcast(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty);
@@ -584,6 +593,20 @@ private :
   std::shared_ptr<TyValueType> srcty;
   std::shared_ptr<TyValueType> midty;
   std::shared_ptr<TyValueType> dstty;
+};
+
+struct TyPtrtointLoad{
+public : 
+  TyPtrtointLoad(std::shared_ptr<TyValue> _ptr, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _v1, std::shared_ptr<TyValueType> _intty, std::shared_ptr<TyValue> _v2, std::shared_ptr<TySize> _a);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> ptr;
+  std::shared_ptr<TyValueType> ptrty;
+  std::shared_ptr<TyValue> v1;
+  std::shared_ptr<TyValueType> intty;
+  std::shared_ptr<TyValue> v2;
+  std::shared_ptr<TySize> a;
 };
 
 struct TyLessthanUndef{
@@ -1275,6 +1298,20 @@ private :
   std::shared_ptr<TyValue> x;
 };
 
+struct TyInttoptrLoad{
+public : 
+  TyInttoptrLoad(std::shared_ptr<TyValue> _ptr, std::shared_ptr<TyValueType> _intty, std::shared_ptr<TyValue> _v1, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _v2, std::shared_ptr<TySize> _a);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> ptr;
+  std::shared_ptr<TyValueType> intty;
+  std::shared_ptr<TyValue> v1;
+  std::shared_ptr<TyValueType> ptrty;
+  std::shared_ptr<TyValue> v2;
+  std::shared_ptr<TySize> a;
+};
+
 struct TyInttoptrZext{
 public : 
   TyInttoptrZext(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty);
@@ -1892,6 +1929,16 @@ private :
   std::shared_ptr<TyGepzero> gepzero;
 };
 
+struct ConsGepInboundsRemove : public TyInfrule{
+public : 
+  ConsGepInboundsRemove(std::shared_ptr<TyGepInboundsRemove> _gep_inbounds_remove);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _gepinst);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyGepInboundsRemove> gep_inbounds_remove;
+};
+
 struct ConsPtrtointBitcast : public TyInfrule{
 public : 
   ConsPtrtointBitcast(std::shared_ptr<TyPtrtointBitcast> _inttoptr_bitcast);
@@ -1900,6 +1947,16 @@ public :
 
 private : 
   std::shared_ptr<TyPtrtointBitcast> inttoptr_bitcast;
+};
+
+struct ConsPtrtointLoad : public TyInfrule{
+public : 
+  ConsPtrtointLoad(std::shared_ptr<TyPtrtointLoad> _ptrtoint_load);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _ptr, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _v1, std::shared_ptr<TyValueType> _intty, std::shared_ptr<TyValue> _v2, std::shared_ptr<TySize> _a);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyPtrtointLoad> ptrtoint_load;
 };
 
 struct ConsLessthanUndef : TyInfrule {
@@ -2490,6 +2547,16 @@ public :
 
 private : 
   std::shared_ptr<TyUremZext> urem_zext;
+};
+
+struct ConsInttoptrLoad : public TyInfrule{
+public : 
+  ConsInttoptrLoad(std::shared_ptr<TyInttoptrLoad> _inttoptr_load);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _ptr, std::shared_ptr<TyValueType> _intty, std::shared_ptr<TyValue> _v1, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _v2, std::shared_ptr<TySize> _a);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyInttoptrLoad> inttoptr_load;
 };
 
 struct ConsInttoptrZext : public TyInfrule{

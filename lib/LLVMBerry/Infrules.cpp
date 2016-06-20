@@ -1172,6 +1172,25 @@ void ConsGepzero::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(gepzero));
 }
 
+TyGepInboundsRemove::TyGepInboundsRemove(std::shared_ptr<TyExpr> _gepinst) : gepinst(_gepinst){
+}
+void TyGepInboundsRemove::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(gepinst));
+}
+
+ConsGepInboundsRemove::ConsGepInboundsRemove(std::shared_ptr<TyGepInboundsRemove> _gep_inbounds_remove) : gep_inbounds_remove(_gep_inbounds_remove){
+}
+std::shared_ptr<TyInfrule> ConsGepInboundsRemove::make(std::shared_ptr<TyExpr> _gepinst){
+  std::shared_ptr<TyGepInboundsRemove> _val(new TyGepInboundsRemove(_gepinst));
+  return std::shared_ptr<TyInfrule>(new ConsGepInboundsRemove(_val));
+}
+void ConsGepInboundsRemove::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("GepInboundsRemove");
+  archive(CEREAL_NVP(gep_inbounds_remove));
+}
+
 TySubSub::TySubSub(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TySize> _sz) : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), w(std::move(_w)), sz(std::move(_sz)){
 }
 void TySubSub::serialize(cereal::JSONOutputArchive& archive) const{
@@ -1365,6 +1384,25 @@ void ConsPtrtointBitcast::serialize(cereal::JSONOutputArchive& archive) const{
   archive.writeName();
   archive.saveValue("PtrtointBitcast");
   archive(CEREAL_NVP(inttoptr_bitcast));
+}
+
+TyPtrtointLoad::TyPtrtointLoad(std::shared_ptr<TyValue> _ptr, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _v1, std::shared_ptr<TyValueType> _intty, std::shared_ptr<TyValue> _v2, std::shared_ptr<TySize> _a) : ptr(_ptr), ptrty(_ptrty), v1(_v1), intty(_intty), v2(_v2), a(_a){
+}
+void TyPtrtointLoad::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(ptr), CEREAL_NVP(ptrty), CEREAL_NVP(v1), CEREAL_NVP(intty), CEREAL_NVP(v2), CEREAL_NVP(a));
+}
+
+ConsPtrtointLoad::ConsPtrtointLoad(std::shared_ptr<TyPtrtointLoad> _ptrtoint_load) : ptrtoint_load(_ptrtoint_load){
+}
+std::shared_ptr<TyInfrule> ConsPtrtointLoad::make(std::shared_ptr<TyValue> _ptr, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _v1, std::shared_ptr<TyValueType> _intty, std::shared_ptr<TyValue> _v2, std::shared_ptr<TySize> _a){
+  std::shared_ptr<TyPtrtointLoad> _val(new TyPtrtointLoad(_ptr, _ptrty, _v1, _intty, _v2, _a));
+  return std::shared_ptr<TyInfrule>(new ConsPtrtointLoad(_val));
+}
+void ConsPtrtointLoad::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("PtrtointLoad");
+  archive(CEREAL_NVP(ptrtoint_load));
 }
 
 TyLessthanUndef::TyLessthanUndef(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _v) : ty(std::move(_ty)), v(std::move(_v)){
@@ -2458,6 +2496,25 @@ void ConsXorZero::serialize(cereal::JSONOutputArchive& archive) const{
   archive.writeName();
   archive.saveValue("XorZero");
   archive(CEREAL_NVP(xor_zero));
+}
+
+TyInttoptrLoad::TyInttoptrLoad(std::shared_ptr<TyValue> _ptr, std::shared_ptr<TyValueType> _intty, std::shared_ptr<TyValue> _v1, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _v2, std::shared_ptr<TySize> _a) : ptr(_ptr), intty(_intty), v1(_v1), ptrty(_ptrty), v2(_v2), a(_a){
+}
+void TyInttoptrLoad::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(ptr), CEREAL_NVP(intty), CEREAL_NVP(v1), CEREAL_NVP(ptrty), CEREAL_NVP(v2), CEREAL_NVP(a));
+}
+
+ConsInttoptrLoad::ConsInttoptrLoad(std::shared_ptr<TyInttoptrLoad> _inttoptr_load) : inttoptr_load(_inttoptr_load){
+}
+std::shared_ptr<TyInfrule> ConsInttoptrLoad::make(std::shared_ptr<TyValue> _ptr, std::shared_ptr<TyValueType> _intty, std::shared_ptr<TyValue> _v1, std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValue> _v2, std::shared_ptr<TySize> _a){
+  std::shared_ptr<TyInttoptrLoad> _val(new TyInttoptrLoad(_ptr, _intty, _v1, _ptrty, _v2, _a));
+  return std::shared_ptr<TyInfrule>(new ConsInttoptrLoad(_val));
+}
+void ConsInttoptrLoad::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("InttoptrLoad");
+  archive(CEREAL_NVP(inttoptr_load));
 }
 
 TyInttoptrZext::TyInttoptrZext(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty) : src(_src), mid(_mid), dst(_dst), srcty(_srcty), midty(_midty), dstty(_dstty){

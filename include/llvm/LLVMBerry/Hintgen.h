@@ -80,7 +80,8 @@ namespace llvmberry{
    *   Invariant { v1 >=src gv } and { gv >=tgt v2 } must be given at definition of v1
    */
   void generateHintForReplaceAllUsesWith(llvm::Instruction *source, llvm::Value *replaceTo,
-      std::string ghost_var = "");
+      std::string ghost_var = "", 
+      std::shared_ptr<TyPosition> source_pos = std::shared_ptr<TyPosition>(nullptr));
 
   /* Hint generation functions for instcombine/instsimplify micro-optimizations
    * that appear multiple times
