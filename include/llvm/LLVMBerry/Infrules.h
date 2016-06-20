@@ -1615,7 +1615,7 @@ private :
   std::shared_ptr<TyValueType> ptrty;
   std::shared_ptr<TyValue> v2;
   std::shared_ptr<TySize> a;
-}
+};
 
 struct TyInttoptrBitcast{
 public : 
@@ -3128,7 +3128,7 @@ public :
 
 private : 
   std::shared_ptr<TyInttoptrLoad> inttoptr_load;
-}
+};
 
 struct ConsInttoptrBitcast : public TyInfrule{
 public : 
