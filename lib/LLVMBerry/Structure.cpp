@@ -480,25 +480,6 @@ int getTerminatorIndex(const llvm::TerminatorInst *instr) {
   }
 }
 
-std::shared_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si) {
-  llvm::Value* Val = si->getOperand(0);
-
-  if (llvm::isa<llvm::ConstantPointerNull>(Val))
-    return NULL;
-
-  if (llvm::ConstantInt* C = llvm::dyn_cast<llvm::ConstantInt>(Val)) {
-    int storeval = C->getSExtValue();
-    int bitwidth = C->getBitWidth();
-
-    return std::shared_ptr<llvmberry::TyExpr>
-              (new ConsConst(storeval, bitwidth));
-  } else {
-    std::string reg_stored = getVariable(*Val);
-
-    return ConsVar::make(reg_stored, Physical);
-  }
-}
-
 /* position */
 
 TyPositionPhinode::TyPositionPhinode(std::string _prev_block_name)
