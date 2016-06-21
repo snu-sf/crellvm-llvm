@@ -159,7 +159,8 @@ namespace llvmberry{
           (llvm::StoreInst *SI, llvm::Instruction *next, int nextIndex);
 
   void generateHintForMem2RegPropagateLoad
-          (llvm::StoreInst *SI, llvm::LoadInst *LI,
+          //(llvm::StoreInst *SI, llvm::LoadInst *LI,
+          (llvm::Instruction *I, llvm::LoadInst *LI,
            llvm::Instruction *use, int useIndex);
 
   int getIndexofMem2Reg(llvm::Instruction *instr, 

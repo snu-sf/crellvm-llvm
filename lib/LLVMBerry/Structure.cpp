@@ -480,22 +480,6 @@ int getTerminatorIndex(const llvm::TerminatorInst *instr) {
   }
 }
 
-std::shared_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst* si) {
-  llvm::Value* Val = si->getOperand(0);
-
-  if (llvm::ConstantInt* C = llvm::dyn_cast<llvm::ConstantInt>(Val)) {
-    int storeval = C->getSExtValue();
-    int bitwidth = C->getBitWidth();
-
-    return std::shared_ptr<llvmberry::TyExpr>
-              (new ConsConst(storeval, bitwidth));
-  } else {
-    std::string reg_stored = getVariable(*Val);
-
-    return ConsVar::make(reg_stored, Physical);
-  }
-}
-
 /* position */
 
 TyPositionPhinode::TyPositionPhinode(std::string _prev_block_name)
@@ -1029,6 +1013,11 @@ std::shared_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
   } else if (type.isX86_FP80Ty()) {
     vt = new ConsFloatValueType(X86_FP80Type);
   } else {
+    std::string output;
+    llvm::raw_string_ostream rso(output);
+    type.print(rso);
+    rso.str();
+    std::cerr << output << type.getTypeID() << std::endl;
     assert("TyValueType::make(const llvmType &) : unknown value type" && false);
     vt = nullptr;
   }

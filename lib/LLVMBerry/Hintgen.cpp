@@ -877,23 +877,43 @@ void generateHintForMem2RegPropagateStore
     std::string bname = getBasicBlockIndex(SI->getParent());
     std::string keySI = bname+std::to_string(instrIndex[SI])+Rstore;
 
+    if (storeItem[SI].expr == NULL)
+      return;
+
     // propagate instruction
-    PROPAGATE(LESSDEF(INSN(*SI),
-                      VAR(Rstore, Ghost),
-                      SRC),
-              BOUNDS(TyPosition::make
-                      (SRC, *SI, instrIndex[SI], ""),
-                     TyPosition::make
-                      (SRC, *next, nextIndex, "")));
+    if (llvm::isa<llvm::PHINode>(next)) {
+      PROPAGATE(LESSDEF(INSN(*SI),
+                        VAR(Rstore, Ghost),
+                        SRC),
+                BOUNDS(TyPosition::make
+                        (SRC, *SI, instrIndex[SI], ""),
+                       TyPosition::make_end_of_block
+                        (TGT, *SI->getParent())));
 
-    PROPAGATE(LESSDEF(VAR(Rstore, Ghost),
-                      values[keySI],
-                      TGT),
-              BOUNDS(TyPosition::make
-                      (SRC, *SI, instrIndex[SI], ""),
-                     TyPosition::make
-                      (SRC, *next, nextIndex, "")));
+      PROPAGATE(LESSDEF(VAR(Rstore, Ghost),
+                        values[keySI],
+                        TGT),
+                BOUNDS(TyPosition::make
+                        (SRC, *SI, instrIndex[SI], ""),
+                       TyPosition::make_end_of_block
+                        (TGT, *SI->getParent())));
+    } else {
+      PROPAGATE(LESSDEF(INSN(*SI),
+                        VAR(Rstore, Ghost),
+                        SRC),
+                BOUNDS(TyPosition::make
+                        (SRC, *SI, instrIndex[SI], ""),
+                       TyPosition::make
+                        (SRC, *next, nextIndex, "")));
 
+      PROPAGATE(LESSDEF(VAR(Rstore, Ghost),
+                        values[keySI],
+                        TGT),
+                BOUNDS(TyPosition::make
+                        (SRC, *SI, instrIndex[SI], ""),
+                       TyPosition::make
+                        (SRC, *next, nextIndex, "")));
+    }
 
     if (storeItem[SI].expr == values[keySI]) {
       // stored value will not be changed in another iteration
@@ -942,15 +962,23 @@ void generateHintForMem2RegPropagateStore
 }
 
 void generateHintForMem2RegPropagateLoad
-        (llvm::StoreInst *SI, llvm::LoadInst *LI,
+//        (llvm::StoreInst *SI, llvm::LoadInst *LI,
+        (llvm::Instruction *I, llvm::LoadInst *LI,
          llvm::Instruction *use, int useIndex) {
   ValidationUnit::GetInstance()->intrude
-    ([&SI, &LI, &use, &useIndex]
+    ([&I, &LI, &use, &useIndex]
       (Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
-    std::string Rstore = getVariable(*(SI->getOperand(1)));
+    //std::string Rstore = getVariable(*(SI->getOperand(1)));
     std::string Rload = getVariable(*LI);
+
+    if (values[Rload] == NULL)
+      return;
+
+    if (llvm::isa<llvm::StoreInst>(I)) {
+    llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(I);
+    std::string Rstore = getVariable(*(SI->getOperand(1)));
 
     PROPAGATE(LESSDEF(VAR(Rload, Physical),
                       VAR(Rload, Ghost),
@@ -994,6 +1022,54 @@ void generateHintForMem2RegPropagateLoad
              (VAR(Rload, Ghost),
               VAR(Rstore, Ghost),
               values[Rload]));
+    } else if (llvm::isa<llvm::PHINode>(I)) {
+      std::cout << "check phi in propagateload" << std::endl; 
+    llvm::PHINode *SI = llvm::dyn_cast<llvm::PHINode>(I);
+    std::string Rstore = getVariable(*SI);
+    PROPAGATE(LESSDEF(VAR(Rload, Physical),
+                      VAR(Rload, Ghost),
+                      SRC),
+              BOUNDS(TyPosition::make
+                      (SRC, *LI, instrIndex[LI], ""),
+                     TyPosition::make
+                      (SRC, *use, useIndex, "")));
+
+    PROPAGATE(LESSDEF(VAR(Rload, Ghost),
+                      values[Rload],
+                      TGT),
+              BOUNDS(TyPosition::make
+                      (SRC, *LI, instrIndex[LI], ""),
+                     TyPosition::make
+                      (SRC, *use, useIndex, "")));
+
+    INFRULE(TyPosition::make
+             (SRC, *LI, instrIndex[LI], ""),
+            ConsIntroGhost::make
+             (ID(Rstore, Ghost),
+              REGISTER(Rload, Ghost)));
+
+    INFRULE(TyPosition::make
+             (SRC, *LI, instrIndex[LI], ""),
+            ConsTransitivity::make
+             (VAR(Rload, Physical),
+              VAR(Rstore, Physical),
+              //INSN(*SI),
+              VAR(Rstore, Ghost)));
+
+    INFRULE(TyPosition::make
+             (SRC, *LI, instrIndex[LI], ""),
+            ConsTransitivity::make
+             (VAR(Rload, Physical),
+              VAR(Rstore, Ghost),
+              VAR(Rload, Ghost)));
+
+    INFRULE(TyPosition::make
+             (SRC, *LI, instrIndex[LI], ""),
+            ConsTransitivityTgt::make
+             (VAR(Rload, Ghost),
+              VAR(Rstore, Ghost),
+              values[Rload]));
+    }
   });
 }
 
