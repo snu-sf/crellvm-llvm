@@ -201,6 +201,12 @@ public :
   static std::shared_ptr<TyValueType> make(const llvm::Type &type);
 };
 
+struct ConsVoidType : public TyValueType{
+public : 
+  ConsVoidType();
+  void serialize(cereal::JSONOutputArchive& archive) const;
+};
+
 struct ConsIntValueType : public TyValueType{
 public : 
   ConsIntValueType(std::shared_ptr<TyIntType> _int_type);
@@ -246,6 +252,18 @@ public :
 private : 
   uint64_t array_size;
   std::shared_ptr<TyValueType> valuetype;
+};
+
+struct ConsFunctionType : public TyValueType{
+public : 
+  ConsFunctionType(std::shared_ptr<TyValueType> _ret_type, std::vector<std::shared_ptr<TyValueType>> &_arg_ty_list, bool _is_vararg, int _vararg_size);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValueType> ret_type;
+  std::vector<std::shared_ptr<TyValueType>> arg_ty_list;
+  bool is_vararg;
+  int vararg_size;
 };
 
 /*
@@ -304,7 +322,7 @@ public :
   TyConstGlobalVarAddr(std::string _var_id, std::shared_ptr<TyValueType> _var_type);
   void serialize(cereal::JSONOutputArchive& archive) const;
   
-  static std::shared_ptr<TyConstGlobalVarAddr> make(const llvm::GlobalVariable &gv);
+  static std::shared_ptr<TyConstGlobalVarAddr> make(const llvm::GlobalObject &gv);
 private : 
   std::string var_id;
   std::shared_ptr<TyValueType> var_type;
@@ -342,6 +360,27 @@ public :
 
 private : 
   std::shared_ptr<TyConstExprGetElementPtr> const_expr_get_element_ptr;
+};
+
+struct TyConstExprBitcast{
+public : 
+  TyConstExprBitcast(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyConstant> v;
+  std::shared_ptr<TyValueType> dstty;
+};
+
+struct ConsConstExprBitcast : public TyConstantExpr{
+public : 
+  ConsConstExprBitcast(std::shared_ptr<TyConstExprBitcast> _const_expr_bitcast);
+  static std::shared_ptr<TyConstantExpr> make(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty);
+  static std::shared_ptr<TyConstantExpr> make(const llvm::ConstantExpr &ce);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyConstExprBitcast> const_expr_bitcast;
 };
 
 // constants
