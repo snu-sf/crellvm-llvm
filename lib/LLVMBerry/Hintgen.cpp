@@ -283,55 +283,89 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I,
 }
 
 void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
-                                       llvm::Value *replaceTo) {
+                                       llvm::Value *replaceTo,
+                                       std::string ghostvar,
+                                       std::shared_ptr<TyPosition> source_pos) {
   assert(ValidationUnit::Exists());
+  if (!source_pos) {
+    source_pos = INSTPOS(SRC, source);
+  }
 
-  ValidationUnit::GetInstance()->intrude(
-      [&source, &replaceTo](ValidationUnit::Dictionary &data, CoreHint &hints) {
-        llvm::Instruction *I = source;
-        llvm::Value *repl = replaceTo;
+  ValidationUnit::GetInstance()->intrude([&source, &replaceTo, &ghostvar,
+                                          &source_pos](
+      ValidationUnit::Dictionary &data, CoreHint &hints) {
+    llvm::Instruction *I = source;
 
-        std::string to_rem = getVariable(*I);
+    std::string to_rem = getVariable(*I);
 
-        for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
-          if (!llvm::isa<llvm::Instruction>(UI->getUser())) {
-            // let the validation fail when the user is not an instruction
-            return;
-          }
-          std::string user = getVariable(*UI->getUser());
-          llvm::Instruction *user_I =
-              llvm::dyn_cast<llvm::Instruction>(UI->getUser());
+    for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+      if (!llvm::isa<llvm::Instruction>(UI->getUser())) {
+        // let the validation fail when the user is not an instruction
+        return;
+      }
+      std::string user = getVariable(*UI->getUser());
+      llvm::Instruction *user_I =
+          llvm::dyn_cast<llvm::Instruction>(UI->getUser());
 
-          std::string prev_block_name = "";
-          if (llvm::isa<llvm::PHINode>(user_I)) {
-            llvm::BasicBlock *bb_from =
-                llvm::dyn_cast<llvm::PHINode>(user_I)->getIncomingBlock(*UI);
-            prev_block_name = getBasicBlockIndex(bb_from);
-          }
+      std::string prev_block_name = "";
+      if (llvm::isa<llvm::PHINode>(user_I)) {
+        llvm::BasicBlock *bb_from =
+            llvm::dyn_cast<llvm::PHINode>(user_I)->getIncomingBlock(*UI);
+        prev_block_name = getBasicBlockIndex(bb_from);
+      }
 
-          hints.addCommand(ConsPropagate::make(
-              ConsLessdef::make(ConsVar::make(to_rem, Physical),
-                                TyExpr::make(*repl, Physical), Source),
-              ConsBounds::make(
-                  TyPosition::make(Source, *I),
-                  TyPosition::make(Source, *user_I, prev_block_name))));
-          if (llvm::isa<llvm::PHINode>(user_I)) {
-            hints.addCommand(ConsInfrule::make(
-                TyPosition::make(Source, *user_I, prev_block_name),
-                ConsTransitivity::make(ConsVar::make(user, Physical),
-                                       ConsVar::make(to_rem, Previous),
-                                       TyExpr::make(*repl, Previous))));
-          } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
-            hints.addCommand(ConsInfrule::make(
-                TyPosition::make(Source, *user_I, prev_block_name),
-                ConsReplaceRhs::make(TyRegister::make(to_rem, Physical),
-                                     TyValue::make(*repl, Physical),
-                                     ConsVar::make(user, Physical),
-                                     ConsRhs::make(user, Physical, Source),
-                                     ConsRhs::make(user, Physical, Target))));
-          }
+      if (ghostvar == "") {
+        PROPAGATE(
+            LESSDEF(VAR(to_rem, Physical), EXPR(replaceTo, Physical), SRC),
+            BOUNDS(source_pos,
+                   TyPosition::make(SRC, *user_I, prev_block_name)));
+        if (llvm::isa<llvm::PHINode>(user_I)) {
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+                  ConsTransitivity::make(VAR(user, Physical),
+                                         VAR(to_rem, Previous),
+                                         EXPR(replaceTo, Previous)));
+        } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+          INFRULE(TyPosition::make(Source, *user_I, prev_block_name),
+                  ConsReplaceRhs::make(
+                      REGISTER(to_rem, Physical), VAL(replaceTo, Physical),
+                      VAR(user, Physical), RHS(user, Physical, Source),
+                      RHS(user, Physical, Target)));
         }
-      });
+      } else {
+        PROPAGATE(LESSDEF(VAR(to_rem, Physical), VAR(ghostvar, Ghost), SRC),
+                  BOUNDS(source_pos,
+                         TyPosition::make(SRC, *user_I, prev_block_name)));
+        PROPAGATE(LESSDEF(VAR(ghostvar, Ghost), EXPR(replaceTo, Physical), TGT),
+                  BOUNDS(INSTPOS(TGT, I),
+                         TyPosition::make(TGT, *user_I, prev_block_name)));
+
+        if (llvm::isa<llvm::PHINode>(user_I)) {
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+                  ConsTransitivity::make(VAR(user, Physical),
+                                         VAR(to_rem, Physical),
+                                         VAR(ghostvar, Ghost)));
+          INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
+                  ConsTransitivity::make(VAR(user, Physical),
+                                         VAR(ghostvar, Ghost),
+                                         EXPR(replaceTo, Physical)));
+        } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+                  ConsSubstitute::make(REGISTER(to_rem, Physical),
+                                       ID(ghostvar, Ghost), INSN(*user_I)));
+          llvm::Instruction *user_I_copy = user_I->clone();
+
+          for (unsigned i = 0; i < user_I_copy->getNumOperands(); i++) {
+            if (user_I->getOperand(i) == source)
+              user_I_copy->setOperand(i, replaceTo);
+          }
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+                  ConsTransitivity::make(EXPR(user_I, Physical), INSN(*user_I),
+                                         INSN(*user_I_copy)));
+          delete user_I_copy;
+        }
+      }
+    }
+  });
 }
 
 void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
@@ -838,7 +872,7 @@ void generateHintForMem2RegPropagateStore(llvm::StoreInst *SI,
       // stored value will not be changed in another iteration
       INFRULE(
           TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-          ConsIntroGhost::make(storeItem[SI].value, REGISTER(Rstore, Ghost)));
+          ConsIntroGhost::make(storeItem[SI].expr, REGISTER(Rstore, Ghost)));
 
       INFRULE(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
               ConsTransitivity::make(INSN(*SI), storeItem[SI].expr,
@@ -846,7 +880,7 @@ void generateHintForMem2RegPropagateStore(llvm::StoreInst *SI,
     } else {
       // stored value will be changed in another iteration
       INFRULE(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-              ConsIntroGhost::make(ID(storeItem[SI].op0, Ghost),
+              ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost),
                                    REGISTER(Rstore, Ghost)));
 
       INFRULE(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
@@ -890,7 +924,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
                      TyPosition::make(SRC, *use, useIndex, "")));
 
     INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-            ConsIntroGhost::make(ID(Rstore, Ghost), REGISTER(Rload, Ghost)));
+            ConsIntroGhost::make(VAR(Rstore, Ghost), REGISTER(Rload, Ghost)));
 
     INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
             ConsTransitivity::make(VAR(Rload, Physical), INSN(*SI),
@@ -903,55 +937,6 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
     INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
             ConsTransitivityTgt::make(VAR(Rload, Ghost), VAR(Rstore, Ghost),
                                       values[Rload]));
-    /*
-        } else if (llvm::isa<llvm::PHINode>(I)) {
-          std::cout << "check phi in propagateload" << std::endl;
-          llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(I);
-          std::string Rphi = getVariable(*PHI);
-          PROPAGATE(LESSDEF(VAR(Rload, Physical),
-                            VAR(Rload, Ghost),
-                            SRC),
-                    BOUNDS(TyPosition::make
-                            (SRC, *LI, instrIndex[LI], ""),
-                           TyPosition::make
-                            (SRC, *use, useIndex, "")));
-
-          PROPAGATE(LESSDEF(VAR(Rload, Ghost),
-                            VAR(Rphi, Physical),
-                            TGT),
-                    BOUNDS(TyPosition::make
-                            (SRC, *LI, instrIndex[LI], ""),
-                           TyPosition::make
-                            (SRC, *use, useIndex, "")));
-
-          INFRULE(TyPosition::make
-                   (SRC, *LI, instrIndex[LI], ""),
-                  ConsIntroGhost::make
-                   (ID(Rphi, Ghost),
-                    REGISTER(Rload, Ghost)));
-
-          INFRULE(TyPosition::make
-                   (SRC, *LI, instrIndex[LI], ""),
-                  ConsTransitivity::make
-                   (VAR(Rload, Physical),
-                    VAR(Rphi, Physical),
-                    VAR(Rphi, Ghost)));
-
-          INFRULE(TyPosition::make
-                   (SRC, *LI, instrIndex[LI], ""),
-                  ConsTransitivity::make
-                   (VAR(Rload, Physical),
-                    VAR(Rphi, Ghost),
-                    VAR(Rload, Ghost)));
-
-          INFRULE(TyPosition::make
-                   (SRC, *LI, instrIndex[LI], ""),
-                  ConsTransitivityTgt::make
-                   (VAR(Rload, Ghost),
-                    VAR(Rphi, Ghost),
-                    VAR(Rphi, Physical)));
-        }
-    */
   });
 }
 

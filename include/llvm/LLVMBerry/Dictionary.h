@@ -21,6 +21,7 @@ enum DictKeys {
   // InstCombine
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
+  ArgForLoadLoadStore,
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
@@ -143,6 +144,19 @@ public:
   OperandCases the_case;
 };
 DEFINE_TRAITS(ArgForFoldSelectOpOp, FoldSelectOpOpArg);
+
+// lib/Transform/InstCombine/InstCombineLoadStoreAlloca.cpp : visitLoadInst
+struct LoadLoadStoreArg {
+public:
+  llvm::Instruction *v1_inst;
+  llvm::Value *v1;
+  llvm::Value *ptr1;
+  llvm::Value *ptr1src;
+  llvm::Value *ptr2;
+  llvm::Value *ptr2src;
+  std::shared_ptr<TyPosition> v2_org_position;
+};
+DEFINE_TRAITS(ArgForLoadLoadStore, LoadLoadStoreArg);
 
 // lib/Transforms/Scalar/GVN.cpp : findLeader
 struct FindLeaderArg {
