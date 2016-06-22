@@ -962,7 +962,6 @@ void generateHintForMem2RegPropagateStore
 }
 
 void generateHintForMem2RegPropagateLoad
-//        (llvm::StoreInst *SI, llvm::LoadInst *LI,
         (llvm::Instruction *I, llvm::LoadInst *LI,
          llvm::Instruction *use, int useIndex) {
   ValidationUnit::GetInstance()->intrude
@@ -970,13 +969,11 @@ void generateHintForMem2RegPropagateLoad
       (Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
-    //std::string Rstore = getVariable(*(SI->getOperand(1)));
     std::string Rload = getVariable(*LI);
 
     if (values[Rload] == NULL)
       return;
 
-    if (llvm::isa<llvm::StoreInst>(I)) {
     llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(I);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
 
@@ -1022,54 +1019,306 @@ void generateHintForMem2RegPropagateLoad
              (VAR(Rload, Ghost),
               VAR(Rstore, Ghost),
               values[Rload]));
+/*      
     } else if (llvm::isa<llvm::PHINode>(I)) {
       std::cout << "check phi in propagateload" << std::endl; 
-    llvm::PHINode *SI = llvm::dyn_cast<llvm::PHINode>(I);
-    std::string Rstore = getVariable(*SI);
-    PROPAGATE(LESSDEF(VAR(Rload, Physical),
-                      VAR(Rload, Ghost),
-                      SRC),
-              BOUNDS(TyPosition::make
-                      (SRC, *LI, instrIndex[LI], ""),
-                     TyPosition::make
-                      (SRC, *use, useIndex, "")));
+      llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(I);
+      std::string Rphi = getVariable(*PHI);
+      PROPAGATE(LESSDEF(VAR(Rload, Physical),
+                        VAR(Rload, Ghost),
+                        SRC),
+                BOUNDS(TyPosition::make
+                        (SRC, *LI, instrIndex[LI], ""),
+                       TyPosition::make
+                        (SRC, *use, useIndex, "")));
 
-    PROPAGATE(LESSDEF(VAR(Rload, Ghost),
-                      values[Rload],
-                      TGT),
-              BOUNDS(TyPosition::make
-                      (SRC, *LI, instrIndex[LI], ""),
-                     TyPosition::make
-                      (SRC, *use, useIndex, "")));
+      PROPAGATE(LESSDEF(VAR(Rload, Ghost),
+                        VAR(Rphi, Physical),
+                        TGT),
+                BOUNDS(TyPosition::make
+                        (SRC, *LI, instrIndex[LI], ""),
+                       TyPosition::make
+                        (SRC, *use, useIndex, "")));
 
-    INFRULE(TyPosition::make
-             (SRC, *LI, instrIndex[LI], ""),
-            ConsIntroGhost::make
-             (ID(Rstore, Ghost),
-              REGISTER(Rload, Ghost)));
+      INFRULE(TyPosition::make
+               (SRC, *LI, instrIndex[LI], ""),
+              ConsIntroGhost::make
+               (ID(Rphi, Ghost),
+                REGISTER(Rload, Ghost)));
 
-    INFRULE(TyPosition::make
-             (SRC, *LI, instrIndex[LI], ""),
-            ConsTransitivity::make
-             (VAR(Rload, Physical),
-              VAR(Rstore, Physical),
-              //INSN(*SI),
-              VAR(Rstore, Ghost)));
+      INFRULE(TyPosition::make
+               (SRC, *LI, instrIndex[LI], ""),
+              ConsTransitivity::make
+               (VAR(Rload, Physical),
+                VAR(Rphi, Physical),
+                VAR(Rphi, Ghost)));
 
-    INFRULE(TyPosition::make
-             (SRC, *LI, instrIndex[LI], ""),
-            ConsTransitivity::make
-             (VAR(Rload, Physical),
-              VAR(Rstore, Ghost),
-              VAR(Rload, Ghost)));
+      INFRULE(TyPosition::make
+               (SRC, *LI, instrIndex[LI], ""),
+              ConsTransitivity::make
+               (VAR(Rload, Physical),
+                VAR(Rphi, Ghost),
+                VAR(Rload, Ghost)));
 
-    INFRULE(TyPosition::make
-             (SRC, *LI, instrIndex[LI], ""),
-            ConsTransitivityTgt::make
-             (VAR(Rload, Ghost),
-              VAR(Rstore, Ghost),
-              values[Rload]));
+      INFRULE(TyPosition::make
+               (SRC, *LI, instrIndex[LI], ""),
+              ConsTransitivityTgt::make
+               (VAR(Rload, Ghost),
+                VAR(Rphi, Ghost),
+                VAR(Rphi, Physical)));
     }
+*/    
+  });
+}
+
+void generateHintForMem2RegPHI
+        (llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
+         llvm::AllocaInst* AI, llvm::StoreInst* SI, 
+         llvm::BasicBlock::iterator II,
+         llvm::DenseMap<llvm::PHINode*, unsigned> PAM,
+         llvm::DenseMap<llvm::AllocaInst*, unsigned> AL,
+         bool isSameBB) {
+  ValidationUnit::GetInstance()->intrude
+    ([&BB, &Pred, &AI, &SI, &II, &PAM, &AL, &isSameBB]
+      (Dictionary &data, CoreHint &hints) {
+    llvm::StoreInst* SItmp = SI;
+    llvm::AllocaInst* AItmp = llvm::dyn_cast<llvm::AllocaInst>
+                                (SItmp->getPointerOperand());
+    llvm::Instruction *keyInst =
+      llvm::dyn_cast<llvm::Instruction>(SItmp->getOperand(1));
+
+    // prepare variables
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
+    auto &values = *(data.get<ArgForMem2Reg>()->values);
+    std::string bname = getBasicBlockIndex(SItmp->getParent());
+    std::string Ralloca = getVariable(*AItmp);
+    std::string Rstore = getVariable(*keyInst);
+    std::string keySI = bname + std::to_string(instrIndex[SItmp]) + Rstore;
+    llvm::BasicBlock* BBtmp = BB;
+    llvm::BasicBlock* Predtmp = Pred;
+    bool newStore = false;
+
+      std::cout<<"check block : " <<getBasicBlockIndex(BB)<<std::endl;
+    llvm::succ_iterator BI = succ_begin(BB), BE = succ_end(BB);
+    if (BI != BE)
+      std::cout<<"check successor : " <<getBasicBlockIndex(*BI)<<std::endl;
+    llvm::BasicBlock::iterator IItmp = II;
+    do {
+      if (!isSameBB) { 
+        if (BI != BE && !newStore) {
+        std::cout << getBasicBlockIndex(*BI) <<std::endl;
+          generateHintForMem2RegPHI(*BI, Predtmp, AItmp, SItmp, *BI->begin(), PAM, AL, true);
+        }
+        Predtmp = BBtmp;
+        BBtmp = *BI++;
+        IItmp = BBtmp->begin();
+      }
+
+      if (llvm::PHINode *PHI =
+            llvm::dyn_cast<llvm::PHINode>(BBtmp->begin())) {
+        llvm::BasicBlock::iterator PNI = BBtmp->begin();
+
+        while (PHI) {
+          std::string Rphi = getVariable(*PHI);
+
+          if (/*!isSameBB &&*/ Predtmp == SItmp->getParent() &&
+              PAM.count(PHI) &&
+              (Rstore == Rphi.substr(0, Rphi.rfind(".")))) {
+            generateHintForMem2RegPropagateStore
+              (SItmp, PHI, termIndex[bname]);
+
+            if (storeItem[SItmp].expr == values[keySI]) {
+              INFRULE(TyPosition::make
+                       (TGT, PHI->getParent()->getName(),
+                             Predtmp->getName()),
+                      ConsTransitivityTgt::make
+                       (VAR(Rstore, Ghost),
+                        storeItem[SItmp].expr,
+                        VAR(Rphi, Physical)));
+            } else {
+              INFRULE(TyPosition::make
+                       (TGT, PHI->getParent()->getName(),
+                             Predtmp->getName()),
+                      ConsTransitivityTgt::make
+                       (VAR(Rstore, Ghost),
+                        VAR(storeItem[SItmp].op0, Ghost),
+                        VAR(Rphi, Physical)));
+            }
+          }
+          PNI++;
+          PHI = llvm::dyn_cast<llvm::PHINode>(PNI);
+        }
+      }
+
+      for (llvm::BasicBlock::iterator Iiter = IItmp;
+           !llvm::isa<llvm::TerminatorInst>(Iiter);) {
+        llvm::Instruction *I = Iiter++;
+
+        if (llvm::LoadInst* LI = llvm::dyn_cast<llvm::LoadInst>(I)) {
+          if (getVariable(*(LI->getOperand(0))) != Ralloca)
+            continue;
+
+          llvm::AllocaInst *Src =
+            llvm::dyn_cast<llvm::AllocaInst>(LI->getPointerOperand());
+          if(!Src)
+            continue;
+
+          llvm::DenseMap<llvm::AllocaInst *, unsigned>::iterator AImap =
+            AL.find(Src);
+          if (AImap == AL.end())
+            continue;
+
+          // prepare variables
+          std::string Rload = getVariable(*LI);
+
+          if (llvm::PHINode *PHI =
+                llvm::dyn_cast<llvm::PHINode>(LI->getParent()->begin())) {
+            llvm::BasicBlock::iterator PNI = LI->getParent()->begin();
+
+            while (PHI) {
+              std::string Rphi = getVariable(*PHI);
+
+              if (!isSameBB &&
+                  PAM.count(PHI) &&
+                  (Rstore == Rphi.substr(0, Rphi.rfind(".")))) {
+                values[Rload] = ConsVar::make(Rphi, Physical);
+
+                PROPAGATE(LESSDEF(INSN(*SItmp),
+                                  VAR(Rstore, Ghost),
+                                  SRC),
+                          BOUNDS(TyPosition::make_start_of_block
+                                  (SRC, getBasicBlockIndex(LI->getParent())),
+                                 TyPosition::make
+                                  (SRC, *LI, instrIndex[LI], "")));
+
+                PROPAGATE(LESSDEF(VAR(Rstore, Ghost),
+                                  VAR(getVariable(*PHI), Physical),
+                                  TGT),
+                          BOUNDS(TyPosition::make_start_of_block
+                                  (SRC, getBasicBlockIndex(LI->getParent())),
+                                 TyPosition::make
+                                  (SRC, *LI, instrIndex[LI], "")));
+
+                if (storeItem[SItmp].expr == values[keySI]) {
+                  INFRULE(TyPosition::make
+                           (TGT, LI->getParent()->getName(), 
+                            Predtmp->getName()),
+                          ConsTransitivityTgt::make
+                           (VAR(Rstore, Ghost),
+                            storeItem[SItmp].expr,
+                            VAR(getVariable(*PHI), Physical)));
+                } else {
+                  INFRULE(TyPosition::make
+                           (TGT, LI->getParent()->getName(), 
+                            Predtmp->getName()),
+                          ConsTransitivityTgt::make
+                           (VAR(Rstore, Ghost),
+                            VAR(storeItem[SItmp].op0, Ghost),
+                            VAR(getVariable(*PHI), Physical)));
+                }
+              }
+              PNI++;
+              PHI = llvm::dyn_cast<llvm::PHINode>(PNI);
+            }
+          }
+
+          PROPAGATE(ALLOCA(REGISTER(Ralloca, Physical),
+                           SRC),
+                    BOUNDS(TyPosition::make
+                            (SRC, *AItmp, instrIndex[AItmp], ""),
+                           TyPosition::make
+                            (SRC, *LI, instrIndex[LI], "")));
+
+          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
+                            SRC),
+                    BOUNDS(TyPosition::make
+                            (SRC, *AItmp, instrIndex[AItmp], ""),
+                           TyPosition::make
+                            (SRC, *LI, instrIndex[LI], "")));
+
+          if ((getVariable(*LI->getOperand(0)) == Rstore) &&
+              ((LI->getParent() == SItmp->getParent() &&
+               instrIndex[SItmp] < instrIndex[LI]) ||
+              (LI->getParent() != SItmp->getParent()))) {
+            if (llvm::PHINode *PHI =
+                 llvm::dyn_cast<llvm::PHINode>(LI->getParent()->begin())) {
+              llvm::BasicBlock::iterator PNI = LI->getParent()->begin();
+              std::cout << "bugfixblock: " <<getBasicBlockIndex(LI->getParent())<<std::endl;
+              bool isSamePHI = false;
+              while (PHI) {
+                std::string Rphi = getVariable(*PHI);
+
+                if (/*!isSameBB &&*/ SItmp->getParent() != LI->getParent() &&
+                    PAM.count(PHI) &&
+                    (Rstore == Rphi.substr(0, Rphi.rfind(".")))) {
+                  isSamePHI = true;
+                } else {
+                  std::cout<<"bugfix: "<<getBasicBlockIndex(SItmp->getParent())<<instrIndex[SItmp]<<", "<<getVariable(*LI)<<" "<<instrIndex[LI]<<std::endl;
+                }
+                PNI++;
+                PHI = llvm::dyn_cast<llvm::PHINode>(PNI);
+              }
+
+              if (!isSamePHI)
+                generateHintForMem2RegPropagateStore
+                  (SItmp, LI, instrIndex[LI]);
+            } else {
+                  std::cout<<"bugfix2: "<<getVariable(*SItmp->getOperand(1))<<", "<<getVariable(*LI)<<" "<<instrIndex[LI]<<std::endl;
+              generateHintForMem2RegPropagateStore
+                (SItmp, LI, instrIndex[LI]);
+            }
+
+            // add hints per every use of LI
+            for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
+              llvm::Use &U = *(UI++);
+              llvm::Instruction *use =
+                llvm::dyn_cast<llvm::Instruction>(U.getUser());
+
+              // set index of use
+              int useIndex =
+                    getIndexofMem2Reg
+                      (use, instrIndex[use],
+                       termIndex[getBasicBlockIndex(use->getParent())]);
+
+              if ((LI->getParent() == use->getParent() &&
+                   instrIndex[LI] < instrIndex[use]) ||
+                  (LI->getParent() != use->getParent())) {
+                generateHintForMem2RegPropagateLoad
+                  (SItmp, LI, use, useIndex);
+              }
+            }
+          }
+
+          std::cout << "maydiff: " << Rload << std::endl;
+          // propagate maydiff
+          propagateMaydiffGlobal(Rload, Physical);
+          propagateMaydiffGlobal(Rload, Previous);
+/*
+          // check if load is already in nop
+          std::vector<std::string>::iterator it =
+            find(checkNop.begin(), checkNop.end(), Rload);
+          if (it == checkNop.end()) {
+            // add nop
+            hints.addNopPosition
+              (TyPosition::make
+                (Target, *LI, instrIndex[LI]-1, ""));
+          }
+*/          
+        } else if (llvm::StoreInst *SItmp2 =
+                    llvm::dyn_cast<llvm::StoreInst>(I)) {
+          // if we find new store to same alloca,
+          // stop searching
+          if (getVariable(*(SItmp2->getOperand(1))) == Ralloca) {
+            SItmp = SItmp2;
+            newStore = true;
+            break;
+          } else continue;
+        }
+      }
+      isSameBB = false;
+    } while (BI != BE);      
   });
 }
 

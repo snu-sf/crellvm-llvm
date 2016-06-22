@@ -611,12 +611,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                 (next, instrIndex[next],
                  termIndex[llvmberry::getBasicBlockIndex(next->getParent())]);
 
-        // set index of use
-        int useIndex = 
-              llvmberry::getIndexofMem2Reg
-                (use, instrIndex[use],
-                 termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
-
         // skip if there is no use of SI
         if ((instrIndex[SI] != instrIndex[use]) ||
             (SI->getParent() != use->getParent())) {
@@ -733,7 +727,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               (llvmberry::Dictionary &data,
                llvmberry::CoreHint &hints) {
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-      std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
+      //std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
 
       hints.addNopPosition
         (llvmberry::TyPosition::make
@@ -1024,6 +1018,7 @@ void PromoteMem2Reg::run() {
 
         // propagate maydiff
         llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
 
         hints.addNopPosition
           (llvmberry::TyPosition::make
@@ -1179,12 +1174,10 @@ void PromoteMem2Reg::run() {
         (llvmberry::TyPosition::make
           (llvmberry::Target, *A, instrIndex[A]-1, ""));
 
-/* (working)        
       std::vector<AllocaInst*>::iterator position = std::find(allocas.begin(), allocas.end(), A);
       if (position != allocas.end()) {
         allocas.erase(position);
       }
-*/      
     });
 
     // If there are any uses of the alloca instructions left, they must be in
@@ -1415,8 +1408,6 @@ NextIteration:
   // If we are inserting any phi nodes into this BB, they will already be in the
   // block.
   if (PHINode *APN = dyn_cast<PHINode>(BB->begin())) {
-    std::cout << "origin: "<<std::string(APN->getName()) << " "<<isa<PHINode>(APN)<<std::endl;
-
     // If we have PHI nodes to update, compute the number of edges from Pred to
     // BB.
     if (PhiToAllocaMap.count(APN)) {
@@ -1435,8 +1426,6 @@ NextIteration:
       BasicBlock::iterator PNI = BB->begin();
       do {
         unsigned AllocaNo = PhiToAllocaMap[APN];
-
-        std::cout<<"checkphi " <<(llvmberry::getVariable(*APN)).substr(0, (llvmberry::getVariable(*APN)).rfind(".")) << ": "<<AllocaNo<<std::endl;
       
         // Add N incoming values to the PHI node.
         for (unsigned i = 0; i != NumEdges; ++i)
@@ -1445,20 +1434,12 @@ NextIteration:
         llvmberry::ValidationUnit::GetInstance()->intrude
                 ([&APN, &Pred]
                   (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-          auto &values = *(data.get<llvmberry::ArgForMem2Reg>()->values);
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
 
-          //values[LI] = ConsVar::make(reg_stored, Physical);
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
-/*
-          // add nop
-          hints.addNopPosition
-            (llvmberry::TyPosition::make
-              (llvmberry::Source, *APN, prev));
-*/              
         });
 
 
@@ -1497,6 +1478,17 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
 
       Value *V = IncomingVals[AI->second];
 
+      llvmberry::ValidationUnit::GetInstance()->intrude
+             ([&LI]
+                (llvmberry::Dictionary &data,
+                 llvmberry::CoreHint &hints) {
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+
+        hints.addNopPosition
+          (llvmberry::TyPosition::make
+            (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
+      });
+
       // Anything using the load now uses the current value.
       LI->replaceAllUsesWith(V);
       if (AST && LI->getType()->isPointerTy())
@@ -1516,8 +1508,11 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
       DenseMap<PHINode *, unsigned> &PAM = PhiToAllocaMap;
       DenseMap<AllocaInst *, unsigned> &AL = AllocaLookup;
       llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&BB, &Dest, &SI, &II, &PAM, &AL]
+              ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        llvmberry::generateHintForMem2RegPHI
+          (BB, Pred, Dest, SI, II, PAM, AL, true);
+/*                
         Instruction *keyInst = dyn_cast<Instruction>(SI->getOperand(1));
 
         // prepare variables
@@ -1536,32 +1531,40 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
         BasicBlock::iterator IItmp = II;
         IItmp--;
         do {
-          BasicBlock *B = *BI;
-
-          if (!isSameBB)
+          if (!isSameBB) {
             IItmp = *(BI++)->begin();
+          }
 
-          if (PHINode *PHI = dyn_cast<PHINode>(B->begin())) {
+          if (PHINode *PHI = dyn_cast<PHINode>(SI->getParent()->begin())) {
+            BasicBlock::iterator PNI = SI->getParent()->begin();
+            
+            while (PHI) {
+              std::string Rphi = llvmberry::getVariable(*PHI);
 
-            if (PAM.count(PHI)) {
-              llvmberry::generateHintForMem2RegPropagateStore
-                (SI, PHI, termIndex[bname]);
+              if (!isSameBB &&
+                  PAM.count(PHI) &&
+                  (Rstore == Rphi.substr(0, Rphi.rfind(".")))) {
+                llvmberry::generateHintForMem2RegPropagateStore
+                  (SI, PHI, termIndex[bname]);
 
-              if (storeItem[SI].expr == values[keySI]) {
-                INFRULE(llvmberry::TyPosition::make
-                         (TGT, PHI->getParent()->getName(), SI->getParent()->getName()),
-                        llvmberry::ConsTransitivityTgt::make
-                         (VAR(Rstore, Ghost),
-                          storeItem[SI].expr,
-                          VAR(llvmberry::getVariable(*PHI), Physical)));
-              } else {
-                INFRULE(llvmberry::TyPosition::make
-                         (TGT, PHI->getParent()->getName(), SI->getParent()->getName()),
-                        llvmberry::ConsTransitivityTgt::make
-                         (VAR(Rstore, Ghost),
-                          VAR(storeItem[SI].op0, Ghost),
-                          VAR(llvmberry::getVariable(*PHI), Physical)));
+                if (storeItem[SI].expr == values[keySI]) {
+                  INFRULE(llvmberry::TyPosition::make
+                           (TGT, PHI->getParent()->getName(), SI->getParent()->getName()),
+                          llvmberry::ConsTransitivityTgt::make
+                           (VAR(Rstore, Ghost),
+                            storeItem[SI].expr,
+                            VAR(Rphi, Physical)));
+                } else {
+                  INFRULE(llvmberry::TyPosition::make
+                           (TGT, PHI->getParent()->getName(), SI->getParent()->getName()),
+                          llvmberry::ConsTransitivityTgt::make
+                           (VAR(Rstore, Ghost),
+                            VAR(storeItem[SI].op0, Ghost),
+                            VAR(Rphi, Physical)));
+                }
               }
+              PNI++;
+              PHI = dyn_cast<PHINode>(PNI);
             }
           }
 
@@ -1585,42 +1588,51 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
               std::string Rload = llvmberry::getVariable(*LI);
                 std::cout<<"out - "<<llvmberry::getBasicBlockIndex(LI->getParent())<<instrIndex[LI]<<": "<<llvmberry::getBasicBlockIndex(SI->getParent())<<instrIndex[SI]<<std::endl;
 
-              if (PHINode *PHI = dyn_cast<PHINode>(B->begin())) {
-                std::string Rphi = llvmberry::getVariable(*PHI);
-                values[Rload] =  llvmberry::ConsVar::make(Rphi, llvmberry::Physical);
-
-                if (PAM.count(PHI)) {
-                  PROPAGATE(LESSDEF(INSN(*SI),
-                                    VAR(Rstore, Ghost),
-                                    SRC),
-                            BOUNDS(llvmberry::TyPosition::make_start_of_block
-                                    (SRC, llvmberry::getBasicBlockIndex(LI->getParent())),
-                                   llvmberry::TyPosition::make
-                                    (SRC, *LI, instrIndex[LI], "")));
-
-                  PROPAGATE(LESSDEF(VAR(Rstore, Ghost),
-                                    VAR(llvmberry::getVariable(*PHI), Physical),
-                                    TGT),
-                            BOUNDS(llvmberry::TyPosition::make_start_of_block
-                                    (SRC, llvmberry::getBasicBlockIndex(LI->getParent())),
-                                   llvmberry::TyPosition::make
-                                    (SRC, *LI, instrIndex[LI], "")));
+              if (PHINode *PHI = dyn_cast<PHINode>(LI->getParent()->begin())) {
+                BasicBlock::iterator PNI = LI->getParent()->begin();
                 
-                  if (storeItem[SI].expr == values[keySI]) {
-                    INFRULE(llvmberry::TyPosition::make
-                             (TGT, LI->getParent()->getName(), SI->getParent()->getName()),
-                            llvmberry::ConsTransitivityTgt::make
-                             (VAR(Rstore, Ghost),
-                              storeItem[SI].expr,
-                              VAR(llvmberry::getVariable(*PHI), Physical)));
-                  } else {
-                    INFRULE(llvmberry::TyPosition::make
-                             (TGT, LI->getParent()->getName(), SI->getParent()->getName()),
-                            llvmberry::ConsTransitivityTgt::make
-                             (VAR(Rstore, Ghost),
-                              VAR(storeItem[SI].op0, Ghost),
-                              VAR(llvmberry::getVariable(*PHI), Physical)));
+                while (PHI) {
+                  std::string Rphi = llvmberry::getVariable(*PHI);
+
+                  if (!isSameBB &&
+                      PAM.count(PHI) &&
+                      (Rstore == Rphi.substr(0, Rphi.rfind(".")))) {
+                    values[Rload] =  llvmberry::ConsVar::make(Rphi, llvmberry::Physical);
+                    
+                    PROPAGATE(LESSDEF(INSN(*SI),
+                                      VAR(Rstore, Ghost),
+                                      SRC),
+                              BOUNDS(llvmberry::TyPosition::make_start_of_block
+                                      (SRC, llvmberry::getBasicBlockIndex(LI->getParent())),
+                                     llvmberry::TyPosition::make
+                                      (SRC, *LI, instrIndex[LI], "")));
+
+                    PROPAGATE(LESSDEF(VAR(Rstore, Ghost),
+                                      VAR(llvmberry::getVariable(*PHI), Physical),
+                                      TGT),
+                              BOUNDS(llvmberry::TyPosition::make_start_of_block
+                                      (SRC, llvmberry::getBasicBlockIndex(LI->getParent())),
+                                     llvmberry::TyPosition::make
+                                      (SRC, *LI, instrIndex[LI], "")));
+                  
+                    if (storeItem[SI].expr == values[keySI]) {
+                      INFRULE(llvmberry::TyPosition::make
+                               (TGT, LI->getParent()->getName(), SI->getParent()->getName()),
+                              llvmberry::ConsTransitivityTgt::make
+                               (VAR(Rstore, Ghost),
+                                storeItem[SI].expr,
+                                VAR(llvmberry::getVariable(*PHI), Physical)));
+                    } else {
+                      INFRULE(llvmberry::TyPosition::make
+                               (TGT, LI->getParent()->getName(), SI->getParent()->getName()),
+                              llvmberry::ConsTransitivityTgt::make
+                               (VAR(Rstore, Ghost),
+                                VAR(storeItem[SI].op0, Ghost),
+                                VAR(llvmberry::getVariable(*PHI), Physical)));
+                    }
                   }
+                  PNI++;
+                  PHI = dyn_cast<PHINode>(PNI);
                 }
               }
 
@@ -1655,10 +1667,26 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
                 // %b = load i32 %x      | %b = load i32 1
                 // %c = add i32 %a, %b   | %c = add i32 %a, %b
                 // ret i32 %c            | ret i32 %c
-                if (PHINode *PHI = dyn_cast<PHINode>(LI->getParent()->begin())) {}
-                else
-                llvmberry::generateHintForMem2RegPropagateStore
-                  (SI, LI, instrIndex[LI]);
+                if (PHINode *PHI = dyn_cast<PHINode>(LI->getParent()->begin())) {
+                  BasicBlock::iterator PNI = SI->getParent()->begin();
+                  
+                  while (PHI) {
+                    std::string Rphi = llvmberry::getVariable(*PHI);
+                    
+                    if (!isSameBB &&
+                        PAM.count(PHI) &&
+                        (Rstore == Rphi.substr(0, Rphi.rfind(".")))) { }
+                    else {
+                      llvmberry::generateHintForMem2RegPropagateStore
+                        (SI, LI, instrIndex[LI]);
+                    }
+                    PNI++;
+                    PHI = dyn_cast<PHINode>(PNI);
+                  }
+                } else {
+                  llvmberry::generateHintForMem2RegPropagateStore
+                    (SI, LI, instrIndex[LI]);
+                }
 
                 // add hints per every use of LI
                 for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
@@ -1706,6 +1734,7 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
           }
           isSameBB = false;
         } while (BI != BE);
+*/              
       });
 
       // what value were we writing?

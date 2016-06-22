@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/IR/CFG.h"
 
 #define PHIPOS(SCOPE, PN, prevI) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), prevI->getParent()->getName()) 
 #define PHIPOSJustPhi(SCOPE, PN) llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
@@ -159,9 +161,16 @@ namespace llvmberry{
           (llvm::StoreInst *SI, llvm::Instruction *next, int nextIndex);
 
   void generateHintForMem2RegPropagateLoad
-          //(llvm::StoreInst *SI, llvm::LoadInst *LI,
           (llvm::Instruction *I, llvm::LoadInst *LI,
            llvm::Instruction *use, int useIndex);
+
+  void generateHintForMem2RegPHI
+          (llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
+           llvm::AllocaInst* AI, llvm::StoreInst* SI,
+           llvm::BasicBlock::iterator II,
+           llvm::DenseMap<llvm::PHINode*, unsigned> PAM,
+           llvm::DenseMap<llvm::AllocaInst*, unsigned> AL,
+           bool isSameBB);
 
   int getIndexofMem2Reg(llvm::Instruction *instr, 
                         int instrIndex, int termIndex);
