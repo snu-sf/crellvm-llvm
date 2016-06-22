@@ -8,7 +8,6 @@
 
 #include <memory>
 
-
 namespace llvmberry {
 
 enum DictKeys {
@@ -22,6 +21,7 @@ enum DictKeys {
   // InstCombine
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
+  ArgForLoadLoadStore,
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
@@ -37,25 +37,23 @@ enum DictKeys {
  * then Dictionary will use B as a value type for the key A
  * (where A must be in DictKeys enum)
  */
-#define DEFINE_TRAITS(KEYVAL, CLASSNAME) \
-    template<> struct DictKeysTraits<KEYVAL> { \
-      typedef CLASSNAME ty; \
-    }
-template<DictKeys key>
-struct DictKeysTraits {
+#define DEFINE_TRAITS(KEYVAL, CLASSNAME)                                       \
+  template <> struct DictKeysTraits<KEYVAL> { typedef CLASSNAME ty; }
+template <DictKeys key> struct DictKeysTraits {
   // DictKeysTraits class has no member for arbitrary type
 };
-
 
 // Used in InstructionSimplify.cpp : SimplifyAndInst(), SimplifyOrInst()
 struct SimplifyInstArg {
 public:
   SimplifyInstArg();
-  void setHintGenFunc(std::string microoptName, std::function<void(llvm::Instruction *)> hintGenFunc);
+  void setHintGenFunc(std::string microoptName,
+                      std::function<void(llvm::Instruction *)> hintGenFunc);
   void generateHint(llvm::Instruction *arg) const;
   bool isActivated() const;
   std::string getMicroOptName() const;
   bool isSwapped;
+
 private:
   bool activated;
   std::string microoptName;
@@ -78,10 +76,10 @@ DEFINE_TRAITS(ArgForStripPointerCasts, StripPointerCastsArg);
 
 // lib/Analysis/Loads.cpp : FindAvailableLoadedValueArg
 struct FindAvailableLoadedValueArg {
-public: 
+public:
   typedef std::vector<std::pair<
-      llvmberry::StripPointerCastsArg::TyStrippedValues, 
-      std::pair<llvm::StoreInst *, std::string> > > TyOrthogonalStoresObj;
+      llvmberry::StripPointerCastsArg::TyStrippedValues,
+      std::pair<llvm::StoreInst *, std::string>>> TyOrthogonalStoresObj;
   typedef llvmberry::StripPointerCastsArg::TyStrippedValuesObj TyPtrEqValuesObj;
   typedef std::shared_ptr<TyOrthogonalStoresObj> TyOrthogonalStores;
   typedef std::shared_ptr<TyPtrEqValuesObj> TyPtrEqValues;
@@ -90,7 +88,7 @@ public:
   TyPtrEqValues ptr2EquivalentValues;
   bool isLoadStore;
   llvm::StoreInst *loadstoreStoreInst;
-  
+
   FindAvailableLoadedValueArg();
 };
 DEFINE_TRAITS(ArgForFindAvailableLoadedValue, FindAvailableLoadedValueArg);
@@ -102,7 +100,7 @@ public:
   typedef std::shared_ptr<TyAllocasObj> TyAllocas;
   TyAllocas allocas;
 
-  typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndexObj;
+  typedef std::map<const llvm::Instruction *, unsigned> TyInstrIndexObj;
   typedef std::shared_ptr<TyInstrIndexObj> TyInstrIndex;
   TyInstrIndex instrIndex;
 
@@ -110,8 +108,7 @@ public:
   typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
   TyTermIndex termIndex;
 
-  typedef std::map<std::string,
-                   std::shared_ptr<TyExpr>> TyValuesObj;
+  typedef std::map<std::string, std::shared_ptr<TyExpr>> TyValuesObj;
   typedef std::shared_ptr<TyValuesObj> TyValues;
   TyValues values;
 
@@ -121,8 +118,7 @@ public:
     std::string op0;
   };
 
-  typedef std::map<const llvm::Instruction*,
-                   Triple> TyStoreItemObj;
+  typedef std::map<const llvm::Instruction *, Triple> TyStoreItemObj;
   typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
   TyStoreItem storeItem;
 
@@ -140,12 +136,23 @@ DEFINE_TRAITS(ArgForVisitMul, VisitMulArg);
 // lib/Transforms/InstCombine/InstCombineSelect.cpp : FoldSelectOpOp
 struct FoldSelectOpOpArg {
 public:
-  enum OperandCases{
-  XY_XZ, YX_ZX, XY_ZX, YX_XZ
-  };
+  enum OperandCases { XY_XZ, YX_ZX, XY_ZX, YX_XZ };
   OperandCases the_case;
 };
 DEFINE_TRAITS(ArgForFoldSelectOpOp, FoldSelectOpOpArg);
+
+// lib/Transform/InstCombine/InstCombineLoadStoreAlloca.cpp : visitLoadInst
+struct LoadLoadStoreArg {
+public:
+  llvm::Instruction *v1_inst;
+  llvm::Value *v1;
+  llvm::Value *ptr1;
+  llvm::Value *ptr1src;
+  llvm::Value *ptr2;
+  llvm::Value *ptr2src;
+  std::shared_ptr<TyPosition> v2_org_position;
+};
+DEFINE_TRAITS(ArgForLoadLoadStore, LoadLoadStoreArg);
 
 // lib/Transforms/Scalar/GVN.cpp : findLeader
 struct FindLeaderArg {
@@ -154,47 +161,43 @@ public:
 };
 DEFINE_TRAITS(ArgForFindLeader, FindLeaderArg);
 
-
-
-
 class Dictionary {
 private:
   std::map<DictKeys, boost::any> data;
 
 public:
-  template<DictKeys key>
-  void assertExists() {
-    assert(data.find(key) != data.end() && "Dictionary does not contain the key.");
+  template <DictKeys key> void assertExists() {
+    assert(data.find(key) != data.end() &&
+           "Dictionary does not contain the key.");
   }
 
-  template<DictKeys key>
+  template <DictKeys key>
   std::shared_ptr<typename DictKeysTraits<key>::ty> get() {
     assertExists<key>();
-    std::shared_ptr<typename DictKeysTraits<key>::ty> ptr = boost::any_cast<std::shared_ptr<
-          typename DictKeysTraits<key>::ty> >(data[key]);
+    std::shared_ptr<typename DictKeysTraits<key>::ty> ptr =
+        boost::any_cast<std::shared_ptr<typename DictKeysTraits<key>::ty>>(
+            data[key]);
     return ptr;
   }
 
-  template<DictKeys key>
+  template <DictKeys key>
   std::shared_ptr<typename DictKeysTraits<key>::ty> create() {
-    auto ptr = std::shared_ptr<typename DictKeysTraits<key>::ty>
-        (new typename DictKeysTraits<key>::ty());
+    auto ptr = std::shared_ptr<typename DictKeysTraits<key>::ty>(
+        new typename DictKeysTraits<key>::ty());
     data[key] = ptr;
     return ptr;
   }
 
-  template<DictKeys key>
+  template <DictKeys key>
   void set(std::shared_ptr<typename DictKeysTraits<key>::ty> &t) {
     data[key] = t;
   }
 
-  template<DictKeys key>
-  void erase() {
+  template <DictKeys key> void erase() {
     assertExists<key>();
     data.erase(key);
   }
 };
-
 }
 
 #endif
