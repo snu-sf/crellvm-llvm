@@ -179,7 +179,8 @@ void generateHintForMem2RegPropagateNoalias(llvm::AllocaInst *AI,
                                             llvm::Instruction *useInst,
                                             int useIndex);
 
-void generateHintForMem2RegPropagateStore(llvm::StoreInst *SI,
+void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
+                                          llvm::StoreInst *SI,
                                           llvm::Instruction *next,
                                           int nextIndex);
 

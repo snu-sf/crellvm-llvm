@@ -425,7 +425,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // %c = add i32 %a, %b   | %c = add i32 %a, %b
         // ret i32 %c            | ret i32 %c
         llvmberry::generateHintForMem2RegPropagateStore
-          (OnlyStore, LI, instrIndex[LI]);
+          (NULL, OnlyStore, LI, instrIndex[LI]);
       }
 
       // add hints per every use of LI
@@ -627,7 +627,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
           // %c = load i32 %x       | %c = load i32 3
           // ret i32 %c             | ret i32 %c
           llvmberry::generateHintForMem2RegPropagateStore
-            (SI, next, nextIndex);
+            (NULL, SI, next, nextIndex);
         }
       });     
     }
