@@ -846,6 +846,9 @@ void generateHintForMem2RegPropagateStore(llvm::StoreInst *SI,
     std::string bname = getBasicBlockIndex(SI->getParent());
     std::string keySI = bname + std::to_string(instrIndex[SI]) + Rstore;
 
+    if (storeItem[SI].expr == NULL)
+      return;
+
     // propagate instruction
     PROPAGATE(LESSDEF(INSN(*SI), VAR(Rstore, Ghost), SRC),
               BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
@@ -896,6 +899,9 @@ void generateHintForMem2RegPropagateLoad(llvm::StoreInst *SI,
     auto &values = *(data.get<ArgForMem2Reg>()->values);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
     std::string Rload = getVariable(*LI);
+
+    if (values[Rload] == NULL)
+      return;
 
     PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),

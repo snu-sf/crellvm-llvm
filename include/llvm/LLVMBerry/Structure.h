@@ -888,8 +888,6 @@ private:
   std::shared_ptr<TyInstruction> instruction;
 };
 
-std::shared_ptr<TyExpr> makeExpr_fromStoreInst(const llvm::StoreInst *si);
-
 /*
  * propagate object
  */
