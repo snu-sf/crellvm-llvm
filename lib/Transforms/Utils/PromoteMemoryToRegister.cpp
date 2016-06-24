@@ -839,7 +839,11 @@ void PromoteMem2Reg::run() {
                               std::string(SI->getOperand(1)->getName());
 
           storeItem[SI].value = std::move(llvmberry::TyValue::make(*(SI->getOperand(0))));
-          storeItem[SI].expr = std::move(llvmberry::makeExpr_fromStoreInst(SI));
+          if (isa<ConstantPointerNull>(SI->getOperand(0)))
+            storeItem[SI].expr = NULL;
+          else
+            storeItem[SI].expr = std::move(llvmberry::TyExpr::make(*(SI->getOperand(0)), 
+                                                                 llvmberry::Physical));
           storeItem[SI].op0 = "%" + std::string(SI->getOperand(0)->getName());
           values[keySI] = storeItem[SI].expr;
         }
