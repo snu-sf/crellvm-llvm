@@ -793,6 +793,11 @@ std::shared_ptr<TyConstantExpr> TyConstantExpr::make(const llvm::ConstantExpr &c
     return ConsConstExprGetElementPtr::make(ce);
   else if(ce.getOpcode() == llvm::Instruction::BitCast)
     return ConsConstExprBitcast::make(ce);
+  std::string output;
+  llvm::raw_string_ostream rso(output);
+  ce.print(rso);
+  rso.str();
+  std::cerr << output << std::endl;
   assert("TyConstantExpr::make() : unsupported constant expression" && false);
 }
 
@@ -1071,6 +1076,11 @@ std::shared_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
   } else if (type.isX86_FP80Ty()) {
     vt = new ConsFloatValueType(X86_FP80Type);
   } else {
+    std::string output;
+    llvm::raw_string_ostream rso(output);
+    type.print(rso);
+    rso.str();
+    std::cerr << output << std::endl;
     assert("TyValueType::make(const llvmType &) : unknown value type" && false);
     vt = nullptr;
   }
@@ -1192,6 +1202,11 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
   } else if (const llvm::GetElementPtrInst *gepi = llvm::dyn_cast<llvm::GetElementPtrInst>(&i)) {
     return std::shared_ptr<TyInstruction>(new ConsGetElementPtrInst(TyGetElementPtrInst::make(*gepi)));
   } else {
+    std::string output;
+    llvm::raw_string_ostream rso(output);
+    i.print(rso);
+    rso.str();
+    std::cerr << output << std::endl;
     assert("TyInstruction::make : unsupporting instruction type" && false);
     return std::shared_ptr<TyInstruction>(nullptr);
   }
