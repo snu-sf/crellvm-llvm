@@ -2268,6 +2268,25 @@ void ConsTruncBitcast::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(trunc_bitcast));
 }
 
+TyTruncOnebit::TyTruncOnebit(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _orgsz) : z(_z), x(_x), y(_y), orgsz(_orgsz){
+}
+void TyTruncOnebit::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(orgsz));
+}
+
+ConsTruncOnebit::ConsTruncOnebit(std::shared_ptr<TyTruncOnebit> _trunc_onebit) : trunc_onebit(_trunc_onebit){
+}
+std::shared_ptr<TyInfrule> ConsTruncOnebit::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _orgsz){
+  std::shared_ptr<TyTruncOnebit> _val(new TyTruncOnebit(_z, _x, _y, _orgsz));
+  return std::shared_ptr<TyInfrule>(new ConsTruncOnebit(_val));
+}
+void ConsTruncOnebit::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("TruncOnebit");
+  archive(CEREAL_NVP(trunc_onebit));
+}
+
 TyTruncPtrtoint::TyTruncPtrtoint(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty) : src(_src), mid(_mid), dst(_dst), srcty(_srcty), midty(_midty), dstty(_dstty){
 }
 void TyTruncPtrtoint::serialize(cereal::JSONOutputArchive& archive) const{
@@ -3148,6 +3167,63 @@ void ConsZextBitcast::serialize(cereal::JSONOutputArchive& archive) const{
   archive.writeName();
   archive.saveValue("ZextBitcast");
   archive(CEREAL_NVP(zext_bitcast));
+}
+
+TyZextTruncAnd::TyZextTruncAnd(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TyConstant> _c, std::shared_ptr<TySize> _s, std::shared_ptr<TySize> _sprime) : z(_z), x(_x), y(_y), w(_w), c(_c), s(_s), sprime(_sprime){
+}
+void TyZextTruncAnd::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(w), CEREAL_NVP(c), CEREAL_NVP(s), CEREAL_NVP(sprime));
+}
+
+ConsZextTruncAnd::ConsZextTruncAnd(std::shared_ptr<TyZextTruncAnd> _zext_trunc_and) : zext_trunc_and(_zext_trunc_and){
+}
+std::shared_ptr<TyInfrule> ConsZextTruncAnd::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _w, std::shared_ptr<TyConstant> _c, std::shared_ptr<TySize> _s, std::shared_ptr<TySize> _sprime){
+  std::shared_ptr<TyZextTruncAnd> _val(new TyZextTruncAnd(_z, _x, _y, _w, _c, _s, _sprime));
+  return std::shared_ptr<TyInfrule>(new ConsZextTruncAnd(_val));
+}
+void ConsZextTruncAnd::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ZextTruncAnd");
+  archive(CEREAL_NVP(zext_trunc_and));
+}
+
+TyZextTruncAndXor::TyZextTruncAndXor(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyConstant> _c, std::shared_ptr<TySize> _s, std::shared_ptr<TySize> _sprime) : z(_z), x(_x), v(_v), w(_w), y(_y), yprime(_yprime), c(_c), s(_s), sprime(_sprime){
+}
+void TyZextTruncAndXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(v), CEREAL_NVP(w), CEREAL_NVP(y), CEREAL_NVP(yprime), CEREAL_NVP(c), CEREAL_NVP(s), CEREAL_NVP(sprime));
+}
+
+ConsZextTruncAndXor::ConsZextTruncAndXor(std::shared_ptr<TyZextTruncAndXor> _zext_trunc_and_xor) : zext_trunc_and_xor(_zext_trunc_and_xor){
+}
+std::shared_ptr<TyInfrule> ConsZextTruncAndXor::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyConstant> _c, std::shared_ptr<TySize> _s, std::shared_ptr<TySize> _sprime){
+  std::shared_ptr<TyZextTruncAndXor> _val(new TyZextTruncAndXor(_z, _x, _v, _w, _y, _yprime, _c, _s, _sprime));
+  return std::shared_ptr<TyInfrule>(new ConsZextTruncAndXor(_val));
+}
+void ConsZextTruncAndXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ZextTruncAndXor");
+  archive(CEREAL_NVP(zext_trunc_and_xor));
+}
+
+TyZextXor::TyZextXor(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyValue> _x) : z(_z), y(_y), yprime(_yprime), x(_x){
+}
+void TyZextXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(yprime), CEREAL_NVP(x));
+}
+
+ConsZextXor::ConsZextXor(std::shared_ptr<TyZextXor> _zext_xor) : zext_xor(_zext_xor){
+}
+std::shared_ptr<TyInfrule> ConsZextXor::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyValue> _x){
+  std::shared_ptr<TyZextXor> _val(new TyZextXor(_z, _y, _yprime, _x));
+  return std::shared_ptr<TyInfrule>(new ConsZextXor(_val));
+}
+void ConsZextXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ZextXor");
+  archive(CEREAL_NVP(zext_xor));
 }
 
 TyZextZext::TyZextZext(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty) : src(_src), mid(_mid), dst(_dst), srcty(_srcty), midty(_midty), dstty(_dstty){
