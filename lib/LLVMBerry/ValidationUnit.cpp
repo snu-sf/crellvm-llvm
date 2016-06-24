@@ -27,8 +27,7 @@ namespace llvmberry {
 
 std::string defaultOutputDir = "";
 
-void writeModuleToBuffer(const llvm::Module &module,
-                         std::string *buffer) {
+void writeModuleToBuffer(const llvm::Module &module, std::string *buffer) {
   llvm::raw_string_ostream strstream(*buffer);
   WriteBitcodeToFile(&module, strstream);
 }
@@ -74,20 +73,20 @@ ValidationUnit::~ValidationUnit() {
 }
 
 // public functions
-const std::string &ValidationUnit::getOptimizationName() const{
+const std::string &ValidationUnit::getOptimizationName() const {
   return _Instance->_optname;
 }
 
-const std::string &ValidationUnit::getDescription() const{
+const std::string &ValidationUnit::getDescription() const {
   return _Instance->_corehint.getDescription();
 }
 
-void ValidationUnit::setOptimizationName(const std::string &str){
+void ValidationUnit::setOptimizationName(const std::string &str) {
   _optname = str;
   _Instance->_corehint.setOptimizationName(str);
 }
 
-void ValidationUnit::setDescription(const std::string &str){
+void ValidationUnit::setDescription(const std::string &str) {
   _Instance->_corehint.setDescription(str);
 }
 
@@ -117,7 +116,7 @@ void ValidationUnit::begin() {
   llvmberry::name_instructions(*_func);
   _srcfile_buffer = new std::string();
   writeModuleToBuffer(*module, _srcfile_buffer);
-  //writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc.org"));
+  // writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc.org"));
 
   // set corehints
   std::string mid = module->getModuleIdentifier();

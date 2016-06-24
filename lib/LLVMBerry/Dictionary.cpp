@@ -4,39 +4,38 @@
 
 namespace llvmberry {
 
-SimplifyInstArg::SimplifyInstArg(){
+SimplifyInstArg::SimplifyInstArg() {
   this->activated = false;
   this->isSwapped = false;
 }
 
-void SimplifyInstArg::setHintGenFunc(std::string _microoptName, std::function<void(llvm::Instruction *)> _hintGenFunc){
+void SimplifyInstArg::setHintGenFunc(
+    std::string _microoptName,
+    std::function<void(llvm::Instruction *)> _hintGenFunc) {
   this->activated = true;
   this->microoptName = _microoptName;
   this->hintGenFunc = _hintGenFunc;
 }
 
-void SimplifyInstArg::generateHint(llvm::Instruction *arg) const{
+void SimplifyInstArg::generateHint(llvm::Instruction *arg) const {
   assert(this->activated);
   auto &func = this->hintGenFunc;
-  ValidationUnit::GetInstance()->intrude([&func, &arg]
-      (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hint){
-    func(arg);
-  });
+  ValidationUnit::GetInstance()->intrude(
+      [&func, &arg](llvmberry::ValidationUnit::Dictionary &data,
+                    llvmberry::CoreHint &hint) { func(arg); });
 }
 
-std::string SimplifyInstArg::getMicroOptName() const{
+std::string SimplifyInstArg::getMicroOptName() const {
   return this->microoptName;
 }
 
-bool SimplifyInstArg::isActivated() const{
-  return activated;
-}
+bool SimplifyInstArg::isActivated() const { return activated; }
 
-StripPointerCastsArg::StripPointerCastsArg(){
+StripPointerCastsArg::StripPointerCastsArg() {
   strippedValues = TyStrippedValues(new TyStrippedValuesObj());
 }
 
-FindAvailableLoadedValueArg::FindAvailableLoadedValueArg(){
+FindAvailableLoadedValueArg::FindAvailableLoadedValueArg() {
   orthogonalStores = TyOrthogonalStores(new TyOrthogonalStoresObj());
   ptr1EquivalentValues = TyPtrEqValues(new TyPtrEqValuesObj());
   ptr2EquivalentValues = TyPtrEqValues(new TyPtrEqValuesObj());
@@ -45,8 +44,8 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg(){
 }
 
 Mem2RegArg::Mem2RegArg()
-  : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
-    termIndex(new TyTermIndexObj()), values(new TyValuesObj()),
-    storeItem(new TyStoreItemObj()) {}
+    : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
+      termIndex(new TyTermIndexObj()), values(new TyValuesObj()),
+      storeItem(new TyStoreItemObj()) {}
 
 } // llvmberry
