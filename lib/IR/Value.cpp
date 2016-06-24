@@ -422,9 +422,10 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
   if(llvmberry_isActive){
     llvmberry::ValidationUnit::GetInstance()->intrude([V](
         llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-      auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
-      if(ptr)
+      if(data.exists<llvmberry::ArgForStripPointerCasts>()){
+        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
         ptr->strippedValues->push_back(V);
+      }
     });
   }
 
@@ -470,9 +471,10 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
     if(llvmberry_isActive){
       llvmberry::ValidationUnit::GetInstance()->intrude([V](
           llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
-        if(ptr)
+        if(data.exists<llvmberry::ArgForStripPointerCasts>()){
+          auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
           ptr->strippedValues->push_back(V);
+        }
       });
     }
   } while (Visited.insert(V).second);

@@ -166,6 +166,10 @@ private:
   std::map<DictKeys, boost::any> data;
 
 public:
+  template <DictKeys key> bool exists() {
+    return data.find(key) != data.end();
+  }
+
   template <DictKeys key> void assertExists() {
     assert(data.find(key) != data.end() &&
            "Dictionary does not contain the key.");
