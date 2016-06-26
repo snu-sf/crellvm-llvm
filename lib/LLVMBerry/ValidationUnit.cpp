@@ -138,7 +138,6 @@ void ValidationUnit::commit() {
 
   // print tgt
   llvmberry::name_instructions(*_func);
-  
   const llvm::Module *module = _func->getParent();
   std::string tgt_ss;
   writeModuleToBuffer(*module, &tgt_ss);
