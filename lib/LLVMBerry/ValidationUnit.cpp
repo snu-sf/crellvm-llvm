@@ -126,7 +126,6 @@ void ValidationUnit::begin() {
 
 void ValidationUnit::commit() {
   // print src
-  /*
   std::ofstream src_ofs(makeFullFilename(_filename, ".src.bc"), std::ios::out);
   src_ofs << *_srcfile_buffer;
   src_ofs.close();
@@ -135,11 +134,11 @@ void ValidationUnit::commit() {
         << "LLVMBerry : ValidationUnit::commit() : Fail to write source file"
         << std::endl;
     std::exit(-10);
-  }*/
+  }
 
   // print tgt
   llvmberry::name_instructions(*_func);
-  /*
+  
   const llvm::Module *module = _func->getParent();
   std::string tgt_ss;
   writeModuleToBuffer(*module, &tgt_ss);
@@ -151,10 +150,9 @@ void ValidationUnit::commit() {
         << "LLVMBerry : ValidationUnit::commit() : Fail to write target file"
         << std::endl;
     std::exit(-11);
-  }*/
+  }
 
   // print corehints
-  /*
   std::ofstream ofs(makeFullFilename(_filename, ".hint.json"));
   cereal::JSONOutputArchive oarchive(ofs);
   _corehint.serialize(oarchive);
@@ -164,7 +162,7 @@ void ValidationUnit::commit() {
         << "LLVMBerry : ValidationUnit::commit() : Fail to write core hint file"
         << std::endl;
     std::exit(-12);
-  }*/
+  }
 }
 
 void ValidationUnit::abort() {}
