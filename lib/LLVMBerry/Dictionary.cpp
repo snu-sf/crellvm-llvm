@@ -43,6 +43,10 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg() {
   loadstoreStoreInst = nullptr;
 }
 
+VisitICmpArg::VisitICmpArg() {
+  swapOps = false;
+}
+
 Mem2RegArg::Mem2RegArg()
     : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
       termIndex(new TyTermIndexObj()), values(new TyValuesObj()),

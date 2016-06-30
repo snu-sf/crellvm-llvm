@@ -4352,6 +4352,45 @@ void ConsIcmpInverse::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(icmp_inverse));
 }
 
+TyIcmpSwapOperands::TyIcmpSwapOperands(enum TyIcmpPred _predicate,
+                             std::shared_ptr<TyValueType> _ty,
+                             std::shared_ptr<TyValue> _x,
+                             std::shared_ptr<TyValue> _y,
+                             std::shared_ptr<TyValue> _z)
+    : predicate(_predicate), ty(_ty), x(_x), y(_y), z(_z) {}
+
+void TyIcmpSwapOperands::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(cereal::make_nvp("predicate", toString(predicate)));
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(z));
+}
+
+ConsIcmpSwapOperands::ConsIcmpSwapOperands(std::shared_ptr<TyIcmpSwapOperands> _icmp_swap_operands)
+    : icmp_swap_operands(_icmp_swap_operands) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpSwapOperands::make(llvm::ICmpInst &CI) {
+  enum TyIcmpPred pred = getIcmpPred(CI.getPredicate());
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+  std::shared_ptr<TyValue> z = TyValue::make(CI);
+
+  std::shared_ptr<TyIcmpSwapOperands> _icmp_so =
+      std::make_shared<TyIcmpSwapOperands>(pred, ty, x, y, z);
+
+  return std::make_shared<ConsIcmpSwapOperands>(_icmp_so);
+}
+
+void ConsIcmpSwapOperands::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpSwapOperands");
+  archive(CEREAL_NVP(icmp_swap_operands));
+}
+
 TyIcmpEqSame::TyIcmpEqSame(std::shared_ptr<TyValueType> _ty,
                            std::shared_ptr<TyValue> _x,
                            std::shared_ptr<TyValue> _y)
@@ -4377,11 +4416,47 @@ std::shared_ptr<TyInfrule> ConsIcmpEqSame::make(llvm::ICmpInst &CI) {
   return std::make_shared<ConsIcmpEqSame>(_icmp_eq_same);
 }
 
+TyIcmpEqXorNot::TyIcmpEqXorNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpEqXorNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpEqXorNot::ConsIcmpEqXorNot(std::shared_ptr<TyIcmpEqXorNot> _icmp_eq_xor_not) : icmp_eq_xor_not(_icmp_eq_xor_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpEqXorNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpEqXorNot> _val(new TyIcmpEqXorNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpEqXorNot(_val));
+}
+void ConsIcmpEqXorNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpEqXorNot");
+  archive(CEREAL_NVP(icmp_eq_xor_not));
+}
+
 void ConsIcmpEqSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("IcmpEqSame");
   archive(CEREAL_NVP(icmp_eq_same));
+}
+
+TyIcmpNeXor::TyIcmpNeXor(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), a(_a), b(_b), s(_s){
+}
+void TyIcmpNeXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpNeXor::ConsIcmpNeXor(std::shared_ptr<TyIcmpNeXor> _icmp_ne_xor) : icmp_ne_xor(_icmp_ne_xor){
+}
+std::shared_ptr<TyInfrule> ConsIcmpNeXor::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpNeXor> _val(new TyIcmpNeXor(_z, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpNeXor(_val));
+}
+void ConsIcmpNeXor::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpNeXor");
+  archive(CEREAL_NVP(icmp_ne_xor));
 }
 
 TyIcmpNeqSame::TyIcmpNeqSame(std::shared_ptr<TyValueType> _ty,
@@ -4415,6 +4490,149 @@ void ConsIcmpNeqSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("IcmpNeqSame");
   archive(CEREAL_NVP(icmp_neq_same));
+}
+
+TyIcmpSgeOrNot::TyIcmpSgeOrNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpSgeOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpSgeOrNot::ConsIcmpSgeOrNot(std::shared_ptr<TyIcmpSgeOrNot> _icmp_sge_or_not) : icmp_sge_or_not(_icmp_sge_or_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpSgeOrNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpSgeOrNot> _val(new TyIcmpSgeOrNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpSgeOrNot(_val));
+}
+void ConsIcmpSgeOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpSgeOrNot");
+  archive(CEREAL_NVP(icmp_sge_or_not));
+}
+TyIcmpSgtAndNot::TyIcmpSgtAndNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpSgtAndNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpSgtAndNot::ConsIcmpSgtAndNot(std::shared_ptr<TyIcmpSgtAndNot> _icmp_sgt_and_not) : icmp_sgt_and_not(_icmp_sgt_and_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpSgtAndNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpSgtAndNot> _val(new TyIcmpSgtAndNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpSgtAndNot(_val));
+}
+void ConsIcmpSgtAndNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpSgtAndNot");
+  archive(CEREAL_NVP(icmp_sgt_and_not));
+}
+
+TyIcmpSleOrNot::TyIcmpSleOrNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpSleOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpSleOrNot::ConsIcmpSleOrNot(std::shared_ptr<TyIcmpSleOrNot> _icmp_sle_or_not) : icmp_sle_or_not(_icmp_sle_or_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpSleOrNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpSleOrNot> _val(new TyIcmpSleOrNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpSleOrNot(_val));
+}
+void ConsIcmpSleOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpSleOrNot");
+  archive(CEREAL_NVP(icmp_sle_or_not));
+}
+
+TyIcmpSltAndNot::TyIcmpSltAndNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpSltAndNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpSltAndNot::ConsIcmpSltAndNot(std::shared_ptr<TyIcmpSltAndNot> _icmp_slt_and_not) : icmp_slt_and_not(_icmp_slt_and_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpSltAndNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpSltAndNot> _val(new TyIcmpSltAndNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpSltAndNot(_val));
+}
+void ConsIcmpSltAndNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpSltAndNot");
+  archive(CEREAL_NVP(icmp_slt_and_not));
+}
+
+TyIcmpUgeOrNot::TyIcmpUgeOrNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpUgeOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpUgeOrNot::ConsIcmpUgeOrNot(std::shared_ptr<TyIcmpUgeOrNot> _icmp_uge_or_not) : icmp_uge_or_not(_icmp_uge_or_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpUgeOrNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpUgeOrNot> _val(new TyIcmpUgeOrNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpUgeOrNot(_val));
+}
+void ConsIcmpUgeOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpUgeOrNot");
+  archive(CEREAL_NVP(icmp_uge_or_not));
+}
+
+TyIcmpUgtAndNot::TyIcmpUgtAndNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpUgtAndNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpUgtAndNot::ConsIcmpUgtAndNot(std::shared_ptr<TyIcmpUgtAndNot> _icmp_ugt_and_not) : icmp_ugt_and_not(_icmp_ugt_and_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpUgtAndNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpUgtAndNot> _val(new TyIcmpUgtAndNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpUgtAndNot(_val));
+}
+void ConsIcmpUgtAndNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpUgtAndNot");
+  archive(CEREAL_NVP(icmp_ugt_and_not));
+}
+
+TyIcmpUleOrNot::TyIcmpUleOrNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpUleOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpUleOrNot::ConsIcmpUleOrNot(std::shared_ptr<TyIcmpUleOrNot> _icmp_ule_or_not) : icmp_ule_or_not(_icmp_ule_or_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpUleOrNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpUleOrNot> _val(new TyIcmpUleOrNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpUleOrNot(_val));
+}
+void ConsIcmpUleOrNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpUleOrNot");
+  archive(CEREAL_NVP(icmp_ule_or_not));
+}
+
+TyIcmpUltAndNot::TyIcmpUltAndNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
+}
+void TyIcmpUltAndNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(a), CEREAL_NVP(b), CEREAL_NVP(s));
+}
+ConsIcmpUltAndNot::ConsIcmpUltAndNot(std::shared_ptr<TyIcmpUltAndNot> _icmp_ult_and_not) : icmp_ult_and_not(_icmp_ult_and_not){
+}
+std::shared_ptr<TyInfrule> ConsIcmpUltAndNot::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s){
+  std::shared_ptr<TyIcmpUltAndNot> _val(new TyIcmpUltAndNot(_z, _zprime, _a, _b, _s));
+  return std::shared_ptr<TyInfrule>(new ConsIcmpUltAndNot(_val));
+}
+void ConsIcmpUltAndNot::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpUltAndNot");
+  archive(CEREAL_NVP(icmp_ult_and_not));
 }
 
 } // llvmberry
