@@ -798,8 +798,9 @@ void PromoteMem2Reg::run() {
     AllocaInst *AItmp = Allocas[tmpNum];
     DominatorTree &Domtree = DT;
 
+      DenseMap<AllocaInst *, unsigned> &AL = AllocaLookup;
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AItmp, &Domtree]
+            ([&AItmp, &Domtree, this, &AL]
               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       // initialize dictionaries
       auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
@@ -829,7 +830,7 @@ void PromoteMem2Reg::run() {
 
         if (isa<StoreInst>(tmpInst)) {
           StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
-          std::string keySI = bname+std::to_string(instrIndex[SI])+"%"+
+          std::string keySI = bname+"-"+std::to_string(instrIndex[SI])+"-%"+
                               std::string(SI->getOperand(1)->getName());
 
           storeItem[SI].value = std::move(llvmberry::TyValue::make(*(SI->getOperand(0))));
@@ -874,6 +875,7 @@ void PromoteMem2Reg::run() {
           // to the stored/loaded value of that register
           if (isa<LoadInst>(tmpInst)) {
             const LoadInst* LI = dyn_cast<LoadInst>(tmpInst);
+            AllocaInst* AI = dyn_cast<AllocaInst>(LI->getOperand(0));
             std::string keyLI = "%"+std::string(LI->getName());
             std::string bname = "";
             unsigned nearestStore = 0;
@@ -928,27 +930,68 @@ void PromoteMem2Reg::run() {
                     SB = SI->getParent();
                     isChanged = true;
                   }
+                } else {
+/*//                  
+    AllocaInfo Info;
+    Info.AnalyzeAlloca(AI);
+    IDFCalculator IDF(Domtree);
+    SmallPtrSet<BasicBlock *, 32> DefBlocks;
+    DefBlocks.insert(Info.DefiningBlocks.begin(), Info.DefiningBlocks.end());
+
+    // Determine which blocks the value is live in.  These are blocks which lead
+    // to uses.
+    SmallPtrSet<BasicBlock *, 32> LiveInBlocks;
+    ComputeLiveInBlocks(AI, Info, DefBlocks, LiveInBlocks);
+
+    // At this point, we're committed to promoting the alloca using IDF's, and
+    // the standard SSA construction algorithm.  Determine which blocks need phi
+    // nodes and see if we can optimize out some work by avoiding insertion of
+    // dead phi nodes.
+    IDF.setLiveInBlocks(LiveInBlocks);
+    IDF.setDefiningBlocks(DefBlocks);
+    SmallVector<BasicBlock *, 32> PHIBlocks;
+    IDF.calculate(PHIBlocks);
+    
+    if (PHIBlocks.size() > 1)
+      std::sort(PHIBlocks.begin(), PHIBlocks.end(),
+                [this](BasicBlock *A, BasicBlock *B) {
+                  return BBNumbers.lookup(A) < BBNumbers.lookup(B);
+                });
+    std::cout<<"queuephi in dict"<<std::endl;
+    unsigned CurrentVersion = 0;
+    for (unsigned i = 0, e = PHIBlocks.size(); i != e; ++i)
+      QueuePhiNode(PHIBlocks[i], AL[AI], CurrentVersion);
+    std::cout<<"end in dict"<<std::endl;
+//*/    
                 }
               }
             }
 
             // update dictionary if previous value is different with
             // current value
-            std::string keyNew = bname+std::to_string(nearestStore)+"%"+
+            std::string keyNew = bname+"-"+std::to_string(nearestStore)+"-%"+
                                  std::string(LI->getOperand(0)->getName());
 
-            if (values[keyLI] != values[keyNew] &&
+            std::cout<<"LIkeyNew: "<<keyNew<<", "<<values[keyNew]<<std::endl;
+            std::cout<<"keyLI: "<<keyLI<<", "<<values[keyLI]<<std::endl;
+
+            if (bname != "" &&
+                values[keyLI] != values[keyNew] &&
                 values[keyNew] != NULL) {
               values[keyLI] = values[keyNew];
               hasChanged = true;
             }
           } else {
             // the case of store is same as load
+        std::map<const Instruction*, unsigned>::const_iterator it;
             const StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
             std::string bname = llvmberry::getBasicBlockIndex(SI->getParent());
-            std::string keySI = bname+std::to_string(instrIndex[SI])+"%"+
+            std::string keySI = bname+"-"+std::to_string(instrIndex[SI])+"-%"+
                                 std::string(SI->getOperand(1)->getName());
             std::string keyNew = "%"+std::string(SI->getOperand(0)->getName());
+
+            std::cout<<"SIkeyNew: "<<keyNew<<", "<<values[keyNew]<<std::endl;
+            std::cout<<"keySI: "<<keySI<<", "<<values[keySI]<<std::endl;
 
             if (values[keySI] != values[keyNew] &&
                 values[keyNew] != NULL) {
@@ -958,6 +1001,14 @@ void PromoteMem2Reg::run() {
           }
         }
       }
+
+        std::map<const Instruction*, unsigned>::const_iterator it;
+        for (it = instrIndex.begin(); it != instrIndex.end(); ++it) {
+          const Instruction *tmpInst = it->first;
+          std::string bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
+          std::cout << "instrIndex: "<<bname<<", "<<instrIndex[tmpInst]<<std::endl;
+        }
+
     }); 
   }
 
@@ -1093,7 +1144,7 @@ void PromoteMem2Reg::run() {
     // dead phi nodes.
 
 
-    // Unique the set of defining blocks for efficient lookup.
+    
     SmallPtrSet<BasicBlock *, 32> DefBlocks;
     DefBlocks.insert(Info.DefiningBlocks.begin(), Info.DefiningBlocks.end());
 
@@ -1387,7 +1438,8 @@ bool PromoteMem2Reg::QueuePhiNode(BasicBlock *BB, unsigned AllocaNo,
   PN = PHINode::Create(Allocas[AllocaNo]->getAllocatedType(), getNumPreds(BB),
                        Allocas[AllocaNo]->getName() + "." + Twine(Version++),
                        BB->begin());
-
+  std::cout<<"queuephi check"<<std::endl;
+  std::cout<<"queuephi: "<<std::string((Allocas[AllocaNo]->getName()+"."+Twine(Version)).str())<<std::endl;
   PhiToAllocaMap[PN] = AllocaNo;
 
   if (AST && PN->getType()->isPointerTy())

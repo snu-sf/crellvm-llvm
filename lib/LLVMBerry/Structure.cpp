@@ -686,6 +686,23 @@ TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
       new TyPosition(_scope, _block_name, std::move(_cmd)));
 }
 
+std::shared_ptr<TyPosition>
+TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB,
+                              int index) {
+  std::string _block_name = getBasicBlockIndex(&BB);
+  std::string _register_name = "";
+
+  int _index = index;
+
+  std::shared_ptr<TyPositionCommand> _pos_cmd(
+      new TyPositionCommand(_index, _register_name));
+
+  std::shared_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+  return std::shared_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_cmd)));
+}
+
 /* value */
 
 // register

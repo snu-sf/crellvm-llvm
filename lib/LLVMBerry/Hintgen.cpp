@@ -841,11 +841,15 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
   ValidationUnit::GetInstance()->intrude([&Pred, &SI, &next, &nextIndex](
       Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
     std::string bname = getBasicBlockIndex(SI->getParent());
-    std::string keySI = bname + std::to_string(instrIndex[SI]) + Rstore;
+    std::string predName = getBasicBlockIndex(Pred);
+    std::string keySI = bname + "-" + std::to_string(instrIndex[SI]) + "-" + Rstore;
+
+    std::cout<<"*****SI:"<<Rstore+", "+bname+"("+std::to_string(instrIndex[SI])+")"<<" | "<< getBasicBlockIndex(next->getParent())+": "+std::to_string(instrIndex[next])+", "+std::to_string(nextIndex)<<std::endl;
 
     if (storeItem[SI].expr == NULL)
       return;
@@ -854,11 +858,13 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
     if (llvm::isa<llvm::PHINode>(next)) {
       PROPAGATE(LESSDEF(INSN(*SI), VAR(Rstore, Ghost), SRC),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-                       TyPosition::make_end_of_block(TGT, *Pred)));
+                       //TyPosition::make(SRC, *next, termIndex[predName], "")));
+                       TyPosition::make_end_of_block(TGT, *Pred, termIndex[predName])));
 
       PROPAGATE(LESSDEF(VAR(Rstore, Ghost), values[keySI], TGT),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-                       TyPosition::make_end_of_block(TGT, *Pred)));
+                       //TyPosition::make(SRC, *next, termIndex[predName], "")));
+                       TyPosition::make_end_of_block(TGT, *Pred, termIndex[predName])));
     } else {
       PROPAGATE(LESSDEF(INSN(*SI), VAR(Rstore, Ghost), SRC),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
@@ -1004,7 +1010,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
     std::string bname = getBasicBlockIndex(SItmp->getParent());
     std::string Ralloca = getVariable(*AItmp);
     std::string Rstore = getVariable(*keyInst);
-    std::string keySI = bname + std::to_string(instrIndex[SItmp]) + Rstore;
+    std::string keySI = bname + "-" + std::to_string(instrIndex[SItmp]) + "-" + Rstore;
     llvm::BasicBlock *BBtmp = BB;
     llvm::BasicBlock *Predtmp = Pred;
     bool newStore = false;
