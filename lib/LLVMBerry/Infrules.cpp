@@ -3737,6 +3737,25 @@ void ConsUdivZext::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(udiv_zext));
 }
 
+TyUdivZextConst::TyUdivZextConst(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2) : z(_z), x(_x), c(_c), k(_k), a(_a), sz1(_sz1), sz2(_sz2){
+}
+void TyUdivZextConst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(c), CEREAL_NVP(k), CEREAL_NVP(a), CEREAL_NVP(sz1), CEREAL_NVP(sz2));
+}
+
+ConsUdivZextConst::ConsUdivZextConst(std::shared_ptr<TyUdivZextConst> _udiv_zext_const) : udiv_zext_const(_udiv_zext_const){
+}
+std::shared_ptr<TyInfrule> ConsUdivZextConst::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2){
+  std::shared_ptr<TyUdivZextConst> _val(new TyUdivZextConst(_z, _x, _c, _k, _a, _sz1, _sz2));
+  return std::shared_ptr<TyInfrule>(new ConsUdivZextConst(_val));
+}
+void ConsUdivZextConst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("UdivZextConst");
+  archive(CEREAL_NVP(udiv_zext_const));
+}
+
 TyUremZext::TyUremZext(std::shared_ptr<TyRegister> _z,
                        std::shared_ptr<TyRegister> _x,
                        std::shared_ptr<TyRegister> _y,
@@ -3775,6 +3794,25 @@ void ConsUremZext::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("UremZext");
   archive(CEREAL_NVP(urem_zext));
+}
+
+TyUremZextConst::TyUremZextConst(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2) : z(_z), x(_x), c(_c), k(_k), a(_a), sz1(_sz1), sz2(_sz2){
+}
+void TyUremZextConst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(c), CEREAL_NVP(k), CEREAL_NVP(a), CEREAL_NVP(sz1), CEREAL_NVP(sz2));
+}
+
+ConsUremZextConst::ConsUremZextConst(std::shared_ptr<TyUremZextConst> _urem_zext_const) : urem_zext_const(_urem_zext_const){
+}
+std::shared_ptr<TyInfrule> ConsUremZextConst::make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2){
+  std::shared_ptr<TyUremZextConst> _val(new TyUremZextConst(_z, _x, _c, _k, _a, _sz1, _sz2));
+  return std::shared_ptr<TyInfrule>(new ConsUremZextConst(_val));
+}
+void ConsUremZextConst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("UremZextConst");
+  archive(CEREAL_NVP(urem_zext_const));
 }
 
 TyIntroGhost::TyIntroGhost(std::shared_ptr<TyExpr> _x,

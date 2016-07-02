@@ -2056,6 +2056,21 @@ private:
   std::shared_ptr<TySize> sz2;
 };
 
+struct TyUdivZextConst{
+public : 
+  TyUdivZextConst(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyConstInt> c;
+  std::shared_ptr<TyRegister> k;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz1;
+  std::shared_ptr<TySize> sz2;
+};
+
 struct TyUremZext {
 public:
   TyUremZext(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
@@ -2071,6 +2086,21 @@ private:
   std::shared_ptr<TyRegister> k;
   std::shared_ptr<TyValue> a;
   std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz1;
+  std::shared_ptr<TySize> sz2;
+};
+
+struct TyUremZextConst{
+public : 
+  TyUremZextConst(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyConstInt> c;
+  std::shared_ptr<TyRegister> k;
+  std::shared_ptr<TyValue> a;
   std::shared_ptr<TySize> sz1;
   std::shared_ptr<TySize> sz2;
 };
@@ -3810,6 +3840,16 @@ private:
   std::shared_ptr<TyUdivZext> udiv_zext;
 };
 
+struct ConsUdivZextConst : public TyInfrule{
+public : 
+  ConsUdivZextConst(std::shared_ptr<TyUdivZextConst> _udiv_zext_const);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyUdivZextConst> udiv_zext_const;
+};
+
 struct ConsUremZext : public TyInfrule {
 public:
   ConsUremZext(std::shared_ptr<TyUremZext> _urem_zext);
@@ -3822,6 +3862,16 @@ public:
 
 private:
   std::shared_ptr<TyUremZext> urem_zext;
+};
+
+struct ConsUremZextConst : public TyInfrule{
+public : 
+  ConsUremZextConst(std::shared_ptr<TyUremZextConst> _urem_zext_const);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x, std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyRegister> _k, std::shared_ptr<TyValue> _a, std::shared_ptr<TySize> _sz1, std::shared_ptr<TySize> _sz2);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyUremZextConst> urem_zext_const;
 };
 
 struct ConsInttoptrLoad : public TyInfrule {
