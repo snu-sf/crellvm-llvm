@@ -2720,7 +2720,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
     case ICmpInst::ICMP_NE:                  // icmp eq i1 A, B -> A^B
       llvmberry::ValidationUnit::GetInstance()->intrude([&I]
           (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        llvmberry::ValidationUnit::Begin("icmp_ne_xor", I.getParent()->getParent());
+        llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ne_xor");
         //        <src>        |      <tgt>
         // Z = icmp ne i1 A, B | Z  = xor A, B
         ICmpInst *Z = &I;
