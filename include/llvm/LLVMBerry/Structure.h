@@ -205,6 +205,8 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyRegister> make(std::string _name, enum TyTag _tag);
+  static bool isSame(std::shared_ptr<TyRegister> r1,
+                     std::shared_ptr<TyRegister> r2);
 
 private:
   std::string name;
@@ -845,6 +847,8 @@ public:
 
   static std::shared_ptr<TyExpr> make(std::string _name, enum TyTag _tag);
 
+  std::shared_ptr<TyRegister> get_TyReg();
+
 private:
   std::shared_ptr<TyRegister> register_name;
 };
@@ -905,6 +909,10 @@ public:
                                                   std::shared_ptr<TyExpr> _rhs,
                                                   enum TyScope _scope);
 
+  std::shared_ptr<TyExpr> get_lhs();
+  std::shared_ptr<TyExpr> get_rhs();
+
+  void update_rhs(std::shared_ptr<TyExpr>(newExpr));
 private:
   std::shared_ptr<TyExpr> lhs;
   std::shared_ptr<TyExpr> rhs;

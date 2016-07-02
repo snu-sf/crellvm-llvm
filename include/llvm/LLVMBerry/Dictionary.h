@@ -122,9 +122,11 @@ public:
   typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
   TyStoreItem storeItem;
 
-  typedef std::map<const llvm::AllocaInst *, llvm::StoreInst *> TyStoreMapObj;
-  typedef std::shared_ptr<TyStoreMapObj> TyStoreMap;
-  TyStoreMap storeMap;
+  typedef std::map<std::string, std::vector<std::shared_ptr<TyPropagateLessdef>>> TyMem2RegCmdsObj;
+  typedef std::shared_ptr<TyMem2RegCmdsObj> TyMem2RegCmds;
+  TyMem2RegCmds mem2regCmds;
+
+  void replaceCmdRhs(std::string key, std::shared_ptr<TyExpr> newExpr);
 
   Mem2RegArg();
 };

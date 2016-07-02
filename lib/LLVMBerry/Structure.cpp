@@ -719,6 +719,11 @@ std::shared_ptr<TyRegister> TyRegister::make(std::string _name,
   return std::shared_ptr<TyRegister>(new TyRegister(_name, _tag));
 }
 
+bool TyRegister::isSame(std::shared_ptr<TyRegister> r1,
+                        std::shared_ptr<TyRegister> r2) {
+  return (r1->name==r2->name && r1->tag==r2->tag);
+}
+
 // constant
 ConsIntType::ConsIntType(int _value) : value(_value) {}
 
@@ -1746,6 +1751,10 @@ std::shared_ptr<TyExpr> ConsVar::make(std::string _name, enum TyTag _tag) {
   return std::shared_ptr<TyExpr>(new ConsVar(_name, _tag));
 }
 
+std::shared_ptr<TyRegister> ConsVar::get_TyReg() {
+  return register_name;
+}
+
 ConsRhs::ConsRhs(std::shared_ptr<TyRegister> _register_name,
                  enum TyScope _scope)
     : register_name(std::move(_register_name)), scope(_scope) {}
@@ -1829,6 +1838,18 @@ TyPropagateLessdef::make(std::shared_ptr<TyExpr> _lhs,
       new TyPropagateLessdef(std::move(_lhs), std::move(_rhs), _scope));
 }
 
+std::shared_ptr<TyExpr> TyPropagateLessdef::get_lhs() {
+  return lhs;
+}
+
+std::shared_ptr<TyExpr> TyPropagateLessdef::get_rhs() {
+  return rhs;
+}
+
+void TyPropagateLessdef::update_rhs(std::shared_ptr<TyExpr> newExpr) {
+  rhs = newExpr;
+}
+
 TyPropagateNoalias::TyPropagateNoalias(std::shared_ptr<TyPointer> _lhs,
                                        std::shared_ptr<TyPointer> _rhs,
                                        enum TyScope _scope)
@@ -1882,7 +1903,7 @@ void TyPropagatePrivate::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 ConsLessdef::ConsLessdef(std::shared_ptr<TyPropagateLessdef> _propagate_lessdef)
-    : propagate_lessdef(std::move(_propagate_lessdef)) {}
+    : propagate_lessdef(_propagate_lessdef) {}
 
 void ConsLessdef::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();

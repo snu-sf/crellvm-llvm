@@ -914,6 +914,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
       Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
+    auto &mem2regCmds = *(data.get<ArgForMem2Reg>()->mem2regCmds);
     std::string Rload = getVariable(*LI);
 
     if (values[Rload] == NULL)
@@ -926,9 +927,23 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                      TyPosition::make(SRC, *use, useIndex, "")));
 
+/*    
     PROPAGATE(LESSDEF(VAR(Rload, Ghost), values[Rload], TGT),
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                      TyPosition::make(SRC, *use, useIndex, "")));
+*/
+
+    std::shared_ptr<llvmberry::TyPropagateLessdef> tmp = llvmberry::TyPropagateLessdef::make
+                                              (VAR(Rload, Ghost), VAR(Rload, Physical), TGT);
+
+    PROPAGATE(std::shared_ptr<TyPropagateObject>(new llvmberry::ConsLessdef(tmp)),
+              BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                     TyPosition::make(SRC, *use, useIndex, "")));
+
+    mem2regCmds[Rload].push_back(tmp);
+
+    data.get<ArgForMem2Reg>()->replaceCmdRhs(Rload, VAR("sfsfsfsfsfsf", Physical));
+    
 
     INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
             ConsIntroGhost::make(VAR(Rstore, Ghost), REGISTER(Rload, Ghost)));

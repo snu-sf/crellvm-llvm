@@ -808,6 +808,7 @@ void PromoteMem2Reg::run() {
       auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
       auto &values = *(data.get<llvmberry::ArgForMem2Reg>()->values);
       auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
+      auto &mem2regCmds = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmds);
       std::string bname = llvmberry::getBasicBlockIndex(AItmp->getParent());
       
       allocas.push_back(AItmp);

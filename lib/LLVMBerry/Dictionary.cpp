@@ -46,6 +46,30 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg() {
 Mem2RegArg::Mem2RegArg()
     : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
       termIndex(new TyTermIndexObj()), values(new TyValuesObj()),
-      storeItem(new TyStoreItemObj()) {}
+      storeItem(new TyStoreItemObj()), mem2regCmds(new TyMem2RegCmdsObj()) {}
+
+static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
+                            std::shared_ptr<TyExpr> e2) {
+    ConsVar *cv1 = dynamic_cast<ConsVar *>(e1.get());
+    ConsVar *cv2 = dynamic_cast<ConsVar *>(e2.get());
+
+    return TyRegister::isSame(cv1->get_TyReg(), cv2->get_TyReg());
+}
+void Mem2RegArg::replaceCmdRhs(std::string key, std::shared_ptr<TyExpr> newExpr) {
+  assert(mem2regCmds->find(key) != mem2regCmds->end());
+ 
+  std::cout<<"replace:"+key<<std::endl;
+
+  std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
+
+  std::vector<std::shared_ptr<TyPropagateLessdef>> &vec = mem2regCmds->find(key)->second;
+  for(size_t i = 0; i < vec.size(); i++){
+    if (equalsIfConsVar(vec[i]->get_rhs(), keyExpr)) {
+      std::cout<<"check: "<<vec[i]->get_rhs()<<", "<<newExpr<<std::endl;
+      vec[i]->update_rhs(newExpr);
+      std::cout<<"check: "<<vec[i]->get_rhs()<<std::endl;
+    }
+  }
+}
 
 } // llvmberry
