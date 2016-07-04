@@ -1,4 +1,0 @@
-[submodule "include/llvm/cereal"]
-	path = include/llvm/cereal
-	url = https://github.com/snu-sf/cereal.git
-	branch = no-exceptions
