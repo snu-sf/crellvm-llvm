@@ -844,7 +844,9 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
     auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
+    auto &mem2regCmds = *(data.get<ArgForMem2Reg>()->mem2regCmds);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
+    std::string Rload = getVariable(*(SI->getOperand(0)));
     std::string bname = getBasicBlockIndex(SI->getParent());
     std::string predName = getBasicBlockIndex(Pred);
     std::string keySI = bname + "-" + std::to_string(instrIndex[SI]) + "-" + Rstore;
@@ -870,7 +872,15 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
                        TyPosition::make(SRC, *next, nextIndex, "")));
 
-      PROPAGATE(LESSDEF(VAR(Rstore, Ghost), values[keySI], TGT),
+      std::shared_ptr<llvmberry::TyPropagateLessdef> tmp = llvmberry::TyPropagateLessdef::make
+                                                (VAR(Rstore, Ghost),
+                                                 llvmberry::TyExpr::make(*(SI->getOperand(0)),
+                                                                         llvmberry::Physical),
+                                                 TGT);
+
+      mem2regCmds[Rload].push_back(tmp);
+
+      PROPAGATE(std::shared_ptr<TyPropagateObject>(new llvmberry::ConsLessdef(tmp)),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
                        TyPosition::make(SRC, *next, nextIndex, "")));
     }
@@ -881,8 +891,9 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
           TyPosition::make(SRC, *SI, instrIndex[SI], ""),
           ConsIntroGhost::make(storeItem[SI].expr, REGISTER(Rstore, Ghost)));
 
-      INFRULE(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-              ConsTransitivity::make(INSN(*SI), storeItem[SI].expr,
+      INFRULE(
+          TyPosition::make(SRC, *SI, instrIndex[SI], ""),
+          ConsTransitivity::make(INSN(*SI), storeItem[SI].expr,
                                      VAR(Rstore, Ghost)));
     } else {
       // stored value will be changed in another iteration
@@ -934,16 +945,18 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
 */
 
     std::shared_ptr<llvmberry::TyPropagateLessdef> tmp = llvmberry::TyPropagateLessdef::make
-                                              (VAR(Rload, Ghost), VAR(Rload, Physical), TGT);
+                                              (VAR(Rload, Ghost),
+                                               llvmberry::TyExpr::make(*(LI->getOperand(0)),
+                                                                       llvmberry::Physical),
+                                               TGT);
+
+    mem2regCmds[Rload].push_back(tmp);
 
     PROPAGATE(std::shared_ptr<TyPropagateObject>(new llvmberry::ConsLessdef(tmp)),
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                      TyPosition::make(SRC, *use, useIndex, "")));
 
-    mem2regCmds[Rload].push_back(tmp);
-
-    data.get<ArgForMem2Reg>()->replaceCmdRhs(Rload, VAR("sfsfsfsfsfsf", Physical));
-    
+    //data.get<ArgForMem2Reg>()->replaceCmdRhs(Rload, VAR("sfsfsfsfsfsf", Physical)); 
 
     INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
             ConsIntroGhost::make(VAR(Rstore, Ghost), REGISTER(Rload, Ghost)));
