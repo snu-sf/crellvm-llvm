@@ -703,6 +703,30 @@ private:
   bool is_inbounds;
 };
 
+struct TyFpextInst{
+public : 
+  TyFpextInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyFpextInst> make(const llvm::FPExtInst &fpti);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
+struct TyFptruncInst{
+public : 
+  TyFptruncInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyFptruncInst> make(const llvm::FPTruncInst &fpti);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
 struct ConsBinaryOp : public TyInstruction {
 public:
   ConsBinaryOp(std::shared_ptr<TyBinaryOperator> _binary_operator);
@@ -824,6 +848,28 @@ public:
 
 private:
   std::shared_ptr<TyGetElementPtrInst> get_element_ptr_inst;
+};
+
+struct ConsFpextInst : public TyInstruction{
+public : 
+  ConsFpextInst(std::shared_ptr<TyFpextInst> _fpext_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::FPExtInst &fpei);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyFpextInst> fpext_inst;
+};
+
+struct ConsFptruncInst : public TyInstruction{
+public : 
+  ConsFptruncInst(std::shared_ptr<TyFptruncInst> _fptrunc_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::FPTruncInst &fpti);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyFptruncInst> fptrunc_inst;
 };
 
 /* propagate */

@@ -967,10 +967,10 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
         
         // step 2-A. make ptr1src _||_ ptr3src
         if (noalias_source == "alloca_or_global") {
-          if (AllocaInst *ptr3_org_alloca = dyn_cast<AllocaInst>(ptr3)) {
+          if (AllocaInst *ptr3_org_alloca = dyn_cast<AllocaInst>(ptr3src)) {
             diffblock_propagate_end = ptr3_org_alloca;
           }
-          if (AllocaInst *ptr1_org_alloca = dyn_cast<AllocaInst>(ptr1)) {
+          if (AllocaInst *ptr1_org_alloca = dyn_cast<AllocaInst>(ptr1src)) {
             if (diffblock_propagate_end == nullptr ||
                 // Does sdiffblock_propagate_end precede ptr1_org_alloca?
                 DT->dominates(diffblock_propagate_end, ptr1_org_alloca)) {

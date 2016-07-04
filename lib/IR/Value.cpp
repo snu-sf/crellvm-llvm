@@ -422,8 +422,10 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
   if(llvmberry_isActive){
     llvmberry::ValidationUnit::GetInstance()->intrude([V](
         llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-      auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
-      ptr->strippedValues->push_back(V);
+      if(data.exists<llvmberry::ArgForStripPointerCasts>()){
+        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
+        ptr->strippedValues->push_back(V);
+      }
     });
   }
 
@@ -469,8 +471,10 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
     if(llvmberry_isActive){
       llvmberry::ValidationUnit::GetInstance()->intrude([V](
           llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
-        ptr->strippedValues->push_back(V);
+        if(data.exists<llvmberry::ArgForStripPointerCasts>()){
+          auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
+          ptr->strippedValues->push_back(V);
+        }
       });
     }
   } while (Visited.insert(V).second);
@@ -480,14 +484,6 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
 } // namespace
 
 Value *Value::stripPointerCasts() {
-  bool llvmberry_isActive = llvmberry::ValidationUnit::Exists() && 
-        llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
-  if(llvmberry_isActive){
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-      data.assertExists<llvmberry::ArgForStripPointerCasts>();
-    });
-  }
   return stripPointerCastsAndOffsets<PSK_ZeroIndicesAndAliases>(this);
 }
 
