@@ -844,9 +844,9 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
     auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
-    auto &mem2regCmds = *(data.get<ArgForMem2Reg>()->mem2regCmds);
+    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
-    std::string Rload = getVariable(*(SI->getOperand(0)));
+    //std::string Rstored = getVariable(*(SI->getOperand(0)));
     std::string bname = getBasicBlockIndex(SI->getParent());
     std::string predName = getBasicBlockIndex(Pred);
     std::string keySI = bname + "-" + std::to_string(instrIndex[SI]) + "-" + Rstore;
@@ -872,28 +872,37 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
                        TyPosition::make(SRC, *next, nextIndex, "")));
 
-      std::shared_ptr<llvmberry::TyPropagateLessdef> tmp = llvmberry::TyPropagateLessdef::make
-                                                (VAR(Rstore, Ghost),
-                                                 llvmberry::TyExpr::make(*(SI->getOperand(0)),
-                                                                         llvmberry::Physical),
-                                                 TGT);
+      std::shared_ptr<TyPropagateLessdef> tmp = TyPropagateLessdef::make
+                                                  (VAR(Rstore, Ghost),
+                                                   TyExpr::make(*(SI->getOperand(0)),
+                                                                Physical),
+                                                   TGT);
 
-      mem2regCmds[Rload].push_back(tmp);
+      if (!llvm::isa<llvm::ConstantInt>(SI->getOperand(0)))
+        mem2regCmd[getVariable(*(SI->getOperand(0)))].lessdef.push_back(tmp);
 
-      PROPAGATE(std::shared_ptr<TyPropagateObject>(new llvmberry::ConsLessdef(tmp)),
+      PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(tmp)),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
                        TyPosition::make(SRC, *next, nextIndex, "")));
     }
+    //data.get<ArgForMem2Reg>()->replaceCmdRhs(Rload, VAR("sfsfsfsfsfsf", Physical)); 
 
-    if (storeItem[SI].expr == values[keySI]) {
+    //if (storeItem[SI].expr == values[keySI]) {
+    if (storeItem[SI].op0 == "%" ||
+        data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, 
+                                                   TyExpr::make(*(SI->getOperand(0)),
+                                                                Physical))) {
       // stored value will not be changed in another iteration
       INFRULE(
           TyPosition::make(SRC, *SI, instrIndex[SI], ""),
           ConsIntroGhost::make(storeItem[SI].expr, REGISTER(Rstore, Ghost)));
+          //ConsIntroGhost::make(TyExpr::make(*(SI->getOperand(0)), Physical),
+                               //REGISTER(Rstore, Ghost)));
 
       INFRULE(
           TyPosition::make(SRC, *SI, instrIndex[SI], ""),
           ConsTransitivity::make(INSN(*SI), storeItem[SI].expr,
+          //ConsTransitivity::make(INSN(*SI), TyExpr::make(*(SI->getOperand(0)), Physical),
                                      VAR(Rstore, Ghost)));
     } else {
       // stored value will be changed in another iteration
@@ -913,8 +922,10 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
       INFRULE(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
               ConsTransitivityTgt::make(VAR(Rstore, Ghost),
                                         VAR(storeItem[SI].op0, Ghost),
-                                        values[keySI]));
+                                        TyExpr::make(*(SI->getOperand(0)), Physical)));
+                                        //values[keySI]));
     }
+
   });
 }
 
@@ -925,7 +936,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
       Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
-    auto &mem2regCmds = *(data.get<ArgForMem2Reg>()->mem2regCmds);
+    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     std::string Rload = getVariable(*LI);
 
     if (values[Rload] == NULL)
@@ -946,17 +957,19 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
 
     std::shared_ptr<llvmberry::TyPropagateLessdef> tmp = llvmberry::TyPropagateLessdef::make
                                               (VAR(Rload, Ghost),
-                                               llvmberry::TyExpr::make(*(LI->getOperand(0)),
-                                                                       llvmberry::Physical),
+                                               TyExpr::make(*(SI->getOperand(0)), Physical),
+                                               VAR(Rload, Physical),
                                                TGT);
 
-    mem2regCmds[Rload].push_back(tmp);
+    //if (!llvm::isa<llvm::ConstantInt>(LI->getOperand(0)))
+      //mem2regCmds[getVariable(*(LI->getOperand(0)))].push_back(tmp);
+    mem2regCmd[Rload].lessdef.push_back(tmp);
 
     PROPAGATE(std::shared_ptr<TyPropagateObject>(new llvmberry::ConsLessdef(tmp)),
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                      TyPosition::make(SRC, *use, useIndex, "")));
 
-    //data.get<ArgForMem2Reg>()->replaceCmdRhs(Rload, VAR("sfsfsfsfsfsf", Physical)); 
+    //mem2regCmd[Rload].replaceCmdRhs(Rload, VAR("sfsfsfsf", Physical));
 
     INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
             ConsIntroGhost::make(VAR(Rstore, Ghost), REGISTER(Rload, Ghost)));
@@ -971,7 +984,8 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
 
     INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
             ConsTransitivityTgt::make(VAR(Rload, Ghost), VAR(Rstore, Ghost),
-                                      values[Rload]));
+                                      //values[Rload]));
+                                      TyExpr::make(*(SI->getOperand(0)), Physical)));
   });
 }
 

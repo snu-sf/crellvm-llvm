@@ -389,7 +389,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     Value *ReplVal = OnlyStore->getOperand(0);
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AI, &OnlyStore, &LI, &DT]
+            ([&AI, &OnlyStore, &LI, &ReplVal, &DT]
               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       //        <src>          |     <tgt>
       // %x = alloca i32       | nop
@@ -402,6 +402,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       // prepare variables
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
       auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+      auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
       std::string Rload = llvmberry::getVariable(*LI);
@@ -469,12 +470,71 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       hints.addNopPosition
         (llvmberry::TyPosition::make
           (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
+/*
+      data.get<llvmberry::ArgForMem2Reg>()->
+                replaceCmdRhs(Rload,
+                              llvmberry::TyExpr::make(*ReplVal,
+                                                      llvmberry::Physical));
+*/                                                      
     });
 
     // If the replacement value is the load, this must occur in unreachable
     // code.
     if (ReplVal == LI)
       ReplVal = UndefValue::get(LI->getType());
+
+    llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&LI, &ReplVal]
+              (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
+      std::string LI_string = llvmberry::getVariable(*LI);
+
+      //data.get<llvmberry::ArgForMem2Reg>()->
+      mem2regCmd[LI_string].
+                replaceCmdRhs(LI_string, llvmberry::TyExpr::make(*ReplVal, llvmberry::Physical));
+
+      Instruction *tmpUseinst;
+      for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E; UI++) {
+        llvm::Use &U = *UI;
+
+        if ((tmpUseinst = dyn_cast<Instruction>(U.getUser()))) {
+          if (LoadInst *LI_use = dyn_cast<LoadInst>(tmpUseinst)) {
+            std::string use_string = llvmberry::getVariable(*LI_use);
+            INFRULE(llvmberry::TyPosition::make
+                           (TGT, *LI_use),
+                    llvmberry::ConsTransitivityTgt::make
+                           (VAR(use_string, Physical),
+                            VAR(LI_string, Ghost),
+                            llvmberry::TyExpr::make(*ReplVal, llvmberry::Physical)));
+
+            INFRULE(llvmberry::TyPosition::make
+                           (TGT, *tmpUseinst),
+                    llvmberry::ConsTransitivityTgt::make
+                           (VAR(use_string, Ghost),
+                            VAR(use_string, Physical),
+                            llvmberry::TyExpr::make(*ReplVal, llvmberry::Physical)));
+          }
+
+          if (StoreInst *SI_use = dyn_cast<StoreInst>(tmpUseinst)) {
+            std::string use_string = llvmberry::getVariable(*SI_use);
+            INFRULE(llvmberry::TyPosition::make
+                           (TGT, *SI_use),
+                    llvmberry::ConsTransitivityTgt::make
+                           (VAR(use_string, Physical),
+                            VAR(LI_string, Ghost),
+                            llvmberry::TyExpr::make(*ReplVal, llvmberry::Physical)));
+
+            INFRULE(llvmberry::TyPosition::make
+                           (TGT, *tmpUseinst),
+                    llvmberry::ConsTransitivityTgt::make
+                           (VAR(use_string, Ghost),
+                            VAR(use_string, Physical),
+                            llvmberry::TyExpr::make(*ReplVal, llvmberry::Physical)));
+          }
+        }
+      }
+    });
+
     LI->replaceAllUsesWith(ReplVal);
 
     if (AST && LI->getType()->isPointerTy())
@@ -808,7 +868,7 @@ void PromoteMem2Reg::run() {
       auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
       auto &values = *(data.get<llvmberry::ArgForMem2Reg>()->values);
       auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
-      auto &mem2regCmds = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmds);
+      auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       std::string bname = llvmberry::getBasicBlockIndex(AItmp->getParent());
       
       allocas.push_back(AItmp);

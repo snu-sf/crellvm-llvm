@@ -5,6 +5,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Infrules.h"
 
 #include <memory>
 
@@ -112,21 +113,35 @@ public:
   typedef std::shared_ptr<TyValuesObj> TyValues;
   TyValues values;
 
-  struct Triple {
+  struct StoreTriple {
     std::shared_ptr<TyValue> value;
     std::shared_ptr<TyExpr> expr;
     std::string op0;
   };
 
-  typedef std::map<const llvm::Instruction *, Triple> TyStoreItemObj;
+  typedef std::map<const llvm::Instruction *, StoreTriple> TyStoreItemObj;
   typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
   TyStoreItem storeItem;
-
+/*
   typedef std::map<std::string, std::vector<std::shared_ptr<TyPropagateLessdef>>> TyMem2RegCmdsObj;
   typedef std::shared_ptr<TyMem2RegCmdsObj> TyMem2RegCmds;
   TyMem2RegCmds mem2regCmds;
+*/
+  struct CmdTriple {
+    std::vector<std::shared_ptr<TyPropagateLessdef>> lessdef;
+    std::vector<std::shared_ptr<TyTransitivity>> transitivity;
+    std::vector<std::shared_ptr<TyIntroGhost>> ghost;
+    
+    void replaceCmdRhs(std::string key, std::shared_ptr<TyExpr> newExpr);
+  };
 
-  void replaceCmdRhs(std::string key, std::shared_ptr<TyExpr> newExpr);
+  typedef std::map<std::string, CmdTriple> TyMem2RegCmdObj;
+  typedef std::shared_ptr<TyMem2RegCmdObj> TyMem2RegCmd;
+  TyMem2RegCmd mem2regCmd;
+
+  //void replaceCmdRhs(std::string key, std::shared_ptr<TyExpr> newExpr);
+  static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
+                              std::shared_ptr<TyExpr> e2);
 
   Mem2RegArg();
 };
