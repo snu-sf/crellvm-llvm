@@ -188,6 +188,9 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
                                          llvm::LoadInst *LI,
                                          llvm::Instruction *use, int useIndex);
 
+void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
+                                       llvm::LoadInst *LI);
+
 void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                llvm::AllocaInst *AI, llvm::StoreInst *SI,
                                llvm::BasicBlock::iterator II,

@@ -1698,6 +1698,13 @@ public:
                  std::shared_ptr<TyExpr> _e3);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
+  std::shared_ptr<TyExpr> get_expr1();
+  std::shared_ptr<TyExpr> get_expr2();
+  std::shared_ptr<TyExpr> get_expr3();
+  void update_expr1(std::shared_ptr<TyExpr> newExpr);
+  void update_expr2(std::shared_ptr<TyExpr> newExpr);
+  void update_expr3(std::shared_ptr<TyExpr> newExpr);
+
 private:
   std::shared_ptr<TyExpr> e1;
   std::shared_ptr<TyExpr> e2;
@@ -1743,6 +1750,9 @@ public:
   TyTransitivityTgt(std::shared_ptr<TyExpr> _e1, std::shared_ptr<TyExpr> _e2,
                     std::shared_ptr<TyExpr> _e3);
   void serialize(cereal::JSONOutputArchive &archive) const;
+
+  std::shared_ptr<TyExpr> get_expr3();
+  void update_expr3(std::shared_ptr<TyExpr> newExpr);
 
 private:
   std::shared_ptr<TyExpr> e1;
@@ -1860,6 +1870,10 @@ struct TyIntroGhost {
 public:
   TyIntroGhost(std::shared_ptr<TyExpr> _x, std::shared_ptr<TyRegister> _g);
   void serialize(cereal::JSONOutputArchive &archive) const;
+
+  std::shared_ptr<TyExpr> get_expr();
+  std::shared_ptr<TyRegister> get_reg();
+  void update_expr(std::shared_ptr<TyExpr> newExpr);
 
 private:
   std::shared_ptr<TyExpr> x;

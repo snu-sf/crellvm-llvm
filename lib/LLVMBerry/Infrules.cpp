@@ -3369,10 +3369,34 @@ void ConsMulShl::serialize(cereal::JSONOutputArchive &archive) const {
 TyTransitivity::TyTransitivity(std::shared_ptr<TyExpr> _e1,
                                std::shared_ptr<TyExpr> _e2,
                                std::shared_ptr<TyExpr> _e3)
-    : e1(std::move(_e1)), e2(std::move(_e2)), e3(std::move(_e3)) {}
+    : e1(_e1), e2(_e2), e3(_e3) {}
 
 void TyTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
+}
+
+std::shared_ptr<TyExpr> TyTransitivity::get_expr1() {
+  return e1;
+}
+
+std::shared_ptr<TyExpr> TyTransitivity::get_expr2() {
+  return e2;
+}
+
+std::shared_ptr<TyExpr> TyTransitivity::get_expr3() {
+  return e3;
+}
+
+void TyTransitivity::update_expr1(std::shared_ptr<TyExpr> newExpr) {
+  e1 = newExpr;
+}
+
+void TyTransitivity::update_expr2(std::shared_ptr<TyExpr> newExpr) {
+  e2 = newExpr;
+}
+
+void TyTransitivity::update_expr3(std::shared_ptr<TyExpr> newExpr) {
+  e3 = newExpr;
 }
 
 ConsTransitivity::ConsTransitivity(
@@ -3461,6 +3485,14 @@ TyTransitivityTgt::TyTransitivityTgt(std::shared_ptr<TyExpr> _e1,
 
 void TyTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
+}
+
+std::shared_ptr<TyExpr> TyTransitivityTgt::get_expr3() {
+  return e3;
+}
+
+void TyTransitivityTgt::update_expr3(std::shared_ptr<TyExpr> newExpr) {
+  e3 = newExpr;
 }
 
 ConsTransitivityTgt::ConsTransitivityTgt(
@@ -3784,6 +3816,18 @@ TyIntroGhost::TyIntroGhost(std::shared_ptr<TyExpr> _x,
 void TyIntroGhost::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(x));
   archive(CEREAL_NVP(g));
+}
+
+std::shared_ptr<TyExpr> TyIntroGhost::get_expr() {
+  return x;
+}
+
+std::shared_ptr<TyRegister> TyIntroGhost::get_reg() {
+  return g;
+}
+
+void TyIntroGhost::update_expr(std::shared_ptr<TyExpr> newExpr) {
+  x = newExpr;
 }
 
 ConsIntroGhost::ConsIntroGhost(std::shared_ptr<TyIntroGhost> _intro_ghost)

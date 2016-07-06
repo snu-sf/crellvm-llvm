@@ -8,6 +8,7 @@
 #include "llvm/LLVMBerry/Infrules.h"
 
 #include <memory>
+#include <deque>
 
 namespace llvmberry {
 
@@ -127,15 +128,18 @@ public:
   typedef std::shared_ptr<TyMem2RegCmdsObj> TyMem2RegCmds;
   TyMem2RegCmds mem2regCmds;
 */
-  struct CmdTriple {
+  struct Tuple {
     std::vector<std::shared_ptr<TyPropagateLessdef>> lessdef;
-    std::vector<std::shared_ptr<TyTransitivity>> transitivity;
+    std::vector<std::pair<std::shared_ptr<TyPosition>,
+                         std::shared_ptr<TyTransitivity>>> transSrc;
+    std::vector<std::shared_ptr<TyTransitivityTgt>> transTgt;
     std::vector<std::shared_ptr<TyIntroGhost>> ghost;
     
-    void replaceCmdRhs(std::string key, std::shared_ptr<TyExpr> newExpr);
+    void replaceCmdRhs(std::string which, std::string key,
+                       std::shared_ptr<TyExpr> newExpr);
   };
 
-  typedef std::map<std::string, CmdTriple> TyMem2RegCmdObj;
+  typedef std::map<std::string, Tuple> TyMem2RegCmdObj;
   typedef std::shared_ptr<TyMem2RegCmdObj> TyMem2RegCmd;
   TyMem2RegCmd mem2regCmd;
 

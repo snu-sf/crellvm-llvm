@@ -1823,7 +1823,7 @@ std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value,
 }
 
 ConsVar::ConsVar(std::shared_ptr<TyRegister> _register_name)
-    : register_name(std::move(_register_name)) {}
+    : register_name(_register_name) {}
 
 ConsVar::ConsVar(std::string _name, enum TyTag _tag)
     : register_name(new TyRegister(_name, _tag)) {}
@@ -1890,7 +1890,7 @@ std::shared_ptr<TyExpr> ConsConst::make(int _int_value, int _bitwidth) {
 }
 
 ConsInsn::ConsInsn(std::shared_ptr<TyInstruction> _instruction)
-    : instruction(std::move(_instruction)) {}
+    : instruction(_instruction) {}
 std::shared_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i) {
   return std::shared_ptr<TyExpr>(
       new ConsInsn(std::move(TyInstruction::make(i))));
@@ -1899,6 +1899,11 @@ std::shared_ptr<TyExpr>
 ConsInsn::make(std::shared_ptr<TyInstruction> _instruction) {
   return std::shared_ptr<TyExpr>(new ConsInsn(std::move(_instruction)));
 }
+
+std::shared_ptr<TyInstruction> ConsInsn::get_TyInsn() {
+  return instruction; 
+}
+
 void ConsInsn::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
