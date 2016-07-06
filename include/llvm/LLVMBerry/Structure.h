@@ -291,6 +291,16 @@ private:
   std::shared_ptr<TyValueType> valuetype;
 };
 
+struct ConsVectorType : public TyValueType {
+public:
+  ConsVectorType(uint64_t _array_size, std::shared_ptr<TyValueType> _valuetype);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  uint64_t array_size;
+  std::shared_ptr<TyValueType> valuetype;
+};
+
 struct ConsFunctionType : public TyValueType {
 public:
   ConsFunctionType(std::shared_ptr<TyValueType> _ret_type,

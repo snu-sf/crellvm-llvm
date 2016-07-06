@@ -1160,6 +1160,10 @@ std::shared_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
                  llvm::dyn_cast<llvm::ArrayType>(&type)) {
     vt = new ConsArrayType(atype->getNumElements(),
                            TyValueType::make(*atype->getElementType()));
+  } else if (const llvm::VectorType *vtype = 
+                 llvm::dyn_cast<llvm::VectorType>(&type)) {
+    vt = new ConsVectorType(vtype->getNumElements(),
+                           TyValueType::make(*vtype->getElementType()));
   } else if (const llvm::FunctionType *ftype =
                  llvm::dyn_cast<llvm::FunctionType>(&type)) {
     std::vector<std::shared_ptr<TyValueType>> argtys;
@@ -1254,6 +1258,22 @@ void ConsArrayType::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("ArrayType");
+
+  archive.startNode();
+  archive.makeArray();
+  archive(cereal::make_nvp("array_size", array_size));
+  archive(CEREAL_NVP(valuetype));
+  archive.finishNode();
+}
+
+ConsVectorType::ConsVectorType(uint64_t _array_size,
+                             std::shared_ptr<TyValueType> _valuetype)
+    : array_size(_array_size), valuetype(_valuetype) {}
+
+void ConsVectorType::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("VectorType");
 
   archive.startNode();
   archive.makeArray();
