@@ -58,11 +58,12 @@ tools/llgo
 tools/polly
 # Sphinx build tree, if building in-source dir.
 docs/_build
-lib/LLVMberry/temp
-include/llvm/LLVMberry/temp
-include/llvm/cereal
 #==============================================================================#
 # Files created in tree by the Go bindings.
 #==============================================================================#
 bindings/go/llvm/llvm_config.go
 bindings/go/llvm/workdir
+#==============================================================================#
+# LLVMBerry related things.
+#==============================================================================#
+include/llvm/cereal
