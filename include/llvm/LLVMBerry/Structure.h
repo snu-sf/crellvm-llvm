@@ -208,6 +208,7 @@ public:
 
   static bool isSame(std::shared_ptr<TyRegister> r1,
                      std::shared_ptr<TyRegister> r2);
+  std::string getName();
 
 private:
   std::string name;
@@ -905,6 +906,7 @@ public:
   static std::shared_ptr<TyExpr> make(std::string _name, enum TyTag _tag);
 
   std::shared_ptr<TyRegister> get_TyReg();
+  void updateTyReg(std::shared_ptr<TyRegister> newTyReg);
 
 private:
   std::shared_ptr<TyRegister> register_name;

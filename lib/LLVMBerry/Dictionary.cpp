@@ -46,7 +46,8 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg() {
 Mem2RegArg::Mem2RegArg()
     : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
       termIndex(new TyTermIndexObj()), values(new TyValuesObj()),
-      storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()) {}
+      storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
+      transTgt(new TyTransTgtObj()) {}
 
 bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                             std::shared_ptr<TyExpr> e2) {
@@ -153,6 +154,22 @@ void Mem2RegArg::Tuple::replaceCmdRhs(std::string which, std::string key,
         vec[i]->update_expr(newExpr);
         std::cout<<"check: "<<vec[i]->get_expr()<<std::endl;
       }
+    }
+  }
+}
+
+void Mem2RegArg::replaceTransTgtPrev() {
+  std::cout<<"TransTgtPrev"<<std::endl;
+  std::vector<std::shared_ptr<TyTransitivityTgt>> &vec = *this->transTgt.get();
+
+  for(size_t i = 0; i < vec.size(); i++) {
+    if (ConsVar *cv = dynamic_cast<ConsVar *>(vec[i]->get_expr2().get())) {
+      vec[i]->update_expr2(std::shared_ptr<TyExpr>
+                            (new ConsVar(std::shared_ptr<TyRegister>
+                                          (new TyRegister(cv->get_TyReg()->getName(),
+                                                          Previous)))));
+//      cv->updateTyReg(std::shared_ptr<TyRegister>
+//                       (new TyRegister(cv->get_TyReg()->getName(), Previous)));
     }
   }
 }

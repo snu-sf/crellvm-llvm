@@ -143,7 +143,11 @@ public:
   typedef std::shared_ptr<TyMem2RegCmdObj> TyMem2RegCmd;
   TyMem2RegCmd mem2regCmd;
 
-  //void replaceCmdRhs(std::string key, std::shared_ptr<TyExpr> newExpr);
+  typedef std::vector<std::shared_ptr<TyTransitivityTgt>> TyTransTgtObj;
+  typedef std::shared_ptr<TyTransTgtObj> TyTransTgt;
+  TyTransTgt transTgt;
+
+  void replaceTransTgtPrev();
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
 

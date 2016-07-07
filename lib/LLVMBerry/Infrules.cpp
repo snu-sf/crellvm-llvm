@@ -3487,8 +3487,16 @@ void TyTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
 }
 
+std::shared_ptr<TyExpr> TyTransitivityTgt::get_expr2() {
+  return e2;
+}
+
 std::shared_ptr<TyExpr> TyTransitivityTgt::get_expr3() {
   return e3;
+}
+
+void TyTransitivityTgt::update_expr2(std::shared_ptr<TyExpr> newExpr) {
+  e2 = newExpr;
 }
 
 void TyTransitivityTgt::update_expr3(std::shared_ptr<TyExpr> newExpr) {

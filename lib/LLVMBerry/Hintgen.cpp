@@ -850,7 +850,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
     std::string keySI = bname + "-" + std::to_string(instrIndex[SI]) + "-" + Rstore;
 
     std::cout<<"*****SI:"<<Rstore+", "+bname+"("+std::to_string(instrIndex[SI])+")"<<" | "<< getBasicBlockIndex(next->getParent())+": "+std::to_string(instrIndex[next])+", "+std::to_string(nextIndex)<<std::endl;
-
+    
     if (storeItem[SI].expr == NULL)
       return;
 
@@ -1111,7 +1111,7 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
 
     mem2regCmd[Rload].replaceCmdRhs("TransitivityTgt", Rload,
                                     llvmberry::TyExpr::make(*ReplVal, llvmberry::Physical));
-    
+
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(Rload, Physical);
     std::vector<std::pair<std::shared_ptr<TyPosition>,
                          std::shared_ptr<TyTransitivity>>> &vec =
@@ -1268,6 +1268,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
     auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &values = *(data.get<ArgForMem2Reg>()->values);
+    auto &transTgt = *(data.get<ArgForMem2Reg>()->transTgt);
     std::string bname = getBasicBlockIndex(SItmp->getParent());
     std::string Ralloca = getVariable(*AItmp);
     std::string Rstore = getVariable(*keyInst);
@@ -1370,11 +1371,27 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                                            TyExpr::make(*(SItmp->getOperand(0)),
                                                                         Physical))) {
             //if (storeItem[SItmp].expr == values[keySI]) {
+              /*
               INFRULE(TyPosition::make(TGT, PHI->getParent()->getName(),
                                        Predtmp->getName()),
                       ConsTransitivityTgt::make(VAR(Rstore, Ghost),
                                                 storeItem[SItmp].expr,
                                                 VAR(Rphi, Physical)));
+              */
+              //check transtgt
+              std::shared_ptr<TyTransitivityTgt> transitivitytgt
+                (new TyTransitivityTgt(VAR(Rstore, Ghost),
+                                       storeItem[SItmp].expr,
+                                       VAR(Rphi, Physical)));
+
+              INFRULE(TyPosition::make(TGT, PHI->getParent()->getName(),
+                                       Predtmp->getName()),
+                      std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
+
+              if (storeItem[SItmp].op0 != "%")
+                transTgt.push_back(transitivitytgt);
+              //check end
+
             } else {
               INFRULE(TyPosition::make(TGT, PHI->getParent()->getName(),
                                        Predtmp->getName()),
@@ -1495,11 +1512,27 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                                                TyExpr::make(*(SItmp->getOperand(0)),
                                                                             Physical))) {
                 //if (storeItem[SItmp].expr == values[keySI]) {
+                  /*
                   INFRULE(TyPosition::make(TGT, LI->getParent()->getName(),
                                            Predtmp->getName()),
                           ConsTransitivityTgt::make(
                               VAR(Rstore, Ghost), storeItem[SItmp].expr,
                               VAR(getVariable(*PHI), Physical)));
+                  */
+              //check transtgt
+              std::shared_ptr<TyTransitivityTgt> transitivitytgt
+                (new TyTransitivityTgt(VAR(Rstore, Ghost),
+                                       storeItem[SItmp].expr,
+                                       VAR(getVariable(*PHI), Physical)));
+
+              INFRULE(TyPosition::make(TGT, LI->getParent()->getName(),
+                                       Predtmp->getName()),
+                      std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
+
+              if (storeItem[SItmp].op0 != "%")
+                transTgt.push_back(transitivitytgt);
+              //check end
+
                 } else {
                   INFRULE(TyPosition::make(TGT, LI->getParent()->getName(),
                                            Predtmp->getName()),

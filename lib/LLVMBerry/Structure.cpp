@@ -724,6 +724,10 @@ bool TyRegister::isSame(std::shared_ptr<TyRegister> r1,
   return (r1->name==r2->name && r1->tag==r2->tag);
 }
 
+std::string TyRegister::getName() {
+  return name;
+}
+
 // constant
 ConsIntType::ConsIntType(int _value) : value(_value) {}
 
@@ -1862,6 +1866,10 @@ std::shared_ptr<TyExpr> ConsVar::make(std::string _name, enum TyTag _tag) {
 
 std::shared_ptr<TyRegister> ConsVar::get_TyReg() {
   return register_name;
+}
+
+void ConsVar::updateTyReg(std::shared_ptr<TyRegister> newTyReg) {
+  register_name = newTyReg;
 }
 
 ConsRhs::ConsRhs(std::shared_ptr<TyRegister> _register_name,

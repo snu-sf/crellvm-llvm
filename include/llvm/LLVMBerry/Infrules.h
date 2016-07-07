@@ -1751,7 +1751,10 @@ public:
                     std::shared_ptr<TyExpr> _e3);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
+
+  std::shared_ptr<TyExpr> get_expr2();
   std::shared_ptr<TyExpr> get_expr3();
+  void update_expr2(std::shared_ptr<TyExpr> newExpr);
   void update_expr3(std::shared_ptr<TyExpr> newExpr);
 
 private:

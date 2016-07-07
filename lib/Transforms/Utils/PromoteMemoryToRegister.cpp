@@ -1228,6 +1228,8 @@ void PromoteMem2Reg::run() {
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
       std::string Ralloca = llvmberry::getVariable(*A);
 
+      data.get<llvmberry::ArgForMem2Reg>()->replaceTransTgtPrev();
+
       // propagate maydiff
       llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
       llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
