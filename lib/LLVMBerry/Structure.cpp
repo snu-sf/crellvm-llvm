@@ -160,6 +160,7 @@ std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
     std::string tempstr;
     llvm::raw_string_ostream rso(tempstr);
     PrintLLVMName(rso, block);
+    assert(rso.str()[0] == '%');
     return rso.str().substr(1); //to remove %
   }
 
