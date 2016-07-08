@@ -1429,8 +1429,20 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
   // If the RHS is an alloca with a single use, zapify the store, making the
   // alloca dead.
   if (Ptr->hasOneUse()) {
-    if (isa<AllocaInst>(Ptr))
+    if (isa<AllocaInst>(Ptr)) {
+      llvmberry::ValidationUnit::Begin("dead_store_elim", SI.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&SI, &Ptr](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        std::string regname = llvmberry::getVariable(*Ptr);
+        AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
+        llvmberry::insertTgtNopAtSrcI(hints, &SI);
+        PROPAGATE(ALLOCA(REGISTER(regname, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
+        PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
+      });
       return EraseInstFromFunction(SI);
+    }
     if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Ptr)) {
       if (isa<AllocaInst>(GEP->getOperand(0))) {
         if (GEP->getOperand(0)->hasOneUse())

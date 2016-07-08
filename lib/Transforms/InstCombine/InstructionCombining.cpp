@@ -1977,6 +1977,36 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
   // true or false as appropriate.
   SmallVector<WeakVH, 64> Users;
   if (isAllocSiteRemovable(&MI, Users, TLI)) {
+    llvmberry::ValidationUnit::Begin("dead_store_elim2", MI.getParent()->getParent());
+    llvmberry::ValidationUnit::GetInstance()->intrude([&MI, &Users](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      // NOTE : We only support the case when Ptr is alloca and uses are store.
+      bool doAbort = false;
+      if (isa<AllocaInst>(&MI)) {
+        std::string regname = llvmberry::getVariable(MI);
+        for (unsigned i = 0, e = Users.size(); i != e; ++i) {
+          if (!isa<StoreInst>(&*Users[i])) {
+            doAbort = true;
+            break;
+          }
+          StoreInst *SI = dyn_cast<StoreInst>(&*Users[i]);
+          llvmberry::insertTgtNopAtSrcI(hints, SI);
+          PROPAGATE(ALLOCA(REGISTER(regname, Physical), SRC),
+              BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
+          PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
+              BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
+        }
+        llvmberry::insertTgtNopAtSrcI(hints, &MI);
+        llvmberry::propagateMaydiffGlobal(regname, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(regname, llvmberry::Previous);
+      } else {
+        doAbort = true;
+      }
+      if (doAbort) {
+        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
+            llvmberry::ValidationUnit::ABORT);
+      }
+    });
     for (unsigned i = 0, e = Users.size(); i != e; ++i) {
       Instruction *I = cast_or_null<Instruction>(&*Users[i]);
       if (!I) continue;
@@ -2004,7 +2034,10 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
       InvokeInst::Create(F, II->getNormalDest(), II->getUnwindDest(),
                          None, "", II->getParent());
     }
-    return EraseInstFromFunction(MI);
+    
+    Instruction *Res = EraseInstFromFunction(MI);
+    llvmberry::ValidationUnit::End();
+    return Res;
   }
   return nullptr;
 }
