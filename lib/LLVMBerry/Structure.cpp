@@ -68,7 +68,7 @@ unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
 
 
 
-// Below code is exactly copied from lib/IR/AsmWriter.cpp 326L to 395L
+// Below code PrintEscapedString is exactly copied from lib/IR/AsmWriter.cpp
 
 // PrintEscapedString - Print each character of the specified string, escaping
 // it if it is not printable or if it is an escape char.
@@ -82,6 +82,7 @@ static void PrintEscapedString(llvm::StringRef Name, llvm::raw_ostream &Out) {
   }
 }
 
+// Below code PrefixType is exactly copied from lib/IR/AsmWriter.cpp
 enum PrefixType {
   GlobalPrefix,
   ComdatPrefix,
@@ -89,6 +90,8 @@ enum PrefixType {
   LocalPrefix,
   NoPrefix
 };
+
+// Below code PrintLLVMName is exactly copied from lib/IR/AsmWriter.cpp
 
 /// PrintLLVMName - Turn the specified name into an 'LLVM name', which is either
 /// prefixed with % (if the string only contains simple characters) or is
@@ -132,6 +135,8 @@ static void PrintLLVMName(llvm::raw_ostream &OS, llvm::StringRef Name, PrefixTyp
   PrintEscapedString(Name, OS);
   OS << '"';
 }
+
+// Below code PrintLLVMName is exactly copied from lib/IR/AsmWriter.cpp
 
 /// PrintLLVMName - Turn the specified name into an 'LLVM name', which is either
 /// prefixed with % (if the string only contains simple characters) or is
