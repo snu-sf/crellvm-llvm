@@ -1254,8 +1254,6 @@ void PromoteMem2Reg::run() {
     A->eraseFromParent();
   }
 
-  llvmberry::ValidationUnit::End();
-
   const DataLayout &DL = F.getParent()->getDataLayout();
 
   // Remove alloca's dbg.declare instrinsics from the function.
@@ -1285,6 +1283,13 @@ void PromoteMem2Reg::run() {
       if (Value *V = SimplifyInstruction(PN, DL, nullptr, &DT, AC)) {
         if (AST && PN->getType()->isPointerTy())
           AST->deleteValue(PN);
+
+        llvmberry::ValidationUnit::GetInstance()->intrude
+                        ([&PN, &V]
+                                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+                          llvmberry::generateHintForMem2RegReplaceHint(V, PN);
+        });
+
         PN->replaceAllUsesWith(V);
         PN->eraseFromParent();
         NewPhiNodes.erase(I++);
@@ -1294,7 +1299,8 @@ void PromoteMem2Reg::run() {
       ++I;
     }
   }
-
+    
+  llvmberry::ValidationUnit::End();
   // At this point, the renamer has added entries to PHI nodes for all reachable
   // code.  Unfortunately, there may be unreachable blocks which the renamer
   // hasn't traversed.  If this is the case, the PHI nodes may not

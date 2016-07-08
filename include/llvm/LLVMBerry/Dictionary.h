@@ -135,8 +135,6 @@ public:
     std::vector<std::shared_ptr<TyTransitivityTgt>> transTgt;
     std::vector<std::shared_ptr<TyIntroGhost>> ghost;
     
-    void replaceCmdRhs(std::string which, std::string key,
-                       std::shared_ptr<TyExpr> newExpr);
   };
 
   typedef std::map<std::string, Tuple> TyMem2RegCmdObj;
@@ -152,6 +150,10 @@ public:
                               std::shared_ptr<TyExpr> e2);
 
   Mem2RegArg();
+
+  void replaceCmdRhs(std::string which, std::string key,
+                             std::shared_ptr<TyExpr> newExpr);
+
 };
 DEFINE_TRAITS(ArgForMem2Reg, Mem2RegArg);
 

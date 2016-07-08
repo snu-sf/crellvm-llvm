@@ -60,32 +60,43 @@ bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
     return false;
 }
 
-void Mem2RegArg::Tuple::replaceCmdRhs(std::string which, std::string key,
+void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
                                           std::shared_ptr<TyExpr> newExpr) {
   //assert(mem2regCmd->find(key) != mem2regCmd->end());
+  if (mem2regCmd->find(key) == mem2regCmd->end())
+    return;
+
   if (which == "Lessdef") {
     std::cout<<"lessdef replace:"+key<<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
     std::vector<std::shared_ptr<TyPropagateLessdef>> &vec =
-      this->lessdef;
+      mem2regCmd->find(key)->second.lessdef;
+
+    std::string phiKey = "";
+    if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
+      phiKey = cv->get_TyReg()->getName();
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i]->get_rhs(), keyExpr)) {
         std::cout<<"check: "<<vec[i]->get_rhs()<<", "<<newExpr<<std::endl;
         vec[i]->update_rhs(newExpr);
+
+        if (phiKey != "")
+          mem2regCmd->find(phiKey)->second.lessdef.push_back(vec[i]);
+
         std::cout<<"check: "<<vec[i]->get_rhs()<<std::endl;
       }
     }
   } else if (which == "Transitivity_e1") {
-    std::cout<<"trans replace:"+key<<std::endl;
+    std::cout<<"trans1 replace:"+key<<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
     std::vector<std::pair<std::shared_ptr<TyPosition>,
                          std::shared_ptr<TyTransitivity>>> &vec =
-      this->transSrc;
+      mem2regCmd->find(key)->second.transSrc;
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i].second->get_expr2(), keyExpr)) {
@@ -95,13 +106,13 @@ void Mem2RegArg::Tuple::replaceCmdRhs(std::string which, std::string key,
       }
     }
   } else if (which == "Transitivity_e2") {
-    std::cout<<"trans replace:"+key<<std::endl;
+    std::cout<<"trans2 replace:"+key<<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
     std::vector<std::pair<std::shared_ptr<TyPosition>,
                          std::shared_ptr<TyTransitivity>>> &vec =
-      this->transSrc;
+      mem2regCmd->find(key)->second.transSrc;
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i].second->get_expr2(), keyExpr)) {
@@ -111,13 +122,13 @@ void Mem2RegArg::Tuple::replaceCmdRhs(std::string which, std::string key,
       }
     }
   } else if (which == "Transitivity_e3") {
-    std::cout<<"trans replace:"+key<<std::endl;
+    std::cout<<"trans3 replace:"+key<<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
     std::vector<std::pair<std::shared_ptr<TyPosition>,
                          std::shared_ptr<TyTransitivity>>> &vec =
-      this->transSrc;
+      mem2regCmd->find(key)->second.transSrc;
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i].second->get_expr2(), keyExpr)) {
@@ -129,15 +140,22 @@ void Mem2RegArg::Tuple::replaceCmdRhs(std::string which, std::string key,
   } else if (which == "TransitivityTgt") {
     std::cout<<"transTgt replace:"+key<<std::endl;
 
+    std::string phiKey = "";
+    if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
+      phiKey = cv->get_TyReg()->getName();
+
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
     std::vector<std::shared_ptr<TyTransitivityTgt>> &vec =
-      this->transTgt;
+      mem2regCmd->find(key)->second.transTgt;
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i]->get_expr3(), keyExpr)) {
         std::cout<<"check: "<<vec[i]->get_expr3()<<", "<<newExpr<<std::endl;
         vec[i]->update_expr3(newExpr);
+
+        if (phiKey != "")
+          mem2regCmd->find(phiKey)->second.transTgt.push_back(vec[i]);
         std::cout<<"check: "<<vec[i]->get_expr3()<<std::endl;
       }
     }
@@ -146,7 +164,7 @@ void Mem2RegArg::Tuple::replaceCmdRhs(std::string which, std::string key,
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
     std::vector<std::shared_ptr<TyIntroGhost>> &vec =
-      this->ghost;
+      mem2regCmd->find(key)->second.ghost;
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i]->get_expr(), keyExpr)) {
@@ -168,8 +186,6 @@ void Mem2RegArg::replaceTransTgtPrev() {
                             (new ConsVar(std::shared_ptr<TyRegister>
                                           (new TyRegister(cv->get_TyReg()->getName(),
                                                           Previous)))));
-//      cv->updateTyReg(std::shared_ptr<TyRegister>
-//                       (new TyRegister(cv->get_TyReg()->getName(), Previous)));
     }
   }
 }

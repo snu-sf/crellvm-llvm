@@ -1104,21 +1104,12 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     return std::shared_ptr<TyConstant>(
         new ConsConstNull(ptype->getAddressSpace(),
                           TyValueType::make(*ptype->getPointerElementType())));
-  } else if (llvm::isa<llvm::ConstantAggregateZero>(value)) {
-    // TODO
-    const llvm::ConstantAggregateZero *zeroinit =
-        llvm::dyn_cast<llvm::ConstantAggregateZero>(&value);
-    const llvm::PointerType *ptype = zeroinit->getType();
-
-    return std::shared_ptr<TyConstant>(
-        new ConsConstNull(ptype->getAddressSpace(),
-                          TyValueType::make(*ptype->getPointerElementType())));
   }
-    std::string output;
-    llvm::raw_string_ostream rso(output);
-    value.print(rso);
-    rso.str();
-    std::cerr << output << std::endl;
+  std::string output;
+  llvm::raw_string_ostream rso(output);
+  value.print(rso);
+  rso.str();
+  std::cerr << output << std::endl;
   assert("TyConstant::make() : unsupported value" && false);
 }
 
