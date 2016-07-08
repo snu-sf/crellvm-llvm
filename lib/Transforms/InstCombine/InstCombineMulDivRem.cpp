@@ -1271,71 +1271,61 @@ Instruction *InstCombiner::visitUDiv(BinaryOperator &I) {
       llvmberry::ValidationUnit::Begin("udiv_zext", I.getParent()->getParent());
 
       Value *UDivVal = Builder->CreateUDiv(ZOp0->getOperand(0), ZOp1, "div", I.isExact());
-      //        <src>        |     <tgt>
-      // X = zext s1 A to s2 | X = zext s1 A to s2
-      // Y = zext s1 B to s2 | Y = zext s1 B to s2
-      // <nop>               | K = A udiv B
-      // Z = udiv X Y        | Z = zext s1 K to s2
       llvmberry::ValidationUnit::GetInstance()->intrude([&UDivVal, &ZOp0, &Op1, &I](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
+        // udiv_zext (case 1) : 
+        //        <src>        |     <tgt>
+        // X = zext s1 A to s2 | X = zext s1 A to s2
+        // Y = zext s1 B to s2 | Y = zext s1 B to s2
+        // <nop>               | K = A udiv B
+        // Z = udiv X Y        | Z = zext s1 K to s2
+        //
+        // udiv_zext (case 2) : 
+        //        <src>        |     <tgt>
+        // X = zext s1 A to s2 | X = zext s1 A to s2
+        // <nop>               | K = A udiv c
+        // Z = udiv X c        | Z = zext s1 K to s2
         BinaryOperator *Z = &I;
         ZExtInst *X = ZOp0;
-        ZExtInst *Y = dyn_cast<ZExtInst>(Op1);
         BinaryOperator *K = dyn_cast<BinaryOperator>(UDivVal);
         Value *A = X->getOperand(0);
-        Value *B = Y->getOperand(0);
         std::string reg_x_name = llvmberry::getVariable(*X);
-        std::string reg_y_name = llvmberry::getVariable(*Y);
         std::string reg_z_name = llvmberry::getVariable(*Z);
         std::string reg_k_name = llvmberry::getVariable(*K);
         int size1 = X->getSrcTy()->getIntegerBitWidth();
         int size2 = X->getDestTy()->getIntegerBitWidth();
 
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(reg_x_name, llvmberry::Physical, llvmberry::Target),
-                llvmberry::ConsVar::make(reg_x_name, llvmberry::Physical),
-                llvmberry::Target),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Target, *X),
-                llvmberry::TyPosition::make(llvmberry::Target, *Z))));
-
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Target),
-                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-                llvmberry::Target),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Target, *Y),
-                llvmberry::TyPosition::make(llvmberry::Target, *Z))));
-
+        llvmberry::propagateInstruction(X, Z, llvmberry::Target);
         llvmberry::insertSrcNopAtTgtI(hints, K);
-        
-        hints.addCommand(llvmberry::ConsPropagate::make(
-                llvmberry::ConsMaydiff::make(reg_k_name, llvmberry::Physical),
-                llvmberry::ConsGlobal::make()));
- 
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(reg_k_name, llvmberry::Physical, llvmberry::Target),
-                llvmberry::ConsVar::make(reg_k_name, llvmberry::Physical),
-                llvmberry::Target),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Target, *K),
-                llvmberry::TyPosition::make(llvmberry::Target, *Z))));
-        
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Target, *Z),
-            llvmberry::ConsUdivZext::make(
-                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_k_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*A),
-                llvmberry::TyValue::make(*B),
-                llvmberry::ConsSize::make(size1),
-                llvmberry::ConsSize::make(size2))));
+        llvmberry::propagateMaydiffGlobal(reg_k_name, llvmberry::Physical);
+        llvmberry::propagateInstruction(K, Z, llvmberry::Target);
+       
+        if(isa<ZExtInst>(Op1)) {
+          ZExtInst *Y = dyn_cast<ZExtInst>(Op1);
+          std::string reg_y_name = llvmberry::getVariable(*Y);
+          Value *B = Y->getOperand(0);
+          
+          llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
+          INFRULE(INSTPOS(TGT, Z),
+              llvmberry::ConsUdivZext::make(
+                REGISTER(reg_z_name, Physical),
+                REGISTER(reg_x_name, Physical),
+                REGISTER(reg_y_name, Physical),
+                REGISTER(reg_k_name, Physical),
+                VAL(A, Physical), VAL(B, Physical), BITSIZE(size1), BITSIZE(size2)));
+        } else if(isa<ConstantInt>(Op1)) {
+          ConstantInt *C = dyn_cast<ConstantInt>(Op1);
+          INFRULE(INSTPOS(TGT, Z),
+              llvmberry::ConsUdivZextConst::make(
+                REGISTER(reg_z_name, Physical),
+                REGISTER(reg_x_name, Physical),
+                llvmberry::TyConstInt::make(C->getSExtValue(), C->getBitWidth()),
+                REGISTER(reg_k_name, Physical),
+                VAL(A, Physical), BITSIZE(size1), BITSIZE(size2)));
+        } else {
+          assert("Must be constant int or ZExtInst, by dyn_castZExtVal definition " && false);
+        }
       });
 
       return new ZExtInst(UDivVal, I.getType());
@@ -1682,68 +1672,57 @@ Instruction *InstCombiner::visitURem(BinaryOperator &I) {
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
         llvmberry::name_instructions(*I.getParent()->getParent());
+        // (case 1)
         //        <src>        |     <tgt>
         // X = zext s1 A to s2 | X = zext s1 A to s2
         // Y = zext s1 B to s2 | Y = zext s1 B to s2
         // <nop>               | K = A urem B
         // Z = urem X Y        | Z = zext s1 K to s2
-        BinaryOperator *Z = &I;
+        // (case 2)
+        //        <src>        |     <tgt>
+        // X = zext s1 A to s2 | X = zext s1 A to s2
+        // <nop>               | K = A urem C
+        // Z = urem X C        | Z = zext s1 K to s2
+         BinaryOperator *Z = &I;
         ZExtInst *X = ZOp0;
-        ZExtInst *Y = dyn_cast<ZExtInst>(Op1);
         BinaryOperator *K = dyn_cast<BinaryOperator>(URemVal);
         Value *A = X->getOperand(0);
-        Value *B = Y->getOperand(0);
         std::string reg_x_name = llvmberry::getVariable(*X);
-        std::string reg_y_name = llvmberry::getVariable(*Y);
         std::string reg_z_name = llvmberry::getVariable(*Z);
         std::string reg_k_name = llvmberry::getVariable(*K);
         int size1 = X->getSrcTy()->getIntegerBitWidth();
         int size2 = X->getDestTy()->getIntegerBitWidth();
 
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(reg_x_name, llvmberry::Physical, llvmberry::Target),
-                llvmberry::ConsVar::make(reg_x_name, llvmberry::Physical),
-                llvmberry::Target),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Target, *X),
-                llvmberry::TyPosition::make(llvmberry::Target, *Z))));
-
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Target),
-                llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-                llvmberry::Target),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Target, *Y),
-                llvmberry::TyPosition::make(llvmberry::Target, *Z))));
-
+        llvmberry::propagateInstruction(X, Z, llvmberry::Target);
         llvmberry::insertSrcNopAtTgtI(hints, K);
-        
-        hints.addCommand(llvmberry::ConsPropagate::make(
-                llvmberry::ConsMaydiff::make(reg_k_name, llvmberry::Physical),
-                llvmberry::ConsGlobal::make()));
- 
-        hints.addCommand(llvmberry::ConsPropagate::make(
-            llvmberry::ConsLessdef::make(
-                llvmberry::ConsRhs::make(reg_k_name, llvmberry::Physical, llvmberry::Target),
-                llvmberry::ConsVar::make(reg_k_name, llvmberry::Physical),
-                llvmberry::Target),
-            llvmberry::ConsBounds::make(
-                llvmberry::TyPosition::make(llvmberry::Target, *K),
-                llvmberry::TyPosition::make(llvmberry::Target, *Z))));
-        
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Target, *Z),
-            llvmberry::ConsUremZext::make(
-                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_k_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*A),
-                llvmberry::TyValue::make(*B),
-                llvmberry::ConsSize::make(size1),
-                llvmberry::ConsSize::make(size2))));
+        llvmberry::propagateMaydiffGlobal(reg_k_name, llvmberry::Physical);
+        llvmberry::propagateInstruction(K, Z, llvmberry::Target);
+       
+        if(isa<ZExtInst>(Op1)) {
+          ZExtInst *Y = dyn_cast<ZExtInst>(Op1);
+          std::string reg_y_name = llvmberry::getVariable(*Y);
+          Value *B = Y->getOperand(0);
+          
+          llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
+          INFRULE(INSTPOS(TGT, Z),
+              llvmberry::ConsUremZext::make(
+                REGISTER(reg_z_name, Physical),
+                REGISTER(reg_x_name, Physical),
+                REGISTER(reg_y_name, Physical),
+                REGISTER(reg_k_name, Physical),
+                VAL(A, Physical), VAL(B, Physical), BITSIZE(size1), BITSIZE(size2)));
+        } else if(isa<ConstantInt>(Op1)) {
+          ConstantInt *C = dyn_cast<ConstantInt>(Op1);
+          INFRULE(INSTPOS(TGT, Z),
+              llvmberry::ConsUremZextConst::make(
+                REGISTER(reg_z_name, Physical),
+                REGISTER(reg_x_name, Physical),
+                llvmberry::TyConstInt::make(C->getSExtValue(), C->getBitWidth()),
+                REGISTER(reg_k_name, Physical),
+                VAL(A, Physical), BITSIZE(size1), BITSIZE(size2)));
+        } else {
+          assert("Must be constant int or ZExtInst, by dyn_castZExtVal definition " && false);
+        }
       });
 
 
