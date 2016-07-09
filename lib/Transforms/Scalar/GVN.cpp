@@ -3117,7 +3117,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         Instruction *VI = dyn_cast<Instruction>(V);
         std::string VI_id = llvmberry::getVariable(*VI);
         Instruction *VI_evolving = (*VI).clone();
-
+        VI_evolving->insertBefore(CurrentBlock->getTerminator());
         // INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
         //                                     PB->getName()),
         //         llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
@@ -3168,7 +3168,9 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           // RHS((*VI_evolving).getName(), Physical, SRC),
           // RHS((*VI_evolving).getName(), Physical, SRC),
           // RHS((*VI_evolving_next).getName(), Physical, SRC)));
+          (*VI_evolving).eraseFromParent();
           VI_evolving = VI_evolving_next;
+          VI_evolving->insertBefore(CurrentBlock->getTerminator());
         }
 
         // propagate VI >= VI_evolving (evolve ended)
@@ -3210,6 +3212,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                 llvmberry::ConsTransitivity::make(VAR(Phi_id, Physical),
                                                   VAR(VI_id, Physical),
                                                   INSN(*VI_evolving)));
+        (*VI_evolving).eraseFromParent();
       }
 
       PROPAGATE(
