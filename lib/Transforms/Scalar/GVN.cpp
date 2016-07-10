@@ -2992,13 +2992,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
     std::string CurInst_id = llvmberry::getVariable(*CurInst);
     std::string Phi_id = llvmberry::getVariable(*Phi);
-    // SmallVector<uint32_t, 4> op_CurInst;
-    // bool CurInst_swapped = false;
-    // for (Instruction::op_iterator OI = CurInst->op_begin(), OE =
-    // CurInst->op_end(); OI != OE; ++OI)
-    //   op_CurInst.push_back(VN.lookup(*OI));
-    // llvmberry::Expression expr_CurInst =
-    // llvmberry::create_expression(CurInst, CurInst_swapped, op_CurInst);
     std::vector<Instruction *> op_CurInst;
     std::vector<std::vector<int>> notSameIdx(
         predMap.size(), std::vector<int>(0)); // predMap idx -> operand idx
@@ -3016,13 +3009,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       assert(isa<Instruction>(V) &&
              "Value not an instruction: not yet handled.");
       Instruction *VI = dyn_cast<Instruction>(V);
-      // SmallVector<uint32_t, 4> op_VI;
-      // bool VI_swapped = false;
-      // for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
-      // OI != OE; ++OI)
-      //   op_VI.push_back(VN.lookup(*OI));
-      // llvmberry::Expression expr_VI = llvmberry::create_expression(VI,
-      // VI_swapped, op_VI);
       std::vector<Instruction *> op_VI;
       for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
            OI != OE; ++OI)
@@ -3039,18 +3025,14 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       }
       hints.appendToDescription("VI: " + (*VI).getName().str());
 
-      std::string tmp = "";
-      if (isSame)
-        tmp += "true";
-      else
-        tmp += "false";
-      hints.appendToDescription("RHS of CurInst and VI is same: " + tmp);
-      // hints.appendToDescription("expr_CurInst == expr_VI: " +
-      // (int)(expr_CurInst == expr_VI));
+      hints.appendToDescription("RHS of CurInst and VI is same: " +
+                                std::to_string(isSame));
       isSameForAll &= isSame;
     }
 
     if (!isSameForAll) {
+      llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+          "GVN_PRE_hard");
       // if is same for all, it does not involve previous PRE and just works
       // it is treated below
       for (int i = 0; i < notSameIdx.size(); i++)
@@ -3118,11 +3100,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         std::string VI_id = llvmberry::getVariable(*VI);
         Instruction *VI_evolving = (*VI).clone();
         VI_evolving->insertBefore(CurrentBlock->getTerminator());
-        // INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
-        //                                     PB->getName()),
-        //         llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-        //                                           VAR(VI_id, Previous),
-        //                                           VAR(Phi_id, Physical)));
 
         for (auto k : PrevPRE) {
           PHINode *PrevPhi = k.first;
@@ -3138,16 +3115,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                                     VAR(VI_op_id, Previous),
                                                     VAR(PrevPhi_id, Physical)));
 
-          // std::shared_ptr<TyInfrule>
-          // ConsReplaceRhs::make(std::shared_ptr<TyRegister> _x,
-          //                                                 std::shared_ptr<TyValue>
-          //                                                 _y,
-          //                                                 std::shared_ptr<TyExpr>
-          //                                                 _e1,
-          //                                                 std::shared_ptr<TyExpr>
-          //                                                 _e2,
-          //                                                 std::shared_ptr<TyExpr>
-          //                                                 _e2_p) {
           INFRULE(llvmberry::TyPosition::make(SRC, (*CurrentBlock).getName(),
                                               (*PB).getName()),
                   llvmberry::ConsSubstitute::make(
@@ -3165,41 +3132,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                       // EXPR(VI_evolving, Physical)
                       ));
 
-          // RHS((*VI_evolving).getName(), Physical, SRC),
-          // RHS((*VI_evolving).getName(), Physical, SRC),
-          // RHS((*VI_evolving_next).getName(), Physical, SRC)));
           (*VI_evolving).eraseFromParent();
           VI_evolving = VI_evolving_next;
           VI_evolving->insertBefore(CurrentBlock->getTerminator());
         }
-
-        // propagate VI >= VI_evolving (evolve ended)
-        // PROPAGATE(LESSDEF(VAR(VI_id, Physical), INSN(*VI_evolving), SRC),
-        //           BOUNDS(
-        //                  llvmberry::TyPosition::make(SRC,
-        //                                              (*CurrentBlock).getName(),
-        //                                              (*PB).getName()),
-        //                  // INSTPOS(SRC, VI),
-        //                  llvmberry::TyPosition::make(SRC,
-        //                                              (*CurrentBlock).getName(),
-        //                                              (*PB).getName())
-        //                  ));
-
-        // if (Instruction *Inst = dyn_cast<Instruction>(V)) {
-        //   std::string Inst_id = llvmberry::getVariable(*Inst);
-        //   PROPAGATE
-        //     (LESSDEF(RHS(Inst_id, Physical, SRC), VAR(Inst_id, Physical),
-        //     SRC),
-        //      BOUNDS(INSTPOS(SRC, Inst),
-        //             llvmberry::TyPosition::make_end_of_block
-        //             (llvmberry::Source, *PB)));
-        //   PROPAGATE
-        //     (LESSDEF(VAR(Inst_id, Physical), RHS(Inst_id, Physical, SRC),
-        //     SRC),
-        //      BOUNDS(INSTPOS(SRC, Inst),
-        //             llvmberry::TyPosition::make_end_of_block
-        //             (llvmberry::Source, *PB)));
-        // }
 
         INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
                                             PB->getName()),
