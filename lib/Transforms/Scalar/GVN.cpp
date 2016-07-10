@@ -3087,7 +3087,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           }
         }
 
-      Instruction *VI_evolving_merged;
       for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
         BasicBlock *PB = predMap[i].second;
         Value *V = nullptr;
@@ -3145,29 +3144,20 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                 llvmberry::ConsTransitivity::make(INSN(*VI_evolving),
                                                   VAR(VI_id, Physical),
                                                   VAR(Phi_id, Physical)));
-        if (i == 0)
-          VI_evolving_merged = VI_evolving;
-        else {
-          if ((*VI_evolving_merged).isIdenticalTo(VI_evolving)) {
-          } else {
-            hints.appendToDescription(
-                "VI_evolving_merged != VI_evolving. Fail here");
-            return;
-          }
-        }
+
+        PROPAGATE(LESSDEF(INSN(*VI_evolving), VAR(Phi_id, Physical), SRC),
+                  BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                             llvmberry::Source,
+                             llvmberry::getBasicBlockIndex(CurrentBlock)),
+                         INSTPOS(SRC, CurInst)));
+
+        INFRULE(INSTPOS(SRC, CurInst),
+                llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
+                                                  INSN(*VI_evolving),
+                                                  VAR(Phi_id, Physical)));
+
         (*VI_evolving).eraseFromParent();
       }
-
-      PROPAGATE(LESSDEF(INSN(*VI_evolving_merged), VAR(Phi_id, Physical), SRC),
-                BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                           llvmberry::Source,
-                           llvmberry::getBasicBlockIndex(CurrentBlock)),
-                       INSTPOS(SRC, CurInst)));
-
-      INFRULE(INSTPOS(SRC, CurInst),
-              llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
-                                                INSN(*VI_evolving_merged),
-                                                VAR(Phi_id, Physical)));
 
       for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
         if (!isa<Instruction>(UI->getUser())) {
