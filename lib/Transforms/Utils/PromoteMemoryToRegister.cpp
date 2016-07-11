@@ -369,7 +369,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         if (StoreIndex == -1)
           StoreIndex = LBI.getInstructionIndex(OnlyStore);
 
-        if (unsigned(StoreIndex) > LBI.getInstructionIndex(LI)) {
           // Can't handle this load, bail out.
           Info.UsingBlocks.push_back(StoreBB);
           continue;
@@ -402,7 +401,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       // prepare variables
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
       auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
-      auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
       std::string Rload = llvmberry::getVariable(*LI);
@@ -655,9 +653,52 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                         static_cast<StoreInst *>(nullptr)),
                          less_first());
 
-    if (I == StoresByIndex.begin())
+    if (I == StoresByIndex.begin()) {
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&AI, &LI]
+                (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        Value* ReplVal = UndefValue::get(LI->getType());
+
+        // prepare variables
+        auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+        auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+        //std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
+        std::string Ralloca = llvmberry::getVariable(*AI);
+        std::string Rload = llvmberry::getVariable(*LI);
+
+        // add hints per user of load
+        for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
+          llvm::Use &U = *(UI++);
+          llvm::Instruction *use = dyn_cast<Instruction>(U.getUser());
+
+          // set index of use
+          int useIndex = 
+                llvmberry::getIndexofMem2Reg
+                  (use, instrIndex[use],
+                   termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
+
+          // propagate undef
+          PROPAGATE(LESSDEF(VAR(Rload, Physical),
+                            llvmberry::TyExpr::make(*ReplVal, llvmberry::Physical),
+                            //VAR(Ralloca, Physical),
+                            SRC),
+                    BOUNDS(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                           llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+        }
+
+        // propagate maydiff
+        llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
+
+        hints.addNopPosition
+          (llvmberry::TyPosition::make
+            (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
+        //llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI);
+      });
+
       // If there is no store before this load, the load takes the undef value.
       LI->replaceAllUsesWith(UndefValue::get(LI->getType()));
+    }
     else {
       llvmberry::ValidationUnit::GetInstance()->intrude
          ([&AI, &LI, &I]
@@ -688,10 +729,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
           // call void @bar(i32 %b) | call void @bar(i32 2)
           // %c = load i32 3        | nop
           // ret i32 %c             | ret i32 3
-/*         
-          llvmberry::generateHintForMem2RegPropagateNoalias
-            (AI, use, useIndex);
-*/
           llvmberry::generateHintForMem2RegPropagateLoad
             (SI, LI, use, useIndex);
         }
@@ -703,11 +740,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         hints.addNopPosition
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
-      });
 
-      llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&LI, &I]
-                (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         Value* ReplVal = std::prev(I)->second->getOperand(0);
         llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI);
       });
@@ -806,19 +839,15 @@ void PromoteMem2Reg::run() {
   // memorize indices of alloca, store, load, and terminator instructions
   for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
     AllocaInst *AItmp = Allocas[tmpNum];
-    DominatorTree &Domtree = DT;
-
-      DenseMap<AllocaInst *, unsigned> &AL = AllocaLookup;
+    //DenseMap<AllocaInst *, unsigned> &AL = AllocaLookup;
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AItmp, &Domtree, this, &AL]
+            ([&AItmp]
               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       // initialize dictionaries
       auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
       auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
-      auto &values = *(data.get<llvmberry::ArgForMem2Reg>()->values);
       auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
-      auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       std::string bname = llvmberry::getBasicBlockIndex(AItmp->getParent());
       
       allocas.push_back(AItmp);
@@ -851,7 +880,6 @@ void PromoteMem2Reg::run() {
             storeItem[SI].expr = std::move(llvmberry::TyExpr::make(*(SI->getOperand(0)),
                                                                    llvmberry::Physical));
           storeItem[SI].op0 = "%" + std::string(SI->getOperand(0)->getName());
-          //values[keySI] = storeItem[SI].expr;
         }
 
         // save information of instruction's use
@@ -867,159 +895,6 @@ void PromoteMem2Reg::run() {
           }
         }
       }
-/*
-      // update dictionary named "values" until there is no more change
-      bool hasChanged = true;
-      while (hasChanged) {
-        hasChanged = false;
-
-        // check every saved information
-        std::map<const Instruction*, unsigned>::const_iterator it;
-        for (it = instrIndex.begin(); it != instrIndex.end(); ++it) {
-          const Instruction *tmpInst = it->first;
-
-          if (!(isa<LoadInst>(tmpInst) || isa<StoreInst>(tmpInst)))
-            continue;
-
-          // if instruction store/load other register,
-          // data in dictionary can be changed 
-          // to the stored/loaded value of that register
-          if (isa<LoadInst>(tmpInst)) {
-            const LoadInst* LI = dyn_cast<LoadInst>(tmpInst);
-            AllocaInst* AI = dyn_cast<AllocaInst>(LI->getOperand(0));
-            std::string keyLI = "%"+std::string(LI->getName());
-            std::string bname = "";
-            unsigned nearestStore = 0;
-            const BasicBlock *SB = NULL;
-            bool isSameBlock = false;
-            bool isChanged = false;
-
-            std::map<const Instruction*, unsigned>::const_iterator it2;
-            for (it2=instrIndex.begin(); it2!=instrIndex.end(); ++it2) {
-              if (isa<StoreInst>(it2->first) && 
-                  LI->getOperand(0) == it2->first->getOperand(1)) {
-                const StoreInst* SI = dyn_cast<StoreInst>(it2->first);
-
-                if ((LI->getParent() == SI->getParent())) {
-                  // store and load is in the same block,
-                  if (isSameBlock &&
-                     (instrIndex[SI] < instrIndex[LI]) &&
-                     (instrIndex[SI] > nearestStore)) {
-                    // previous nearestStore is in the same block
-                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
-                    nearestStore = instrIndex[SI];
-                    SB = SI->getParent();
-                    isChanged = true;
-                  } else if (!isSameBlock) {
-                    // previous nearestStore is in different block
-                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
-                    nearestStore = instrIndex[SI];
-                    isSameBlock = true;
-                    isChanged = true;
-                  }
-                } else if ((LI->getParent() != SI->getParent()) &&
-                           Domtree.dominates(SI->getParent(), LI->getParent())) {
-                  // if store and load is not in the same block,
-                  // store block should dominate load block
-                  if (!isChanged) {
-                    // initial state
-                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
-                    nearestStore = instrIndex[SI];
-                    isChanged = true;
-                  } else if ((SB == SI->getParent()) && 
-                           (instrIndex[SI] > nearestStore)) {
-                    // previous nearestStore is further from load
-                    // than current store in the same block
-                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
-                    nearestStore = instrIndex[SI];
-                    isChanged = true;
-                  } else if (Domtree.dominates(SB, SI->getParent())) {
-                    // previous nearestStore is further from load
-                    // than current store in different block
-                    bname = llvmberry::getBasicBlockIndex(SI->getParent());
-                    nearestStore = instrIndex[SI];
-                    SB = SI->getParent();
-                    isChanged = true;
-                  }
-                } else {
-                  
-    AllocaInfo Info;
-    Info.AnalyzeAlloca(AI);
-    IDFCalculator IDF(Domtree);
-    SmallPtrSet<BasicBlock *, 32> DefBlocks;
-    DefBlocks.insert(Info.DefiningBlocks.begin(), Info.DefiningBlocks.end());
-
-    // Determine which blocks the value is live in.  These are blocks which lead
-    // to uses.
-    SmallPtrSet<BasicBlock *, 32> LiveInBlocks;
-    ComputeLiveInBlocks(AI, Info, DefBlocks, LiveInBlocks);
-
-    // At this point, we're committed to promoting the alloca using IDF's, and
-    // the standard SSA construction algorithm.  Determine which blocks need phi
-    // nodes and see if we can optimize out some work by avoiding insertion of
-    // dead phi nodes.
-    IDF.setLiveInBlocks(LiveInBlocks);
-    IDF.setDefiningBlocks(DefBlocks);
-    SmallVector<BasicBlock *, 32> PHIBlocks;
-    IDF.calculate(PHIBlocks);
-    
-    if (PHIBlocks.size() > 1)
-      std::sort(PHIBlocks.begin(), PHIBlocks.end(),
-                [this](BasicBlock *A, BasicBlock *B) {
-                  return BBNumbers.lookup(A) < BBNumbers.lookup(B);
-                });
-    std::cout<<"queuephi in dict"<<std::endl;
-    unsigned CurrentVersion = 0;
-    for (unsigned i = 0, e = PHIBlocks.size(); i != e; ++i)
-      QueuePhiNode(PHIBlocks[i], AL[AI], CurrentVersion);
-    std::cout<<"end in dict"<<std::endl;
-    
-                }
-              }
-            }
-
-            // update dictionary if previous value is different with
-            // current value
-            std::string keyNew = bname+"-"+std::to_string(nearestStore)+"-%"+
-                                 std::string(LI->getOperand(0)->getName());
-
-            std::cout<<"LIkeyNew: "<<keyNew<<", "<<values[keyNew]<<std::endl;
-            std::cout<<"keyLI: "<<keyLI<<", "<<values[keyLI]<<std::endl;
-
-            if (bname != "" &&
-                values[keyLI] != values[keyNew] &&
-                values[keyNew] != NULL) {
-              values[keyLI] = values[keyNew];
-              hasChanged = true;
-            }
-          } else {
-            // the case of store is same as load
-        std::map<const Instruction*, unsigned>::const_iterator it;
-            const StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
-            std::string bname = llvmberry::getBasicBlockIndex(SI->getParent());
-            std::string keySI = bname+"-"+std::to_string(instrIndex[SI])+"-%"+
-                                std::string(SI->getOperand(1)->getName());
-            std::string keyNew = "%"+std::string(SI->getOperand(0)->getName());
-
-            std::cout<<"SIkeyNew: "<<keyNew<<", "<<values[keyNew]<<std::endl;
-            std::cout<<"keySI: "<<keySI<<", "<<values[keySI]<<std::endl;
-
-            if (values[keySI] != values[keyNew] &&
-                values[keyNew] != NULL) {
-              values[keySI] = values[keyNew];
-              hasChanged = true;
-            }
-          }
-        }
-      }
-
-        std::map<const Instruction*, unsigned>::const_iterator it;
-        for (it = instrIndex.begin(); it != instrIndex.end(); ++it) {
-          const Instruction *tmpInst = it->first;
-          std::string bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
-          std::cout << "instrIndex: "<<bname<<", "<<instrIndex[tmpInst]<<std::endl;
-        }
-*/
     }); 
   }
 
@@ -1112,6 +987,7 @@ void PromoteMem2Reg::run() {
     // it that are directly dominated by the definition with the value stored.
     if (Info.DefiningBlocks.size() == 1) {
       if (rewriteSingleStoreAlloca(AI, Info, LBI, DT, AST)) {
+        std::cout<<"singlestore success"<<std::endl;
         // The alloca has been processed, move on.
         RemoveFromAllocasList(AllocaNum);
         ++NumSingleStore;
@@ -1123,6 +999,7 @@ void PromoteMem2Reg::run() {
     // linear sweep over the block to eliminate it.
     if (Info.OnlyUsedInOneBlock) {
       promoteSingleBlockAlloca(AI, Info, LBI, AST);
+        std::cout<<"singleblock success"<<std::endl;
 
       // The alloca has been processed, move on.
       RemoveFromAllocasList(AllocaNum);
@@ -1153,9 +1030,6 @@ void PromoteMem2Reg::run() {
     // the standard SSA construction algorithm.  Determine which blocks need PHI
     // nodes and see if we can optimize out some work by avoiding insertion of
     // dead phi nodes.
-
-
-    
     SmallPtrSet<BasicBlock *, 32> DefBlocks;
     DefBlocks.insert(Info.DefiningBlocks.begin(), Info.DefiningBlocks.end());
 
