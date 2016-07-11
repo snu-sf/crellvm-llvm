@@ -3092,11 +3092,19 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         Value *V = nullptr;
         if (!(V = predMap[i].first))
           V = PREInstr;
-        propagateInstrUntilBlockEnd_rec(hints, V, PB);
-        // TODO propagate only one step
 
         Instruction *VI = dyn_cast<Instruction>(V);
         std::string VI_id = llvmberry::getVariable(*VI);
+
+        PROPAGATE(
+            LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
+                                         llvmberry::Source, *PB)));
+        PROPAGATE(
+            LESSDEF(VAR(VI_id, Physical), RHS(VI_id, Physical, SRC), SRC),
+            BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
+                                         llvmberry::Source, *PB)));
+
         Instruction *VI_evolving = (*VI).clone();
         VI_evolving->insertBefore(CurrentBlock->getTerminator());
 
