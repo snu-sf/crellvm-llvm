@@ -372,8 +372,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           // Can't handle this load, bail out.
           Info.UsingBlocks.push_back(StoreBB);
           continue;
-        }
-
       } else if (LI->getParent() != StoreBB &&
                  !DT.dominates(StoreBB, LI->getParent())) {
         // If the load and store are in different blocks, use BB dominance to
@@ -1331,8 +1329,6 @@ bool PromoteMem2Reg::QueuePhiNode(BasicBlock *BB, unsigned AllocaNo,
   PN = PHINode::Create(Allocas[AllocaNo]->getAllocatedType(), getNumPreds(BB),
                        Allocas[AllocaNo]->getName() + "." + Twine(Version++),
                        BB->begin());
-  std::cout<<"queuephi check"<<std::endl;
-  std::cout<<"queuephi: "<<std::string((Allocas[AllocaNo]->getName()+"."+Twine(Version)).str())<<std::endl;
   PhiToAllocaMap[PN] = AllocaNo;
 
   if (AST && PN->getType()->isPointerTy())
