@@ -60,6 +60,9 @@ ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
 ValidationUnit::~ValidationUnit() {
   switch (_return_code) {
   case COMMIT:
+    if (_optname.compare("mem2reg"))
+      this->abort();
+    else
     this->commit();
     break;
   case ABORT:
@@ -96,6 +99,8 @@ void ValidationUnit::setReturnCode(RETURN_CODE return_code) {
 
 void ValidationUnit::intrude(
     std::function<void(Dictionary &, CoreHint &)> func) {
+  if (_optname.compare("mem2reg"))
+    return;
   func(_data, _corehint);
 }
 
@@ -115,6 +120,8 @@ void ValidationUnit::begin() {
   // print src
   llvmberry::name_instructions(*_func);
   _srcfile_buffer = new std::string();
+  if (_optname.compare("mem2reg")) {}
+  else
   writeModuleToBuffer(*module, _srcfile_buffer);
   // writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc.org"));
 

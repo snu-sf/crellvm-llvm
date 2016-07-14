@@ -7,6 +7,7 @@
 #include <memory>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/Analysis/CFG.h"
 
 #define PHIPOS(SCOPE, PN, prevI)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(),                \
@@ -196,6 +197,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                llvm::BasicBlock::iterator II,
                                llvm::DenseMap<llvm::PHINode *, unsigned> PAM,
                                llvm::DenseMap<llvm::AllocaInst *, unsigned> AL,
+                               std::vector<llvm::BasicBlock*> succs,
                                bool isSameBB);
 
 int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);

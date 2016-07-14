@@ -62,7 +62,6 @@ bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
 
 void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
                                           std::shared_ptr<TyExpr> newExpr) {
-  //assert(mem2regCmd->find(key) != mem2regCmd->end());
   if (mem2regCmd->find(key) == mem2regCmd->end())
     return;
 
@@ -178,7 +177,7 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
 void Mem2RegArg::replaceTransTgtPrev() {
   std::cout<<"TransTgtPrev"<<std::endl;
-  std::vector<std::shared_ptr<TyTransitivityTgt>> &vec = *this->transTgt.get();
+  std::vector<std::shared_ptr<TyTransitivityTgt>> &vec = *transTgt.get();
 
   for(size_t i = 0; i < vec.size(); i++) {
     if (ConsVar *cv = dynamic_cast<ConsVar *>(vec[i]->get_expr2().get())) {
@@ -188,6 +187,7 @@ void Mem2RegArg::replaceTransTgtPrev() {
                                                           Previous)))));
     }
   }
+  std::cout<<"TransTgtPrevEnd"<<std::endl;
 }
 
 } // llvmberry

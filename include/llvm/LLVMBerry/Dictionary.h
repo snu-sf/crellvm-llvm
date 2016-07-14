@@ -145,15 +145,13 @@ public:
   typedef std::shared_ptr<TyTransTgtObj> TyTransTgt;
   TyTransTgt transTgt;
 
-  void replaceTransTgtPrev();
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
-
-  Mem2RegArg();
-
+  void replaceTransTgtPrev();
   void replaceCmdRhs(std::string which, std::string key,
                              std::shared_ptr<TyExpr> newExpr);
 
+  Mem2RegArg();
 };
 DEFINE_TRAITS(ArgForMem2Reg, Mem2RegArg);
 

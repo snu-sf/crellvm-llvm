@@ -410,7 +410,27 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       if ((LI->getParent() == OnlyStore->getParent() && 
            instrIndex[OnlyStore] < instrIndex[LI]) ||
           (LI->getParent() != OnlyStore->getParent() &&
-           DT.dominates(OnlyStore->getParent(), LI->getParent()))) {
+           DT.dominates(OnlyStore->getParent(), LI->getParent())) ||
+          (isPotentiallyReachable(OnlyStore->getParent(), LI->getParent()))) {
+        Value* UndefVal = UndefValue::get(AI->getType());
+
+        PROPAGATE(
+            LESSDEF(INSN(*AI),
+                    VAR(Ralloca, Ghost),
+                    SRC),
+        BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+               llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], "")));
+
+        PROPAGATE(
+            LESSDEF(VAR(Ralloca, Ghost),
+                    EXPR(UndefVal, Physical),
+                    TGT),
+        BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+               llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], "")));
+
+        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
+                                                REGISTER(Rstore, Ghost)));
         // Step1: propagate store instruction
         //        <src>          |     <tgt>
         // %x = alloca i32       | nop
@@ -441,7 +461,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         if ((LI->getParent() == OnlyStore->getParent() && 
              instrIndex[OnlyStore] < instrIndex[LI]) ||
             (LI->getParent() != OnlyStore->getParent() &&
-             DT.dominates(OnlyStore->getParent(), LI->getParent()))) {
+             DT.dominates(OnlyStore->getParent(), LI->getParent())) ||
+            (isPotentiallyReachable(OnlyStore->getParent(), LI->getParent()))) {
           // Step2: propagate load instruction
           //        <src>          |     <tgt>
           // %a = load i32 1       | nop
@@ -1456,8 +1477,9 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        std::vector<llvm::BasicBlock*> succs;
         llvmberry::generateHintForMem2RegPHI
-          (BB, Pred, Dest, SI, II, PAM, AL, true);
+          (BB, Pred, Dest, SI, II, PAM, AL, succs, true);
       });
 
       // what value were we writing?

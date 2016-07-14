@@ -642,6 +642,7 @@ public:
              std::shared_ptr<TyValueType> _valtype,
              std::shared_ptr<TyValue> _ptrvalue, int _align);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  static std::shared_ptr<TyLoadInst> make(const llvm::AllocaInst &ai);
   static std::shared_ptr<TyLoadInst> make(const llvm::LoadInst &li);
   static std::shared_ptr<TyLoadInst> make(const llvm::StoreInst &si);
 

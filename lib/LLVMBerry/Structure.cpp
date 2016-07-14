@@ -1327,6 +1327,9 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
   } else if (const llvm::FCmpInst *fcmp = llvm::dyn_cast<llvm::FCmpInst>(&i)) {
     return std::shared_ptr<TyInstruction>(
         new ConsFCmpInst(TyFCmpInst::make(*fcmp)));
+  } else if (const llvm::AllocaInst *ai = llvm::dyn_cast<llvm::AllocaInst>(&i)) {
+    return std::shared_ptr<TyInstruction>(
+        new ConsLoadInst(TyLoadInst::make(*ai)));
   } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
     return std::shared_ptr<TyInstruction>(
         new ConsLoadInst(TyLoadInst::make(*li)));
@@ -1441,6 +1444,13 @@ std::shared_ptr<TyFCmpInst> TyFCmpInst::make(const llvm::FCmpInst &fcmpInst) {
       new TyFCmpInst(predicate, TyValueType::make(*fcmpInst.getType()),
                      TyValue::make(*fcmpInst.getOperand(0)),
                      TyValue::make(*fcmpInst.getOperand(1))));
+}
+
+std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::AllocaInst &ai) {
+  return std::shared_ptr<TyLoadInst>(new TyLoadInst(
+      TyValueType::make(*ai.getType()),
+      TyValueType::make(*ai.getOperand(0)->getType()), TyValue::make(ai),
+      ai.getAlignment()));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
