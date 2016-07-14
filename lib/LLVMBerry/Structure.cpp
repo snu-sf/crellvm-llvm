@@ -9,6 +9,8 @@
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/StringExtras.h"
 
 namespace cereal {
 [[noreturn]] void throw_exception(std::exception const &e) { std::exit(1); }
@@ -64,6 +66,86 @@ unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
 
 } // anonymous
 
+
+
+// Below code PrintEscapedString is exactly copied from lib/IR/AsmWriter.cpp
+
+// PrintEscapedString - Print each character of the specified string, escaping
+// it if it is not printable or if it is an escape char.
+static void PrintEscapedString(llvm::StringRef Name, llvm::raw_ostream &Out) {
+  for (unsigned i = 0, e = Name.size(); i != e; ++i) {
+    unsigned char C = Name[i];
+    if (isprint(C) && C != '\\' && C != '"')
+      Out << C;
+    else
+      Out << '\\' << llvm::hexdigit(C >> 4) << llvm::hexdigit(C & 0x0F);
+  }
+}
+
+// Below code PrefixType is exactly copied from lib/IR/AsmWriter.cpp
+enum PrefixType {
+  GlobalPrefix,
+  ComdatPrefix,
+  LabelPrefix,
+  LocalPrefix,
+  NoPrefix
+};
+
+// Below code PrintLLVMName is exactly copied from lib/IR/AsmWriter.cpp
+
+/// PrintLLVMName - Turn the specified name into an 'LLVM name', which is either
+/// prefixed with % (if the string only contains simple characters) or is
+/// surrounded with ""'s (if it has special chars in it).  Print it out.
+static void PrintLLVMName(llvm::raw_ostream &OS, llvm::StringRef Name, PrefixType Prefix) {
+  assert(!Name.empty() && "Cannot get empty name!");
+  switch (Prefix) {
+  case NoPrefix: break;
+  case GlobalPrefix: OS << '@'; break;
+  case ComdatPrefix: OS << '$'; break;
+  case LabelPrefix:  break;
+  case LocalPrefix:  OS << '%'; break;
+  }
+
+  // Scan the name to see if it needs quotes first.
+  bool NeedsQuotes = isdigit(static_cast<unsigned char>(Name[0]));
+  if (!NeedsQuotes) {
+    for (unsigned i = 0, e = Name.size(); i != e; ++i) {
+      // By making this unsigned, the value passed in to isalnum will always be
+      // in the range 0-255.  This is important when building with MSVC because
+      // its implementation will assert.  This situation can arise when dealing
+      // with UTF-8 multibyte characters.
+      unsigned char C = Name[i];
+      if (!isalnum(static_cast<unsigned char>(C)) && C != '-' && C != '.' &&
+          C != '_') {
+        NeedsQuotes = true;
+        break;
+      }
+    }
+  }
+
+  // If we didn't need any quotes, just write out the name in one blast.
+  if (!NeedsQuotes) {
+    OS << Name;
+    return;
+  }
+
+  // Okay, we need quotes.  Output the quotes and escape any scary characters as
+  // needed.
+  OS << '"';
+  PrintEscapedString(Name, OS);
+  OS << '"';
+}
+
+// Below code PrintLLVMName is exactly copied from lib/IR/AsmWriter.cpp
+
+/// PrintLLVMName - Turn the specified name into an 'LLVM name', which is either
+/// prefixed with % (if the string only contains simple characters) or is
+/// surrounded with ""'s (if it has special chars in it).  Print it out.
+static void PrintLLVMName(llvm::raw_ostream &OS, const llvm::Value *V) {
+  PrintLLVMName(OS, V->getName(),
+                llvm::isa<llvm::GlobalValue>(V) ? GlobalPrefix : LocalPrefix);
+}
+
 namespace llvmberry {
 /// @return the index of the BasicBlock w.r.t. the parent function.
 std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
@@ -77,15 +159,9 @@ std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
   if (block->hasName()) {
     std::string tempstr;
     llvm::raw_string_ostream rso(tempstr);
-    block->printAsOperand(rso);
-
-    std::string name = rso.str();
-    std::string label("label %");
-    if (name.compare(0, label.length(), label) != 0) {
-      assert(false && "if we get block name by printAsOperand(), it should "
-                      "begin with \"label %\"");
-    }
-    return name.substr(label.length());
+    PrintLLVMName(rso, block);
+    assert(rso.str()[0] == '%');
+    return rso.str().substr(1); //to remove %
   }
 
   // If else, calculate the index and return it.
@@ -110,8 +186,15 @@ std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
 }
 
 std::string getVariable(const llvm::Value &value) {
+  if (value.hasName()) {
+    std::string tempstr;
+    llvm::raw_string_ostream rso(tempstr);
+    PrintLLVMName(rso, &value);
+    return rso.str();
+  }
+
+
   std::string val;
-  std::string val2;
 
   if (llvm::isa<llvm::GlobalValue>(value)) {
     val = std::string("@");
@@ -122,13 +205,6 @@ std::string getVariable(const llvm::Value &value) {
   } else {
     assert("value must be a global value or an instruction" && false);
   }
-
-  llvm::raw_string_ostream rso(val2);
-  value.printAsOperand(rso, /*PrintType=*/false);
-  rso.str();
-
-  if (val2.compare("<badref>") != 0)
-    return val2;
 
   val += std::string(value.getName().data());
 
@@ -872,6 +948,10 @@ TyConstantExpr::make(const llvm::ConstantExpr &ce) {
     return ConsConstExprGetElementPtr::make(ce);
   else if (ce.getOpcode() == llvm::Instruction::BitCast)
     return ConsConstExprBitcast::make(ce);
+  else if (ce.getOpcode() == llvm::Instruction::IntToPtr)
+    return ConsConstExprInttoptr::make(ce);
+  else if (ce.getOpcode() == llvm::Instruction::PtrToInt)
+    return ConsConstExprPtrtoint::make(ce);
   std::string output;
   llvm::raw_string_ostream rso(output);
   ce.print(rso);
@@ -882,17 +962,18 @@ TyConstantExpr::make(const llvm::ConstantExpr &ce) {
 
 ConsConstExprGetElementPtr::ConsConstExprGetElementPtr(
     std::shared_ptr<TyConstExprGetElementPtr> _const_expr_get_element_ptr)
-    : const_expr_get_element_ptr(std::move(_const_expr_get_element_ptr)) {}
+    : const_expr_get_element_ptr(_const_expr_get_element_ptr) {}
+
 std::shared_ptr<TyConstantExpr> ConsConstExprGetElementPtr::make(
     std::shared_ptr<TyValueType> _srcelemty, std::shared_ptr<TyConstant> _v,
     std::vector<std::shared_ptr<TyConstant>> _idxlist,
     std::shared_ptr<TyValueType> _dstty, bool _is_inbounds) {
   std::shared_ptr<TyConstExprGetElementPtr> _val(new TyConstExprGetElementPtr(
-      std::move(_srcelemty), std::move(_v), std::move(_idxlist),
-      std::move(_dstty), std::move(_is_inbounds)));
+      _srcelemty, _v, _idxlist, _dstty, _is_inbounds));
   return std::shared_ptr<TyConstantExpr>(
       new ConsConstExprGetElementPtr(std::move(_val)));
 }
+
 void ConsConstExprGetElementPtr::serialize(
     cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -900,6 +981,7 @@ void ConsConstExprGetElementPtr::serialize(
   archive.saveValue("ConstExprGetElementPtr");
   archive(CEREAL_NVP(const_expr_get_element_ptr));
 }
+
 std::shared_ptr<TyConstantExpr>
 ConsConstExprGetElementPtr::make(const llvm::ConstantExpr &ce) {
   llvm::GetElementPtrInst *gepi = llvm::dyn_cast<llvm::GetElementPtrInst>(
@@ -928,9 +1010,8 @@ TyConstExprGetElementPtr::TyConstExprGetElementPtr(
     std::shared_ptr<TyValueType> _srcelemty, std::shared_ptr<TyConstant> _v,
     std::vector<std::shared_ptr<TyConstant>> _idxlist,
     std::shared_ptr<TyValueType> _dstty, bool _is_inbounds)
-    : srcelemty(std::move(_srcelemty)), v(std::move(_v)),
-      idxlist(std::move(_idxlist)), dstty(std::move(_dstty)),
-      is_inbounds(std::move(_is_inbounds)) {}
+    : srcelemty(_srcelemty), v(_v), idxlist(_idxlist), dstty(_dstty),
+      is_inbounds(_is_inbounds) {}
 void TyConstExprGetElementPtr::serialize(
     cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(srcelemty));
@@ -950,12 +1031,14 @@ void TyConstExprBitcast::serialize(cereal::JSONOutputArchive &archive) const {
 ConsConstExprBitcast::ConsConstExprBitcast(
     std::shared_ptr<TyConstExprBitcast> _const_expr_bitcast)
     : const_expr_bitcast(_const_expr_bitcast) {}
+
 std::shared_ptr<TyConstantExpr>
 ConsConstExprBitcast::make(std::shared_ptr<TyConstant> _v,
                            std::shared_ptr<TyValueType> _dstty) {
   std::shared_ptr<TyConstExprBitcast> _val(new TyConstExprBitcast(_v, _dstty));
   return std::shared_ptr<TyConstantExpr>(new ConsConstExprBitcast(_val));
 }
+
 std::shared_ptr<TyConstantExpr>
 ConsConstExprBitcast::make(const llvm::ConstantExpr &ce) {
   llvm::BitCastInst *bi = llvm::dyn_cast<llvm::BitCastInst>(
@@ -973,6 +1056,60 @@ void ConsConstExprBitcast::serialize(cereal::JSONOutputArchive &archive) const {
   archive.saveValue("ConstExprBitcast");
   archive(CEREAL_NVP(const_expr_bitcast));
 }
+
+ConsConstExprInttoptr::ConsConstExprInttoptr(std::shared_ptr<TyConstExprInttoptr> _const_expr_inttoptr) : const_expr_inttoptr(_const_expr_inttoptr){
+}
+std::shared_ptr<TyConstantExpr> ConsConstExprInttoptr::make(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty){
+  std::shared_ptr<TyConstExprInttoptr> _val(new TyConstExprInttoptr(_v, _dstty));
+  return std::shared_ptr<TyConstantExpr>(new ConsConstExprInttoptr(_val));
+}
+std::shared_ptr<TyConstantExpr>
+ConsConstExprInttoptr::make(const llvm::ConstantExpr &ce) {
+  llvm::Constant *ptr = llvm::dyn_cast<llvm::Constant>(ce.getOperand(0));
+  auto tyc = TyConstant::make(*ptr);
+  auto tyvt = TyValueType::make(*ce.getType());
+  return make(tyc, tyvt);
+}
+void ConsConstExprInttoptr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstExprInttoptr");
+  archive(CEREAL_NVP(const_expr_inttoptr));
+}
+
+TyConstExprInttoptr::TyConstExprInttoptr(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty) : v(_v), dstty(_dstty){
+}
+void TyConstExprInttoptr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(v), CEREAL_NVP(dstty));
+}
+
+ConsConstExprPtrtoint::ConsConstExprPtrtoint(std::shared_ptr<TyConstExprPtrtoint> _const_expr_ptrtoint) : const_expr_ptrtoint(_const_expr_ptrtoint){
+}
+std::shared_ptr<TyConstantExpr> ConsConstExprPtrtoint::make(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty){
+  std::shared_ptr<TyConstExprPtrtoint> _val(new TyConstExprPtrtoint(_v, _dstty));
+  return std::shared_ptr<TyConstantExpr>(new ConsConstExprPtrtoint(_val));
+}
+std::shared_ptr<TyConstantExpr>
+ConsConstExprPtrtoint::make(const llvm::ConstantExpr &ce) {
+  llvm::Constant *ptr = llvm::dyn_cast<llvm::Constant>(ce.getOperand(0));
+  auto tyc = TyConstant::make(*ptr);
+  auto tyvt = TyValueType::make(*ce.getType());
+  return make(tyc, tyvt);
+}
+void ConsConstExprPtrtoint::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstExprPtrtoint");
+  archive(CEREAL_NVP(const_expr_ptrtoint));
+}
+
+TyConstExprPtrtoint::TyConstExprPtrtoint(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty) : v(_v), dstty(_dstty){
+}
+void TyConstExprPtrtoint::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(v), CEREAL_NVP(dstty));
+}
+
+
 
 void ConsConstGlobalVarAddr::serialize(
     cereal::JSONOutputArchive &archive) const {
@@ -1163,8 +1300,14 @@ std::shared_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
         std::move(TyValueType::make(*ptype->getPointerElementType())));
   } else if (const llvm::StructType *stype =
                  llvm::dyn_cast<llvm::StructType>(&type)) {
-    assert(stype->hasName());
-    vt = new ConsNamedType(stype->getName().str());
+    if (stype->hasName())
+      vt = new ConsNamedType(stype->getName().str());
+    else {
+      std::vector<std::shared_ptr<TyValueType>> elemtys;
+      for (auto itr = stype->element_begin(); itr != stype->element_end(); itr++)
+        elemtys.push_back(TyValueType::make(*(*itr)));
+      vt = new ConsStructType(elemtys);
+    }
   } else if (const llvm::ArrayType *atype =
                  llvm::dyn_cast<llvm::ArrayType>(&type)) {
     vt = new ConsArrayType(atype->getNumElements(),
@@ -1307,6 +1450,18 @@ void ConsFunctionType::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(arg_ty_list));
   archive(CEREAL_NVP(is_vararg));
   archive(CEREAL_NVP(vararg_size));
+  archive.finishNode();
+}
+
+ConsStructType::ConsStructType(std::vector<std::shared_ptr<TyValueType>>& _vec_value_type) : vec_value_type(_vec_value_type){
+}
+void ConsStructType::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("StructType");
+  archive.startNode();
+  archive.makeArray();
+  archive(CEREAL_NVP(vec_value_type));
   archive.finishNode();
 }
 

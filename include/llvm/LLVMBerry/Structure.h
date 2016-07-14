@@ -316,6 +316,15 @@ private:
   int vararg_size;
 };
 
+struct ConsStructType : public TyValueType{
+public : 
+  ConsStructType(std::vector<std::shared_ptr<TyValueType>> &_vec_value_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::vector<std::shared_ptr<TyValueType>> vec_value_type;
+};
+
 /*
  * size
  */
@@ -444,6 +453,49 @@ public:
 private:
   std::shared_ptr<TyConstExprBitcast> const_expr_bitcast;
 };
+
+struct TyConstExprInttoptr{
+public : 
+  TyConstExprInttoptr(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyConstant> v;
+  std::shared_ptr<TyValueType> dstty;
+};
+
+struct ConsConstExprInttoptr : public TyConstantExpr{
+public : 
+  ConsConstExprInttoptr(std::shared_ptr<TyConstExprInttoptr> _const_expr_inttoptr);
+  static std::shared_ptr<TyConstantExpr> make(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty);
+  static std::shared_ptr<TyConstantExpr> make(const llvm::ConstantExpr &ce);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyConstExprInttoptr> const_expr_inttoptr;
+};
+
+struct TyConstExprPtrtoint{
+public : 
+  TyConstExprPtrtoint(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyConstant> v;
+  std::shared_ptr<TyValueType> dstty;
+};
+
+struct ConsConstExprPtrtoint : public TyConstantExpr{
+public : 
+  ConsConstExprPtrtoint(std::shared_ptr<TyConstExprPtrtoint> _const_expr_ptrtoint);
+  static std::shared_ptr<TyConstantExpr> make(std::shared_ptr<TyConstant> _v, std::shared_ptr<TyValueType> _dstty);
+  static std::shared_ptr<TyConstantExpr> make(const llvm::ConstantExpr &ce);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyConstExprPtrtoint> const_expr_ptrtoint;
+};
+
 
 // constants
 

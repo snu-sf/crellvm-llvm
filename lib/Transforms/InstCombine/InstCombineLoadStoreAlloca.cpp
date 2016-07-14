@@ -826,40 +826,76 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
         // %ptr2src = getelementptr %a, 1
         if (Instruction *i1 = dyn_cast<Instruction>(ptr1src)) {
           Instruction *i2 = dyn_cast<Instruction>(ptr2src);
-          assert(i2);
-          llvmberry::propagateInstruction(i1, v1_inst, llvmberry::Source, true);
-          llvmberry::propagateInstruction(i2, v1_inst, llvmberry::Source, true);
-          llvmberry::propagateInstruction(i1, &LI, llvmberry::Source, true);
-          llvmberry::propagateInstruction(i2, &LI, llvmberry::Source, true);
-          
-          std::string ptr1srcname = llvmberry::getVariable(*i1);
-          std::string ptr2srcname = llvmberry::getVariable(*i2);
-          
-          // i1 >= i2 >= ptr2srcname
-          if (GetElementPtrInst *gepi1 = dyn_cast<GetElementPtrInst>(i1)){
-            GetElementPtrInst *gepi2 = dyn_cast<GetElementPtrInst>(i2);
-            if(gepi1->isInBounds() != gepi2->isInBounds()){
-              // Apply gep_inbounds_remove
-              // XXX: This code only deals with the case when (gepi2->isInBounds() == true) &&
-              //      (gepi1->isInBounds() == false).
-              INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsGepInboundsRemove::make(INSN(*gepi1)));
-              INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsTransitivity::make(
-                  INSN(*gepi2), INSN(*gepi1), VAR(ptr1srcname, Physical)));
-              INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsTransitivity::make(
-                  VAR(ptr2srcname, Physical), INSN(*gepi2), INSN(*gepi1)));
-            }
-          }
 
-          // (ptr1srcname >= <rhs> >= ptr2srcname) -> (ptr1srcname >= ptr2srcname)
-          INFRULE(INSTPOS(SRC, v1_inst), llvmberry::ConsTransitivity::make(
-              VAR(ptr1srcname, Physical), INSN(*i1), VAR(ptr2srcname, Physical)));
-          INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsTransitivity::make(
-              VAR(ptr1srcname, Physical), INSN(*i1), VAR(ptr2srcname, Physical)));
-          // (ptr2srcname >= <rhs> >= ptr1srcname) -> (ptr2srcname >= ptr1srcname)
-          INFRULE(INSTPOS(SRC, v1_inst), llvmberry::ConsTransitivity::make(
-              VAR(ptr2srcname, Physical), INSN(*i1), VAR(ptr1srcname, Physical)));
-          INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsTransitivity::make(
-              VAR(ptr2srcname, Physical), INSN(*i1), VAR(ptr1srcname, Physical)));
+          if (PHINode *phi1 = dyn_cast<PHINode>(i1)) {
+            PHINode *phi2 = dyn_cast<PHINode>(i2);
+            assert(phi2 && "ptr2src must be PHI node");
+            std::string phi1name = llvmberry::getVariable(*phi1);
+            std::string phi2name = llvmberry::getVariable(*phi2);
+            for (unsigned i = 0; i < phi1->getNumIncomingValues(); i++) {
+              BasicBlock *bbi1 = phi1->getIncomingBlock(i);
+              Value *vi1 = phi1->getIncomingValue(i);
+              
+              INFRULE(
+                llvmberry::TyPosition::make(SRC, *phi1, bbi1->getName()),
+                llvmberry::ConsTransitivity::make(
+                  VAR(phi1name, Physical), 
+                  EXPR(vi1, Physical), 
+                  VAR(phi2name, Physical)));
+              INFRULE(
+                llvmberry::TyPosition::make(SRC, *phi1, bbi1->getName()),
+                llvmberry::ConsTransitivity::make(
+                  VAR(phi2name, Physical), 
+                  EXPR(vi1, Physical), 
+                  VAR(phi1name, Physical)));
+            }
+            PROPAGATE(
+              LESSDEF(VAR(phi1name, Physical), VAR(phi2name, Physical), SRC),
+              BOUNDS(
+                llvmberry::TyPosition::make(SRC, *phi1),
+                llvmberry::TyPosition::make(SRC, LI)));
+            
+            PROPAGATE(
+              LESSDEF(VAR(phi2name, Physical), VAR(phi1name, Physical), SRC),
+              BOUNDS(
+                llvmberry::TyPosition::make(SRC, *phi1),
+                llvmberry::TyPosition::make(SRC, LI)));
+          } else {
+            assert(i2 && "ptr2src must be Instruction");
+            llvmberry::propagateInstruction(i1, v1_inst, llvmberry::Source, true);
+            llvmberry::propagateInstruction(i2, v1_inst, llvmberry::Source, true);
+            llvmberry::propagateInstruction(i1, &LI, llvmberry::Source, true);
+            llvmberry::propagateInstruction(i2, &LI, llvmberry::Source, true);
+            
+            std::string ptr1srcname = llvmberry::getVariable(*i1);
+            std::string ptr2srcname = llvmberry::getVariable(*i2);
+            
+            // i1 >= i2 >= ptr2srcname
+            if (GetElementPtrInst *gepi1 = dyn_cast<GetElementPtrInst>(i1)){
+              GetElementPtrInst *gepi2 = dyn_cast<GetElementPtrInst>(i2);
+              if(gepi1->isInBounds() != gepi2->isInBounds()){
+                // Apply gep_inbounds_remove
+                // XXX: This code only deals with the case when (gepi2->isInBounds() == true) &&
+                //      (gepi1->isInBounds() == false).
+                INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsGepInboundsRemove::make(INSN(*gepi1)));
+                INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsTransitivity::make(
+                    INSN(*gepi2), INSN(*gepi1), VAR(ptr1srcname, Physical)));
+                INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsTransitivity::make(
+                    VAR(ptr2srcname, Physical), INSN(*gepi2), INSN(*gepi1)));
+              }
+            }
+
+            // (ptr1srcname >= <rhs> >= ptr2srcname) -> (ptr1srcname >= ptr2srcname)
+            INFRULE(INSTPOS(SRC, v1_inst), llvmberry::ConsTransitivity::make(
+                VAR(ptr1srcname, Physical), INSN(*i1), VAR(ptr2srcname, Physical)));
+            INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsTransitivity::make(
+                VAR(ptr1srcname, Physical), INSN(*i1), VAR(ptr2srcname, Physical)));
+            // (ptr2srcname >= <rhs> >= ptr1srcname) -> (ptr2srcname >= ptr1srcname)
+            INFRULE(INSTPOS(SRC, v1_inst), llvmberry::ConsTransitivity::make(
+                VAR(ptr2srcname, Physical), INSN(*i1), VAR(ptr1srcname, Physical)));
+            INFRULE(INSTPOS(SRC, &LI), llvmberry::ConsTransitivity::make(
+                VAR(ptr2srcname, Physical), INSN(*i1), VAR(ptr1srcname, Physical)));
+          }
         } else {
           assert("load-load optimization : unknown case ; ptr1src and ptr2src are not equivalent, and also not Instruction" && false);
         }
@@ -1429,8 +1465,20 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
   // If the RHS is an alloca with a single use, zapify the store, making the
   // alloca dead.
   if (Ptr->hasOneUse()) {
-    if (isa<AllocaInst>(Ptr))
+    if (isa<AllocaInst>(Ptr)) {
+      llvmberry::ValidationUnit::Begin("dead_store_elim", SI.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude([&SI, &Ptr](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        std::string regname = llvmberry::getVariable(*Ptr);
+        AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
+        llvmberry::insertTgtNopAtSrcI(hints, &SI);
+        PROPAGATE(ALLOCA(REGISTER(regname, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
+        PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
+      });
       return EraseInstFromFunction(SI);
+    }
     if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Ptr)) {
       if (isa<AllocaInst>(GEP->getOperand(0))) {
         if (GEP->getOperand(0)->hasOneUse())
