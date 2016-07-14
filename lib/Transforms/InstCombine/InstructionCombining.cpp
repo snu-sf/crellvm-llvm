@@ -2825,9 +2825,9 @@ bool InstCombiner::run() {
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
-      llvmberry::name_instructions(*(I->getParent()->getParent()));
-      llvmberry::ValidationUnit::Begin("dead_code_elim",
-                                       I->getParent()->getParent());
+      if (I->getParent() != nullptr)
+        llvmberry::name_instructions(*(I->getParent()->getParent()));
+      llvmberry::ValidationUnit::Begin("dead_code_elim");
       llvmberry::generateHintForTrivialDCE(*I);
       EraseInstFromFunction(*I);
       llvmberry::ValidationUnit::End();
@@ -2944,10 +2944,10 @@ bool InstCombiner::run() {
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
-          llvmberry::name_instructions(*(I->getParent()->getParent()));
-           llvmberry::ValidationUnit::Begin("dead_code_elim",
-                            I->getParent()->getParent());
-           llvmberry::generateHintForTrivialDCE(*I);
+          if (I->getParent() != nullptr)
+            llvmberry::name_instructions(*(I->getParent()->getParent()));
+          llvmberry::ValidationUnit::Begin("dead_code_elim");
+          llvmberry::generateHintForTrivialDCE(*I);
           EraseInstFromFunction(*I);
           llvmberry::ValidationUnit::End();
         } else {
@@ -2997,9 +2997,9 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (isInstructionTriviallyDead(Inst, TLI)) {
         ++NumDeadInst;
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
-        llvmberry::name_instructions(*(Inst->getParent()->getParent()));
-        llvmberry::ValidationUnit::Begin("dead_code_elim",
-                              Inst->getParent()->getParent());
+        if (Inst->getParent() != nullptr)
+          llvmberry::name_instructions(*(Inst->getParent()->getParent()));
+        llvmberry::ValidationUnit::Begin("dead_code_elim");
         llvmberry::generateHintForTrivialDCE(*Inst);
         Inst->eraseFromParent();
         llvmberry::ValidationUnit::End();
@@ -3295,7 +3295,12 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   auto *LIWP = getAnalysisIfAvailable<LoopInfoWrapperPass>();
   auto *LI = LIWP ? &LIWP->getLoopInfo() : nullptr;
 
+  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
+  llvmberry::ValidationUnit::SetDefaultFunction(&F);
+
   return combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
+
+  llvmberry::ValidationUnit::EndPass();
 }
 
 char InstructionCombiningPass::ID = 0;

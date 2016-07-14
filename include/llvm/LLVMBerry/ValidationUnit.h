@@ -22,6 +22,7 @@ class ValidationUnit {
 public:
   typedef llvmberry::Dictionary Dictionary;
   enum RETURN_CODE { COMMIT = 0, ABORT };
+  enum PASS { NOTHING = 0, GVN, MEM2REG, PRE, INSTCOMBINE };
 
   CoreHint &getHint();
   const std::string &getOptimizationName() const;
@@ -48,6 +49,10 @@ private:
 
 public:
   static ValidationUnit *GetInstance();
+  static void StartPass(PASS pass);
+  static void EndPass();
+  static void SetDefaultFunction(llvm::Function *defaultFunc);
+  static void Begin(const std::string &optname);
   static void Begin(const std::string &optname, llvm::Function *func);
   static bool BeginIfNotExists(const std::string &optname,
                                llvm::Function *func);
@@ -59,6 +64,8 @@ public:
 private:
   static ValidationUnit *_Instance;
   static int _Counter;
+  static PASS _CurrentPass;
+  static llvm::Function *_DefaultFunc;
 };
 
 } // llvmberry
