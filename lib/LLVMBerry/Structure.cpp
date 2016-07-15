@@ -1415,8 +1415,15 @@ void ConsFunctionType::serialize(cereal::JSONOutputArchive &archive) const {
   archive.saveValue("FunctionType");
   archive.startNode();
   archive.makeArray();
-  archive(CEREAL_NVP(ret_type));
+  if(std::shared_ptr<ConsVoidType> p = std::dynamic_pointer_cast<ConsVoidType>(ret_type)){
+    archive.writeName();
+    archive.saveValue("VoidType");
+  }else
+    archive(CEREAL_NVP(ret_type));
+  archive.startNode();
+  archive.makeArray();
   archive(CEREAL_NVP(arg_ty_list));
+  archive.finishNode();
   archive(CEREAL_NVP(is_vararg));
   archive(CEREAL_NVP(vararg_size));
   archive.finishNode();

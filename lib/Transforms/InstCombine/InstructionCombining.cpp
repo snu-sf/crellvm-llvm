@@ -3295,12 +3295,9 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   auto *LIWP = getAnalysisIfAvailable<LoopInfoWrapperPass>();
   auto *LI = LIWP ? &LIWP->getLoopInfo() : nullptr;
 
-  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
   llvmberry::ValidationUnit::SetDefaultFunction(&F);
 
   return combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
-
-  llvmberry::ValidationUnit::EndPass();
 }
 
 char InstructionCombiningPass::ID = 0;

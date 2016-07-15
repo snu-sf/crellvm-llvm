@@ -168,21 +168,12 @@ void ValidationUnit::abort() {}
 
 // static members
 ValidationUnit *ValidationUnit::_Instance = nullptr;
-ValidationUnit::PASS ValidationUnit::_CurrentPass = ValidationUnit::NOTHING;
 int ValidationUnit::_Counter = 0;
 llvm::Function *ValidationUnit::_DefaultFunc = nullptr;
 
 ValidationUnit *ValidationUnit::GetInstance() {
   assert(Exists() && "No ValidationUnit exists");
   return _Instance;
-}
-
-void ValidationUnit::StartPass(PASS pass) {
-  _CurrentPass = pass;
-}
-
-void ValidationUnit::EndPass() {
-  _CurrentPass = NOTHING;
 }
 
 void ValidationUnit::SetDefaultFunction(llvm::Function *defaultFunc) {
