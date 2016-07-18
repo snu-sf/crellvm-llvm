@@ -3196,6 +3196,9 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
                                 AliasAnalysis *AA, AssumptionCache &AC,
                                 TargetLibraryInfo &TLI, DominatorTree &DT,
                                 LoopInfo *LI = nullptr) {
+  
+  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
+  
   // Minimizing size?
   bool MinimizeSize = F.hasFnAttribute(Attribute::MinSize);
   auto &DL = F.getParent()->getDataLayout();
@@ -3228,6 +3231,8 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
     if (!Changed)
       break;
   }
+  
+  llvmberry::ValidationUnit::EndPass();
 
   return DbgDeclaresChanged || Iteration > 1;
 }
