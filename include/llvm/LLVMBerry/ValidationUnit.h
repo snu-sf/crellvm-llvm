@@ -48,8 +48,6 @@ private:
 
 public:
   static ValidationUnit *GetInstance();
-  static void SetDefaultFunction(llvm::Function *defaultFunc);
-  static void Begin(const std::string &optname);
   static void Begin(const std::string &optname, llvm::Function *func);
   static bool BeginIfNotExists(const std::string &optname,
                                llvm::Function *func);
@@ -61,7 +59,6 @@ public:
 private:
   static ValidationUnit *_Instance;
   static int _Counter;
-  static llvm::Function *_DefaultFunc;
 };
 
 } // llvmberry

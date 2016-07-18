@@ -711,17 +711,12 @@ void generateHintForTrivialDCE(llvm::Instruction &I) {
   assert(llvmberry::ValidationUnit::Exists());
   llvmberry::ValidationUnit::GetInstance()->intrude([&I](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-    if (I.getParent() != nullptr) {
-      generateHintForDCE(hints, I);
-      if (llvm::dyn_cast<llvm::CallInst>(&I)) {
-        hints.setDescription("DCE on call "
-                             "instruction.\n\"isInstructionTriviallyDead\" "
-                             "should give enough power to validate.");
-        hints.appendAdmittedToDescription();
-      }
-    } else {
-      // This rarely happens.
-      // E.g. grammar.bc in Python benchmark 
+    generateHintForDCE(hints, I);
+    if (llvm::dyn_cast<llvm::CallInst>(&I)) {
+      hints.setDescription("DCE on call "
+                           "instruction.\n\"isInstructionTriviallyDead\" "
+                           "should give enough power to validate.");
+      hints.appendAdmittedToDescription();
     }
   });
 }
