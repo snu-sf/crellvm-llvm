@@ -2945,9 +2945,9 @@ bool InstCombiner::run() {
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
           llvmberry::name_instructions(*(I->getParent()->getParent()));
-           llvmberry::ValidationUnit::Begin("dead_code_elim",
-                            I->getParent()->getParent());
-           llvmberry::generateHintForTrivialDCE(*I);
+          llvmberry::ValidationUnit::Begin("dead_code_elim",
+                           I->getParent()->getParent());
+          llvmberry::generateHintForTrivialDCE(*I);
           EraseInstFromFunction(*I);
           llvmberry::ValidationUnit::End();
         } else {
