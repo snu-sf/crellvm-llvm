@@ -2826,8 +2826,8 @@ bool InstCombiner::run() {
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
       llvmberry::name_instructions(*(I->getParent()->getParent()));
-      llvmberry::ValidationUnit::Begin("dead_code_elim", 
-          I->getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("dead_code_elim",
+                                       I->getParent()->getParent());
       llvmberry::generateHintForTrivialDCE(*I);
       EraseInstFromFunction(*I);
       llvmberry::ValidationUnit::End();
@@ -2946,7 +2946,7 @@ bool InstCombiner::run() {
         if (isInstructionTriviallyDead(I, TLI)) {
           llvmberry::name_instructions(*(I->getParent()->getParent()));
           llvmberry::ValidationUnit::Begin("dead_code_elim",
-              I->getParent()->getParent());
+                           I->getParent()->getParent());
           llvmberry::generateHintForTrivialDCE(*I);
           EraseInstFromFunction(*I);
           llvmberry::ValidationUnit::End();
@@ -2999,7 +2999,7 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
         llvmberry::name_instructions(*(Inst->getParent()->getParent()));
         llvmberry::ValidationUnit::Begin("dead_code_elim",
-            Inst->getParent()->getParent());
+                              Inst->getParent()->getParent());
         llvmberry::generateHintForTrivialDCE(*Inst);
         Inst->eraseFromParent();
         llvmberry::ValidationUnit::End();
