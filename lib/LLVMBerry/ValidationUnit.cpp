@@ -247,6 +247,7 @@ bool ValidationUnit::Exists() {
 
 void ValidationUnit::Begin(const std::string &optname, llvm::Function *func) {
   assert(!Exists() && "ValidationUnit already exists");
+  assert(func && "Function cannot be null");
   _Instance = new ValidationUnit(optname, func);
 }
 
