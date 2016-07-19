@@ -22,6 +22,7 @@ enum DictKeys {
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
   ArgForLoadLoadStore,
+  ArgForVisitICmp,
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
@@ -140,6 +141,14 @@ public:
   OperandCases the_case;
 };
 DEFINE_TRAITS(ArgForFoldSelectOpOp, FoldSelectOpOpArg);
+
+// lib/Transforms/Instcombine/InstCombineCompares.cpp
+struct VisitICmpArg {
+public:
+  VisitICmpArg();
+  bool swapOps;
+};
+DEFINE_TRAITS(ArgForVisitICmp, VisitICmpArg);
 
 // lib/Transform/InstCombine/InstCombineLoadStoreAlloca.cpp : visitLoadInst
 struct LoadLoadStoreArg {

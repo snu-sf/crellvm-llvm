@@ -219,57 +219,49 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
           I.setOperand(0, A);
           I.setOperand(1, V);
 
-          if (isa<ConstantInt>(B) && isa<ConstantInt>(C) && isa<ConstantInt>(V) && (Opcode == Instruction::Add)) {
+          llvmberry::ValidationUnit::GetInstance()->intrude
+              ([&Op0, &I, &B, &C, &V, &Opcode]
+               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) && isa<ConstantInt>(V) && (Opcode == Instruction::Add)) {
+              // Op0: A op B
+              // I: Op0 op C
+              // V: B op C
 
-            llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&Op0, &I, &B, &C, &V]
-               (llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-                // Op0: A op B
-                // I: Op0 op C
-                // V: B op C
+              // prepare variables
+              std::string reg0_name = llvmberry::getVariable(*(Op0->getOperand(0)));
+              std::string reg1_name = llvmberry::getVariable(*Op0);
+              std::string reg2_name = llvmberry::getVariable(I);
 
-                // prepare variables
-                std::string reg0_name = llvmberry::getVariable(*(Op0->getOperand(0)));
-                std::string reg1_name = llvmberry::getVariable(*Op0);
-                std::string reg2_name = llvmberry::getVariable(I);
+              ConstantInt *B_const = dyn_cast<ConstantInt>(B);
+              ConstantInt *C_const = dyn_cast<ConstantInt>(C);
+              ConstantInt *V_const = dyn_cast<ConstantInt>(V);
 
-                ConstantInt *B_const = dyn_cast<ConstantInt>(B);
-                ConstantInt *C_const = dyn_cast<ConstantInt>(C);
-                ConstantInt *V_const = dyn_cast<ConstantInt>(V);
+              Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
+              
+              unsigned b_bw = B_const->getBitWidth();
+              unsigned c_bw = C_const->getBitWidth();
+              unsigned v_bw = V_const->getBitWidth();
 
-                Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
-                
-                unsigned b_bw = B_const->getBitWidth();
-                unsigned c_bw = C_const->getBitWidth();
-                unsigned v_bw = V_const->getBitWidth();
+              int64_t b = B_const->getSExtValue();
+              int64_t c = C_const->getSExtValue();
+              int64_t v = V_const->getSExtValue();
+              
+              llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
 
-                int64_t b = B_const->getSExtValue();
-                int64_t c = C_const->getSExtValue();
-                int64_t v = V_const->getSExtValue();
-                
-                llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
+              INFRULE(INSTPOS(llvmberry::Source, &I),
+                  llvmberry::ConsAddAssociative::make
+                  (REGISTER(reg0_name, Physical),
+                   REGISTER(reg1_name, Physical),
+                   REGISTER(reg2_name, Physical),
+                   llvmberry::TyConstInt::make(b, b_bw),
+                   llvmberry::TyConstInt::make(c, c_bw),
+                   llvmberry::TyConstInt::make(v, v_bw),
+                   BITSIZE(b_bw)));
+            } else {
+              llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+            }
+          });
 
-                hints.addCommand
-                  (llvmberry::ConsInfrule::make
-                   (llvmberry::TyPosition::make
-                    (llvmberry::Source, I),
-                    llvmberry::ConsAddAssociative::make
-                    (llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
-                     llvmberry::TyRegister::make(reg1_name, llvmberry::Physical),
-                     llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
-                     llvmberry::TyConstInt::make(b, b_bw),
-                     llvmberry::TyConstInt::make(c, c_bw),
-                     llvmberry::TyConstInt::make(v, v_bw),
-                     llvmberry::ConsSize::make(b_bw)
-                     )
-                    )
-                   );
-              }
-            );
-
-          } else {
-            llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
-          }
           llvmberry::ValidationUnit::End();
           
           // Conservatively clear the optional flags, since they may not be
