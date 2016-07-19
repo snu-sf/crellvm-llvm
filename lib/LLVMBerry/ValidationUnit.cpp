@@ -35,7 +35,6 @@ std::vector<ValidationUnit::PASS> optPassWhiteList;
 bool optPassWhiteListEnabled = false;
 
 void setWhiteList(const std::string &str) {
-  std::cout << "setWhiteList : " << str << std::endl;
   std::stringstream ss(str);
   std::string optname;
   while (std::getline(ss, optname, ',')) {
@@ -45,7 +44,6 @@ void setWhiteList(const std::string &str) {
 }
 
 void setPassWhiteList(const std::string &str) {
-  std::cout << "setPassWhiteList : " << str << std::endl;
   std::stringstream ss(str);
   std::string optname;
   while (std::getline(ss, optname, ',')) {
@@ -90,7 +88,6 @@ void writeModuleToFile(const llvm::Module &module,
 ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
     : _filename(), _optname(optname), _srcfile_buffer(nullptr), _func(func), 
       _corehint(), _data(), _return_code(COMMIT) {
-  std::cout << optname << std::endl;
   if (optWhiteListEnabled && 
       std::find(optWhiteList.begin(), optWhiteList.end(), optname) == 
         optWhiteList.end()) {
