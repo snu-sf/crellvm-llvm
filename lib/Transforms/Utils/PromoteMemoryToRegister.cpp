@@ -781,8 +781,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 }
 
 void PromoteMem2Reg::run() {
-  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
-
   Function &F = *DT.getRoot()->getParent();
 
   if (AST)
@@ -1127,7 +1125,7 @@ void PromoteMem2Reg::run() {
 
   if (Allocas.empty()) {
     llvmberry::ValidationUnit::End();
-    llvmberry::ValidationUnit::EndPass();
+    
     return; // All of the allocas must have been trivial!
   }
 
@@ -1271,7 +1269,6 @@ void PromoteMem2Reg::run() {
   NewPhiNodes.clear();
   
   llvmberry::ValidationUnit::End();
-  llvmberry::ValidationUnit::EndPass();
 }
 
 /// \brief Determine which blocks the value is live in.

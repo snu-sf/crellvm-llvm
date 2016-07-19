@@ -92,7 +92,7 @@ ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
       std::find(optWhiteList.begin(), optWhiteList.end(), optname) == 
         optWhiteList.end()) {
     this->_return_code = ABORT;
-  }else if (optPassWhiteListEnabled &&
+  } else if (optPassWhiteListEnabled &&
       std::find(optPassWhiteList.begin(), optPassWhiteList.end(), _CurrentPass) 
         == optPassWhiteList.end()) {
     this->_return_code = ABORT;
