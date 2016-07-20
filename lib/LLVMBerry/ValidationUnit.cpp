@@ -228,6 +228,7 @@ ValidationUnit *ValidationUnit::GetInstance() {
 }
 
 void ValidationUnit::StartPass(PASS pass) {
+  assert(_CurrentPass == NOTHING);
   _CurrentPass = pass;
 }
 

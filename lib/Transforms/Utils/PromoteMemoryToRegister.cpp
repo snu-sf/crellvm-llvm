@@ -1125,7 +1125,7 @@ void PromoteMem2Reg::run() {
 
   if (Allocas.empty()) {
     llvmberry::ValidationUnit::End();
-    
+
     return; // All of the allocas must have been trivial!
   }
 
