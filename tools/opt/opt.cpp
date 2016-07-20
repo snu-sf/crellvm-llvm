@@ -197,6 +197,20 @@ static cl::opt<std::string>
                              cl::desc("Specify output directory of LLVMBerry"),
                              cl::value_desc("dir"));
 
+static cl::opt<std::string>
+    LLVMBerryWhiteList("llvmberry-whitelist",
+       cl::desc("Enable hint generation for specific "
+                "optimizations only (separated by commas)"),
+       cl::value_desc("opt-names"),
+       cl::init("-"));
+
+static cl::opt<std::string>
+    LLVMBerryPassWhiteList("llvmberry-passwhitelist",
+       cl::desc("Enable hint generation for specific "
+                "passes only (separated by commas)"),
+       cl::value_desc("pass-names(instcombine, mem2reg, gvn, pre)"),
+       cl::init("-"));
+
 static inline void addPass(legacy::PassManagerBase &PM, Pass *P) {
   // Add the pass to the pass manager...
   PM.add(P);
@@ -361,6 +375,10 @@ int main(int argc, char **argv) {
 
   // LLVMBerry : set default output folder
   llvmberry::defaultOutputDir = LLVMBerryOutputDirectory;
+  if (!(LLVMBerryWhiteList == "-"))
+    llvmberry::setWhiteList(LLVMBerryWhiteList);
+  if (!(LLVMBerryPassWhiteList == "-"))
+    llvmberry::setPassWhiteList(LLVMBerryPassWhiteList);
 
   // Immediately run the verifier to catch any problems before starting up the
   // pass pipelines.  Otherwise we can crash on broken code during

@@ -3188,6 +3188,7 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
                                 AliasAnalysis *AA, AssumptionCache &AC,
                                 TargetLibraryInfo &TLI, DominatorTree &DT,
                                 LoopInfo *LI = nullptr) {
+  
   // Minimizing size?
   bool MinimizeSize = F.hasFnAttribute(Attribute::MinSize);
   auto &DL = F.getParent()->getDataLayout();
@@ -3226,6 +3227,9 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
 
 PreservedAnalyses InstCombinePass::run(Function &F,
                                        AnalysisManager<Function> *AM) {
+  
+  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
+  
   auto &AC = AM->getResult<AssumptionAnalysis>(F);
   auto &DT = AM->getResult<DominatorTreeAnalysis>(F);
   auto &TLI = AM->getResult<TargetLibraryAnalysis>(F);
@@ -3241,6 +3245,9 @@ PreservedAnalyses InstCombinePass::run(Function &F,
   // FIXME: Need a way to preserve CFG analyses here!
   PreservedAnalyses PA;
   PA.preserve<DominatorTreeAnalysis>();
+  
+  llvmberry::ValidationUnit::EndPass();
+
   return PA;
 }
 
@@ -3277,6 +3284,8 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   if (skipOptnoneFunction(F))
     return false;
 
+  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
+  
   // Required analyses.
   auto AA = &getAnalysis<AliasAnalysis>();
   auto &AC = getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
@@ -3287,7 +3296,10 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   auto *LIWP = getAnalysisIfAvailable<LoopInfoWrapperPass>();
   auto *LI = LIWP ? &LIWP->getLoopInfo() : nullptr;
 
-  return combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
+  bool result = combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
+  llvmberry::ValidationUnit::EndPass();
+
+  return result;
 }
 
 char InstructionCombiningPass::ID = 0;
