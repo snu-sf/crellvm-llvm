@@ -211,6 +211,18 @@ public:
     data.erase(key);
   }
 };
+
+// PassDictionary: a dictionary shared throughout a pass
+
+class PassDictionary : public Dictionary {
+private:
+  static PassDictionary *_Instance;
+
+public:
+  static void Create();
+  static PassDictionary &GetInstance();
+  static void Destroy();
+};
 }
 
 #endif

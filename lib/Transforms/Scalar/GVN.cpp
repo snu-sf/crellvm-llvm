@@ -845,7 +845,11 @@ make_repl_inv(llvmberry::ValidationUnit::Dictionary &data,
     // e_y == icmp ~P a b
     //  => z = f(y) -> z = f(~X)
 
-    const BasicBlock *leaderBB = data.get<llvmberry::ArgForFindLeader>()->BB;
+    // const BasicBlock *leaderBB = data.get<llvmberry::ArgForFindLeader>()->BB;
+    const BasicBlock *leaderBB = llvmberry::PassDictionary::GetInstance()
+                                     .get<llvmberry::ArgForFindLeader>()
+                                     ->BB;
+
     const BasicBlock *leaderBB_pred = leaderBB->getSinglePredecessor();
     assert(leaderBB_pred &&
            "Expect it to be introduced from propagateEquality, and it checks "
@@ -2339,11 +2343,16 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
   Value *Val = nullptr;
   if (DT->dominates(Vals.BB, BB)) {
     Val = Vals.Val;
-    if (llvmberry::ValidationUnit::Exists())
-      llvmberry::ValidationUnit::GetInstance()->intrude(
-          [&Vals](llvmberry::Dictionary &data, llvmberry::CoreHint &hints)
-          //{ data["findLeader#BB"] = Vals.BB; });
-          { data.get<llvmberry::ArgForFindLeader>()->BB = Vals.BB; });
+
+    // llvmberry::ValidationUnit::GetInstance()->intrude(
+    //     [&Vals](llvmberry::Dictionary &data, llvmberry::CoreHint &hints)
+    //     { data.get<llvmberry::ArgForFindLeader>()->BB = Vals.BB; });
+
+    llvmberry::intrude([&Vals]() {
+      llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+      pdata.get<llvmberry::ArgForFindLeader>()->BB = Vals.BB;
+    });
+
     if (isa<Constant>(Val)) return Val;
   }
 
@@ -2351,24 +2360,19 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
   while (Next) {
     if (DT->dominates(Next->BB, BB)) {
       if (isa<Constant>(Next->Val)) {
-        if (llvmberry::ValidationUnit::Exists())
-          llvmberry::ValidationUnit::GetInstance()->intrude(
-              [&Next](llvmberry::Dictionary &data,
-                      llvmberry::CoreHint &hints) {
-                data.get<llvmberry::ArgForFindLeader>()->BB = Next->BB;
-                //data["findLeader#BB"] = Next->BB;
-              });
+        llvmberry::intrude([&Next]() {
+          llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+          pdata.get<llvmberry::ArgForFindLeader>()->BB = Next->BB;
+        });
         return Next->Val;
       }
       if (!Val) {
         Val = Next->Val;
-        if (llvmberry::ValidationUnit::Exists())
-          llvmberry::ValidationUnit::GetInstance()->intrude(
-              [&Next](llvmberry::Dictionary &data,
-                      llvmberry::CoreHint &hints) {
-                data.get<llvmberry::ArgForFindLeader>()->BB = Next->BB;
-                //data["findLeader#BB"] = Next->BB;
-              });
+
+        llvmberry::intrude([&Next]() {
+          llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+          pdata.get<llvmberry::ArgForFindLeader>()->BB = Next->BB;
+        });
       }
     }
 
@@ -2652,10 +2656,10 @@ bool GVN::processInstruction(Instruction *I) {
 
   llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
   // added by jylee.
-  llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-    data.create<llvmberry::ArgForFindLeader>();
-  });
+  // llvmberry::ValidationUnit::GetInstance()->intrude([](
+  //     llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+  //   data.create<llvmberry::ArgForFindLeader>();
+  // });
 
   // Perform fast-path value-number based elimination of values inherited from
   // dominators.
@@ -2719,7 +2723,11 @@ bool GVN::runOnFunction(Function& F) {
     return false;
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::GVN);
-  
+  llvmberry::intrude([]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.create<llvmberry::ArgForFindLeader>();
+  });
+
   if (!NoLoads)
     MD = &getAnalysis<MemoryDependenceAnalysis>();
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
@@ -2751,7 +2759,12 @@ bool GVN::runOnFunction(Function& F) {
     Changed |= ShouldContinue;
     ++Iteration;
   }
-  
+
+  llvmberry::intrude([]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.erase<llvmberry::ArgForFindLeader>();
+  });
+
   llvmberry::ValidationUnit::EndPass();
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::PRE);
