@@ -64,6 +64,13 @@ PassDictionary &PassDictionary::GetInstance() { return *_Instance; }
 void PassDictionary::Destroy() {
   assert(_Instance && "PassDictionary Instance doesn't exist!");
   delete _Instance;
+  _Instance = nullptr;
+}
+
+GVNReplaceArg::GVNReplaceArg() {
+  isGVNReplace = false;
+  BB = nullptr;
+  VNptr = nullptr;
 }
 
 PassDictionary *PassDictionary::_Instance = nullptr;

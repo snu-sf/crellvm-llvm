@@ -26,7 +26,7 @@ enum DictKeys {
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
-  ArgForFindLeader
+  ArgForGVNReplace
 };
 
 /*
@@ -163,12 +163,15 @@ public:
 };
 DEFINE_TRAITS(ArgForLoadLoadStore, LoadLoadStoreArg);
 
-// lib/Transforms/Scalar/GVN.cpp : findLeader
-struct FindLeaderArg {
+// lib/Transforms/Scalar/GVN.cpp : processInstruction, findLeader
+struct GVNReplaceArg {
 public:
+  GVNReplaceArg();
+  bool isGVNReplace;
   const llvm::BasicBlock *BB;
+  boost::any VNptr;
 };
-DEFINE_TRAITS(ArgForFindLeader, FindLeaderArg);
+DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
 
 class Dictionary {
 private:

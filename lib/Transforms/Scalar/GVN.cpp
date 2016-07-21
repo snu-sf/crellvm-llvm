@@ -845,9 +845,9 @@ make_repl_inv(llvmberry::ValidationUnit::Dictionary &data,
     // e_y == icmp ~P a b
     //  => z = f(y) -> z = f(~X)
 
-    // const BasicBlock *leaderBB = data.get<llvmberry::ArgForFindLeader>()->BB;
+    // const BasicBlock *leaderBB = data.get<llvmberry::ArgForGVNReplace>()->BB;
     const BasicBlock *leaderBB = llvmberry::PassDictionary::GetInstance()
-                                     .get<llvmberry::ArgForFindLeader>()
+                                     .get<llvmberry::ArgForGVNReplace>()
                                      ->BB;
 
     const BasicBlock *leaderBB_pred = leaderBB->getSinglePredecessor();
@@ -2137,7 +2137,54 @@ static void patchReplacementInstruction(Instruction *I, Value *Repl) {
 
 static void patchAndReplaceAllUsesWith(Instruction *I, Value *Repl) {
   patchReplacementInstruction(I, Repl);
+
+  llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
+
+  llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Repl](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    if (!pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace) {
+      llvmberry::ValidationUnit::GetInstance()->setReturnCode(
+        llvmberry::ValidationUnit::ABORT);
+      return;
+    }
+    pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace = false;
+
+    ValueTable &VN = *boost::any_cast<ValueTable*>(pdata.get<llvmberry::ArgForGVNReplace>()->VNptr);
+
+    std::shared_ptr<llvmberry::TyPropagateObject> repl_inv
+      = make_repl_inv(data, hints, VN, I, Repl, SRC);
+
+    // TODO: change to assert
+    if (!repl_inv)
+      return;
+
+    // Propagate repl_inv from I to each use, and replace will be done
+    // automatically
+    for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+      if (!isa<Instruction>(UI->getUser())) {
+        // let the validation fail when the user is not an instruction
+        assert(false && "User is not an instruction");
+      }
+
+      Instruction *userI = dyn_cast<Instruction>(UI->getUser());
+      std::string userI_id = llvmberry::getVariable(*userI);
+
+      std::string prev_block_name = "";
+      if (isa<PHINode>(userI)) {
+        BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+        prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+      }
+
+      PROPAGATE(repl_inv, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(
+                                                      llvmberry::Source, *userI,
+                                                      prev_block_name)));
+    }
+  });
+
   I->replaceAllUsesWith(Repl);
+
+  llvmberry::ValidationUnit::EndIfExists();
 }
 
 /// Attempt to eliminate a load, first by eliminating it
@@ -2346,11 +2393,11 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
 
     // llvmberry::ValidationUnit::GetInstance()->intrude(
     //     [&Vals](llvmberry::Dictionary &data, llvmberry::CoreHint &hints)
-    //     { data.get<llvmberry::ArgForFindLeader>()->BB = Vals.BB; });
+    //     { data.get<llvmberry::ArgForGVNReplace>()->BB = Vals.BB; });
 
     llvmberry::intrude([&Vals]() {
       llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
-      pdata.get<llvmberry::ArgForFindLeader>()->BB = Vals.BB;
+      pdata.get<llvmberry::ArgForGVNReplace>()->BB = Vals.BB;
     });
 
     if (isa<Constant>(Val)) return Val;
@@ -2362,7 +2409,7 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
       if (isa<Constant>(Next->Val)) {
         llvmberry::intrude([&Next]() {
           llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
-          pdata.get<llvmberry::ArgForFindLeader>()->BB = Next->BB;
+          pdata.get<llvmberry::ArgForGVNReplace>()->BB = Next->BB;
         });
         return Next->Val;
       }
@@ -2371,7 +2418,7 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
 
         llvmberry::intrude([&Next]() {
           llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
-          pdata.get<llvmberry::ArgForFindLeader>()->BB = Next->BB;
+          pdata.get<llvmberry::ArgForGVNReplace>()->BB = Next->BB;
         });
       }
     }
@@ -2654,63 +2701,25 @@ bool GVN::processInstruction(Instruction *I) {
     return false;
   }
 
-  llvmberry::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
-  // added by jylee.
-  // llvmberry::ValidationUnit::GetInstance()->intrude([](
-  //     llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-  //   data.create<llvmberry::ArgForFindLeader>();
-  // });
-
   // Perform fast-path value-number based elimination of values inherited from
   // dominators.
   Value *repl = findLeader(I->getParent(), Num);
   if (!repl) {
     // Failure, just remember this instance for future use.
     addToLeaderTable(Num, I, I->getParent());
-    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-    llvmberry::ValidationUnit::End();
-
     return false;
   }
 
   // Remove it!
 
-  llvmberry::ValidationUnit::GetInstance()->intrude([&I, &repl, this](
-      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-    std::shared_ptr<llvmberry::TyPropagateObject> repl_inv
-      = make_repl_inv(data, hints, VN, I, repl, SRC);
-
-    // TODO: change to assert
-    if (!repl_inv)
-      return;
-
-    // Propagate repl_inv from I to each use, and replace will be done
-    // automatically
-    for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
-      if (!isa<Instruction>(UI->getUser())) {
-        // let the validation fail when the user is not an instruction
-        assert(false && "User is not an instruction");
-      }
-
-      Instruction *userI = dyn_cast<Instruction>(UI->getUser());
-      std::string userI_id = llvmberry::getVariable(*userI);
-
-      std::string prev_block_name = "";
-      if (isa<PHINode>(userI)) {
-        BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
-        prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-      }
-
-      PROPAGATE(repl_inv, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(
-                                                      llvmberry::Source, *userI,
-                                                      prev_block_name)));
-    }
+  llvmberry::intrude([this]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace = true;
+    pdata.get<llvmberry::ArgForGVNReplace>()->VNptr = &VN;
   });
 
   patchAndReplaceAllUsesWith(I, repl);
 
-  llvmberry::ValidationUnit::End();
-  
   if (MD && repl->getType()->getScalarType()->isPointerTy())
     MD->invalidateCachedPointerInfo(repl);
   markInstructionForDeletion(I);
@@ -2725,7 +2734,7 @@ bool GVN::runOnFunction(Function& F) {
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::GVN);
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
-    pdata.create<llvmberry::ArgForFindLeader>();
+    pdata.create<llvmberry::ArgForGVNReplace>();
   });
 
   if (!NoLoads)
@@ -2762,7 +2771,7 @@ bool GVN::runOnFunction(Function& F) {
 
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
-    pdata.erase<llvmberry::ArgForFindLeader>();
+    pdata.erase<llvmberry::ArgForGVNReplace>();
   });
 
   llvmberry::ValidationUnit::EndPass();
