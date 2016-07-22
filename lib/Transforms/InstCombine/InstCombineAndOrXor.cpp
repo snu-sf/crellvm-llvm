@@ -1454,13 +1454,90 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
       }
     }
 
-    // (A&((~A)|B)) -> A&B
+    // (((~B)|A)&B) -> A&B
+    //   <src>    |   <tgt>
+    // X = B ^ -1 | X = B ^ -1
+    // Y = X | A  | Y = X | A
+    // Z = Y & B  | Z = A & B
     if (match(Op0, m_Or(m_Not(m_Specific(Op1)), m_Value(A))) ||
-        match(Op0, m_Or(m_Value(A), m_Not(m_Specific(Op1)))))
+        match(Op0, m_Or(m_Value(A), m_Not(m_Specific(Op1))))) {
+      llvmberry::ValidationUnit::Begin("and_or_not1",
+                                       I.getParent()->getParent());
+
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        BinaryOperator *Z = &I;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
+        BinaryOperator *X = dyn_cast<BinaryOperator>(Y->getOperand(0));
+
+        Value *B = Op1;
+
+        std::string reg_x_name = llvmberry::getVariable(*X);
+        std::string reg_y_name = llvmberry::getVariable(*Y);
+        std::string reg_z_name = llvmberry::getVariable(*Z);
+
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        llvmberry::propagateInstruction(X, Z, llvmberry::Target);
+        llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Target, I),
+            llvmberry::ConsAndOrNot1::make(
+                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*A), llvmberry::TyValue::make(*B),
+                llvmberry::ConsSize::make(bitwidth))));
+      });
+
       return BinaryOperator::CreateAnd(A, Op1);
+    }
+
+    // (B&((~B)|A)) -> A&B
+    //   <src>    |   <tgt>
+    // X = B ^ -1 | X = B ^ -1
+    // Y = X | A  | Y = X | A
+    // Z = B & Y  | Z = A & B
     if (match(Op1, m_Or(m_Not(m_Specific(Op0)), m_Value(A))) ||
-        match(Op1, m_Or(m_Value(A), m_Not(m_Specific(Op0)))))
+        match(Op1, m_Or(m_Value(A), m_Not(m_Specific(Op0))))) {
+      // I can't find any example
+      /*
+      llvmberry::ValidationUnit::Begin("and_or_not2",
+                                       I.getParent()->getParent());
+
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        BinaryOperator *Z = &I;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+        BinaryOperator *X = dyn_cast<BinaryOperator>(Y->getOperand(0));
+
+        Value *B = Op0;
+
+        std::string reg_x_name = llvmberry::getVariable(*X);
+        std::string reg_y_name = llvmberry::getVariable(*Y);
+        std::string reg_z_name = llvmberry::getVariable(*Z);
+
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        llvmberry::propagateInstruction(X, Z, llvmberry::Target);
+        llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
+
+        hints.addCommand(llvmberry::ConsInfrule::make(
+            llvmberry::TyPosition::make(llvmberry::Target, I),
+            llvmberry::ConsAndOrNot1::make(
+                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
+                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+                llvmberry::TyValue::make(*A), llvmberry::TyValue::make(*B),
+                llvmberry::ConsSize::make(bitwidth))));
+      });
+      */
+
       return BinaryOperator::CreateAnd(A, Op0);
+    }
 
     // (A ^ B) & ((B ^ C) ^ A) -> (A ^ B) & ~C
     if (match(Op0, m_Xor(m_Value(A), m_Value(B))))
