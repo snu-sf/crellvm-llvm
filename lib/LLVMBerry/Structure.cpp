@@ -2613,12 +2613,12 @@ ConsInfrule::make(std::shared_ptr<TyPosition> _position,
 
 // core hint
 
-CoreHint::CoreHint() {}
+CoreHint::CoreHint() : validation_result(CoreHint::ACTUAL) {}
 
 CoreHint::CoreHint(std::string _module_id, std::string _function_id,
                    std::string _opt_name, std::string _description)
     : module_id(_module_id), function_id(_function_id), opt_name(_opt_name),
-      description(_description) {}
+      description(_description), validation_result(CoreHint::ACTUAL) {}
 
 const std::string &CoreHint::getDescription() const {
   return this->description;
@@ -2630,6 +2630,21 @@ void CoreHint::setDescription(const std::string &desc) {
 
 void CoreHint::appendToDescription(const std::string &desc) {
   this->description += "\n" + desc;
+}
+
+// User may not need to use this function; it may only be used inside intrude.
+const CoreHint::VALIDATION_RESULT &CoreHint::getValidationResult() const {
+  return this->validation_result;
+}
+
+void CoreHint::setValidationResultToAdmitted() {
+  assert(this->validation_result == CoreHint::ACTUAL);
+  this->validation_result = ADMITTED;
+}
+
+void CoreHint::setValidationResultToFail() {
+  assert(this->validation_result == CoreHint::ACTUAL);
+  this->validation_result = FAIL;
 }
 
 void CoreHint::addCommand(std::shared_ptr<TyCommand> c) {
@@ -2646,6 +2661,7 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(function_id));
   archive(CEREAL_NVP(opt_name));
   archive(CEREAL_NVP(description));
+  archive(CEREAL_NVP(validation_result));
   archive(CEREAL_NVP(commands));
   archive(CEREAL_NVP(nop_positions));
 }
