@@ -1410,7 +1410,6 @@ public:
   const VALIDATION_RESULT &getValidationResult() const;
   void setValidationResultToAdmitted();
   void setValidationResultToFail();
-  void appendAdmittedToDescription();
   void addCommand(std::shared_ptr<TyCommand> c);
   void setOptimizationName(const std::string &name);
   void addNopPosition(std::shared_ptr<TyPosition> position);
