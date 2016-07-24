@@ -990,6 +990,8 @@ public:
 
   static std::shared_ptr<TyExpr> make(int _int_value, int _bitwidth);
 
+  std::shared_ptr<TyConstant> get_TyConst();
+
 private:
   std::shared_ptr<TyConstant> constant;
 };

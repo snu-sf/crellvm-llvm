@@ -193,7 +193,6 @@ std::string getVariable(const llvm::Value &value) {
     return rso.str();
   }
 
-
   std::string val;
 
   if (llvm::isa<llvm::GlobalValue>(value)) {
@@ -1604,7 +1603,7 @@ std::shared_ptr<TyFCmpInst> TyFCmpInst::make(const llvm::FCmpInst &fcmpInst) {
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::AllocaInst &ai) {
   return std::shared_ptr<TyLoadInst>(new TyLoadInst(
       TyValueType::make(*ai.getType()),
-      TyValueType::make(*ai.getOperand(0)->getType()), TyValue::make(ai),
+      TyValueType::make(*ai.getAllocatedType()), TyValue::make(ai),
       ai.getAlignment()));
 }
 
@@ -2085,6 +2084,10 @@ void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
 
 std::shared_ptr<TyExpr> ConsConst::make(int _int_value, int _bitwidth) {
   return std::shared_ptr<TyExpr>(new ConsConst(_int_value, _bitwidth));
+}
+
+std::shared_ptr<TyConstant> ConsConst::get_TyConst() {
+  return constant;
 }
 
 ConsInsn::ConsInsn(std::shared_ptr<TyInstruction> _instruction)

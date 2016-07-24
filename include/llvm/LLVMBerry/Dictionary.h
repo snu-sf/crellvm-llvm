@@ -123,18 +123,14 @@ public:
   typedef std::map<const llvm::Instruction *, StoreTriple> TyStoreItemObj;
   typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
   TyStoreItem storeItem;
-/*
-  typedef std::map<std::string, std::vector<std::shared_ptr<TyPropagateLessdef>>> TyMem2RegCmdsObj;
-  typedef std::shared_ptr<TyMem2RegCmdsObj> TyMem2RegCmds;
-  TyMem2RegCmds mem2regCmds;
-*/
+
   struct Tuple {
     std::vector<std::shared_ptr<TyPropagateLessdef>> lessdef;
     std::vector<std::pair<std::shared_ptr<TyPosition>,
                          std::shared_ptr<TyTransitivity>>> transSrc;
     std::vector<std::shared_ptr<TyTransitivityTgt>> transTgt;
     std::vector<std::shared_ptr<TyIntroGhost>> ghost;
-    
+    std::vector<std::shared_ptr<TyLessthanUndef>> lessUndef; 
   };
 
   typedef std::map<std::string, Tuple> TyMem2RegCmdObj;
@@ -147,9 +143,13 @@ public:
 
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
+  static bool isUndef(std::shared_ptr<TyExpr> e);
+
   void replaceTransTgtPrev();
   void replaceCmdRhs(std::string which, std::string key,
-                             std::shared_ptr<TyExpr> newExpr);
+                     std::shared_ptr<TyExpr> newExpr);
+  void replaceLessthanUndef(std::string key,
+                            std::shared_ptr<TyValue> newVal);
 
   Mem2RegArg();
 };
