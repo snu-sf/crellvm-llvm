@@ -830,6 +830,7 @@ TyConstGlobalVarAddr::make(const llvm::GlobalObject &gv) {
   llvm::Type *ty = gv.getType();
   assert(ty->isPointerTy() &&
          "Global variables must be pointers to their locations."); // jylee
+  ty = ty->getPointerElementType();
 
   return std::shared_ptr<TyConstGlobalVarAddr>(new TyConstGlobalVarAddr(
       std::string("@") + std::string(gv.getName().data()),
