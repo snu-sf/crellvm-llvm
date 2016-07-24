@@ -705,6 +705,19 @@ private:
   int align;
 };
 
+struct TySelectInst{
+public : 
+  TySelectInst(std::shared_ptr<TyValue> _cond, std::shared_ptr<TyValueType> _valty, std::shared_ptr<TyValue> _trueval, std::shared_ptr<TyValue> _falseval);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TySelectInst> make(const llvm::SelectInst &si);
+
+private : 
+  std::shared_ptr<TyValue> cond;
+  std::shared_ptr<TyValueType> valty;
+  std::shared_ptr<TyValue> trueval;
+  std::shared_ptr<TyValue> falseval;
+};
+
 struct TyBitCastInst {
 public:
   TyBitCastInst(std::shared_ptr<TyValueType> _fromty,
@@ -792,6 +805,66 @@ private :
   std::shared_ptr<TyValueType> toty;
 };
 
+struct TyZextInst{
+public : 
+  TyZextInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyZextInst> make(const llvm::ZExtInst &zei);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
+struct TySextInst{
+public : 
+  TySextInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TySextInst> make(const llvm::SExtInst &sei);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
+struct TyTruncInst{
+public : 
+  TyTruncInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyTruncInst> make(const llvm::TruncInst &ti);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
+struct TySitofpInst{
+public : 
+  TySitofpInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TySitofpInst> make(const llvm::SIToFPInst &stfi);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
+struct TyUitofpInst{
+public : 
+  TyUitofpInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyUitofpInst> make(const llvm::UIToFPInst &utfi);
+
+private : 
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
 struct ConsBinaryOp : public TyInstruction {
 public:
   ConsBinaryOp(std::shared_ptr<TyBinaryOperator> _binary_operator);
@@ -856,6 +929,17 @@ public:
 
 private:
   std::shared_ptr<TyLoadInst> load_inst;
+};
+
+struct ConsSelectInst : public TyInstruction{
+public : 
+  ConsSelectInst(std::shared_ptr<TySelectInst> _select_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValue> _cond, std::shared_ptr<TyValueType> _valty, std::shared_ptr<TyValue> _trueval, std::shared_ptr<TyValue> _falseval);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyInstruction> make(const llvm::SelectInst &si);
+
+private : 
+  std::shared_ptr<TySelectInst> select_inst;
 };
 
 struct ConsBitCastInst : public TyInstruction {
@@ -936,6 +1020,62 @@ public :
 private : 
   std::shared_ptr<TyFptruncInst> fptrunc_inst;
 };
+
+struct ConsZextInst : public TyInstruction{
+public : 
+  ConsZextInst(std::shared_ptr<TyZextInst> _zext_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::ZExtInst &zi);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyZextInst> zext_inst;
+};
+
+struct ConsSextInst : public TyInstruction{
+public : 
+  ConsSextInst(std::shared_ptr<TySextInst> _sext_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::SExtInst &si);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TySextInst> sext_inst;
+};
+
+struct ConsTruncInst : public TyInstruction{
+public : 
+  ConsTruncInst(std::shared_ptr<TyTruncInst> _trunc_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::TruncInst &ti);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyTruncInst> trunc_inst;
+};
+
+struct ConsSitofpInst : public TyInstruction{
+public : 
+  ConsSitofpInst(std::shared_ptr<TySitofpInst> _sitofp_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::SIToFPInst &stfi);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TySitofpInst> sitofp_inst;
+};
+
+struct ConsUitofpInst : public TyInstruction{
+public : 
+  ConsUitofpInst(std::shared_ptr<TyUitofpInst> _uitofp_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::UIToFPInst &utfi);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyUitofpInst> uitofp_inst;
+};
+
 
 /* propagate */
 

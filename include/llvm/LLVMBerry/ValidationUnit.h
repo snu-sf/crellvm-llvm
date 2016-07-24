@@ -16,12 +16,11 @@
 
 namespace llvmberry {
 
-extern std::string defaultOutputDir;
-
 class ValidationUnit {
 public:
   typedef llvmberry::Dictionary Dictionary;
   enum RETURN_CODE { COMMIT = 0, ABORT };
+  enum PASS { NOTHING = 0, GVN, MEM2REG, PRE, INSTCOMBINE };
 
   CoreHint &getHint();
   const std::string &getOptimizationName() const;
@@ -48,6 +47,8 @@ private:
 
 public:
   static ValidationUnit *GetInstance();
+  static void StartPass(PASS pass);
+  static void EndPass();
   static void Begin(const std::string &optname, llvm::Function *func);
   static bool BeginIfNotExists(const std::string &optname,
                                llvm::Function *func);
@@ -59,7 +60,17 @@ public:
 private:
   static ValidationUnit *_Instance;
   static int _Counter;
+  static PASS _CurrentPass;
 };
+
+extern std::string defaultOutputDir;
+extern std::vector<std::string> optWhiteList;
+extern bool optWhiteListEnabled;
+extern std::vector<ValidationUnit::PASS> optPassWhiteList;
+extern bool optPassWhiteListEnabled;
+
+void setWhiteList(const std::string &str);
+void setPassWhiteList(const std::string &str);
 
 } // llvmberry
 
