@@ -601,6 +601,26 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyAndOrConst2 {
+public:
+  TyAndOrConst2(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+                std::shared_ptr<TyRegister> _yprime,
+                std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1,
+                std::shared_ptr<TyConstInt> _c2,
+                std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> yprime;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TyConstInt> c3;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyAndSame {
 public:
   TyAndSame(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
@@ -2696,6 +2716,20 @@ public:
 
 private:
   std::shared_ptr<TyAndOr> and_or;
+};
+
+struct ConsAndOrConst2 : public TyInfrule {
+public:
+  ConsAndOrConst2(std::shared_ptr<TyAndOrConst2> _ans_or_const2);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+       std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x,
+       std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2,
+       std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAndOrConst2> and_or_const2;
 };
 
 struct ConsAndSame : public TyInfrule {
