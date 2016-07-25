@@ -1120,6 +1120,29 @@ void ConsConstNull::serialize(cereal::JSONOutputArchive &archive) const {
   archive.finishNode();
 }
 
+ConsConstDataVector::ConsConstDataVector(
+    std::shared_ptr<TyValueType> _elem_type,
+    std::vector<std::shared_ptr<TyConstant> > &_elements)
+    : elem_type(_elem_type), elements(_elements) {}
+void ConsConstDataVector::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstDataVector");
+  archive.startNode();
+  archive.makeArray();
+  if (auto p = std::dynamic_pointer_cast<ConsVoidType>(elem_type)) {
+    archive.writeName();
+    archive.saveValue("VoidType");
+  } else {
+    archive(CEREAL_NVP(elem_type));
+  }
+  archive.startNode();
+  archive.makeArray();
+  archive(CEREAL_NVP(elements));
+  archive.finishNode();
+  archive.finishNode();
+}
+
 // values
 
 ConsId::ConsId(std::shared_ptr<TyRegister> _register)
@@ -1215,6 +1238,15 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     return std::shared_ptr<TyConstant>(
         new ConsConstNull(ptype->getAddressSpace(),
                           TyValueType::make(*ptype->getPointerElementType())));
+  } else if (const llvm::ConstantDataVector *dv =
+                 llvm::dyn_cast<llvm::ConstantDataVector>(&value)) {
+    const llvm::Type *elemty = dv->getElementType();
+    std::vector<std::shared_ptr<TyConstant> > elems;
+    for (unsigned i = 0; i < dv->getNumElements(); i++) {
+      elems.push_back(TyConstant::make(*dv->getElementAsConstant(i)));
+    }
+    return std::shared_ptr<TyConstant>(
+        new ConsConstDataVector(TyValueType::make(*elemty), elems));
   }
   assert("TyConstant::make() : unsupported value" && false);
 }
