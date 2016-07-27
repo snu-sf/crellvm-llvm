@@ -61,6 +61,7 @@ public:
 private:
   bool activated;
   bool aborted;
+  llvm::Instruction *I;
   std::string microoptName;
   std::function<void(llvm::Instruction *)> hintGenFunc;
 };

@@ -1381,6 +1381,17 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
     }
   }
 
+  if (llvmberry_doHintGen) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      if (Op0->getType()->isVectorTy()) {
+        data.get<llvmberry::ArgForSimplifyShiftInst>()->abort();
+      } else if (!Op0->getType()->isIntegerTy()) {
+        assert(false && "Op0 must be integer or vector ty");
+      }
+    });
+  }
+
   // 0 shift by X -> 0
   if (match(Op0, m_Zero())) {
     if (llvmberry_doHintGen) {
@@ -1438,6 +1449,13 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
   // Fold undefined shifts.
   if (isUndefShift(Op1))
     return UndefValue::get(Op0->getType());
+
+  if (llvmberry_doHintGen) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      data.get<llvmberry::ArgForSimplifyShiftInst>()->abort();
+    });
+  }
 
   // If the operation is with the result of a select instruction, check whether
   // operating on either branch of the select always yields the same value.
@@ -1671,9 +1689,14 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   bool llvmberry_doHintGen = llvmberry::ValidationUnit::Exists() &&
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_and_inst";
   if(llvmberry_doHintGen){
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
+    llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
         llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       data.get<llvmberry::ArgForSimplifyAndInst>()->isSwapped = false;
+      if (Op0->getType()->isVectorTy()) {
+        data.get<llvmberry::ArgForSimplifyAndInst>()->abort();
+      } else if (!Op0->getType()->isIntegerTy()) {
+        assert(false && "Op0 must be integer or vector ty");
+      }
     });
   }
   if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
@@ -1898,6 +1921,13 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
    return Op0;
   }
 
+  if (llvmberry_doHintGen) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      data.get<llvmberry::ArgForSimplifyAndInst>()->abort();
+    });
+  }
+
   // A & (-A) = A if A is a power of two or zero.
   if (match(Op0, m_Neg(m_Specific(Op1))) ||
       match(Op1, m_Neg(m_Specific(Op0)))) {
@@ -2017,9 +2047,14 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   bool llvmberry_doHintGen = llvmberry::ValidationUnit::Exists() &&
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_or_inst";
   if (llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
+    llvmberry::ValidationUnit::GetInstance()->intrude([Op0](
         llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       data.create<llvmberry::ArgForSimplifyOrInst>()->isSwapped = false;
+      if (Op0->getType()->isVectorTy()) {
+        data.get<llvmberry::ArgForSimplifyOrInst>()->abort();
+      } else if (!Op0->getType()->isIntegerTy()) {
+        assert(false && "Op0 must be integer or vector ty");
+      }
     });
   }
 
@@ -2197,6 +2232,13 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
       (A == Op0 || B == Op0))
     return Constant::getAllOnesValue(Op0->getType());
 
+  if (llvmberry_doHintGen) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      data.get<llvmberry::ArgForSimplifyOrInst>()->abort();
+    });
+  }
+
   if (auto *ICILHS = dyn_cast<ICmpInst>(Op0)) {
     if (auto *ICIRHS = dyn_cast<ICmpInst>(Op1)) {
       if (Value *V = SimplifyOrOfICmps(ICILHS, ICIRHS))
@@ -2283,9 +2325,14 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
   bool llvmberry_doHintGen = llvmberry::ValidationUnit::Exists() &&
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_xor_inst";
   if(llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
+    llvmberry::ValidationUnit::GetInstance()->intrude([Op0](
         llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       data.get<llvmberry::ArgForSimplifyXorInst>()->isSwapped = false;
+      if (Op0->getType()->isVectorTy()) {
+        data.get<llvmberry::ArgForSimplifyXorInst>()->abort();
+      } else if (!Op0->getType()->isIntegerTy()) {
+        assert(false && "Op0 must be integer or vector ty");
+      }
     });
   }
   if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
@@ -2409,6 +2456,13 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
       });
     }
     return Constant::getAllOnesValue(Op0->getType());
+  }
+
+  if (llvmberry_doHintGen) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      data.get<llvmberry::ArgForSimplifyXorInst>()->abort();
+    });
   }
 
   // Try some generic simplifications for associative operations.
