@@ -189,14 +189,75 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
         return BinaryOperator::CreateAnd(Or, AndRHS);
       }
 
+      // Together == OpRHS, i.e. C1 & C2 == C1
       ConstantInt *TogetherCI = dyn_cast<ConstantInt>(Together);
       if (TogetherCI && !TogetherCI->isZero()){
         // (X | C1) & C2 --> (X & (C2^(C1&C2))) | C1
         // NOTE: This reduces the number of bits set in the & mask, which
         // can expose opportunities for store narrowing.
+        llvmberry::ValidationUnit::Begin("and_or_const2",
+                                         TheAnd.getParent()->getParent());
         Together = ConstantExpr::getXor(AndRHS, Together);
         Value *And = Builder->CreateAnd(X, Together);
+        //   <src>     |   <tgt>
+        // Y = X | C1  | Y' = X  | C1
+        // nop         | Y  = X  & (C2 ^ C1)
+        // Z = Y & C2  | Z  = Y  | C1
+
+        // Propagate Y = X | C1 in Source
+        llvmberry::ValidationUnit::GetInstance()->intrude([&TheAnd, &Op](
+            llvmberry::ValidationUnit::Dictionary &data,
+            llvmberry::CoreHint &hints) {
+          BinaryOperator *Z = &TheAnd;
+          BinaryOperator *Ysrc = dyn_cast<BinaryOperator>(Op);
+
+          llvmberry::propagateInstruction(Ysrc, Z, SRC);
+        });
+
         And->takeName(Op);
+
+        llvmberry::ValidationUnit::GetInstance()
+            ->intrude([&TheAnd, &And, &Op, &X, &OpRHS, &AndRHS](
+                  llvmberry::ValidationUnit::Dictionary &data,
+                  llvmberry::CoreHint &hints) {
+                llvmberry::name_instructions(*Op->getParent()->getParent());
+
+              BinaryOperator *Z = &TheAnd;
+              BinaryOperator *Y = dyn_cast<BinaryOperator>(And);
+              BinaryOperator *Yprime = dyn_cast<BinaryOperator>(Op);
+              ConstantInt *C1 = OpRHS;
+              ConstantInt *C2 = AndRHS;
+              std::string reg_z_name = llvmberry::getVariable(*Z);
+              std::string reg_y_name = llvmberry::getVariable(*Y);
+              std::string reg_yprime_name = llvmberry::getVariable(*Yprime);
+
+              int64_t c1 = C1->getSExtValue();
+              int64_t c2 = C2->getSExtValue();
+              int64_t c3 = c2 ^ c1;
+              int bitwidth = Z->getType()->getIntegerBitWidth();
+
+              llvmberry::propagateInstruction(Yprime, Z, TGT);
+              llvmberry::propagateInstruction(Y, Z, TGT);
+              llvmberry::insertSrcNopAtTgtI(hints, Y);
+
+              hints.addCommand(llvmberry::ConsPropagate::make(
+                  llvmberry::ConsMaydiff::make(reg_yprime_name,
+                                               llvmberry::Physical),
+                  llvmberry::ConsGlobal::make()));
+              hints.addCommand(llvmberry::ConsPropagate::make(
+                  llvmberry::ConsMaydiff::make(reg_y_name, llvmberry::Physical),
+                  llvmberry::ConsGlobal::make()));
+              INFRULE(INSTPOS(TGT, Z),
+                      llvmberry::ConsAndOrConst2::make(
+                          REGISTER(reg_z_name, Physical),
+                          REGISTER(reg_y_name, Physical),
+                          REGISTER(reg_yprime_name, Physical), VAL(X, Physical),
+                          llvmberry::TyConstInt::make(c1, bitwidth),
+                          llvmberry::TyConstInt::make(c2, bitwidth),
+                          llvmberry::TyConstInt::make(c3, bitwidth),
+                          BITSIZE(bitwidth)));
+              });
+
         return BinaryOperator::CreateOr(And, OpRHS);
       }
     }
