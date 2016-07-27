@@ -1649,10 +1649,9 @@ void TyUdivSubUrem::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 TySubAdd::TySubAdd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _my,
-                   std::shared_ptr<TyRegister> _x, std::shared_ptr<TyValue> _y,
+                   std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
                    std::shared_ptr<TySize> _sz)
-    : z(std::move(_z)), my(std::move(_my)), x(std::move(_x)), y(std::move(_y)),
-      sz(std::move(_sz)) {}
+    : z(_z), my(_my), x(_x), y(_y), sz(_sz) {}
 
 void TySubAdd::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(z), CEREAL_NVP(my), CEREAL_NVP(x), CEREAL_NVP(y),
@@ -1660,7 +1659,7 @@ void TySubAdd::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 ConsSubAdd::ConsSubAdd(std::shared_ptr<TySubAdd> _sub_add)
-    : sub_add(std::move(_sub_add)) {}
+    : sub_add(_sub_add) {}
 
 void ConsSubAdd::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -1672,13 +1671,11 @@ void ConsSubAdd::serialize(cereal::JSONOutputArchive &archive) const {
 
 std::shared_ptr<TyInfrule> ConsSubAdd::make(std::shared_ptr<TyRegister> _z,
                                             std::shared_ptr<TyValue> _my,
-                                            std::shared_ptr<TyRegister> _x,
+                                            std::shared_ptr<TyValue> _x,
                                             std::shared_ptr<TyValue> _y,
                                             std::shared_ptr<TySize> _sz) {
-  std::shared_ptr<TySubAdd> _sub_add(new TySubAdd(std::move(_z), std::move(_my),
-                                                  std::move(_x), std::move(_y),
-                                                  std::move(_sz)));
-  return std::shared_ptr<TyInfrule>(new ConsSubAdd(std::move(_sub_add)));
+  std::shared_ptr<TySubAdd> _sub_add(new TySubAdd(_z, _my, _x, _y, _sz));
+  return std::shared_ptr<TyInfrule>(new ConsSubAdd(_sub_add));
 }
 
 TySubMone::TySubMone(std::shared_ptr<TyRegister> _z,

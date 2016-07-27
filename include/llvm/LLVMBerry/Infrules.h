@@ -1545,14 +1545,14 @@ private:
 struct TySubAdd {
 public:
   TySubAdd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _my,
-           std::shared_ptr<TyRegister> _x, std::shared_ptr<TyValue> _y,
+           std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
            std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
   std::shared_ptr<TyRegister> z;
   std::shared_ptr<TyValue> my;
-  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyValue> x;
   std::shared_ptr<TyValue> y;
   std::shared_ptr<TySize> sz;
 };
@@ -3694,7 +3694,7 @@ public:
 
   static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z,
                                          std::shared_ptr<TyValue> _my,
-                                         std::shared_ptr<TyRegister> _x,
+                                         std::shared_ptr<TyValue> _x,
                                          std::shared_ptr<TyValue> _y,
                                          std::shared_ptr<TySize> _sz);
 
