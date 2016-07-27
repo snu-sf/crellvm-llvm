@@ -166,12 +166,12 @@ public:
 DEFINE_TRAITS(ArgForLoadLoadStore, LoadLoadStoreArg);
 
 // lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
-struct SinkInstArg{
+struct SinkInstArg {
 public:
   llvm::DominatorTree *sinkDT;
 };
 DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
-   
+
 // lib/Transforms/Scalar/GVN.cpp : findLeader
 struct FindLeaderArg {
 public:
