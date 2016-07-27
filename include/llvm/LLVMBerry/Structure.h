@@ -175,6 +175,9 @@ public:
   static std::shared_ptr<TyPosition>
   make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB);
   static std::shared_ptr<TyPosition>
+  make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB,
+                    int index);
+  static std::shared_ptr<TyPosition>
   make_start_of_block(enum TyScope _scope, std::string _block_name);
   static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           std::string _block_name,
@@ -202,6 +205,10 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyRegister> make(std::string _name, enum TyTag _tag);
+
+  static bool isSame(std::shared_ptr<TyRegister> r1,
+                     std::shared_ptr<TyRegister> r2);
+  std::string getName();
 
 private:
   std::string name;
@@ -699,6 +706,7 @@ public:
              std::shared_ptr<TyValueType> _valtype,
              std::shared_ptr<TyValue> _ptrvalue, int _align);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  static std::shared_ptr<TyLoadInst> make(const llvm::AllocaInst &ai);
   static std::shared_ptr<TyLoadInst> make(const llvm::LoadInst &li);
   static std::shared_ptr<TyLoadInst> make(const llvm::StoreInst &si);
 
@@ -1102,6 +1110,9 @@ public:
 
   static std::shared_ptr<TyExpr> make(std::string _name, enum TyTag _tag);
 
+  std::shared_ptr<TyRegister> getTyReg();
+  void updateTyReg(std::shared_ptr<TyRegister> newTyReg);
+
 private:
   std::shared_ptr<TyRegister> register_name;
 };
@@ -1131,6 +1142,8 @@ public:
 
   static std::shared_ptr<TyExpr> make(int _int_value, int _bitwidth);
 
+  std::shared_ptr<TyConstant> getTyConst();
+
 private:
   std::shared_ptr<TyConstant> constant;
 };
@@ -1143,6 +1156,8 @@ public:
   static std::shared_ptr<TyExpr> make(const llvm::Instruction &i);
   static std::shared_ptr<TyExpr>
   make(std::shared_ptr<TyInstruction> _instruction);
+
+  std::shared_ptr<TyInstruction> getTyInsn();
 
 private:
   std::shared_ptr<TyInstruction> instruction;
@@ -1161,6 +1176,10 @@ public:
   static std::shared_ptr<TyPropagateLessdef> make(std::shared_ptr<TyExpr> _lhs,
                                                   std::shared_ptr<TyExpr> _rhs,
                                                   enum TyScope _scope);
+
+  std::shared_ptr<TyExpr> getLhs();
+  std::shared_ptr<TyExpr> getRhs();
+  void updateRhs(std::shared_ptr<TyExpr>(newExpr));
 
 private:
   std::shared_ptr<TyExpr> lhs;

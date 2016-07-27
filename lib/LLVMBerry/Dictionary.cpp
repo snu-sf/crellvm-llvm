@@ -20,7 +20,9 @@ void SimplifyInstArg::setHintGenFunc(
   this->hintGenFunc = _hintGenFunc;
 }
 
-void SimplifyInstArg::abort() { this->aborted = true; }
+void SimplifyInstArg::abort() {
+  this->aborted = true;
+}
 
 void SimplifyInstArg::generateHint(llvm::Instruction *arg) const {
   assert(this->activated);
@@ -36,7 +38,9 @@ std::string SimplifyInstArg::getMicroOptName() const {
   return this->microoptName;
 }
 
-bool SimplifyInstArg::isActivated() const { return !aborted && activated; }
+bool SimplifyInstArg::isActivated() const {
+  return !aborted && activated;
+}
 
 StripPointerCastsArg::StripPointerCastsArg() {
   strippedValues = TyStrippedValues(new TyStrippedValuesObj());
