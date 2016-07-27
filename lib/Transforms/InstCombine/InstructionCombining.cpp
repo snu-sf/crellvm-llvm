@@ -2760,7 +2760,7 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
   BasicBlock::iterator InsertPos = DestBlock->getFirstInsertionPt();
   
   llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&I, &InsertPos, &DestBlock](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
+            ([&I, &InsertPos, &DestBlock](llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
              auto si_arg = data.get<llvmberry::ArgForSinkInst>();
              DominatorTree *DT = si_arg->sinkDT;
              insertSrcNopAtTgtI(hints,InsertPos);  //src nop
