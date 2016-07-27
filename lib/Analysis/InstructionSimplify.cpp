@@ -1287,19 +1287,73 @@ Value *llvm::SimplifyFRemInst(Value *Op0, Value *Op1, FastMathFlags FMF,
 
 /// isUndefShift - Returns true if a shift by \c Amount always yields undef.
 static bool isUndefShift(Value *Amount) {
+  bool llvmberry_doHintGen =
+      llvmberry::ValidationUnit::Exists() &&
+      llvmberry::ValidationUnit::GetInstance()->getOptimizationName() ==
+          "simplify_shift";
   Constant *C = dyn_cast<Constant>(Amount);
   if (!C)
     return false;
 
   // X shift by undef -> undef because it may shift by the bitwidth.
-  if (isa<UndefValue>(C))
+  if (isa<UndefValue>(C)) {
+    if (llvmberry_doHintGen) {
+      llvmberry::ValidationUnit::GetInstance()->intrude([](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>        |  <tgt>
+        // Z = X >>a undef | (Z equals undef)
+        //    <src>        |  <tgt>
+        // Z = X >>l undef | (Z equals undef)
+        //    <src>        |  <tgt>
+        // Z = X <<  undef | (Z equals undef)
+        auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
+
+        ptr->setHintGenFunc("shift_undef1", [&hints](llvm::Instruction *I) {
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          Value *Y = Z->getOperand(0);
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+          INFRULE(INSTPOS(SRC, Z),
+                  llvmberry::ConsShiftUndef1::make(
+                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+        });
+      });
+    }
     return true;
+  }
 
   // Shifting by the bitwidth or more is undefined.
   if (ConstantInt *CI = dyn_cast<ConstantInt>(C))
     if (CI->getValue().getLimitedValue() >=
-        CI->getType()->getScalarSizeInBits())
+        CI->getType()->getScalarSizeInBits()) {
+      if (llvmberry_doHintGen) {
+        llvmberry::ValidationUnit::GetInstance()->intrude([CI](
+            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          //    <src>    |  <tgt>
+          // Z = X >>a C | (Z equals undef)
+          //   (C is not smaller than size of bit)
+          //    <src>    |  <tgt>
+          // Z = X >>l C | (Z equals undef)
+          //   (C is not smaller than size of bit)
+          //    <src>    |  <tgt>
+          // Z = X <<  C | (Z equals undef)
+          //   (C is not smaller than size of bit)
+          auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
+
+          ptr->setHintGenFunc("shift_undef2",
+                              [CI, &hints](llvm::Instruction *I) {
+            BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+            Value *Y = Z->getOperand(0);
+            ConstantInt *C = CI;
+            int bitwidth = Z->getType()->getIntegerBitWidth();
+            INFRULE(INSTPOS(SRC, Z),
+                    llvmberry::ConsShiftUndef2::make(
+                        VAL(Z, Physical), VAL(Y, Physical),
+                        llvmberry::TyConstInt::make(*C), BITSIZE(bitwidth)));
+          });
+        });
+      }
       return true;
+    }
 
   // If all lanes of a vector shift are undefined the whole shift is.
   if (isa<ConstantVector>(C) || isa<ConstantDataVector>(C)) {
@@ -1316,6 +1370,10 @@ static bool isUndefShift(Value *Amount) {
 /// fold the result.  If not, this returns null.
 static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
                             const Query &Q, unsigned MaxRecurse) {
+  bool llvmberry_doHintGen =
+      llvmberry::ValidationUnit::Exists() &&
+      llvmberry::ValidationUnit::GetInstance()->getOptimizationName() ==
+          "simplify_shift";
   if (Constant *C0 = dyn_cast<Constant>(Op0)) {
     if (Constant *C1 = dyn_cast<Constant>(Op1)) {
       Constant *Ops[] = { C0, C1 };
@@ -1324,12 +1382,58 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
   }
 
   // 0 shift by X -> 0
-  if (match(Op0, m_Zero()))
+  if (match(Op0, m_Zero())) {
+    if (llvmberry_doHintGen) {
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>    |  <tgt>
+        // Z = 0 >>a X | (Z equals 0)
+        //    <src>    |  <tgt>
+        // Z = 0 >>l X | (Z equals 0)
+        //    <src>    |  <tgt>
+        // Z = 0 <<  X | (Z equals 0)
+        auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
+
+        ptr->setHintGenFunc("shift_zero1",
+                            [Op0, Op1, &hints](llvm::Instruction *I) {
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          Value *Y = Z->getOperand(1);
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+          INFRULE(INSTPOS(SRC, Z),
+                  llvmberry::ConsShiftZero1::make(
+                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+        });
+      });
+    }
     return Op0;
+  }
 
   // X shift by 0 -> X
-  if (match(Op1, m_Zero()))
+  if (match(Op1, m_Zero())) {
+    if (llvmberry_doHintGen) {
+      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        //    <src>    |  <tgt>
+        // Z = X >>a 0 | (Z equals X)
+        //    <src>    |  <tgt>
+        // Z = X >>l 0 | (Z equals X)
+        //    <src>    |  <tgt>
+        // Z = X <<  0 | (Z equals X)
+        auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
+
+        ptr->setHintGenFunc("shift_zero2",
+                            [Op0, Op1, &hints](llvm::Instruction *I) {
+          BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+          Value *Y = Z->getOperand(0);
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+          INFRULE(INSTPOS(SRC, Z),
+                  llvmberry::ConsShiftZero2::make(
+                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+        });
+      });
+    }
     return Op0;
+  }
 
   // Fold undefined shifts.
   if (isUndefShift(Op1))

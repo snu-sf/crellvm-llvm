@@ -17,6 +17,7 @@ enum DictKeys {
   // InstSimplify
   ArgForSimplifyAndInst,
   ArgForSimplifyOrInst,
+  ArgForSimplifyShiftInst,
   ArgForSimplifyXorInst,
   // InstCombine
   ArgForVisitMul,
@@ -44,12 +45,14 @@ template <DictKeys key> struct DictKeysTraits {
   // DictKeysTraits class has no member for arbitrary type
 };
 
-// Used in InstructionSimplify.cpp : SimplifyAndInst(), SimplifyOrInst()
+// Used in InstructionSimplify.cpp : SimplifyAndInst(), SimplifyOrInst(),
+// SimplifyXorInst(), SimplifyShiftInst()
 struct SimplifyInstArg {
 public:
   SimplifyInstArg();
   void setHintGenFunc(std::string microoptName,
                       std::function<void(llvm::Instruction *)> hintGenFunc);
+  void abort();
   void generateHint(llvm::Instruction *arg) const;
   bool isActivated() const;
   std::string getMicroOptName() const;
@@ -57,12 +60,14 @@ public:
 
 private:
   bool activated;
+  bool aborted;
   std::string microoptName;
   std::function<void(llvm::Instruction *)> hintGenFunc;
 };
 DEFINE_TRAITS(ArgForSimplifyAndInst, SimplifyInstArg);
 DEFINE_TRAITS(ArgForSimplifyOrInst, SimplifyInstArg);
 DEFINE_TRAITS(ArgForSimplifyXorInst, SimplifyInstArg);
+DEFINE_TRAITS(ArgForSimplifyShiftInst, SimplifyInstArg);
 
 // lib/IR/Value.cpp : Value::stripPointerCasts(), stripPointerCastsAndOffsets()
 struct StripPointerCastsArg {

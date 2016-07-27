@@ -349,6 +349,7 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyConstInt> make(int64_t _int_value, int _bitwidth);
+  static std::shared_ptr<TyConstInt> make(const llvm::ConstantInt &ci);
 
 private:
   int64_t int_value;

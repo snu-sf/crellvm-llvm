@@ -1492,6 +1492,55 @@ private:
   std::shared_ptr<TyValueType> dstty;
 };
 
+struct TyShiftUndef1 {
+public:
+  TyShiftUndef1(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
+                std::shared_ptr<TySize> _s);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> s;
+};
+
+struct TyShiftUndef2 {
+public:
+  TyShiftUndef2(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
+                std::shared_ptr<TyConstInt> _c, std::shared_ptr<TySize> _s);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyConstInt> c;
+  std::shared_ptr<TySize> s;
+};
+
+struct TyShiftZero1 {
+public:
+  TyShiftZero1(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
+               std::shared_ptr<TySize> _s);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> s;
+};
+
+struct TyShiftZero2 {
+public:
+  TyShiftZero2(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
+               std::shared_ptr<TySize> _s);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> s;
+};
+
 struct TySitofpBitcast {
 public:
   TySitofpBitcast(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid,
@@ -3646,6 +3695,55 @@ public:
 
 private:
   std::shared_ptr<TySextSext> sext_sext;
+};
+
+struct ConsShiftUndef1 : public TyInfrule {
+public:
+  ConsShiftUndef1(std::shared_ptr<TyShiftUndef1> _shift_undef1);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _s);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyShiftUndef1> shift_undef1;
+};
+
+struct ConsShiftUndef2 : public TyInfrule {
+public:
+  ConsShiftUndef2(std::shared_ptr<TyShiftUndef2> _shift_undef2);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TyConstInt> _c,
+                                         std::shared_ptr<TySize> _s);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyShiftUndef2> shift_undef2;
+};
+
+struct ConsShiftZero1 : public TyInfrule {
+public:
+  ConsShiftZero1(std::shared_ptr<TyShiftZero1> _shift_zero1);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _s);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyShiftZero1> shift_zero1;
+};
+
+struct ConsShiftZero2 : public TyInfrule {
+public:
+  ConsShiftZero2(std::shared_ptr<TyShiftZero2> _shift_zero2);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _s);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyShiftZero2> shift_zero2;
 };
 
 struct ConsSitofpBitcast : public TyInfrule {

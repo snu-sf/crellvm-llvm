@@ -803,6 +803,10 @@ std::shared_ptr<TyConstInt> TyConstInt::make(int64_t _int_value, int _value) {
   return std::shared_ptr<TyConstInt>(new TyConstInt(_int_value, _value));
 }
 
+std::shared_ptr<TyConstInt> TyConstInt::make(const llvm::ConstantInt &ci) {
+  return TyConstInt::make(ci.getSExtValue(), ci.getBitWidth());
+}
+
 TyConstFloat::TyConstFloat(double _float_value, enum TyFloatType _float_type)
     : float_value(_float_value), float_type(_float_type) {}
 

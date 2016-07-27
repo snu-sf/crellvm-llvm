@@ -3232,6 +3232,100 @@ void ConsSextSext::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(sext_sext));
 }
 
+TyShiftUndef1::TyShiftUndef1(std::shared_ptr<TyValue> _z,
+                             std::shared_ptr<TyValue> _y,
+                             std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), s(_s) {}
+void TyShiftUndef1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(s));
+}
+
+ConsShiftUndef1::ConsShiftUndef1(std::shared_ptr<TyShiftUndef1> _shift_undef1)
+    : shift_undef1(_shift_undef1) {}
+std::shared_ptr<TyInfrule> ConsShiftUndef1::make(std::shared_ptr<TyValue> _z,
+                                                 std::shared_ptr<TyValue> _y,
+                                                 std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TyShiftUndef1> _val(new TyShiftUndef1(_z, _y, _s));
+  return std::shared_ptr<TyInfrule>(new ConsShiftUndef1(_val));
+}
+void ConsShiftUndef1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ShiftUndef1");
+  archive(CEREAL_NVP(shift_undef1));
+}
+
+TyShiftUndef2::TyShiftUndef2(std::shared_ptr<TyValue> _z,
+                             std::shared_ptr<TyValue> _y,
+                             std::shared_ptr<TyConstInt> _c,
+                             std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), c(_c), s(_s) {}
+void TyShiftUndef2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(c), CEREAL_NVP(s));
+}
+
+ConsShiftUndef2::ConsShiftUndef2(std::shared_ptr<TyShiftUndef2> _shift_undef2)
+    : shift_undef2(_shift_undef2) {}
+std::shared_ptr<TyInfrule> ConsShiftUndef2::make(std::shared_ptr<TyValue> _z,
+                                                 std::shared_ptr<TyValue> _y,
+                                                 std::shared_ptr<TyConstInt> _c,
+                                                 std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TyShiftUndef2> _val(new TyShiftUndef2(_z, _y, _c, _s));
+  return std::shared_ptr<TyInfrule>(new ConsShiftUndef2(_val));
+}
+void ConsShiftUndef2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ShiftUndef2");
+  archive(CEREAL_NVP(shift_undef2));
+}
+
+TyShiftZero1::TyShiftZero1(std::shared_ptr<TyValue> _z,
+                           std::shared_ptr<TyValue> _y,
+                           std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), s(_s) {}
+void TyShiftZero1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(s));
+}
+
+ConsShiftZero1::ConsShiftZero1(std::shared_ptr<TyShiftZero1> _shift_zero1)
+    : shift_zero1(_shift_zero1) {}
+std::shared_ptr<TyInfrule> ConsShiftZero1::make(std::shared_ptr<TyValue> _z,
+                                                std::shared_ptr<TyValue> _y,
+                                                std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TyShiftZero1> _val(new TyShiftZero1(_z, _y, _s));
+  return std::shared_ptr<TyInfrule>(new ConsShiftZero1(_val));
+}
+void ConsShiftZero1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ShiftZero1");
+  archive(CEREAL_NVP(shift_zero1));
+}
+
+TyShiftZero2::TyShiftZero2(std::shared_ptr<TyValue> _z,
+                           std::shared_ptr<TyValue> _y,
+                           std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), s(_s) {}
+void TyShiftZero2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(s));
+}
+
+ConsShiftZero2::ConsShiftZero2(std::shared_ptr<TyShiftZero2> _shift_zero2)
+    : shift_zero2(_shift_zero2) {}
+std::shared_ptr<TyInfrule> ConsShiftZero2::make(std::shared_ptr<TyValue> _z,
+                                                std::shared_ptr<TyValue> _y,
+                                                std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TyShiftZero2> _val(new TyShiftZero2(_z, _y, _s));
+  return std::shared_ptr<TyInfrule>(new ConsShiftZero2(_val));
+}
+void ConsShiftZero2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ShiftZero2");
+  archive(CEREAL_NVP(shift_zero2));
+}
+
 TySitofpBitcast::TySitofpBitcast(std::shared_ptr<TyValue> _src,
                                  std::shared_ptr<TyValue> _mid,
                                  std::shared_ptr<TyValue> _dst,
