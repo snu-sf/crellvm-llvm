@@ -762,6 +762,23 @@ TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
       new TyPosition(_scope, _block_name, std::move(_cmd)));
 }
 
+std::shared_ptr<TyPosition>
+TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB,
+                              int index) {
+  std::string _block_name = getBasicBlockIndex(&BB);
+  std::string _register_name = "";
+
+  int _index = index;
+
+  std::shared_ptr<TyPositionCommand> _pos_cmd(
+      new TyPositionCommand(_index, _register_name));
+
+  std::shared_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+  return std::shared_ptr<TyPosition>(
+      new TyPosition(_scope, _block_name, std::move(_cmd)));
+}
+
 /* value */
 
 // register
@@ -776,6 +793,15 @@ void TyRegister::serialize(cereal::JSONOutputArchive &archive) const {
 std::shared_ptr<TyRegister> TyRegister::make(std::string _name,
                                              enum TyTag _tag) {
   return std::shared_ptr<TyRegister>(new TyRegister(_name, _tag));
+}
+
+bool TyRegister::isSame(std::shared_ptr<TyRegister> r1,
+                        std::shared_ptr<TyRegister> r2) {
+  return (r1->name==r2->name && r1->tag==r2->tag);
+}
+
+std::string TyRegister::getName() {
+  return name;
 }
 
 // constant
@@ -1458,6 +1484,9 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
   } else if (const llvm::FCmpInst *fcmp = llvm::dyn_cast<llvm::FCmpInst>(&i)) {
     return std::shared_ptr<TyInstruction>(
         new ConsFCmpInst(TyFCmpInst::make(*fcmp)));
+  } else if (const llvm::AllocaInst *ai = llvm::dyn_cast<llvm::AllocaInst>(&i)) {
+    return std::shared_ptr<TyInstruction>(
+        new ConsLoadInst(TyLoadInst::make(*ai)));
   } else if (const llvm::LoadInst *li = llvm::dyn_cast<llvm::LoadInst>(&i)) {
     return std::shared_ptr<TyInstruction>(
         new ConsLoadInst(TyLoadInst::make(*li)));
@@ -1590,6 +1619,13 @@ std::shared_ptr<TyFCmpInst> TyFCmpInst::make(const llvm::FCmpInst &fcmpInst) {
       new TyFCmpInst(predicate, TyValueType::make(*fcmpInst.getType()),
                      TyValue::make(*fcmpInst.getOperand(0)),
                      TyValue::make(*fcmpInst.getOperand(1))));
+}
+
+std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::AllocaInst &ai) {
+  return std::shared_ptr<TyLoadInst>(new TyLoadInst(
+      TyValueType::make(*ai.getType()),
+      TyValueType::make(*ai.getAllocatedType()), TyValue::make(ai),
+      ai.getAlignment()));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
@@ -2201,6 +2237,14 @@ std::shared_ptr<TyExpr> ConsVar::make(std::string _name, enum TyTag _tag) {
   return std::shared_ptr<TyExpr>(new ConsVar(_name, _tag));
 }
 
+std::shared_ptr<TyRegister> ConsVar::getTyReg() {
+  return register_name;
+}
+
+void ConsVar::updateTyReg(std::shared_ptr<TyRegister> newTyReg) {
+  register_name = newTyReg;
+}
+
 ConsRhs::ConsRhs(std::shared_ptr<TyRegister> _register_name,
                  enum TyScope _scope)
     : register_name(std::move(_register_name)), scope(_scope) {}
@@ -2246,6 +2290,10 @@ std::shared_ptr<TyExpr> ConsConst::make(int _int_value, int _bitwidth) {
   return std::shared_ptr<TyExpr>(new ConsConst(_int_value, _bitwidth));
 }
 
+std::shared_ptr<TyConstant> ConsConst::getTyConst() {
+  return constant;
+}
+
 ConsInsn::ConsInsn(std::shared_ptr<TyInstruction> _instruction)
     : instruction(std::move(_instruction)) {}
 std::shared_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i) {
@@ -2256,6 +2304,11 @@ std::shared_ptr<TyExpr>
 ConsInsn::make(std::shared_ptr<TyInstruction> _instruction) {
   return std::shared_ptr<TyExpr>(new ConsInsn(std::move(_instruction)));
 }
+
+std::shared_ptr<TyInstruction> ConsInsn::getTyInsn() {
+  return instruction;
+}
+
 void ConsInsn::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
@@ -2282,6 +2335,18 @@ TyPropagateLessdef::make(std::shared_ptr<TyExpr> _lhs,
                          std::shared_ptr<TyExpr> _rhs, enum TyScope _scope) {
   return std::shared_ptr<TyPropagateLessdef>(
       new TyPropagateLessdef(std::move(_lhs), std::move(_rhs), _scope));
+}
+
+std::shared_ptr<TyExpr> TyPropagateLessdef::getLhs() {
+  return lhs;
+}
+
+std::shared_ptr<TyExpr> TyPropagateLessdef::getRhs() {
+  return rhs;
+}
+
+void TyPropagateLessdef::updateRhs(std::shared_ptr<TyExpr> newExpr) {
+  rhs = newExpr;
 }
 
 TyPropagateNoalias::TyPropagateNoalias(std::shared_ptr<TyPointer> _lhs,

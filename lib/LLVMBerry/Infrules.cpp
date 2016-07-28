@@ -2504,6 +2504,10 @@ void TyLessthanUndef::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(v));
 }
 
+void TyLessthanUndef::updateRhs(std::shared_ptr<TyValue> newVal) {
+  v = newVal;
+}
+
 ConsLessthanUndef::ConsLessthanUndef(
     std::shared_ptr<TyLessthanUndef> _lessthan_undef)
     : lessthan_undef(std::move(_lessthan_undef)) {}
@@ -3462,6 +3466,30 @@ void TyTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
 }
 
+std::shared_ptr<TyExpr> TyTransitivity::getExpr1() {
+  return e1;
+}
+
+std::shared_ptr<TyExpr> TyTransitivity::getExpr2() {
+  return e2;
+}
+
+std::shared_ptr<TyExpr> TyTransitivity::getExpr3() {
+  return e3;
+}
+
+void TyTransitivity::updateExpr1(std::shared_ptr<TyExpr> newExpr) {
+  e1 = newExpr;
+}
+
+void TyTransitivity::updateExpr2(std::shared_ptr<TyExpr> newExpr) {
+  e2 = newExpr;
+}
+
+void TyTransitivity::updateExpr3(std::shared_ptr<TyExpr> newExpr) {
+  e3 = newExpr;
+}
+
 ConsTransitivity::ConsTransitivity(
     std::shared_ptr<TyTransitivity> _transitivity)
     : transitivity(std::move(_transitivity)) {}
@@ -3548,6 +3576,30 @@ TyTransitivityTgt::TyTransitivityTgt(std::shared_ptr<TyExpr> _e1,
 
 void TyTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
+}
+
+std::shared_ptr<TyExpr> TyTransitivityTgt::getExpr1() {
+  return e2;
+}
+
+std::shared_ptr<TyExpr> TyTransitivityTgt::getExpr2() {
+  return e2;
+}
+
+std::shared_ptr<TyExpr> TyTransitivityTgt::getExpr3() {
+  return e3;
+}
+
+void TyTransitivityTgt::updateExpr1(std::shared_ptr<TyExpr> newExpr) {
+  e1 = newExpr;
+}
+
+void TyTransitivityTgt::updateExpr2(std::shared_ptr<TyExpr> newExpr) {
+  e2 = newExpr;
+}
+
+void TyTransitivityTgt::updateExpr3(std::shared_ptr<TyExpr> newExpr) {
+  e3 = newExpr;
 }
 
 ConsTransitivityTgt::ConsTransitivityTgt(
@@ -3909,6 +3961,18 @@ TyIntroGhost::TyIntroGhost(std::shared_ptr<TyExpr> _x,
 void TyIntroGhost::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(x));
   archive(CEREAL_NVP(g));
+}
+
+std::shared_ptr<TyExpr> TyIntroGhost::getExpr() {
+  return x;
+}
+
+std::shared_ptr<TyRegister> TyIntroGhost::getReg() {
+  return g;
+}
+
+void TyIntroGhost::updateExpr(std::shared_ptr<TyExpr> newExpr) {
+  x = newExpr;
 }
 
 ConsIntroGhost::ConsIntroGhost(std::shared_ptr<TyIntroGhost> _intro_ghost)
