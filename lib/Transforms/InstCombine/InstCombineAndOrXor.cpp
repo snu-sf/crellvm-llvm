@@ -1428,14 +1428,17 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
                                       I.getName()+".demorgan");
         
         llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &Op0NotVal, &Op1NotVal, &Or](
-            llvmberry::ValidationUnit::Dictionary &data,
-            llvmberry::CoreHint &hints) {
+            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           //    <src>   |     <tgt>
           // X = A ^ -1 | X =  A  ^ -1
           // Y = B ^ -1 | Y =  B  ^ -1
           // nop        | Z' = A  | B
           // Z = X & Y  | Z =  Z' ^ -1
           BinaryOperator *Z = &I;
+          if (Z->getType()->isVectorTy()) {
+            llvmberry::ValidationUnit::Abort();
+            return;
+          }
           BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
           BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
           BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Or);
@@ -1452,23 +1455,17 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
           llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
 
           llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-          
-          hints.addCommand(llvmberry::ConsPropagate::make(
-                  llvmberry::ConsMaydiff::make(reg_zprime_name, llvmberry::Physical),
-                  llvmberry::ConsGlobal::make()));
+          llvmberry::propagateMaydiffGlobal(reg_zprime_name, llvmberry::Physical); 
           
           llvmberry::propagateInstruction(Zprime, Z, llvmberry::Target);
-
-          hints.addCommand(llvmberry::ConsInfrule::make(
-              llvmberry::TyPosition::make(llvmberry::Target, I),
+          
+          INFRULE(INSTPOS(llvmberry::Target, Z), 
               llvmberry::ConsAndDeMorgan::make(
-                  llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-                  llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
-                  llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-                  llvmberry::TyRegister::make(reg_zprime_name, llvmberry::Physical),
-                  llvmberry::TyValue::make(*A),
-                  llvmberry::TyValue::make(*B),
-                  llvmberry::ConsSize::make(bitwidth))));
+                  REGISTER(reg_z_name, Physical),
+                  REGISTER(reg_x_name, Physical),
+                  REGISTER(reg_y_name, Physical),
+                  REGISTER(reg_zprime_name, Physical),
+                  VAL(A, Physical), VAL(B, Physical), BITSIZE(bitwidth)));
         });
 
         return BinaryOperator::CreateNot(Or);
