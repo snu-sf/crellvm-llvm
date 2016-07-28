@@ -1034,6 +1034,17 @@ private:
   std::shared_ptr<TyValue> v;
 };
 
+struct TyLessthanUndefTgt {
+public:
+  TyLessthanUndefTgt(std::shared_ptr<TyValueType> _ty,
+                     std::shared_ptr<TyValue> _v);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> v;
+};
+
 struct TyMulShl {
 public:
   TyMulShl(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
@@ -3303,6 +3314,18 @@ public:
 
 private:
   std::shared_ptr<TyLessthanUndef> lessthan_undef;
+};
+
+struct ConsLessthanUndefTgt : TyInfrule {
+public:
+  ConsLessthanUndefTgt(std::shared_ptr<TyLessthanUndefTgt> _lessthan_undef_tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValueType> _ty,
+                                         std::shared_ptr<TyValue> _v);
+
+private:
+  std::shared_ptr<TyLessthanUndefTgt> lessthan_undef_tgt;
 };
 
 struct ConsMulBool : TyInfrule {
