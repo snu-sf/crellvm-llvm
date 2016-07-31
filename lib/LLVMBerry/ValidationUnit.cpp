@@ -256,10 +256,8 @@ void ValidationUnit::End() {
 }
 
 void ValidationUnit::Abort() {
-  _Instance->isAborted = true;
-  assert(Exists() && "No ValidationUnit exists");
-  delete _Instance;
-  _Instance = nullptr;
+  _Instance->setIsAborted();
+  End();
 }
 
 bool ValidationUnit::EndIfExists() {
