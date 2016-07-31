@@ -138,7 +138,7 @@ void ValidationUnit::intrude(
     std::function<void(Dictionary &, CoreHint &)> func) {
   if (isAborted)
     return;
-  if (_corehint.getValidationResult() != CoreHint::ACTUAL)
+  if (_corehint.getReturnCode() != CoreHint::ACTUAL)
     return;
   func(_data, _corehint);
 }
