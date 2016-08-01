@@ -381,12 +381,13 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         continue;
       }
     }
+
     std::cout<<"SingleStore: "<<std::string(AI->getName())<<std::endl;
     // Otherwise, we *can* safely rewrite this load.
     Value *ReplVal = OnlyStore->getOperand(0);
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AI, &OnlyStore, &LI, &ReplVal, &DT]
+            ([&AI, &OnlyStore, &LI, &ReplVal, &DT, &StoringGlobalVal]
               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       //        <src>          |     <tgt>
       // %x = alloca i32       | nop
@@ -403,10 +404,10 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
       std::string Rload = llvmberry::getVariable(*LI);
-/*
-      // propagate undef from alloca to store
-      Value* UndefVal = UndefValue::get(LI->getType());
 
+      Value* UndefVal = UndefValue::get(LI->getType());
+      if (StoringGlobalVal) {
+      // propagate undef from alloca to store
       PROPAGATE(
           LESSDEF(INSN(*AI),
                   VAR(Ralloca, Ghost),
@@ -414,22 +415,56 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
              llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], "")));
 
+      std::shared_ptr<llvmberry::TyPropagateLessdef> lessdefstore =
+        llvmberry::TyPropagateLessdef::make
+          (VAR(Ralloca, Ghost),
+           EXPR(UndefVal, Physical),
+           TGT);
+
+      mem2regCmd[Ralloca].lessdef.push_back(lessdefstore);
+
       PROPAGATE(
-          LESSDEF(VAR(Ralloca, Ghost),
-                  EXPR(UndefVal, Physical),
-                  TGT),
-      BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-             llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], "")));
+          std::shared_ptr<llvmberry::TyPropagateObject>
+            (new llvmberry::ConsLessdef(lessdefstore)),
+          BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                 llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], "")));
 
       INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-              llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
+              llvmberry::ConsIntroGhost::make(EXPR(OnlyStore->getOperand(0), Physical),
                                               REGISTER(Rstore, Ghost)));
+
+      std::shared_ptr<llvmberry::TyLessthanUndef> lessthanundef
+        (new llvmberry::TyLessthanUndef
+          (llvmberry::TyValueType::make(*LI->getType()),
+           std::shared_ptr<llvmberry::TyValue>
+            (new llvmberry::ConsId
+              (llvmberry::TyRegister::make(Rload, llvmberry::Ghost)))));
+
+      mem2regCmd[Rload].lessUndef.push_back(lessthanundef);
+
+      INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+              std::shared_ptr<llvmberry::TyInfrule>
+                (new llvmberry::ConsLessthanUndef(lessthanundef)));
+
+      INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+              llvmberry::ConsTransitivity::make(EXPR(UndefVal, Physical),
+                                                EXPR(OnlyStore->getOperand(0), Physical),
+                                                VAR(Ralloca, Ghost)));
 
       INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
               llvmberry::ConsTransitivity::make(INSN(*AI),
                                                 EXPR(UndefVal, Physical),
                                                 VAR(Ralloca, Ghost)));
-*/
+
+      INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], ""),
+              llvmberry::ConsIntroGhost::make(EXPR(OnlyStore->getOperand(0), Physical),
+                                              REGISTER(Rstore, Ghost)));
+
+      INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], ""),
+              llvmberry::ConsTransitivity::make(INSN(*OnlyStore),
+                                                EXPR(OnlyStore->getOperand(0), Physical),
+                                                VAR(Rstore, Ghost)));
+      }
       // - store and loads are in the same block
       //   and store exists before loads
       // - store and loads are not in the same block
@@ -480,67 +515,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           llvmberry::generateHintForMem2RegPropagateLoad
             (OnlyStore, LI, use, useIndex);
         } else {
-          // propagate undef from alloca to store
-          Value* UndefVal = UndefValue::get(LI->getType());
-
-          PROPAGATE(
-              LESSDEF(INSN(*AI),
-                      VAR(Ralloca, Ghost),
-                      SRC),
-          BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                 llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], "")));
-
-          std::shared_ptr<llvmberry::TyPropagateLessdef> lessdefstore =
-            llvmberry::TyPropagateLessdef::make
-              (VAR(Ralloca, Ghost),
-               EXPR(UndefVal, Physical),
-               TGT);
-
-          mem2regCmd[Ralloca].lessdef.push_back(lessdefstore);
-
-          PROPAGATE(
-              std::shared_ptr<llvmberry::TyPropagateObject>
-                (new llvmberry::ConsLessdef(lessdefstore)),
-              BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                     llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], "")));
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                  llvmberry::ConsIntroGhost::make(EXPR(OnlyStore->getOperand(0), Physical),
-                                                  REGISTER(Rstore, Ghost)));
-
-          std::shared_ptr<llvmberry::TyLessthanUndef> lessthanundef
-            (new llvmberry::TyLessthanUndef
-              (llvmberry::TyValueType::make(*LI->getType()),
-               std::shared_ptr<llvmberry::TyValue>
-                (new llvmberry::ConsId
-                  (llvmberry::TyRegister::make(Rload, llvmberry::Ghost)))));
-
-          mem2regCmd[Rload].lessUndef.push_back(lessthanundef);
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                  std::shared_ptr<llvmberry::TyInfrule>
-                    (new llvmberry::ConsLessthanUndef(lessthanundef)));
-
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                  llvmberry::ConsTransitivity::make(EXPR(UndefVal, Physical),
-                                                    EXPR(OnlyStore->getOperand(0), Physical),
-                                                    VAR(Ralloca, Ghost)));
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                  llvmberry::ConsTransitivity::make(INSN(*AI),
-                                                    EXPR(UndefVal, Physical),
-                                                    VAR(Ralloca, Ghost)));
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], ""),
-                  llvmberry::ConsIntroGhost::make(EXPR(OnlyStore->getOperand(0), Physical),
-                                                  REGISTER(Rstore, Ghost)));
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], ""),
-                  llvmberry::ConsTransitivity::make(INSN(*OnlyStore),
-                                                    EXPR(OnlyStore->getOperand(0), Physical),
-                                                    VAR(Rstore, Ghost)));
-
           // propagate undef from load to use
           PROPAGATE(LESSDEF(VAR(Rload, Physical),
                             VAR(Rload, Ghost),
@@ -580,18 +554,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                   llvmberry::ConsTransitivityTgt::make(VAR(Rload, Ghost),
                                                        VAR(Ralloca, Ghost),
                                                        EXPR(OnlyStore->getOperand(0), Physical)));
-/*
-          std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
-            (new llvmberry::TyTransitivityTgt(VAR(Rload, Ghost),
-                                              EXPR(UndefVal, Physical),
-                                              VAR(Rload, Physical)));
-
-          mem2regCmd[Rload].transTgt.push_back(transTgt);
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                  std::shared_ptr<llvmberry::TyInfrule>
-                    (new llvmberry::ConsTransitivityTgt(transTgt)));
-*/                    
         }
       }
 
@@ -1096,12 +1058,15 @@ void PromoteMem2Reg::run() {
                                 std::string(SI->getOperand(1)->getName());
 
             storeItem[SI].value = std::move(llvmberry::TyValue::make(*(SI->getOperand(0))));
-            if (isa<ConstantPointerNull>(SI->getOperand(0)))
-              storeItem[SI].expr = NULL;
-            else
-              storeItem[SI].expr = std::move(llvmberry::TyExpr::make(*(SI->getOperand(0)),
+            //if (isa<ConstantPointerNull>(SI->getOperand(0)))
+            //  storeItem[SI].expr = NULL;
+            //else
+            storeItem[SI].expr = std::move(llvmberry::TyExpr::make(*(SI->getOperand(0)),
                                                                      llvmberry::Physical));
-            storeItem[SI].op0 = "%" + std::string(SI->getOperand(0)->getName());
+            if (isa<GlobalValue>(SI->getOperand(0)))
+              storeItem[SI].op0 = "%";
+            else 
+              storeItem[SI].op0 = "%" + std::string(SI->getOperand(0)->getName());
           }
 
           // save information of instruction's use
@@ -1372,6 +1337,33 @@ void PromoteMem2Reg::run() {
          I != E;) {
       PHINode *PN = I->second;
 
+      llvmberry::ValidationUnit::GetInstance()->intrude
+             ([&PN, this]
+              (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        if (!(PN->getNumIncomingValues() == getNumPreds(PN->getParent()))) {
+          BasicBlock *BB = PN->getParent();
+          SmallVector<BasicBlock *, 16> Preds(pred_begin(BB), pred_end(BB));
+
+          std::sort(Preds.begin(), Preds.end());
+
+          // Now we loop through all BB's which have entries in SomePHI and remove
+          // them from the Preds list.
+          for (unsigned i = 0, e = PN->getNumIncomingValues(); i != e; ++i) {
+            // Do a log(n) search of the Preds list for the entry we want.
+            SmallVectorImpl<BasicBlock *>::iterator EntIt = std::lower_bound(
+                   Preds.begin(), Preds.end(), PN->getIncomingBlock(i));
+            assert(EntIt != Preds.end() && *EntIt == PN->getIncomingBlock(i) &&
+                  "PHI node has entry for a block which is not a predecessor!");
+
+            // Remove the entry
+            Preds.erase(EntIt);
+          }
+
+          auto &blocks = *(data.get<llvmberry::ArgForMem2Reg>()->blocks);
+          blocks = Preds;
+        }
+      });
+  
       // If this PHI node merges one value and/or undefs, get the value.
       if (Value *V = SimplifyInstruction(PN, DL, nullptr, &DT, AC)) {
         if (AST && PN->getType()->isPointerTy())
@@ -1380,7 +1372,20 @@ void PromoteMem2Reg::run() {
         llvmberry::ValidationUnit::GetInstance()->intrude
                         ([&PN, &V]
                                  (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-                          llvmberry::generateHintForMem2RegReplaceHint(V, PN);
+          auto &blocks = *(data.get<llvmberry::ArgForMem2Reg>()->blocks);
+          Value* UndefVal = UndefValue::get(PN->getType());
+
+          for (unsigned pred = 0, e = blocks.size(); pred != e; ++pred) {
+            INFRULE(llvmberry::TyPosition::make(TGT, PN->getParent()->getName(), blocks[pred]->getName()),
+                    llvmberry::ConsLessthanUndefTgt::make(VALTYPE(PN->getType()), VAL(V, Physical)));
+
+            INFRULE(llvmberry::TyPosition::make(TGT, PN->getParent()->getName(), blocks[pred]->getName()),
+                    llvmberry::ConsTransitivityTgt::make(VAR(llvmberry::getVariable(*PN), Ghost),
+                                                         EXPR(UndefVal, Physical),
+                                                         EXPR(V, Physical)));
+          }
+
+          llvmberry::generateHintForMem2RegReplaceHint(V, PN);
         });
 
         PN->replaceAllUsesWith(V);
@@ -1393,7 +1398,8 @@ void PromoteMem2Reg::run() {
     }
   }
     
-  llvmberry::ValidationUnit::End();
+  //llvmberry::ValidationUnit::End();
+
   // At this point, the renamer has added entries to PHI nodes for all reachable
   // code.  Unfortunately, there may be unreachable blocks which the renamer
   // hasn't traversed.  If this is the case, the PHI nodes may not
@@ -1447,14 +1453,51 @@ void PromoteMem2Reg::run() {
     while ((SomePHI = dyn_cast<PHINode>(BBI++)) &&
            SomePHI->getNumIncomingValues() == NumBadPreds) {
       Value *UndefVal = UndefValue::get(SomePHI->getType());
-      for (unsigned pred = 0, e = Preds.size(); pred != e; ++pred)
+      for (unsigned pred = 0, e = Preds.size(); pred != e; ++pred) {
         SomePHI->addIncoming(UndefVal, Preds[pred]);
+
+        llvmberry::ValidationUnit::GetInstance()->intrude
+               ([&Preds, &pred]
+                        (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
+                            llvmberry::false_encoding.second, SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                           SRC, llvmberry::getBasicBlockIndex(Preds[pred])),
+                           llvmberry::TyPosition::make_end_of_block(SRC, *Preds[pred])));
+
+          std::vector<BasicBlock *> DeadBlockList;
+          BasicBlock *Pre = Preds[pred] ;
+
+          //find predecssor of pred and insert in worklist if it has one
+          for (auto BI = pred_begin(Pre), BE = pred_end(Pre); BI != BE; BI++) {
+            DeadBlockList.push_back((*BI));
+    std::cout<< "find pred" << std::endl;
+          }
+
+          while(!DeadBlockList.empty()) {
+            BasicBlock * L;
+            L = *DeadBlockList.rbegin();
+            DeadBlockList.pop_back();
+
+            //propagate false start to end of K.
+            PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
+                              llvmberry::false_encoding.second, SRC),
+                      BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                                    SRC, llvmberry::getBasicBlockIndex(L)),
+                             llvmberry::TyPosition::make_end_of_block(SRC, *L)));
+
+            //find predessor of K and insert in worklist if it has one
+            for (auto BI = pred_begin(L), BE = pred_end(L); BI != BE; BI++) {
+              DeadBlockList.push_back((*BI));
+            }
+          }
+        }); 
+      }
     }
   }
 
   NewPhiNodes.clear();
-  
-  //llvmberry::ValidationUnit::End();
+  llvmberry::ValidationUnit::End();
 }
 
 /// \brief Determine which blocks the value is live in.
@@ -1640,7 +1683,7 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
       Value *V = IncomingVals[AI->second];
 
       llvmberry::ValidationUnit::GetInstance()->intrude
-             ([&LI]
+             ([&LI, &V]
                 (llvmberry::Dictionary &data,
                  llvmberry::CoreHint &hints) {
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
@@ -1648,11 +1691,7 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
         hints.addNopPosition
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
-      });
 
-      llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&LI, &V]
-                (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
       });
 

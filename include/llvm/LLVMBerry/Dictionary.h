@@ -142,6 +142,10 @@ public:
   typedef std::shared_ptr<TyTransTgtObj> TyTransTgt;
   TyTransTgt transTgt;
 
+  typedef llvm::SmallVector<llvm::BasicBlock *, 16> TyBlocksObj;
+  typedef std::shared_ptr<TyBlocksObj> TyBlocks;
+  TyBlocks blocks;
+
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
   static bool isUndef(std::shared_ptr<TyExpr> e);

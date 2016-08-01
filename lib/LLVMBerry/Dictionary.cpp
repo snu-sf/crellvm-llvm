@@ -51,7 +51,7 @@ Mem2RegArg::Mem2RegArg()
     : allocas(new TyAllocasObj()), instrIndex(new TyInstrIndexObj()),
       termIndex(new TyTermIndexObj()), values(new TyValuesObj()),
       storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
-      transTgt(new TyTransTgtObj()) {}
+      transTgt(new TyTransTgtObj()), blocks(new TyBlocksObj()) {}
 
 bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                             std::shared_ptr<TyExpr> e2) {
@@ -74,9 +74,11 @@ bool Mem2RegArg::isUndef(std::shared_ptr<TyExpr> e) {
 
 void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
                                std::shared_ptr<TyExpr> newExpr) {
+  std::cout<<"replaceCmdRhsbegin: "+which+", "+key<<std::endl;
   if (mem2regCmd->find(key) == mem2regCmd->end())
     return;
 
+  std::cout<<"replaceCmdRhsstart: "+which+", "+key<<std::endl;
   if (which == "Lessdef") {
     std::cout<<"lessdef replace:"+key<<std::endl;
 
@@ -160,8 +162,30 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
         std::cout<<"check: "<<vec[i].second->get_expr3()<<std::endl;
       }
     }
-  } else if (which == "TransitivityTgt") {
-    std::cout<<"transTgt replace:"+key<<std::endl;
+  } else if (which == "TransitivityTgt_e2") {
+    std::cout<<"transTgt2 replace:"+key<<std::endl;
+
+    std::string phiKey = "";
+    if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
+      phiKey = cv->get_TyReg()->getName();
+
+    std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
+
+    std::vector<std::shared_ptr<TyTransitivityTgt>> &vec =
+      mem2regCmd->find(key)->second.transTgt;
+
+    for(size_t i = 0; i < vec.size(); i++) {
+      if (equalsIfConsVar(vec[i]->get_expr2(), keyExpr)) {
+        std::cout<<"check: "<<vec[i]->get_expr2()<<", "<<newExpr<<std::endl;
+        vec[i]->update_expr2(newExpr);
+
+        if (phiKey != "")
+          (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
+        std::cout<<"check: "<<vec[i]->get_expr2()<<std::endl;
+      }
+    }
+  } else if (which == "TransitivityTgt_e3") {
+    std::cout<<"transTgt3 replace:"+key<<std::endl;
 
     std::string phiKey = "";
     if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))

@@ -199,7 +199,8 @@ std::string getVariable(const llvm::Value &value) {
     val = std::string("@");
   } else if (llvm::isa<llvm::Instruction>(value) ||
              llvm::isa<llvm::Argument>(value) ||
-             llvm::isa<llvm::ConstantExpr>(value)) {
+             llvm::isa<llvm::ConstantExpr>(value) ||
+             llvm::isa<llvm::UndefValue>(value)) {
     val = std::string("%");
   } else {
     assert("value must be a global value or an instruction" && false);
