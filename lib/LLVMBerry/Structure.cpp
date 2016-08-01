@@ -871,7 +871,8 @@ std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value,
   if (llvm::isa<llvm::Instruction>(value) || llvm::isa<llvm::Argument>(value)) {
     return std::shared_ptr<TyValue>(
         new ConsId(TyRegister::make(getVariable(value), _tag)));
-  } else if (llvm::isa<llvm::ConstantExpr>(value)) {
+  } else if (const llvm::ConstantExpr *ce =
+                 llvm::dyn_cast<llvm::ConstantExpr>(&value)) {
     // Constant expressions have two kinds of forms :
     // (1) %x = add i32 1, 2
     //     ^^^^^^^^^^^^^^^^^
@@ -880,15 +881,13 @@ std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value,
     // For the case (1), TyValue::make returns register id "%x"
     // For the case (2), TyValue::make returns a constant expression "add (i32
     // 1, i32 2)"
-    const llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(&value);
     if (ce->getName().str() != "") {
       return std::shared_ptr<TyValue>(
           new ConsId(TyRegister::make(getVariable(*ce), _tag)));
     } else {
       return std::shared_ptr<TyValue>(new ConsConstVal(TyConstant::make(*ce)));
     }
-  } else if (llvm::isa<llvm::Constant>(value)) {
-    const llvm::Constant *c = llvm::dyn_cast<llvm::Constant>(&value);
+  } else if (const llvm::Constant *c = llvm::dyn_cast<llvm::Constant>(&value)) {
     return std::shared_ptr<TyValue>(new ConsConstVal(TyConstant::make(*c)));
   } else {
     assert("Unknown value type" && false);
@@ -1185,18 +1184,18 @@ void ConsConstExpr::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
-  if (llvm::isa<llvm::ConstantExpr>(value)) {
-    const llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(&value);
+  if (const llvm::ConstantExpr *ce =
+          llvm::dyn_cast<llvm::ConstantExpr>(&value)) {
     return std::shared_ptr<TyConstant>(
         new ConsConstExpr(TyConstantExpr::make(*ce)));
 
-  } else if (llvm::isa<llvm::ConstantInt>(value)) {
-    const llvm::ConstantInt *v = llvm::dyn_cast<llvm::ConstantInt>(&value);
+  } else if (const llvm::ConstantInt *v =
+                 llvm::dyn_cast<llvm::ConstantInt>(&value)) {
     return std::shared_ptr<TyConstant>(new ConsConstInt(
         TyConstInt::make(v->getSExtValue(), v->getBitWidth())));
 
-  } else if (llvm::isa<llvm::ConstantFP>(value)) {
-    const llvm::ConstantFP *v = llvm::dyn_cast<llvm::ConstantFP>(&value);
+  } else if (const llvm::ConstantFP *v =
+                 llvm::dyn_cast<llvm::ConstantFP>(&value)) {
     const llvm::APFloat &apf = v->getValueAPF();
     const llvm::Type *typ = v->getType();
 
@@ -1219,23 +1218,20 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     return std::shared_ptr<TyConstant>(
         new ConsConstFloat(TyConstFloat::make(apf.convertToDouble(), fty)));
 
-  } else if (llvm::isa<llvm::GlobalVariable>(value)) {
-    const llvm::GlobalVariable *gv =
-        llvm::dyn_cast<llvm::GlobalVariable>(&value);
+  } else if (const llvm::GlobalVariable *gv =
+                 llvm::dyn_cast<llvm::GlobalVariable>(&value)) {
     return std::shared_ptr<TyConstant>(
         new ConsConstGlobalVarAddr(TyConstGlobalVarAddr::make(*gv)));
-  } else if (llvm::isa<llvm::Function>(value)) {
+  } else if (const llvm::Function *f = llvm::dyn_cast<llvm::Function>(&value)) {
     // NOTE : Vellvm uses const_gid to represent both global variable and
     // function
-    const llvm::Function *f = llvm::dyn_cast<llvm::Function>(&value);
     return std::shared_ptr<TyConstant>(
         new ConsConstGlobalVarAddr(TyConstGlobalVarAddr::make(*f)));
   } else if (llvm::isa<llvm::UndefValue>(value)) {
     return std::shared_ptr<TyConstant>(
         new ConsConstUndef(TyValueType::make(*value.getType())));
-  } else if (llvm::isa<llvm::ConstantPointerNull>(value)) {
-    const llvm::ConstantPointerNull *null_val =
-        llvm::dyn_cast<llvm::ConstantPointerNull>(&value);
+  } else if (const llvm::ConstantPointerNull *null_val =
+                 llvm::dyn_cast<llvm::ConstantPointerNull>(&value)) {
     const llvm::PointerType *ptype = null_val->getType();
 
     return std::shared_ptr<TyConstant>(
@@ -2242,7 +2238,7 @@ std::shared_ptr<TyExpr> ConsVar::make(std::string _name, enum TyTag _tag) {
   return std::shared_ptr<TyExpr>(new ConsVar(_name, _tag));
 }
 
-std::shared_ptr<TyRegister> ConsVar::get_TyReg() {
+std::shared_ptr<TyRegister> ConsVar::getTyReg() {
   return register_name;
 }
 
@@ -2295,7 +2291,7 @@ std::shared_ptr<TyExpr> ConsConst::make(int _int_value, int _bitwidth) {
   return std::shared_ptr<TyExpr>(new ConsConst(_int_value, _bitwidth));
 }
 
-std::shared_ptr<TyConstant> ConsConst::get_TyConst() {
+std::shared_ptr<TyConstant> ConsConst::getTyConst() {
   return constant;
 }
 
@@ -2310,8 +2306,8 @@ ConsInsn::make(std::shared_ptr<TyInstruction> _instruction) {
   return std::shared_ptr<TyExpr>(new ConsInsn(std::move(_instruction)));
 }
 
-std::shared_ptr<TyInstruction> ConsInsn::get_TyInsn() {
-  return instruction; 
+std::shared_ptr<TyInstruction> ConsInsn::getTyInsn() {
+  return instruction;
 }
 
 void ConsInsn::serialize(cereal::JSONOutputArchive &archive) const {
@@ -2342,15 +2338,15 @@ TyPropagateLessdef::make(std::shared_ptr<TyExpr> _lhs,
       new TyPropagateLessdef(std::move(_lhs), std::move(_rhs), _scope));
 }
 
-std::shared_ptr<TyExpr> TyPropagateLessdef::get_lhs() {
+std::shared_ptr<TyExpr> TyPropagateLessdef::getLhs() {
   return lhs;
 }
 
-std::shared_ptr<TyExpr> TyPropagateLessdef::get_rhs() {
+std::shared_ptr<TyExpr> TyPropagateLessdef::getRhs() {
   return rhs;
 }
 
-void TyPropagateLessdef::update_rhs(std::shared_ptr<TyExpr> newExpr) {
+void TyPropagateLessdef::updateRhs(std::shared_ptr<TyExpr> newExpr) {
   rhs = newExpr;
 }
 

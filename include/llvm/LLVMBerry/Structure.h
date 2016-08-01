@@ -1098,7 +1098,7 @@ public:
 
   static std::shared_ptr<TyExpr> make(std::string _name, enum TyTag _tag);
 
-  std::shared_ptr<TyRegister> get_TyReg();
+  std::shared_ptr<TyRegister> getTyReg();
   void updateTyReg(std::shared_ptr<TyRegister> newTyReg);
 
 private:
@@ -1130,7 +1130,7 @@ public:
 
   static std::shared_ptr<TyExpr> make(int _int_value, int _bitwidth);
 
-  std::shared_ptr<TyConstant> get_TyConst();
+  std::shared_ptr<TyConstant> getTyConst();
 
 private:
   std::shared_ptr<TyConstant> constant;
@@ -1145,7 +1145,7 @@ public:
   static std::shared_ptr<TyExpr>
   make(std::shared_ptr<TyInstruction> _instruction);
 
-  std::shared_ptr<TyInstruction> get_TyInsn();
+  std::shared_ptr<TyInstruction> getTyInsn();
 
 private:
   std::shared_ptr<TyInstruction> instruction;
@@ -1165,10 +1165,10 @@ public:
                                                   std::shared_ptr<TyExpr> _rhs,
                                                   enum TyScope _scope);
 
-  std::shared_ptr<TyExpr> get_lhs();
-  std::shared_ptr<TyExpr> get_rhs();
+  std::shared_ptr<TyExpr> getLhs();
+  std::shared_ptr<TyExpr> getRhs();
+  void updateRhs(std::shared_ptr<TyExpr>(newExpr));
 
-  void update_rhs(std::shared_ptr<TyExpr>(newExpr));
 private:
   std::shared_ptr<TyExpr> lhs;
   std::shared_ptr<TyExpr> rhs;

@@ -1217,6 +1217,43 @@ void ConsAndOr::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(and_or));
 }
 
+TyAndOrConst2::TyAndOrConst2(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+    std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2,
+    std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz)
+    : z(_z), y(_y), yprime(_yprime), x(_x), c1(_c1), c2(_c2), c3(_c3), sz(_sz) {
+}
+void TyAndOrConst2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(yprime));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(c1));
+  archive(CEREAL_NVP(c2));
+  archive(CEREAL_NVP(c3));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAndOrConst2::ConsAndOrConst2(std::shared_ptr<TyAndOrConst2> _and_or_const2)
+    : and_or_const2(_and_or_const2) {}
+std::shared_ptr<TyInfrule> ConsAndOrConst2::make(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+    std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2,
+    std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAndOrConst2> _val(
+      new TyAndOrConst2(_z, _y, _yprime, _x, _c1, _c2, _c3, _sz));
+  return std::shared_ptr<TyInfrule>(new ConsAndOrConst2(_val));
+}
+
+void ConsAndOrConst2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndOrConst2");
+  archive(CEREAL_NVP(and_or_const2));
+}
+
 TyAndSame::TyAndSame(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
                      std::shared_ptr<TySize> _sz)
     : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)) {}
@@ -1290,6 +1327,43 @@ void ConsAndZero::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("AndZero");
   archive(CEREAL_NVP(and_zero));
+}
+
+TyAndOrNot1::TyAndOrNot1(std::shared_ptr<TyRegister> _z,
+                         std::shared_ptr<TyRegister> _x,
+                         std::shared_ptr<TyRegister> _y,
+                         std::shared_ptr<TyValue> _a,
+                         std::shared_ptr<TyValue> _b,
+                         std::shared_ptr<TySize> _sz)
+    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)),
+      b(std::move(_b)), sz(std::move(_sz)) {}
+void TyAndOrNot1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAndOrNot1::ConsAndOrNot1(std::shared_ptr<TyAndOrNot1> _and_or_not1)
+    : and_or_not1(std::move(_and_or_not1)) {}
+std::shared_ptr<TyInfrule> ConsAndOrNot1::make(std::shared_ptr<TyRegister> _z,
+                                               std::shared_ptr<TyRegister> _x,
+                                               std::shared_ptr<TyRegister> _y,
+                                               std::shared_ptr<TyValue> _a,
+                                               std::shared_ptr<TyValue> _b,
+                                               std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAndOrNot1> _val(
+      new TyAndOrNot1(std::move(_z), std::move(_x), std::move(_y),
+                      std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAndOrNot1(std::move(_val)));
+}
+void ConsAndOrNot1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndOrNot1");
+  archive(CEREAL_NVP(and_or_not1));
 }
 
 TyBopDistributiveOverSelectinst::TyBopDistributiveOverSelectinst(
@@ -2467,7 +2541,7 @@ void TyLessthanUndef::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(v));
 }
 
-void TyLessthanUndef::update_rhs(std::shared_ptr<TyValue> newVal) {
+void TyLessthanUndef::updateRhs(std::shared_ptr<TyValue> newVal) {
   v = newVal;
 }
 
@@ -2489,14 +2563,14 @@ void ConsLessthanUndef::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 TyLessthanUndefTgt::TyLessthanUndefTgt(std::shared_ptr<TyValueType> _ty,
-                                 std::shared_ptr<TyValue> _v)
+                                       std::shared_ptr<TyValue> _v)
     : ty(std::move(_ty)), v(std::move(_v)) {}
 void TyLessthanUndefTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(ty));
   archive(CEREAL_NVP(v));
 }
 
-void TyLessthanUndefTgt::update_rhs(std::shared_ptr<TyValue> newVal) {
+void TyLessthanUndefTgt::updateRhs(std::shared_ptr<TyValue> newVal) {
   v = newVal;
 }
 
@@ -2505,7 +2579,7 @@ ConsLessthanUndefTgt::ConsLessthanUndefTgt(
     : lessthan_undef_tgt(std::move(_lessthan_undef_tgt)) {}
 std::shared_ptr<TyInfrule>
 ConsLessthanUndefTgt::make(std::shared_ptr<TyValueType> _ty,
-                        std::shared_ptr<TyValue> _v) {
+                           std::shared_ptr<TyValue> _v) {
   std::shared_ptr<TyLessthanUndefTgt> _val(
       new TyLessthanUndefTgt(std::move(_ty), std::move(_v)));
   return std::shared_ptr<TyInfrule>(new ConsLessthanUndefTgt(std::move(_val)));
@@ -2516,7 +2590,6 @@ void ConsLessthanUndefTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive.saveValue("LessthanUndefTgt");
   archive(CEREAL_NVP(lessthan_undef_tgt));
 }
-
 
 TyMulCommutative::TyMulCommutative(std::shared_ptr<TyRegister> _z,
                                    std::shared_ptr<TyValue> _x,
@@ -3434,27 +3507,27 @@ void TyTransitivity::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
 }
 
-std::shared_ptr<TyExpr> TyTransitivity::get_expr1() {
+std::shared_ptr<TyExpr> TyTransitivity::getExpr1() {
   return e1;
 }
 
-std::shared_ptr<TyExpr> TyTransitivity::get_expr2() {
+std::shared_ptr<TyExpr> TyTransitivity::getExpr2() {
   return e2;
 }
 
-std::shared_ptr<TyExpr> TyTransitivity::get_expr3() {
+std::shared_ptr<TyExpr> TyTransitivity::getExpr3() {
   return e3;
 }
 
-void TyTransitivity::update_expr1(std::shared_ptr<TyExpr> newExpr) {
+void TyTransitivity::updateExpr1(std::shared_ptr<TyExpr> newExpr) {
   e1 = newExpr;
 }
 
-void TyTransitivity::update_expr2(std::shared_ptr<TyExpr> newExpr) {
+void TyTransitivity::updateExpr2(std::shared_ptr<TyExpr> newExpr) {
   e2 = newExpr;
 }
 
-void TyTransitivity::update_expr3(std::shared_ptr<TyExpr> newExpr) {
+void TyTransitivity::updateExpr3(std::shared_ptr<TyExpr> newExpr) {
   e3 = newExpr;
 }
 
@@ -3546,19 +3619,27 @@ void TyTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(e1), CEREAL_NVP(e2), CEREAL_NVP(e3));
 }
 
-std::shared_ptr<TyExpr> TyTransitivityTgt::get_expr2() {
+std::shared_ptr<TyExpr> TyTransitivityTgt::getExpr1() {
   return e2;
 }
 
-std::shared_ptr<TyExpr> TyTransitivityTgt::get_expr3() {
+std::shared_ptr<TyExpr> TyTransitivityTgt::getExpr2() {
+  return e2;
+}
+
+std::shared_ptr<TyExpr> TyTransitivityTgt::getExpr3() {
   return e3;
 }
 
-void TyTransitivityTgt::update_expr2(std::shared_ptr<TyExpr> newExpr) {
+void TyTransitivityTgt::updateExpr1(std::shared_ptr<TyExpr> newExpr) {
+  e1 = newExpr;
+}
+
+void TyTransitivityTgt::updateExpr2(std::shared_ptr<TyExpr> newExpr) {
   e2 = newExpr;
 }
 
-void TyTransitivityTgt::update_expr3(std::shared_ptr<TyExpr> newExpr) {
+void TyTransitivityTgt::updateExpr3(std::shared_ptr<TyExpr> newExpr) {
   e3 = newExpr;
 }
 
@@ -3923,15 +4004,15 @@ void TyIntroGhost::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(g));
 }
 
-std::shared_ptr<TyExpr> TyIntroGhost::get_expr() {
+std::shared_ptr<TyExpr> TyIntroGhost::getExpr() {
   return x;
 }
 
-std::shared_ptr<TyRegister> TyIntroGhost::get_reg() {
+std::shared_ptr<TyRegister> TyIntroGhost::getReg() {
   return g;
 }
 
-void TyIntroGhost::update_expr(std::shared_ptr<TyExpr> newExpr) {
+void TyIntroGhost::updateExpr(std::shared_ptr<TyExpr> newExpr) {
   x = newExpr;
 }
 

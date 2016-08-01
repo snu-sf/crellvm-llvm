@@ -180,8 +180,8 @@ void applyCommutativity(llvm::Instruction *position,
                                   getFloatType(expression->getType()))));
       case llvm::Instruction::Or:
         INFRULE(
-            INSTPOS(Source, position),
-            ConsOrCommutative::make(REGISTER(regname, Physical),
+            INSTPOS(llvmberry::Source, position),
+            ConsOrCommutativeTgt::make(REGISTER(regname, Physical),
                                     VAL(expression->getOperand(0), Physical),
                                     VAL(expression->getOperand(1), Physical),
                                     BITSIZE(bitwidth)));
@@ -1241,20 +1241,20 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
                           std::shared_ptr<TyTransitivity>>> tmp;
 
     for (size_t i = 0; i < vec.size(); i++) {
-      if(data.get<ArgForMem2Reg>()->equalsIfConsVar(vec[i].second->get_expr2(), 
+      if(data.get<ArgForMem2Reg>()->equalsIfConsVar(vec[i].second->getExpr2(), 
                                                     keyExpr)) {
-        if (ConsInsn *cv1 = dynamic_cast<ConsInsn *>(vec[i].second->get_expr1().get())) {
-        if (ConsVar *cv2 = dynamic_cast<ConsVar *>(vec[i].second->get_expr2().get())) {
-        if (ConsVar *cv3 = dynamic_cast<ConsVar *>(vec[i].second->get_expr3().get())) {
+        if (ConsInsn *cv1 = dynamic_cast<ConsInsn *>(vec[i].second->getExpr1().get())) {
+        if (ConsVar *cv2 = dynamic_cast<ConsVar *>(vec[i].second->getExpr2().get())) {
+        if (ConsVar *cv3 = dynamic_cast<ConsVar *>(vec[i].second->getExpr3().get())) {
           std::shared_ptr<TyTransitivity> transitivity
-            (new TyTransitivity(std::shared_ptr<TyExpr>(new ConsInsn(cv1->get_TyInsn())),
-                                std::shared_ptr<TyExpr>(new ConsVar(cv2->get_TyReg())),
-                                std::shared_ptr<TyExpr>(new ConsVar(cv3->get_TyReg()))));
+            (new TyTransitivity(std::shared_ptr<TyExpr>(new ConsInsn(cv1->getTyInsn())),
+                                std::shared_ptr<TyExpr>(new ConsVar(cv2->getTyReg())),
+                                std::shared_ptr<TyExpr>(new ConsVar(cv3->getTyReg()))));
 
           tmp.push_back(std::make_pair(vec[i].first, transitivity));
 
           std::shared_ptr<TyTransitivityTgt> transitivitytgt
-            (new TyTransitivityTgt(std::shared_ptr<TyExpr>(new ConsVar(cv3->get_TyReg())),
+            (new TyTransitivityTgt(std::shared_ptr<TyExpr>(new ConsVar(cv3->getTyReg())),
                                    VAR(ReplName, Ghost),
                                    TyExpr::make(*ReplVal, Physical)));
 
@@ -1263,7 +1263,7 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
           
           std::cout<<"where1"<<std::endl;
           data.get<ArgForMem2Reg>()->replaceCmdRhs("Transitivity_e3", ReplName,
-                                                   vec[i].second->get_expr3());
+                                                   vec[i].second->getExpr3());
         }}}
       }
     }
