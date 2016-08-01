@@ -181,7 +181,7 @@ void applyCommutativity(llvm::Instruction *position,
       case llvm::Instruction::Or:
         INFRULE(
             INSTPOS(llvmberry::Source, position),
-            ConsOrCommutative::make(REGISTER(regname, Physical),
+            ConsOrCommutativeTgt::make(REGISTER(regname, Physical),
                                     VAL(expression->getOperand(0), Physical),
                                     VAL(expression->getOperand(1), Physical),
                                     BITSIZE(bitwidth)));
