@@ -129,7 +129,10 @@ void ValidationUnit::setDescription(const std::string &str) {
   _Instance->_corehint.setDescription(str);
 }
 
-void ValidationUnit::setIsAborted() { isAborted = true; }
+void ValidationUnit::setIsAborted() {
+  assert(!isAborted);
+  isAborted = true;
+}
 
 void ValidationUnit::intrude(
     std::function<void(Dictionary &, CoreHint &)> func) {
