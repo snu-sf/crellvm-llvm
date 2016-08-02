@@ -25,6 +25,19 @@ void throw_exception(std::exception const &e) {
 
 namespace {
 
+std::string toString(llvmberry::CoreHint::RETURN_CODE return_code) {
+  switch (return_code) {
+  case llvmberry::CoreHint::ACTUAL:
+    return std::string("ACTUAL");
+  case llvmberry::CoreHint::ADMITTED:
+    return std::string("ADMITTED");
+  case llvmberry::CoreHint::FAIL:
+    return std::string("FAIL");
+  default:
+    assert(false && "RETURN_CODE toString");
+  }
+}
+
 std::string toString(llvmberry::TyScope scope) {
   switch (scope) {
   case llvmberry::Source:
@@ -2661,7 +2674,7 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(function_id));
   archive(CEREAL_NVP(opt_name));
   archive(CEREAL_NVP(description));
-  archive(CEREAL_NVP(return_code));
+  archive(cereal::make_nvp("return_code", ::toString(return_code)));
   archive(CEREAL_NVP(commands));
   archive(CEREAL_NVP(nop_positions));
 }
