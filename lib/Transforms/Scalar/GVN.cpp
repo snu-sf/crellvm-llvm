@@ -2663,8 +2663,7 @@ bool GVN::processInstruction(Instruction *I) {
   if (!repl) {
     // Failure, just remember this instance for future use.
     addToLeaderTable(Num, I, I->getParent());
-    llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-        llvmberry::ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
     llvmberry::ValidationUnit::End();
 
     return false;
