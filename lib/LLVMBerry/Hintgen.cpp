@@ -716,7 +716,7 @@ void generateHintForTrivialDCE(llvm::Instruction &I) {
       hints.setDescription("DCE on call "
                            "instruction.\n\"isInstructionTriviallyDead\" "
                            "should give enough power to validate.");
-      hints.appendAdmittedToDescription();
+      hints.setReturnCodeToAdmitted();
     }
   });
 }
@@ -730,7 +730,7 @@ void generateHintForGVNDCE(llvm::Instruction &I) {
       hints.setDescription("DCE on call instruction inside GVN.\nIt might be "
                            "introduced from SimplifyInstruction or "
                            "lookup_or_add_call.");
-      hints.appendAdmittedToDescription();
+      hints.setReturnCodeToAdmitted();
     }
   });
 }

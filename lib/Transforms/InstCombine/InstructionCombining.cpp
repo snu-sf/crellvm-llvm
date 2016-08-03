@@ -258,7 +258,7 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
                    llvmberry::TyConstInt::make(v, v_bw),
                    BITSIZE(b_bw)));
             } else {
-              llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+              llvmberry::ValidationUnit::GetInstance()->setIsAborted();
             }
           });
 
@@ -1995,8 +1995,7 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
         doAbort = true;
       }
       if (doAbort) {
-        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-            llvmberry::ValidationUnit::ABORT);
+        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       }
     });
     for (unsigned i = 0, e = Users.size(); i != e; ++i) {
@@ -3176,8 +3175,7 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
   }
 
   if (!MadeIRChange)
-    llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-        llvmberry::ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
   llvmberry::ValidationUnit::End();
 
   return MadeIRChange;

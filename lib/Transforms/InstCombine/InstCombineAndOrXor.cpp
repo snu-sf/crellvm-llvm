@@ -1293,7 +1293,7 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
         ptr->generateHint(&I);
         llvmberry::generateHintForReplaceAllUsesWith(&I, V);
       }else{
-        llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       }
     });
 
@@ -2367,7 +2367,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
         ptr->generateHint(&I);
         llvmberry::generateHintForReplaceAllUsesWith(&I, V);
       }else{
-        llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       }
     });
 
@@ -2928,7 +2928,7 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
         ptr->generateHint(&I);
         llvmberry::generateHintForReplaceAllUsesWith(&I, V);
       }else{
-        llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       }
     });
     return ReplaceInstUsesWith(I, V);

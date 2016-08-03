@@ -1253,7 +1253,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
 
     return res;
   }
-  llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+  llvmberry::ValidationUnit::GetInstance()->setIsAborted();
   llvmberry::ValidationUnit::End();
 
   // load(gep null, ...) -> unreachable
