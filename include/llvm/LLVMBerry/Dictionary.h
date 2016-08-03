@@ -28,7 +28,7 @@ enum DictKeys {
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
-  ArgForFindLeader
+  ArgForGVNReplace
 };
 
 /*
@@ -172,12 +172,15 @@ public:
 };
 DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
 
-// lib/Transforms/Scalar/GVN.cpp : findLeader
-struct FindLeaderArg {
+// lib/Transforms/Scalar/GVN.cpp : processInstruction, findLeader
+struct GVNReplaceArg {
 public:
+  GVNReplaceArg();
+  bool isGVNReplace;
   const llvm::BasicBlock *BB;
+  boost::any VNptr;
 };
-DEFINE_TRAITS(ArgForFindLeader, FindLeaderArg);
+DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
 
 class Dictionary {
 private:
@@ -219,6 +222,18 @@ public:
     assertExists<key>();
     data.erase(key);
   }
+};
+
+// PassDictionary: a dictionary shared throughout a pass
+
+class PassDictionary : public Dictionary {
+private:
+  static PassDictionary *_Instance;
+
+public:
+  static void Create();
+  static PassDictionary &GetInstance();
+  static void Destroy();
 };
 }
 

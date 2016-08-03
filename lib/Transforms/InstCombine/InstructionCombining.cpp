@@ -258,7 +258,7 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
                    llvmberry::TyConstInt::make(v, v_bw),
                    BITSIZE(b_bw)));
             } else {
-              llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+              llvmberry::ValidationUnit::GetInstance()->setIsAborted();
             }
           });
 
@@ -1995,8 +1995,7 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
         doAbort = true;
       }
       if (doAbort) {
-        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-            llvmberry::ValidationUnit::ABORT);
+        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       }
     });
     for (unsigned i = 0, e = Users.size(); i != e; ++i) {
@@ -3197,8 +3196,7 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
   }
 
   if (!MadeIRChange)
-    llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-        llvmberry::ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
   llvmberry::ValidationUnit::End();
 
   return MadeIRChange;
@@ -3209,6 +3207,7 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
                                 AliasAnalysis *AA, AssumptionCache &AC,
                                 TargetLibraryInfo &TLI, DominatorTree &DT,
                                 LoopInfo *LI = nullptr) {
+  
   // Minimizing size?
   bool MinimizeSize = F.hasFnAttribute(Attribute::MinSize);
   auto &DL = F.getParent()->getDataLayout();
@@ -3247,6 +3246,9 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
 
 PreservedAnalyses InstCombinePass::run(Function &F,
                                        AnalysisManager<Function> *AM) {
+  
+  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
+  
   auto &AC = AM->getResult<AssumptionAnalysis>(F);
   auto &DT = AM->getResult<DominatorTreeAnalysis>(F);
   auto &TLI = AM->getResult<TargetLibraryAnalysis>(F);
@@ -3262,6 +3264,9 @@ PreservedAnalyses InstCombinePass::run(Function &F,
   // FIXME: Need a way to preserve CFG analyses here!
   PreservedAnalyses PA;
   PA.preserve<DominatorTreeAnalysis>();
+  
+  llvmberry::ValidationUnit::EndPass();
+
   return PA;
 }
 
@@ -3298,6 +3303,8 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   if (skipOptnoneFunction(F))
     return false;
 
+  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
+  
   // Required analyses.
   auto AA = &getAnalysis<AliasAnalysis>();
   auto &AC = getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
@@ -3308,7 +3315,10 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   auto *LIWP = getAnalysisIfAvailable<LoopInfoWrapperPass>();
   auto *LI = LIWP ? &LIWP->getLoopInfo() : nullptr;
 
-  return combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
+  bool result = combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
+  llvmberry::ValidationUnit::EndPass();
+
+  return result;
 }
 
 char InstructionCombiningPass::ID = 0;

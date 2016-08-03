@@ -601,6 +601,26 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyAndOrConst2 {
+public:
+  TyAndOrConst2(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+                std::shared_ptr<TyRegister> _yprime,
+                std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c1,
+                std::shared_ptr<TyConstInt> _c2,
+                std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> yprime;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TyConstInt> c3;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyAndSame {
 public:
   TyAndSame(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
@@ -634,6 +654,22 @@ public:
 private:
   std::shared_ptr<TyValue> z;
   std::shared_ptr<TyValue> x;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyAndOrNot1 {
+public:
+  TyAndOrNot1(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
+              std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _a,
+              std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
   std::shared_ptr<TySize> sz;
 };
 
@@ -1007,6 +1043,19 @@ struct TyLessthanUndef {
 public:
   TyLessthanUndef(std::shared_ptr<TyValueType> _ty,
                   std::shared_ptr<TyValue> _v);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  void updateRhs(std::shared_ptr<TyValue>);
+
+private:
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> v;
+};
+
+struct TyLessthanUndefTgt {
+public:
+  TyLessthanUndefTgt(std::shared_ptr<TyValueType> _ty,
+                     std::shared_ptr<TyValue> _v);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -1711,6 +1760,13 @@ public:
                  std::shared_ptr<TyExpr> _e3);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
+  std::shared_ptr<TyExpr> getExpr1();
+  std::shared_ptr<TyExpr> getExpr2();
+  std::shared_ptr<TyExpr> getExpr3();
+  void updateExpr1(std::shared_ptr<TyExpr> newExpr);
+  void updateExpr2(std::shared_ptr<TyExpr> newExpr);
+  void updateExpr3(std::shared_ptr<TyExpr> newExpr);
+
 private:
   std::shared_ptr<TyExpr> e1;
   std::shared_ptr<TyExpr> e2;
@@ -1756,6 +1812,13 @@ public:
   TyTransitivityTgt(std::shared_ptr<TyExpr> _e1, std::shared_ptr<TyExpr> _e2,
                     std::shared_ptr<TyExpr> _e3);
   void serialize(cereal::JSONOutputArchive &archive) const;
+
+  std::shared_ptr<TyExpr> getExpr1();
+  std::shared_ptr<TyExpr> getExpr2();
+  std::shared_ptr<TyExpr> getExpr3();
+  void updateExpr1(std::shared_ptr<TyExpr> newExpr);
+  void updateExpr2(std::shared_ptr<TyExpr> newExpr);
+  void updateExpr3(std::shared_ptr<TyExpr> newExpr);
 
 private:
   std::shared_ptr<TyExpr> e1;
@@ -1873,6 +1936,10 @@ struct TyIntroGhost {
 public:
   TyIntroGhost(std::shared_ptr<TyExpr> _x, std::shared_ptr<TyRegister> _g);
   void serialize(cereal::JSONOutputArchive &archive) const;
+
+  std::shared_ptr<TyExpr> getExpr();
+  std::shared_ptr<TyRegister> getReg();
+  void updateExpr(std::shared_ptr<TyExpr> newExpr);
 
 private:
   std::shared_ptr<TyExpr> x;
@@ -2698,6 +2765,20 @@ private:
   std::shared_ptr<TyAndOr> and_or;
 };
 
+struct ConsAndOrConst2 : public TyInfrule {
+public:
+  ConsAndOrConst2(std::shared_ptr<TyAndOrConst2> _ans_or_const2);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+       std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x,
+       std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2,
+       std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAndOrConst2> and_or_const2;
+};
+
 struct ConsAndSame : public TyInfrule {
 public:
   ConsAndSame(std::shared_ptr<TyAndSame> _and_same);
@@ -2732,6 +2813,19 @@ public:
 
 private:
   std::shared_ptr<TyAndZero> and_zero;
+};
+
+struct ConsAndOrNot1 : public TyInfrule {
+public:
+  ConsAndOrNot1(std::shared_ptr<TyAndOrNot1> _and_or_not1);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
+       std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAndOrNot1> and_or_not1;
 };
 
 struct ConsBopDistributiveOverSelectinst : public TyInfrule {
@@ -3269,6 +3363,18 @@ public:
 
 private:
   std::shared_ptr<TyLessthanUndef> lessthan_undef;
+};
+
+struct ConsLessthanUndefTgt : TyInfrule {
+public:
+  ConsLessthanUndefTgt(std::shared_ptr<TyLessthanUndefTgt> _lessthan_undef_tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValueType> _ty,
+                                         std::shared_ptr<TyValue> _v);
+
+private:
+  std::shared_ptr<TyLessthanUndefTgt> lessthan_undef_tgt;
 };
 
 struct ConsMulBool : TyInfrule {

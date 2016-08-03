@@ -2909,7 +2909,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       return BinaryOperator::CreateOr(Not, Op0);
     }
     }
-    llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
   }
 
   unsigned BitWidth = 0;

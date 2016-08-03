@@ -175,6 +175,9 @@ public:
   static std::shared_ptr<TyPosition>
   make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB);
   static std::shared_ptr<TyPosition>
+  make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB,
+                    int index);
+  static std::shared_ptr<TyPosition>
   make_start_of_block(enum TyScope _scope, std::string _block_name);
   static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           std::string _block_name,
@@ -202,6 +205,10 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyRegister> make(std::string _name, enum TyTag _tag);
+
+  static bool isSame(std::shared_ptr<TyRegister> r1,
+                     std::shared_ptr<TyRegister> r2);
+  std::string getName();
 
 private:
   std::string name;
@@ -687,6 +694,7 @@ public:
              std::shared_ptr<TyValueType> _valtype,
              std::shared_ptr<TyValue> _ptrvalue, int _align);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  static std::shared_ptr<TyLoadInst> make(const llvm::AllocaInst &ai);
   static std::shared_ptr<TyLoadInst> make(const llvm::LoadInst &li);
   static std::shared_ptr<TyLoadInst> make(const llvm::StoreInst &si);
 
@@ -1090,6 +1098,9 @@ public:
 
   static std::shared_ptr<TyExpr> make(std::string _name, enum TyTag _tag);
 
+  std::shared_ptr<TyRegister> getTyReg();
+  void updateTyReg(std::shared_ptr<TyRegister> newTyReg);
+
 private:
   std::shared_ptr<TyRegister> register_name;
 };
@@ -1119,6 +1130,8 @@ public:
 
   static std::shared_ptr<TyExpr> make(int _int_value, int _bitwidth);
 
+  std::shared_ptr<TyConstant> getTyConst();
+
 private:
   std::shared_ptr<TyConstant> constant;
 };
@@ -1131,6 +1144,8 @@ public:
   static std::shared_ptr<TyExpr> make(const llvm::Instruction &i);
   static std::shared_ptr<TyExpr>
   make(std::shared_ptr<TyInstruction> _instruction);
+
+  std::shared_ptr<TyInstruction> getTyInsn();
 
 private:
   std::shared_ptr<TyInstruction> instruction;
@@ -1149,6 +1164,10 @@ public:
   static std::shared_ptr<TyPropagateLessdef> make(std::shared_ptr<TyExpr> _lhs,
                                                   std::shared_ptr<TyExpr> _rhs,
                                                   enum TyScope _scope);
+
+  std::shared_ptr<TyExpr> getLhs();
+  std::shared_ptr<TyExpr> getRhs();
+  void updateRhs(std::shared_ptr<TyExpr>(newExpr));
 
 private:
   std::shared_ptr<TyExpr> lhs;
@@ -1381,13 +1400,16 @@ private:
 
 struct CoreHint {
 public:
+  enum RETURN_CODE { ACTUAL = 0, ADMITTED, FAIL };
   CoreHint();
   CoreHint(std::string _module_id, std::string _function_id,
            std::string _opt_name, std::string _description = "");
   const std::string &getDescription() const;
   void setDescription(const std::string &desc);
   void appendToDescription(const std::string &desc);
-  void appendAdmittedToDescription();
+  const RETURN_CODE &getReturnCode() const;
+  void setReturnCodeToAdmitted();
+  void setReturnCodeToFail();
   void addCommand(std::shared_ptr<TyCommand> c);
   void setOptimizationName(const std::string &name);
   void addNopPosition(std::shared_ptr<TyPosition> position);
@@ -1398,9 +1420,12 @@ private:
   std::string function_id;
   std::string opt_name;
   std::string description;
+  RETURN_CODE return_code;
   std::vector<std::shared_ptr<TyPosition>> nop_positions;
   std::vector<std::shared_ptr<TyCommand>> commands;
 };
+
+void intrude(std::function<void()> func);
 
 } // llvmberry
 

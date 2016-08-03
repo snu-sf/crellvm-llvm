@@ -4,6 +4,9 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include <fstream>
+#include <sstream>
+#include <string>
+#include <algorithm>
 #include "llvm/LLVMBerry/ValidationUnit.h"
 
 namespace {
@@ -26,6 +29,38 @@ static std::string makeFullFilename(std::string org_filename,
 namespace llvmberry {
 
 std::string defaultOutputDir = "";
+std::vector<std::string> optWhiteList;
+bool optWhiteListEnabled = false;
+std::vector<ValidationUnit::PASS> optPassWhiteList;
+bool optPassWhiteListEnabled = false;
+
+void setWhiteList(const std::string &str) {
+  std::stringstream ss(str);
+  std::string optname;
+  while (std::getline(ss, optname, ',')) {
+    optWhiteList.push_back(optname);
+  }
+  optWhiteListEnabled = true;
+}
+
+void setPassWhiteList(const std::string &str) {
+  std::stringstream ss(str);
+  std::string optname;
+  while (std::getline(ss, optname, ',')) {
+    std::transform(optname.begin(), optname.end(), optname.begin(), ::tolower);
+    if (optname == "gvn")
+      optPassWhiteList.push_back(ValidationUnit::GVN);
+    else if (optname == "mem2reg")
+      optPassWhiteList.push_back(ValidationUnit::MEM2REG);
+    else if (optname == "pre")
+      optPassWhiteList.push_back(ValidationUnit::PRE);
+    else if (optname == "instcombine")
+      optPassWhiteList.push_back(ValidationUnit::INSTCOMBINE);
+    else
+      assert(false && "Invalid pass white list");
+  }
+  optPassWhiteListEnabled = true;
+}
 
 void writeModuleToBuffer(const llvm::Module &module, std::string *buffer) {
   llvm::raw_string_ostream strstream(*buffer);
@@ -51,25 +86,29 @@ void writeModuleToFile(const llvm::Module &module,
 // class ValidationUnit
 // constructor
 ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
-    : _filename(), _optname(optname), _func(func), _corehint(), _data(),
-      _return_code(COMMIT) {
-  this->begin();
+    : _filename(), _optname(optname), _srcfile_buffer(nullptr), _func(func),
+      _corehint(), _data(), isAborted(false) {
+  if (optWhiteListEnabled && 
+      std::find(optWhiteList.begin(), optWhiteList.end(), optname) == 
+        optWhiteList.end()) {
+    this->isAborted = true;
+  } else if (optPassWhiteListEnabled &&
+      std::find(optPassWhiteList.begin(), optPassWhiteList.end(), _CurrentPass) 
+        == optPassWhiteList.end()) {
+    this->isAborted = true;
+  } else {
+    this->begin();
+  }
 }
 
 // destructor
 ValidationUnit::~ValidationUnit() {
-  switch (_return_code) {
-  case COMMIT:
+  if (!isAborted)
     this->commit();
-    break;
-  case ABORT:
+  else
     this->abort();
-    break;
-  default:
-    assert(false && "Not a possible return code");
-    break;
-  }
-  delete _srcfile_buffer;
+  if (_srcfile_buffer != nullptr)
+    delete _srcfile_buffer;
 }
 
 // public functions
@@ -90,17 +129,24 @@ void ValidationUnit::setDescription(const std::string &str) {
   _Instance->_corehint.setDescription(str);
 }
 
-void ValidationUnit::setReturnCode(RETURN_CODE return_code) {
-  _return_code = return_code;
+void ValidationUnit::setIsAborted() {
+  assert(!isAborted);
+  isAborted = true;
 }
 
 void ValidationUnit::intrude(
     std::function<void(Dictionary &, CoreHint &)> func) {
+  if (isAborted)
+    return;
+  if (_corehint.getReturnCode() != CoreHint::ACTUAL)
+    return;
   func(_data, _corehint);
 }
 
 // private functions
 void ValidationUnit::begin() {
+  assert(!isAborted);
+
   // get module & module name
   const llvm::Module *module = _func->getParent();
   std::string moduleName = module->getModuleIdentifier();
@@ -125,6 +171,8 @@ void ValidationUnit::begin() {
 }
 
 void ValidationUnit::commit() {
+  assert(!isAborted);
+
   // print src
   std::ofstream src_ofs(makeFullFilename(_filename, ".src.bc"), std::ios::out);
   src_ofs << *_srcfile_buffer;
@@ -168,11 +216,23 @@ void ValidationUnit::abort() {}
 
 // static members
 ValidationUnit *ValidationUnit::_Instance = nullptr;
+ValidationUnit::PASS ValidationUnit::_CurrentPass = ValidationUnit::NOTHING;
 int ValidationUnit::_Counter = 0;
 
 ValidationUnit *ValidationUnit::GetInstance() {
   assert(Exists() && "No ValidationUnit exists");
   return _Instance;
+}
+
+void ValidationUnit::StartPass(PASS pass) {
+  assert(_CurrentPass == NOTHING);
+  _CurrentPass = pass;
+  PassDictionary::Create();
+}
+
+void ValidationUnit::EndPass() {
+  _CurrentPass = NOTHING;
+  PassDictionary::Destroy();
 }
 
 bool ValidationUnit::Exists() {
@@ -203,10 +263,8 @@ void ValidationUnit::End() {
 }
 
 void ValidationUnit::Abort() {
-  _Instance->setReturnCode(ABORT);
-  assert(Exists() && "No ValidationUnit exists");
-  delete _Instance;
-  _Instance = nullptr;
+  _Instance->setIsAborted();
+  End();
 }
 
 bool ValidationUnit::EndIfExists() {

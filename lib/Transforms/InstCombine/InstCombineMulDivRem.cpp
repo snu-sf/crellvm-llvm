@@ -493,7 +493,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
         BO->setHasNoSignedWrap();
       return BO;
     }
-    llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
     llvmberry::ValidationUnit::End();
   }
 
