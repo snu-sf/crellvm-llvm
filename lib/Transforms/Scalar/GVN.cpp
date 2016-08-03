@@ -2776,7 +2776,12 @@ bool GVN::runOnFunction(Function& F) {
   llvmberry::ValidationUnit::EndPass();
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::PRE);
-  
+
+  llvmberry::intrude([]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.create<llvmberry::ArgForGVNReplace>();
+  });
+
   if (EnablePRE) {
     // Fabricate val-num for dead-code in order to suppress assertion in
     // performPRE().
