@@ -2144,8 +2144,7 @@ static void patchAndReplaceAllUsesWith(Instruction *I, Value *Repl) {
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     if (!pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace) {
-      llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-        llvmberry::ValidationUnit::ABORT);
+      llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       return;
     }
     pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace = false;
