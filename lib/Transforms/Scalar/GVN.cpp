@@ -3146,8 +3146,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         }
 
       });
-
-      llvmberry::ValidationUnit::End();
     } else {
       llvmberry::ValidationUnit::Begin("GVN_PRE_hard",
                                        CurInst->getParent()->getParent());
@@ -3318,10 +3316,9 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
 
         return;
       });
-
-      llvmberry::ValidationUnit::End();
     }
 
+    llvmberry::ValidationUnit::End();
   });
 
   // Validation hint generation for PRE
