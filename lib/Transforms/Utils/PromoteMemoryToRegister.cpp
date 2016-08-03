@@ -1349,7 +1349,6 @@ void PromoteMem2Reg::run() {
              E = NewPhiNodes.end();
          I != E;) {
       PHINode *PN = I->second;
- 
       // If this PHI node merges one value and/or undefs, get the value.
       if (Value *V = SimplifyInstruction(PN, DL, nullptr, &DT, AC)) {
         if (AST && PN->getType()->isPointerTy())
@@ -1361,7 +1360,6 @@ void PromoteMem2Reg::run() {
                                  (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         llvmberry::generateHintForMem2RegReplaceHint(V, PN);
         });        
-
         PN->replaceAllUsesWith(V);
         PN->eraseFromParent();
         NewPhiNodes.erase(I++);

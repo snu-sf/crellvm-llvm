@@ -1098,7 +1098,7 @@ public:
 
   static std::shared_ptr<TyExpr> make(std::string _name, enum TyTag _tag);
 
-  std::shared_ptr<TyRegister> get_TyReg();
+  std::shared_ptr<TyRegister> getTyReg();
   void updateTyReg(std::shared_ptr<TyRegister> newTyReg);
 
 private:
@@ -1130,7 +1130,7 @@ public:
 
   static std::shared_ptr<TyExpr> make(int _int_value, int _bitwidth);
 
-  std::shared_ptr<TyConstant> get_TyConst();
+  std::shared_ptr<TyConstant> getTyConst();
 
 private:
   std::shared_ptr<TyConstant> constant;
@@ -1145,7 +1145,7 @@ public:
   static std::shared_ptr<TyExpr>
   make(std::shared_ptr<TyInstruction> _instruction);
 
-  std::shared_ptr<TyInstruction> get_TyInsn();
+  std::shared_ptr<TyInstruction> getTyInsn();
 
 private:
   std::shared_ptr<TyInstruction> instruction;
@@ -1165,10 +1165,10 @@ public:
                                                   std::shared_ptr<TyExpr> _rhs,
                                                   enum TyScope _scope);
 
-  std::shared_ptr<TyExpr> get_lhs();
-  std::shared_ptr<TyExpr> get_rhs();
+  std::shared_ptr<TyExpr> getLhs();
+  std::shared_ptr<TyExpr> getRhs();
+  void updateRhs(std::shared_ptr<TyExpr>(newExpr));
 
-  void update_rhs(std::shared_ptr<TyExpr>(newExpr));
 private:
   std::shared_ptr<TyExpr> lhs;
   std::shared_ptr<TyExpr> rhs;
@@ -1400,13 +1400,16 @@ private:
 
 struct CoreHint {
 public:
+  enum RETURN_CODE { ACTUAL = 0, ADMITTED, FAIL };
   CoreHint();
   CoreHint(std::string _module_id, std::string _function_id,
            std::string _opt_name, std::string _description = "");
   const std::string &getDescription() const;
   void setDescription(const std::string &desc);
   void appendToDescription(const std::string &desc);
-  void appendAdmittedToDescription();
+  const RETURN_CODE &getReturnCode() const;
+  void setReturnCodeToAdmitted();
+  void setReturnCodeToFail();
   void addCommand(std::shared_ptr<TyCommand> c);
   void setOptimizationName(const std::string &name);
   void addNopPosition(std::shared_ptr<TyPosition> position);
@@ -1417,6 +1420,7 @@ private:
   std::string function_id;
   std::string opt_name;
   std::string description;
+  RETURN_CODE return_code;
   std::vector<std::shared_ptr<TyPosition>> nop_positions;
   std::vector<std::shared_ptr<TyCommand>> commands;
 };
