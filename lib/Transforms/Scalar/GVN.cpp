@@ -3019,41 +3019,42 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   llvmberry::intrude([&CurInst, &CurrentBlock, &Phi, &predMap, &PREInstr]() {
     std::string CurInst_id = llvmberry::getVariable(*CurInst);
     std::string Phi_id = llvmberry::getVariable(*Phi);
-    std::vector<Instruction *> op_CurInst;
+    std::vector<Value *> op_CurInst;
     std::vector<std::vector<int>> notSameIdx(
         predMap.size(), std::vector<int>(0)); // predMap idx -> operand idx
     bool isSameForAll = true;
     for (Instruction::op_iterator OI = CurInst->op_begin(),
                                   OE = CurInst->op_end();
          OI != OE; ++OI) {
-      op_CurInst.push_back(dyn_cast<Instruction>(OI));
+      op_CurInst.push_back(OI->get());
     }
     for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
       BasicBlock *PB = predMap[i].second;
       Value *V = nullptr;
       if (!(V = predMap[i].first))
         V = PREInstr;
-      assert(isa<Instruction>(V) &&
-             "Value not an instruction: not yet handled.");
-      Instruction *VI = dyn_cast<Instruction>(V);
-      std::vector<Instruction *> op_VI;
-      for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
-           OI != OE; ++OI)
-        op_VI.push_back(dyn_cast<Instruction>(OI));
+      if (Instruction *VI = dyn_cast<Instruction>(V)) {
+        std::vector<Value *> op_VI;
+        for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
+             OI != OE; ++OI)
+          op_VI.push_back(OI->get());
 
-      bool isSame = true;
-      if (op_CurInst.size() != op_VI.size())
-        assert("Um.. what is this case??" && false);
-      for (int j = 0; j < op_CurInst.size(); j++) {
-        bool tmp = (op_CurInst[j] == op_VI[j]);
-        if (!tmp)
-          notSameIdx[i].push_back(j);
-        isSame &= tmp;
-      }
-      // hints.appendToDescription("VI: " + (*VI).getName().str());
-      // hints.appendToDescription("RHS of CurInst and VI is same: " +
-      //                           std::to_string(isSame));
-      isSameForAll &= isSame;
+        bool isSame = true;
+        if (op_CurInst.size() != op_VI.size())
+          assert("Um.. what is this case??" && false);
+        for (int j = 0; j < op_CurInst.size(); j++) {
+          bool tmp = (op_CurInst[j] == op_VI[j]);
+          if (!tmp)
+            notSameIdx[i].push_back(j);
+          isSame &= tmp;
+        }
+        // hints.appendToDescription("VI: " + (*VI).getName().str());
+        // hints.appendToDescription("RHS of CurInst and VI is same: " +
+        //                           std::to_string(isSame));
+        isSameForAll &= isSame;
+      } else
+        isSameForAll = false;
+      // TODO care notSameIdx??
     }
 
     if (isSameForAll) {
