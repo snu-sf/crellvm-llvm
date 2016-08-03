@@ -1512,7 +1512,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                   std::vector<llvm::BasicBlock*> preds;
                   
                   for (auto UI2 = pred_begin(init), UE2 = pred_end(init); UI2 != UE2; UI2++) {
-                    std::cout<<"isPred before: "+getBasicBlockIndex(init)+", "+getBasicBlockIndex(target)<<std::endl;
+                    std::cout<<"isPred before("+std::string(init->getParent()->getName())+"): "+getBasicBlockIndex(init)+", "+getBasicBlockIndex(target)<<std::endl;
                     llvm::BasicBlock* usePred = *UI2;
                     if (isPotentiallyReachable(target, usePred)) {
                       PROPAGATE(
