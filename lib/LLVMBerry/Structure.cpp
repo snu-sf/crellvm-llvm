@@ -2683,4 +2683,6 @@ void CoreHint::setOptimizationName(const std::string &name) {
   this->opt_name = name;
 }
 
+void intrude(std::function<void()> func) { func(); }
+
 } // llvmberry

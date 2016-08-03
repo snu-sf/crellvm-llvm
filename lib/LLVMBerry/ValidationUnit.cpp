@@ -227,10 +227,12 @@ ValidationUnit *ValidationUnit::GetInstance() {
 void ValidationUnit::StartPass(PASS pass) {
   assert(_CurrentPass == NOTHING);
   _CurrentPass = pass;
+  PassDictionary::Create();
 }
 
 void ValidationUnit::EndPass() {
   _CurrentPass = NOTHING;
+  PassDictionary::Destroy();
 }
 
 bool ValidationUnit::Exists() {

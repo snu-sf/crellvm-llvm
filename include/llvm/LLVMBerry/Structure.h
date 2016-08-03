@@ -1425,6 +1425,8 @@ private:
   std::vector<std::shared_ptr<TyCommand>> commands;
 };
 
+void intrude(std::function<void()> func);
+
 } // llvmberry
 
 #endif
