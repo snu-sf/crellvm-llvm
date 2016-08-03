@@ -130,7 +130,6 @@ void ValidationUnit::setDescription(const std::string &str) {
 }
 
 void ValidationUnit::setIsAborted() {
-  assert(!isAborted);
   isAborted = true;
 }
 
