@@ -1239,6 +1239,19 @@ void PromoteMem2Reg::run() {
     unsigned CurrentVersion = 0;
     for (unsigned i = 0, e = PHIBlocks.size(); i != e; ++i)
       QueuePhiNode(PHIBlocks[i], AllocaNum, CurrentVersion);
+  
+ 
+    llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&F, &AI, this, &AllocaNum]
+                     (llvmberry::Dictionary &data,
+                      llvmberry::CoreHint &hints) {
+
+              BasicBlock *start = F.begin();
+              std::vector<BasicBlock *> VistedBlock;
+
+              llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI, PhiToAllocaMap, AllocaNum);
+            });
+  
   }
 
   if (Allocas.empty()) {
@@ -1336,57 +1349,18 @@ void PromoteMem2Reg::run() {
              E = NewPhiNodes.end();
          I != E;) {
       PHINode *PN = I->second;
-
-      llvmberry::ValidationUnit::GetInstance()->intrude
-             ([&PN, this]
-              (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        if (!(PN->getNumIncomingValues() == getNumPreds(PN->getParent()))) {
-          BasicBlock *BB = PN->getParent();
-          SmallVector<BasicBlock *, 16> Preds(pred_begin(BB), pred_end(BB));
-
-          std::sort(Preds.begin(), Preds.end());
-
-          // Now we loop through all BB's which have entries in SomePHI and remove
-          // them from the Preds list.
-          for (unsigned i = 0, e = PN->getNumIncomingValues(); i != e; ++i) {
-            // Do a log(n) search of the Preds list for the entry we want.
-            SmallVectorImpl<BasicBlock *>::iterator EntIt = std::lower_bound(
-                   Preds.begin(), Preds.end(), PN->getIncomingBlock(i));
-            assert(EntIt != Preds.end() && *EntIt == PN->getIncomingBlock(i) &&
-                  "PHI node has entry for a block which is not a predecessor!");
-
-            // Remove the entry
-            Preds.erase(EntIt);
-          }
-
-          auto &blocks = *(data.get<llvmberry::ArgForMem2Reg>()->blocks);
-          blocks = Preds;
-        }
-      });
-  
+ 
       // If this PHI node merges one value and/or undefs, get the value.
       if (Value *V = SimplifyInstruction(PN, DL, nullptr, &DT, AC)) {
         if (AST && PN->getType()->isPointerTy())
           AST->deleteValue(PN);
+        
 
         llvmberry::ValidationUnit::GetInstance()->intrude
                         ([&PN, &V]
                                  (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-          auto &blocks = *(data.get<llvmberry::ArgForMem2Reg>()->blocks);
-          Value* UndefVal = UndefValue::get(PN->getType());
-
-          for (unsigned pred = 0, e = blocks.size(); pred != e; ++pred) {
-            INFRULE(llvmberry::TyPosition::make(TGT, PN->getParent()->getName(), blocks[pred]->getName()),
-                    llvmberry::ConsLessthanUndefTgt::make(VALTYPE(PN->getType()), VAL(V, Physical)));
-
-            INFRULE(llvmberry::TyPosition::make(TGT, PN->getParent()->getName(), blocks[pred]->getName()),
-                    llvmberry::ConsTransitivityTgt::make(VAR(llvmberry::getVariable(*PN), Ghost),
-                                                         EXPR(UndefVal, Physical),
-                                                         EXPR(V, Physical)));
-          }
-
-          llvmberry::generateHintForMem2RegReplaceHint(V, PN);
-        });
+        llvmberry::generateHintForMem2RegReplaceHint(V, PN);
+        });        
 
         PN->replaceAllUsesWith(V);
         PN->eraseFromParent();
