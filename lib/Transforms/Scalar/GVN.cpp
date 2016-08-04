@@ -1051,13 +1051,12 @@ make_repl_inv(llvmberry::ValidationUnit::Dictionary &data,
   return repl_inv;
 }
 
-void propagateInstrAndOperandsUntilBlockEnd(llvmberry::CoreHint &hints,
+bool propagateInstrAndOperandsUntilBlockEnd(llvmberry::CoreHint &hints,
                                             Instruction *Inst, BasicBlock *PB) {
   std::string Inst_id = llvmberry::getVariable(*Inst);
   if (isa<PHINode>(Inst)) {
     hints.appendToDescription("[A]Problem : " + ((*Inst).getName()).str());
-    hints.setReturnCodeToFail();
-    return;
+    return false;
   }
   PROPAGATE(LESSDEF(RHS(Inst_id, Physical, SRC), VAR(Inst_id, Physical), SRC),
             BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
@@ -1072,8 +1071,7 @@ void propagateInstrAndOperandsUntilBlockEnd(llvmberry::CoreHint &hints,
       if (isa<PHINode>(OI_Inst)) {
         hints.appendToDescription("[B]Problem : " +
                                   ((*OI_Inst).getName()).str());
-        hints.setReturnCodeToFail();
-        return;
+        return false;
       }
       std::string OI_Inst_id = llvmberry::getVariable(*OI_Inst);
       PROPAGATE(LESSDEF(RHS(OI_Inst_id, Physical, SRC),
@@ -1089,6 +1087,7 @@ void propagateInstrAndOperandsUntilBlockEnd(llvmberry::CoreHint &hints,
     } else {
     }
   }
+  return true;
 }
 // End LLVMBerry
 
@@ -3104,7 +3103,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           assert(isa<Instruction>(V) &&
                  "Value not an instruction: not yet handled.");
           Instruction *VI = dyn_cast<Instruction>(V);
-          propagateInstrAndOperandsUntilBlockEnd(hints, VI, PB);
+          if (!propagateInstrAndOperandsUntilBlockEnd(hints, VI, PB)) {
+            hints.setReturnCodeToFail();
+            return;
+          }
 
           std::string VI_id = llvmberry::getVariable(*VI);
 
