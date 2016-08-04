@@ -1051,26 +1051,32 @@ make_repl_inv(llvmberry::ValidationUnit::Dictionary &data,
   return repl_inv;
 }
 
-void propagateInstrUntilBlockEnd_rec(llvmberry::CoreHint &hints, Value *V, BasicBlock *PB) {
-  if (Instruction *Inst = dyn_cast<Instruction>(V)) {
-    std::string Inst_id = llvmberry::getVariable(*Inst);
-    PROPAGATE(
-        LESSDEF(RHS(Inst_id, Physical, SRC), VAR(Inst_id, Physical), SRC),
-        BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
-                                        llvmberry::Source, *PB)));
-    PROPAGATE(LESSDEF(VAR(Inst_id, Physical), RHS(Inst_id, Physical, SRC), SRC),
-              BOUNDS(INSTPOS(SRC, Inst),
-                     llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
-                                                              *PB)));
-    // operands
-    for (Instruction::op_iterator OI = Inst->op_begin(), OE = Inst->op_end();
-         OI != OE; ++OI) {
-      propagateInstrUntilBlockEnd_rec(hints, *OI, PB);
+void propagateInstrAndOperandsUntilBlockEnd(llvmberry::CoreHint &hints,
+                                            Instruction *Inst, BasicBlock *PB) {
+  std::string Inst_id = llvmberry::getVariable(*Inst);
+  PROPAGATE(LESSDEF(RHS(Inst_id, Physical, SRC), VAR(Inst_id, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
+                                           llvmberry::Source, *PB)));
+  PROPAGATE(LESSDEF(VAR(Inst_id, Physical), RHS(Inst_id, Physical, SRC), SRC),
+            BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
+                                           llvmberry::Source, *PB)));
+  // operands
+  for (Instruction::op_iterator OI = Inst->op_begin(), OE = Inst->op_end();
+       OI != OE; ++OI) {
+    if (Instruction *OI_Inst = dyn_cast<Instruction>(OI->get())) {
+      std::string OI_Inst_id = llvmberry::getVariable(*OI_Inst);
+      PROPAGATE(LESSDEF(RHS(OI_Inst_id, Physical, SRC),
+                        VAR(OI_Inst_id, Physical), SRC),
+                BOUNDS(INSTPOS(SRC, OI_Inst),
+                       llvmberry::TyPosition::make_end_of_block(
+                           llvmberry::Source, *PB)));
+      PROPAGATE(LESSDEF(VAR(OI_Inst_id, Physical),
+                        RHS(OI_Inst_id, Physical, SRC), SRC),
+                BOUNDS(INSTPOS(SRC, OI_Inst),
+                       llvmberry::TyPosition::make_end_of_block(
+                           llvmberry::Source, *PB)));
+    } else {
     }
-
-  } else {
-    // branch case not handled yet
-    // currently do nothing
   }
 }
 // End LLVMBerry
@@ -3083,11 +3089,11 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           hints.appendToDescription("CurInst is: " +
                                     ((*CurInst).getName()).str());
           dbgs() << "my test :" << *V << "\n";
-          propagateInstrUntilBlockEnd_rec(hints, V, PB);
 
           assert(isa<Instruction>(V) &&
                  "Value not an instruction: not yet handled.");
           Instruction *VI = dyn_cast<Instruction>(V);
+          propagateInstrAndOperandsUntilBlockEnd(hints, VI, PB);
 
           std::string VI_id = llvmberry::getVariable(*VI);
 
