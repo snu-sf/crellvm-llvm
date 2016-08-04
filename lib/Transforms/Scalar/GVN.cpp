@@ -3032,6 +3032,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   addToLeaderTable(ValNo, Phi, CurrentBlock);
   Phi->setDebugLoc(CurInst->getDebugLoc());
 
+  // Validation hint generation for PRE
   llvmberry::intrude([&CurInst, &CurrentBlock, &Phi, &predMap, &PREInstr]() {
     std::string CurInst_id = llvmberry::getVariable(*CurInst);
     std::string Phi_id = llvmberry::getVariable(*Phi);
@@ -3343,11 +3344,11 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       });
     }
 
-    llvmberry::ValidationUnit::End();
   });
 
-  // Validation hint generation for PRE
   CurInst->replaceAllUsesWith(Phi);
+
+  llvmberry::ValidationUnit::End();
 
   if (Phi->getType()->getScalarType()->isPointerTy()) {
     // Because we have added a PHI-use of the pointer value, it has now
