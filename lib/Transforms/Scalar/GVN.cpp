@@ -3034,8 +3034,11 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           op_VI.push_back(OI->get());
 
         bool isSame = true;
-        if (op_CurInst.size() != op_VI.size())
+        if (op_CurInst.size() != op_VI.size()) {
+          dbgs() << "CurInst :" << *CurInst << "\n";
+          dbgs() << "VI :" << *VI << "\n";
           assert("Um.. what is this case??" && false);
+        }
         for (int j = 0; j < op_CurInst.size(); j++) {
           bool tmp = (op_CurInst[j] == op_VI[j]);
           if (!tmp)
@@ -3159,6 +3162,8 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                                          &Phi_id, &notSameIdx](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
+        dbgs() << "CurInst : " << *CurInst << "\n";
+        dbgs() << "Phi : " << *Phi << "\n";
         // if is same for all, it does not involve previous PRE and just works
         // it is treated below
         for (int i = 0; i < notSameIdx.size(); i++)
@@ -3234,9 +3239,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
 
           Instruction *VI_evolving = (*VI).clone();
           VI_evolving->insertBefore(CurrentBlock->getTerminator());
-
           for (auto k : PrevPRE) {
+            dbgs() << "VI_evolving : " << *VI_evolving << "\n";
             PHINode *PrevPhi = k.first;
+            dbgs() << "PrevPphi " << *PrevPhi << "\n";
             std::string PrevPhi_id = llvmberry::getVariable(*PrevPhi);
             int idx = k.second;
 
@@ -3274,6 +3280,8 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                                     VAR(VI_id, Previous),
                                                     VAR(Phi_id, Physical)));
 
+          dbgs() << "VI_evolving_end : " << *VI_evolving << "\n";
+          dbgs() << "VI : " << *VI << "\n";
           INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
                                               PB->getName()),
                   llvmberry::ConsTransitivity::make(INSN(*VI_evolving),
