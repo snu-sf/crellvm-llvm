@@ -1051,8 +1051,8 @@ make_repl_inv(llvmberry::ValidationUnit::Dictionary &data,
   return repl_inv;
 }
 
-bool propagateInstrAndOperandsUntilBlockEnd(llvmberry::CoreHint &hints,
-                                            Instruction *Inst, BasicBlock *PB) {
+bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
+                                 BasicBlock *PB) {
   std::string Inst_id = llvmberry::getVariable(*Inst);
   if (isa<PHINode>(Inst)) {
     hints.appendToDescription("[A]Problem : " + ((*Inst).getName()).str());
@@ -1064,29 +1064,6 @@ bool propagateInstrAndOperandsUntilBlockEnd(llvmberry::CoreHint &hints,
   PROPAGATE(LESSDEF(VAR(Inst_id, Physical), RHS(Inst_id, Physical, SRC), SRC),
             BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
-  // operands
-  for (Instruction::op_iterator OI = Inst->op_begin(), OE = Inst->op_end();
-       OI != OE; ++OI) {
-    if (Instruction *OI_Inst = dyn_cast<Instruction>(OI->get())) {
-      if (isa<PHINode>(OI_Inst)) {
-        hints.appendToDescription("[B]Problem : " +
-                                  ((*OI_Inst).getName()).str());
-        return false;
-      }
-      std::string OI_Inst_id = llvmberry::getVariable(*OI_Inst);
-      PROPAGATE(LESSDEF(RHS(OI_Inst_id, Physical, SRC),
-                        VAR(OI_Inst_id, Physical), SRC),
-                BOUNDS(INSTPOS(SRC, OI_Inst),
-                       llvmberry::TyPosition::make_end_of_block(
-                           llvmberry::Source, *PB)));
-      PROPAGATE(LESSDEF(VAR(OI_Inst_id, Physical),
-                        RHS(OI_Inst_id, Physical, SRC), SRC),
-                BOUNDS(INSTPOS(SRC, OI_Inst),
-                       llvmberry::TyPosition::make_end_of_block(
-                           llvmberry::Source, *PB)));
-    } else {
-    }
-  }
   return true;
 }
 // End LLVMBerry
@@ -3104,7 +3081,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           assert(isa<Instruction>(V) &&
                  "Value not an instruction: not yet handled.");
           Instruction *VI = dyn_cast<Instruction>(V);
-          if (!propagateInstrAndOperandsUntilBlockEnd(hints, VI, PB)) {
+          if (!propagateInstrUntilBlockEnd(hints, VI, PB)) {
             hints.setReturnCodeToFail();
             return;
           }
