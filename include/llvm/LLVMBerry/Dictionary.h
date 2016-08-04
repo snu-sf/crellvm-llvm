@@ -4,6 +4,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/LLVMBerry/Structure.h"
 
 #include <memory>
@@ -22,6 +23,7 @@ enum DictKeys {
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
   ArgForLoadLoadStore,
+  ArgForSinkInst,
   ArgForVisitICmp,
   // Mem2Reg
   ArgForMem2Reg,
@@ -162,6 +164,13 @@ public:
   std::shared_ptr<TyPosition> v2_org_position;
 };
 DEFINE_TRAITS(ArgForLoadLoadStore, LoadLoadStoreArg);
+
+// lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
+struct SinkInstArg {
+public:
+  llvm::DominatorTree *sinkDT;
+};
+DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
 
 // lib/Transforms/Scalar/GVN.cpp : processInstruction, findLeader
 struct GVNReplaceArg {

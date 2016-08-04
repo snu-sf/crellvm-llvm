@@ -2755,34 +2755,30 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
         return false;
   }
 
-  llvmberry::ValidationUnit::Begin("sink_inst",
-                                   I->getParent()->getParent());
 
   BasicBlock::iterator InsertPos = DestBlock->getFirstInsertionPt();
-  
-  llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&I, &InsertPos](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
 
-             insertSrcNopAtTgtI(hints,InsertPos);  //src nop
+  llvmberry::ValidationUnit::GetInstance()
+      ->intrude([&I, &InsertPos, &DestBlock](llvmberry::Dictionary &data,
+                                             llvmberry::CoreHint &hints) {
+          auto si_arg = data.get<llvmberry::ArgForSinkInst>();
+          DominatorTree *DT = si_arg->sinkDT;
+          insertSrcNopAtTgtI(hints, InsertPos); // src nop
              insertTgtNopAtSrcI(hints, I);         //tgt nop
+             std::string reg0_name = llvmberry::getVariable(*I);
 
-             std::string reg0_name = llvmberry::getVariable(*I); 
-
-             hints.addCommand
-                    (llvmberry::ConsPropagate::make   //source propagate
-                             (llvmberry::ConsLessdef::make
-                                      (llvmberry::ConsVar::make
-                                       (reg0_name, llvmberry::Physical),
-                                       llvmberry::ConsRhs::make
-                                       (reg0_name, llvmberry::Physical, llvmberry::Source),
-                                       llvmberry::Source),
-                              llvmberry::ConsBounds::make
-                                      (llvmberry::TyPosition::make
-                                       (llvmberry::Source, *I), 
-                                       llvmberry::TyPosition::make
-                                       (llvmberry::Target, *InsertPos))
-                             ));
-//prev maydiff propagate global -> issue 86
+             hints.addCommand(
+                 llvmberry::ConsPropagate::make // source propagate
+                 (llvmberry::ConsLessdef::make(
+                      llvmberry::ConsVar::make(reg0_name, llvmberry::Physical),
+                      llvmberry::ConsRhs::make(reg0_name, llvmberry::Physical,
+                                               llvmberry::Source),
+                      llvmberry::Source),
+                  llvmberry::ConsBounds::make(
+                      llvmberry::TyPosition::make(llvmberry::Source, *I),
+                      llvmberry::TyPosition::make(llvmberry::Target,
+                                                  *InsertPos))));
+	     //prev maydiff propagate global -> issue 86
             hints.addCommand
                     (llvmberry::ConsPropagate::make
                              (llvmberry::ConsMaydiff::make
@@ -2800,8 +2796,22 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                        llvmberry::TyPosition::make
                                        (llvmberry::Target, *InsertPos))
                              ));
-          }
-          );
+
+            // traversal dominator tree
+            for (auto node = GraphTraits<DominatorTree *>::nodes_begin(DT);
+                 node != GraphTraits<DominatorTree *>::nodes_end(DT); ++node) {
+              BasicBlock *BB = node->getBlock();
+              if ((DestBlock->getName() != BB->getName()) &&
+                  isPotentiallyReachable(I->getParent(), BB) &&
+                  !DT->dominates(DestBlock, BB)) {
+                PROPAGATE(MAYDIFF(reg0_name, llvmberry::Physical),
+                          BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                                     SRC, (BB->getName())),
+                                 llvmberry::TyPosition::make_end_of_block(
+                                     SRC, *(BB->begin()->getParent()))));
+              }
+            }
+        });
   I->moveBefore(InsertPos);
   ++NumSunkInst;
   llvmberry::ValidationUnit::End();
@@ -2867,9 +2877,18 @@ bool InstCombiner::run() {
         // only has us as a predecessors (we'd have to split the critical edge
         // otherwise), we can keep going.
         if (UserIsSuccessor && UserParent->getSinglePredecessor()) {
+          llvmberry::ValidationUnit::Begin("sink_inst",
+                                           I->getParent()->getParent());
+
+          llvmberry::ValidationUnit::GetInstance()->intrude([this](
+              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            DominatorTree *DT = this->getDominatorTree();
+            auto si_arg = data.create<llvmberry::ArgForSinkInst>();
+            si_arg->sinkDT = DT;
+          });
           // Okay, the CFG is simple enough, try to sink this instruction.
           if (TryToSinkInstruction(I, UserParent)) {
-           // llvmberry::ValidationUnit::EndIfExists();
+            
             MadeIRChange = true;
             // We'll add uses of the sunk instruction below, but since sinking
             // can expose opportunities for it's *operands* add them to the
@@ -2877,6 +2896,8 @@ bool InstCombiner::run() {
             for (Use &U : I->operands())
               if (Instruction *OpI = dyn_cast<Instruction>(U.get()))
                 Worklist.Add(OpI);
+          } else {
+            llvmberry::ValidationUnit::Abort();
           }
         }
       }

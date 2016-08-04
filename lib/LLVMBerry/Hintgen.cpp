@@ -1,7 +1,7 @@
-#include "llvm/LLVMBerry/Hintgen.h"
-#include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Dictionary.h"
+#include "llvm/LLVMBerry/Hintgen.h"
+#include "llvm/LLVMBerry/Infrules.h"
 
 namespace llvmberry {
 // insert nop at tgt where I is at src
