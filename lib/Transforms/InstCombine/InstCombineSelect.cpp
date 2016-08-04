@@ -173,8 +173,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
           llvmberry::FoldSelectOpOpArg::YX_ZX;
     });
   } else if (!TI->isCommutative()) {
-    llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::
-                ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
     llvmberry::ValidationUnit::End();
 
     return nullptr;
@@ -200,8 +199,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
           llvmberry::FoldSelectOpOpArg::YX_XZ;
     });
   } else {
-    llvmberry::ValidationUnit::GetInstance()->setReturnCode(llvmberry::
-                ValidationUnit::ABORT);
+    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
     llvmberry::ValidationUnit::End();
 
     return nullptr;

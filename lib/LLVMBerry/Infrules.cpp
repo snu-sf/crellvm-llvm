@@ -1329,6 +1329,43 @@ void ConsAndZero::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(and_zero));
 }
 
+TyAndOrNot1::TyAndOrNot1(std::shared_ptr<TyRegister> _z,
+                         std::shared_ptr<TyRegister> _x,
+                         std::shared_ptr<TyRegister> _y,
+                         std::shared_ptr<TyValue> _a,
+                         std::shared_ptr<TyValue> _b,
+                         std::shared_ptr<TySize> _sz)
+    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), a(std::move(_a)),
+      b(std::move(_b)), sz(std::move(_sz)) {}
+void TyAndOrNot1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(a));
+  archive(CEREAL_NVP(b));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAndOrNot1::ConsAndOrNot1(std::shared_ptr<TyAndOrNot1> _and_or_not1)
+    : and_or_not1(std::move(_and_or_not1)) {}
+std::shared_ptr<TyInfrule> ConsAndOrNot1::make(std::shared_ptr<TyRegister> _z,
+                                               std::shared_ptr<TyRegister> _x,
+                                               std::shared_ptr<TyRegister> _y,
+                                               std::shared_ptr<TyValue> _a,
+                                               std::shared_ptr<TyValue> _b,
+                                               std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAndOrNot1> _val(
+      new TyAndOrNot1(std::move(_z), std::move(_x), std::move(_y),
+                      std::move(_a), std::move(_b), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsAndOrNot1(std::move(_val)));
+}
+void ConsAndOrNot1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndOrNot1");
+  archive(CEREAL_NVP(and_or_not1));
+}
+
 TyBopDistributiveOverSelectinst::TyBopDistributiveOverSelectinst(
     TyBop _opcode, std::shared_ptr<TyRegister> _r,
     std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime,

@@ -86,16 +86,16 @@ void writeModuleToFile(const llvm::Module &module,
 // class ValidationUnit
 // constructor
 ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
-    : _filename(), _optname(optname), _srcfile_buffer(nullptr), _func(func), 
-      _corehint(), _data(), _return_code(COMMIT) {
+    : _filename(), _optname(optname), _srcfile_buffer(nullptr), _func(func),
+      _corehint(), _data(), isAborted(false) {
   if (optWhiteListEnabled && 
       std::find(optWhiteList.begin(), optWhiteList.end(), optname) == 
         optWhiteList.end()) {
-    this->_return_code = ABORT;
+    this->isAborted = true;
   } else if (optPassWhiteListEnabled &&
       std::find(optPassWhiteList.begin(), optPassWhiteList.end(), _CurrentPass) 
         == optPassWhiteList.end()) {
-    this->_return_code = ABORT;
+    this->isAborted = true;
   } else {
     this->begin();
   }
@@ -103,17 +103,10 @@ ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
 
 // destructor
 ValidationUnit::~ValidationUnit() {
-  switch (_return_code) {
-  case COMMIT:
+  if (!isAborted)
     this->commit();
-    break;
-  case ABORT:
+  else
     this->abort();
-    break;
-  default:
-    assert(false && "Not a possible return code");
-    break;
-  }
   if (_srcfile_buffer != nullptr)
     delete _srcfile_buffer;
 }
@@ -136,19 +129,22 @@ void ValidationUnit::setDescription(const std::string &str) {
   _Instance->_corehint.setDescription(str);
 }
 
-void ValidationUnit::setReturnCode(RETURN_CODE return_code) {
-  _return_code = return_code;
+void ValidationUnit::setIsAborted() {
+  isAborted = true;
 }
 
 void ValidationUnit::intrude(
     std::function<void(Dictionary &, CoreHint &)> func) {
-  if (_return_code == ABORT) return;
+  if (isAborted)
+    return;
+  if (_corehint.getReturnCode() != CoreHint::ACTUAL)
+    return;
   func(_data, _corehint);
 }
 
 // private functions
 void ValidationUnit::begin() {
-  assert(_return_code != ABORT);
+  assert(!isAborted);
 
   // get module & module name
   const llvm::Module *module = _func->getParent();
@@ -174,7 +170,7 @@ void ValidationUnit::begin() {
 }
 
 void ValidationUnit::commit() {
-  assert(this->_return_code == COMMIT);
+  assert(!isAborted);
 
   // print src
   std::ofstream src_ofs(makeFullFilename(_filename, ".src.bc"), std::ios::out);
@@ -230,10 +226,12 @@ ValidationUnit *ValidationUnit::GetInstance() {
 void ValidationUnit::StartPass(PASS pass) {
   assert(_CurrentPass == NOTHING);
   _CurrentPass = pass;
+  PassDictionary::Create();
 }
 
 void ValidationUnit::EndPass() {
   _CurrentPass = NOTHING;
+  PassDictionary::Destroy();
 }
 
 bool ValidationUnit::Exists() {
@@ -264,10 +262,8 @@ void ValidationUnit::End() {
 }
 
 void ValidationUnit::Abort() {
-  _Instance->setReturnCode(ABORT);
-  assert(Exists() && "No ValidationUnit exists");
-  delete _Instance;
-  _Instance = nullptr;
+  _Instance->setIsAborted();
+  End();
 }
 
 bool ValidationUnit::EndIfExists() {

@@ -19,7 +19,6 @@ namespace llvmberry {
 class ValidationUnit {
 public:
   typedef llvmberry::Dictionary Dictionary;
-  enum RETURN_CODE { COMMIT = 0, ABORT };
   enum PASS { NOTHING = 0, GVN, MEM2REG, PRE, INSTCOMBINE };
 
   CoreHint &getHint();
@@ -27,7 +26,7 @@ public:
   const std::string &getDescription() const;
   void setOptimizationName(const std::string &name);
   void setDescription(const std::string &str);
-  void setReturnCode(RETURN_CODE return_code);
+  void setIsAborted();
   void intrude(std::function<void(Dictionary &, CoreHint &)> func);
 
 private:
@@ -43,7 +42,7 @@ private:
   llvm::Function *_func;
   CoreHint _corehint;
   Dictionary _data;
-  RETURN_CODE _return_code;
+  bool isAborted;
 
 public:
   static ValidationUnit *GetInstance();

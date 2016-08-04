@@ -1,7 +1,7 @@
-#include "llvm/LLVMBerry/Hintgen.h"
-#include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Dictionary.h"
+#include "llvm/LLVMBerry/Hintgen.h"
+#include "llvm/LLVMBerry/Infrules.h"
 
 namespace llvmberry {
 // insert nop at tgt where I is at src
@@ -181,7 +181,7 @@ void applyCommutativity(llvm::Instruction *position,
       case llvm::Instruction::Or:
         INFRULE(
             INSTPOS(llvmberry::Source, position),
-            ConsOrCommutative::make(REGISTER(regname, Physical),
+            ConsOrCommutativeTgt::make(REGISTER(regname, Physical),
                                     VAL(expression->getOperand(0), Physical),
                                     VAL(expression->getOperand(1), Physical),
                                     BITSIZE(bitwidth)));
@@ -716,7 +716,7 @@ void generateHintForTrivialDCE(llvm::Instruction &I) {
       hints.setDescription("DCE on call "
                            "instruction.\n\"isInstructionTriviallyDead\" "
                            "should give enough power to validate.");
-      hints.appendAdmittedToDescription();
+      hints.setReturnCodeToAdmitted();
     }
   });
 }
@@ -730,7 +730,7 @@ void generateHintForGVNDCE(llvm::Instruction &I) {
       hints.setDescription("DCE on call instruction inside GVN.\nIt might be "
                            "introduced from SimplifyInstruction or "
                            "lookup_or_add_call.");
-      hints.appendAdmittedToDescription();
+      hints.setReturnCodeToAdmitted();
     }
   });
 }

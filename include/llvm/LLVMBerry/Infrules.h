@@ -657,6 +657,22 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyAndOrNot1 {
+public:
+  TyAndOrNot1(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
+              std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _a,
+              std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyBopDistributiveOverSelectinst {
 public:
   TyBopDistributiveOverSelectinst(
@@ -2846,6 +2862,19 @@ public:
 
 private:
   std::shared_ptr<TyAndZero> and_zero;
+};
+
+struct ConsAndOrNot1 : public TyInfrule {
+public:
+  ConsAndOrNot1(std::shared_ptr<TyAndOrNot1> _and_or_not1);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
+       std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAndOrNot1> and_or_not1;
 };
 
 struct ConsBopDistributiveOverSelectinst : public TyInfrule {

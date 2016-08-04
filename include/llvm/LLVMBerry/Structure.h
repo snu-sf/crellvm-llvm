@@ -1412,13 +1412,16 @@ private:
 
 struct CoreHint {
 public:
+  enum RETURN_CODE { ACTUAL = 0, ADMITTED, FAIL };
   CoreHint();
   CoreHint(std::string _module_id, std::string _function_id,
            std::string _opt_name, std::string _description = "");
   const std::string &getDescription() const;
   void setDescription(const std::string &desc);
   void appendToDescription(const std::string &desc);
-  void appendAdmittedToDescription();
+  const RETURN_CODE &getReturnCode() const;
+  void setReturnCodeToAdmitted();
+  void setReturnCodeToFail();
   void addCommand(std::shared_ptr<TyCommand> c);
   void setOptimizationName(const std::string &name);
   void addNopPosition(std::shared_ptr<TyPosition> position);
@@ -1429,9 +1432,12 @@ private:
   std::string function_id;
   std::string opt_name;
   std::string description;
+  RETURN_CODE return_code;
   std::vector<std::shared_ptr<TyPosition>> nop_positions;
   std::vector<std::shared_ptr<TyCommand>> commands;
 };
+
+void intrude(std::function<void()> func);
 
 } // llvmberry
 
