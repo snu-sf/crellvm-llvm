@@ -1924,27 +1924,24 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
     llvmberry::ValidationUnit::Begin("sub_add",
                                      I.getParent()->getParent());
-    
-    llvmberry::generateHintForNegValue(Op1, I); //Op1 will be propagate to Z if is id and infrule will be applied if is constant  
+
+    // Op1 will be propagated to Z if it is id
+    // Inference rule will be applied if is a constant
+    llvmberry::generateHintForNegValue(Op1, I);
 
     llvmberry::ValidationUnit::GetInstance()->intrude([&Op0, &I, &Op1, &V](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
-
-      std::string reg0_name = llvmberry::getVariable(I); // z = x -my
-      std::string reg2_name = llvmberry::getVariable(*Op0); // x
-
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      //    <src>   |    <tgt>
+      // my = 0 - y | my = 0 - y
+      // z = x - my | z = x + y
+      std::string reg0_name = llvmberry::getVariable(I);
       unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
 
-      hints.addCommand(llvmberry::ConsInfrule::make(
-          llvmberry::TyPosition::make(llvmberry::Source, I),
-          llvmberry::ConsSubAdd::make(
-              llvmberry::TyRegister::make(reg0_name, llvmberry::Physical),
-              llvmberry::TyValue::make(*Op1),
-              llvmberry::TyRegister::make(reg2_name, llvmberry::Physical),
-              llvmberry::TyValue::make(*V), llvmberry::ConsSize::make(sz_bw))));
+      INFRULE(INSTPOS(SRC, &I),
+              llvmberry::ConsSubAdd::make(
+                  REGISTER(reg0_name, Physical), VAL(Op1, Physical),
+                  VAL(Op0, Physical), VAL(V, Physical), BITSIZE(sz_bw)));
     });
-
 
     return Res;
   }

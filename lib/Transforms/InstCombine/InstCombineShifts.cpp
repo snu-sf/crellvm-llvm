@@ -16,6 +16,10 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PatternMatch.h"
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -696,10 +700,33 @@ Instruction *InstCombiner::visitShl(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
+  llvmberry::ValidationUnit::Begin("simplify_shift",
+                                   I.getParent()->getParent());
+  llvmberry::ValidationUnit::GetInstance()->intrude([](
+      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    data.create<llvmberry::ArgForSimplifyShiftInst>();
+  });
+
   if (Value *V =
           SimplifyShlInst(I.getOperand(0), I.getOperand(1), I.hasNoSignedWrap(),
-                          I.hasNoUnsignedWrap(), DL, TLI, DT, AC))
+                          I.hasNoUnsignedWrap(), DL, TLI, DT, AC)) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
+      if (ptr->isActivated()) {
+        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+            ptr->getMicroOptName());
+        ptr->generateHint(&I);
+        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+      } else {
+        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
+            llvmberry::ValidationUnit::ABORT);
+      }
+    });
+
     return ReplaceInstUsesWith(I, V);
+  }
+  llvmberry::ValidationUnit::Abort();
 
   if (Instruction *V = commonShiftTransforms(I))
     return V;
@@ -738,9 +765,32 @@ Instruction *InstCombiner::visitLShr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
+  llvmberry::ValidationUnit::Begin("simplify_shift",
+                                   I.getParent()->getParent());
+  llvmberry::ValidationUnit::GetInstance()->intrude([](
+      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    data.create<llvmberry::ArgForSimplifyShiftInst>();
+  });
+
   if (Value *V = SimplifyLShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
-                                  DL, TLI, DT, AC))
+                                  DL, TLI, DT, AC)) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
+      if (ptr->isActivated()) {
+        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+            ptr->getMicroOptName());
+        ptr->generateHint(&I);
+        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+      } else {
+        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
+            llvmberry::ValidationUnit::ABORT);
+      }
+    });
+
     return ReplaceInstUsesWith(I, V);
+  }
+  llvmberry::ValidationUnit::Abort();
 
   if (Instruction *R = commonShiftTransforms(I))
     return R;
@@ -782,9 +832,32 @@ Instruction *InstCombiner::visitAShr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
+  llvmberry::ValidationUnit::Begin("simplify_shift",
+                                   I.getParent()->getParent());
+  llvmberry::ValidationUnit::GetInstance()->intrude([](
+      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    data.create<llvmberry::ArgForSimplifyShiftInst>();
+  });
+
   if (Value *V = SimplifyAShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
-                                  DL, TLI, DT, AC))
+                                  DL, TLI, DT, AC)) {
+    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
+        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
+      if (ptr->isActivated()) {
+        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+            ptr->getMicroOptName());
+        ptr->generateHint(&I);
+        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+      } else {
+        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
+            llvmberry::ValidationUnit::ABORT);
+      }
+    });
+
     return ReplaceInstUsesWith(I, V);
+  }
+  llvmberry::ValidationUnit::Abort();
 
   if (Instruction *R = commonShiftTransforms(I))
     return R;
