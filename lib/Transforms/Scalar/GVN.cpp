@@ -738,6 +738,8 @@ class PREAnalysisResult {
 public:
   std::vector<std::vector<int>> notSameIdx; // predMap idx -> operand idx
   bool isSameForAll;
+  std::vector<std::pair<PHINode *, int>> PrevPRE;
+
   PREAnalysisResult(Instruction *CurInst, Instruction *PREInstr,
                     SmallVector<std::pair<Value *, BasicBlock *>, 8> predMap) {
     std::vector<Value *> op_CurInst;
@@ -780,6 +782,54 @@ public:
         isSameForAll = false;
       // TODO care notSameIdx??
     }
+
+    BasicBlock *CurrentBlock = CurInst->getParent();
+    for (Instruction &I : *CurrentBlock)
+      if (PHINode *PI = dyn_cast<PHINode>(&I)) {
+        int hit = 0;
+        int idx = -1;
+        for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
+          BasicBlock *PB = predMap[i].second;
+          Value *V = nullptr;
+          if (!(V = predMap[i].first))
+            V = PREInstr;
+          Instruction *VI = dyn_cast<Instruction>(V);
+
+          for (int j = 0; j < VI->getNumOperands(); j++) {
+            if (dyn_cast<Instruction>(VI->getOperand(j)) ==
+                PI->getIncomingValueForBlock(PB)) {
+              hit++;
+              // if matched, match to same idx
+              if (idx == -1)
+                idx = j;
+              else if (idx == j) {
+              } else {
+                // this may occur because of 1+x <=> x+1
+                // hints.appendToDescription("idx : " + std::to_string(idx) +
+                //                           " | j : " + std::to_string(j));
+                return;
+              }
+              // hints.appendToDescription(
+              //     "PI: " + (*PI).getName().str() + " | VI: " +
+              //     (*VI).getName().str() + " | OI: " +
+              //     (*dyn_cast<Instruction>(VI->getOperand(j)))
+              //         .getName()
+              //         .str());
+            }
+          }
+        }
+        // if matched, all prev blocks match
+        if (idx != -1) {
+          if (hit == predMap.size()) {
+            PrevPRE.push_back(std::make_pair(PI, idx));
+          } else {
+            // hints.appendToDescription("hit : " + std::to_string(hit) +
+            //                           " | predMap.size() : " +
+            //                           std::to_string(predMap.size()));
+            return;
+          }
+        }
+      }
   }
 };
 }
@@ -3184,53 +3234,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
             hints.appendToDescription("notSameIdx " + std::to_string(i) + ": " +
                                       std::to_string(j));
 
-        std::vector<std::pair<PHINode *, int>> PrevPRE;
-        for (Instruction &I : *CurrentBlock)
-          if (PHINode *PI = dyn_cast<PHINode>(&I)) {
-            int hit = 0;
-            int idx = -1;
-            for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-              BasicBlock *PB = predMap[i].second;
-              Value *V = nullptr;
-              if (!(V = predMap[i].first))
-                V = PREInstr;
-              Instruction *VI = dyn_cast<Instruction>(V);
-
-              for (int j = 0; j < VI->getNumOperands(); j++) {
-                if (dyn_cast<Instruction>(VI->getOperand(j)) ==
-                    PI->getIncomingValueForBlock(PB)) {
-                  hit++;
-                  // if matched, match to same idx
-                  if (idx == -1)
-                    idx = j;
-                  else if (idx == j) {
-                  } else {
-                    // this may occur because of 1+x <=> x+1
-                    hints.appendToDescription("idx : " + std::to_string(idx) +
-                                              " | j : " + std::to_string(j));
-                    return;
-                  }
-                  hints.appendToDescription(
-                      "PI: " + (*PI).getName().str() + " | VI: " +
-                      (*VI).getName().str() + " | OI: " +
-                      (*dyn_cast<Instruction>(VI->getOperand(j)))
-                          .getName()
-                          .str());
-                }
-              }
-            }
-            // if matched, all prev blocks match
-            if (idx != -1) {
-              if (hit == predMap.size()) {
-                PrevPRE.push_back(std::make_pair(PI, idx));
-              } else {
-                hints.appendToDescription("hit : " + std::to_string(hit) +
-                                          " | predMap.size() : " +
-                                          std::to_string(predMap.size()));
-                return;
-              }
-            }
-          }
+        std::vector<std::pair<PHINode *, int>> PrevPRE = PREAR->PrevPRE;
 
         for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
           BasicBlock *PB = predMap[i].second;
