@@ -733,6 +733,57 @@ namespace {
   char GVN::ID = 0;
 }
 
+namespace {
+class PREAnalysisResult {
+public:
+  std::vector<std::vector<int>> notSameIdx; // predMap idx -> operand idx
+  bool isSameForAll;
+  PREAnalysisResult(Instruction *CurInst, Instruction *PREInstr,
+                    SmallVector<std::pair<Value *, BasicBlock *>, 8> predMap) {
+    std::vector<Value *> op_CurInst;
+    notSameIdx.resize(predMap.size());
+    isSameForAll = true;
+    for (Instruction::op_iterator OI = CurInst->op_begin(),
+                                  OE = CurInst->op_end();
+         OI != OE; ++OI) {
+      op_CurInst.push_back(OI->get());
+    }
+
+    for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
+      BasicBlock *PB = predMap[i].second;
+      Value *V = nullptr;
+      if (!(V = predMap[i].first))
+        V = PREInstr;
+      if (Instruction *VI = dyn_cast<Instruction>(V)) {
+        std::vector<Value *> op_VI;
+        for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
+             OI != OE; ++OI)
+          op_VI.push_back(OI->get());
+
+        bool isSame = true;
+        if (op_CurInst.size() != op_VI.size()) {
+          dbgs() << "CurInst :" << *CurInst << "\n";
+          dbgs() << "VI :" << *VI << "\n";
+          assert(isa<PHINode>(VI));
+        }
+        for (int j = 0; j < op_CurInst.size(); j++) {
+          bool tmp = (op_CurInst[j] == op_VI[j]);
+          if (!tmp)
+            notSameIdx[i].push_back(j);
+          isSame &= tmp;
+        }
+        // hints.appendToDescription("VI: " + (*VI).getName().str());
+        // hints.appendToDescription("RHS of CurInst and VI is same: " +
+        //                           std::to_string(isSame));
+        isSameForAll &= isSame;
+      } else
+        isSameForAll = false;
+      // TODO care notSameIdx??
+    }
+  }
+};
+}
+
 // The public interface to this file...
 FunctionPass *llvm::createGVNPass(bool NoLoads) {
   return new GVN(NoLoads);
@@ -3011,50 +3062,12 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
 
   // Validation hint generation for PRE
   llvmberry::intrude([&CurInst, &CurrentBlock, &Phi, &predMap, &PREInstr]() {
+    PREAnalysisResult *PREAR =
+        new PREAnalysisResult(CurInst, PREInstr, predMap);
     std::string CurInst_id = llvmberry::getVariable(*CurInst);
     std::string Phi_id = llvmberry::getVariable(*Phi);
-    std::vector<Value *> op_CurInst;
-    std::vector<std::vector<int>> notSameIdx(
-        predMap.size(), std::vector<int>(0)); // predMap idx -> operand idx
-    bool isSameForAll = true;
-    for (Instruction::op_iterator OI = CurInst->op_begin(),
-                                  OE = CurInst->op_end();
-         OI != OE; ++OI) {
-      op_CurInst.push_back(OI->get());
-    }
-    for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-      BasicBlock *PB = predMap[i].second;
-      Value *V = nullptr;
-      if (!(V = predMap[i].first))
-        V = PREInstr;
-      if (Instruction *VI = dyn_cast<Instruction>(V)) {
-        std::vector<Value *> op_VI;
-        for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
-             OI != OE; ++OI)
-          op_VI.push_back(OI->get());
 
-        bool isSame = true;
-        if (op_CurInst.size() != op_VI.size()) {
-          dbgs() << "CurInst :" << *CurInst << "\n";
-          dbgs() << "VI :" << *VI << "\n";
-          assert("Um.. what is this case??" && false);
-        }
-        for (int j = 0; j < op_CurInst.size(); j++) {
-          bool tmp = (op_CurInst[j] == op_VI[j]);
-          if (!tmp)
-            notSameIdx[i].push_back(j);
-          isSame &= tmp;
-        }
-        // hints.appendToDescription("VI: " + (*VI).getName().str());
-        // hints.appendToDescription("RHS of CurInst and VI is same: " +
-        //                           std::to_string(isSame));
-        isSameForAll &= isSame;
-      } else
-        isSameForAll = false;
-      // TODO care notSameIdx??
-    }
-
-    if (isSameForAll) {
+    if (PREAR->isSameForAll) {
       llvmberry::ValidationUnit::Begin("GVN_PRE",
                                        CurInst->getParent()->getParent());
       llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst,
@@ -3159,15 +3172,15 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                                          &CurrentBlock,
                                                          &predMap, &PREInstr,
                                                          &Phi, &CurInst_id,
-                                                         &Phi_id, &notSameIdx](
+                                                         &Phi_id, &PREAR](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
         dbgs() << "CurInst : " << *CurInst << "\n";
         dbgs() << "Phi : " << *Phi << "\n";
         // if is same for all, it does not involve previous PRE and just works
         // it is treated below
-        for (int i = 0; i < notSameIdx.size(); i++)
-          for (int j = 0; j < notSameIdx[i].size(); j++)
+        for (int i = 0; i < PREAR->notSameIdx.size(); i++)
+          for (int j = 0; j < PREAR->notSameIdx[i].size(); j++)
             hints.appendToDescription("notSameIdx " + std::to_string(i) + ": " +
                                       std::to_string(j));
 
