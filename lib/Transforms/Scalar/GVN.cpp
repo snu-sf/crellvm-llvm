@@ -795,6 +795,11 @@ public:
             V = PREInstr;
           Instruction *VI = dyn_cast<Instruction>(V);
 
+          // It finds the first j that matches
+          // VI may have same operand, such as VI = a + a, so there can be many
+          // j
+          // Anyhow, propagating only once && substituting only once may
+          // sufficient
           for (int j = 0; j < VI->getNumOperands(); j++) {
             if (dyn_cast<Instruction>(VI->getOperand(j)) ==
                 PI->getIncomingValueForBlock(PB)) {
@@ -807,7 +812,7 @@ public:
                 // this may occur because of 1+x <=> x+1
                 // hints.appendToDescription("idx : " + std::to_string(idx) +
                 //                           " | j : " + std::to_string(j));
-                return;
+                assert(false);
               }
               // hints.appendToDescription(
               //     "PI: " + (*PI).getName().str() + " | VI: " +
@@ -826,7 +831,7 @@ public:
             // hints.appendToDescription("hit : " + std::to_string(hit) +
             //                           " | predMap.size() : " +
             //                           std::to_string(predMap.size()));
-            return;
+            assert(false);
           }
         }
       }
@@ -3254,6 +3259,8 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
               BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
 
+          // if it is not isSameForAll, and PrevPRE is empty, what does this
+          // mean..?
           if (PrevPRE.size()) {
             Instruction *VI_evolving = (*VI).clone();
             VI_evolving->insertBefore(CurrentBlock->getTerminator());
