@@ -738,10 +738,12 @@ class PREAnalysisResult {
 public:
   std::vector<std::vector<int>> notSameIdx; // predMap idx -> operand idx
   bool isSameForAll;
+  bool PrevPRENotEnough;
   std::vector<std::pair<PHINode *, int>> PrevPRE;
 
   PREAnalysisResult(Instruction *CurInst, Instruction *PREInstr,
                     SmallVector<std::pair<Value *, BasicBlock *>, 8> predMap) {
+    PrevPRENotEnough = false;
     std::vector<Value *> op_CurInst;
     notSameIdx.resize(predMap.size());
     isSameForAll = true;
@@ -793,33 +795,42 @@ public:
           Value *V = nullptr;
           if (!(V = predMap[i].first))
             V = PREInstr;
-          Instruction *VI = dyn_cast<Instruction>(V);
+          dbgs() << "V is : " << *V << "\n";
 
-          // It finds the first j that matches
-          // VI may have same operand, such as VI = a + a, so there can be many
-          // j
-          // Anyhow, propagating only once && substituting only once may
-          // sufficient
-          for (int j = 0; j < VI->getNumOperands(); j++) {
-            if (dyn_cast<Instruction>(VI->getOperand(j)) ==
-                PI->getIncomingValueForBlock(PB)) {
+          // it may be constant int... ?!
+          if (Instruction *VI = dyn_cast<Instruction>(V)) {
+            if (isa<PHINode>(VI)) {
               hit++;
-              // if matched, match to same idx
-              if (idx == -1)
-                idx = j;
-              else if (idx == j) {
-              } else {
-                // this may occur because of 1+x <=> x+1
-                // hints.appendToDescription("idx : " + std::to_string(idx) +
-                //                           " | j : " + std::to_string(j));
-                assert(false);
+              continue;
+            }
+
+            // It finds the first j that matches
+            // VI may have same operand, such as VI = a + a, so there can be
+            // many
+            // j
+            // Anyhow, propagating only once && substituting only once may
+            // sufficient
+            for (int j = 0; j < VI->getNumOperands(); j++) {
+              if (dyn_cast<Instruction>(VI->getOperand(j)) ==
+                  PI->getIncomingValueForBlock(PB)) {
+                hit++;
+                // if matched, match to same idx
+                if (idx == -1)
+                  idx = j;
+                else if (idx == j) {
+                } else {
+                  // this may occur because of 1+x <=> x+1
+                  // hints.appendToDescription("idx : " + std::to_string(idx) +
+                  //                           " | j : " + std::to_string(j));
+                  assert(false);
+                }
+                // hints.appendToDescription(
+                //     "PI: " + (*PI).getName().str() + " | VI: " +
+                //     (*VI).getName().str() + " | OI: " +
+                //     (*dyn_cast<Instruction>(VI->getOperand(j)))
+                //         .getName()
+                //         .str());
               }
-              // hints.appendToDescription(
-              //     "PI: " + (*PI).getName().str() + " | VI: " +
-              //     (*VI).getName().str() + " | OI: " +
-              //     (*dyn_cast<Instruction>(VI->getOperand(j)))
-              //         .getName()
-              //         .str());
             }
           }
         }
@@ -831,7 +842,7 @@ public:
             // hints.appendToDescription("hit : " + std::to_string(hit) +
             //                           " | predMap.size() : " +
             //                           std::to_string(predMap.size()));
-            assert(false);
+            PrevPRENotEnough = true;
           }
         }
       }
@@ -3153,6 +3164,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                  "Value not an instruction: not yet handled.");
           Instruction *VI = dyn_cast<Instruction>(V);
           if (!propagateInstrUntilBlockEnd(hints, VI, PB)) {
+            hints.appendToDescription("propagateInstrUntilBlockEnd");
             hints.setReturnCodeToFail();
             return;
           }
@@ -3239,6 +3251,11 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
             hints.appendToDescription("notSameIdx " + std::to_string(i) + ": " +
                                       std::to_string(j));
 
+        if (PREAR->PrevPRENotEnough) {
+          hints.appendToDescription("PrevPRENotEnough");
+          hints.setReturnCodeToFail();
+          return;
+        }
         std::vector<std::pair<PHINode *, int>> PrevPRE = PREAR->PrevPRE;
 
         for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
@@ -3247,7 +3264,20 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           if (!(V = predMap[i].first))
             V = PREInstr;
 
+          if (!isa<Instruction>(V)) {
+            // constant int occurs... How can constant int get value number???
+            hints.appendToDescription("V not instruction");
+            hints.setReturnCodeToFail();
+            return;
+          }
+
           Instruction *VI = dyn_cast<Instruction>(V);
+          if (isa<PHINode>(V)) {
+            hints.appendToDescription(
+                "Phi must be introduced from previous PRE");
+            hints.setReturnCodeToAdmitted();
+            return;
+          }
           std::string VI_id = llvmberry::getVariable(*VI);
 
           PROPAGATE(
@@ -3280,6 +3310,8 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                           VAR(PrevPhi_id, Physical), VAR(VI_op_id, Previous),
                           VAR(VI_op_id, Physical)));
 
+              dbgs() << "VI_op : " << *VI_op << "\n";
+              dbgs() << "VI_evolving : " << *VI_evolving << "\n";
               INFRULE(llvmberry::TyPosition::make(
                           SRC, (*CurrentBlock).getName(), (*PB).getName()),
                       llvmberry::ConsSubstituteRev::make(
