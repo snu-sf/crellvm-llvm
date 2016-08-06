@@ -719,8 +719,7 @@ Instruction *InstCombiner::visitShl(BinaryOperator &I) {
         ptr->generateHint(&I);
         llvmberry::generateHintForReplaceAllUsesWith(&I, V);
       } else {
-        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-            llvmberry::ValidationUnit::ABORT);
+        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       }
     });
 
@@ -783,8 +782,7 @@ Instruction *InstCombiner::visitLShr(BinaryOperator &I) {
         ptr->generateHint(&I);
         llvmberry::generateHintForReplaceAllUsesWith(&I, V);
       } else {
-        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-            llvmberry::ValidationUnit::ABORT);
+        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       }
     });
 
@@ -850,8 +848,7 @@ Instruction *InstCombiner::visitAShr(BinaryOperator &I) {
         ptr->generateHint(&I);
         llvmberry::generateHintForReplaceAllUsesWith(&I, V);
       } else {
-        llvmberry::ValidationUnit::GetInstance()->setReturnCode(
-            llvmberry::ValidationUnit::ABORT);
+        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
       }
     });
 
