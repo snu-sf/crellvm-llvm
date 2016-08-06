@@ -1231,6 +1231,10 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
     data.get<ArgForMem2Reg>()->replaceLessthanUndef(ReplName,
                                                     TyValue::make(*ReplVal));
 
+      data.get<ArgForMem2Reg>()->replaceLessthanUndefTgt(ReplName,
+                                                      TyValue::make(*ReplVal));
+
+
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(ReplName, Physical);
 
     std::vector<std::pair<std::shared_ptr<TyPosition>,
@@ -1323,7 +1327,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
 
     if(llvm::PHINode *PN = llvm::dyn_cast<llvm::PHINode>(Inst)) {
       if(PhiToAllocaMap[PN] == AllocaNum) {
-       
+      llvm::BasicBlock *prev = *VisitedBlock.rbegin(); 
         while(!VisitedBlock.empty()) {
           llvm::BasicBlock *current = *VisitedBlock.rbegin();
           VisitedBlock.pop_back();
@@ -1332,6 +1336,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
           ValidationUnit::GetInstance()->intrude([&current, &AI, &PN]
                                                          (Dictionary &data, CoreHint &hints) {
             auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+            auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
+
             if(AI->getParent() != current) {
 
               PROPAGATE(
@@ -1373,9 +1379,46 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
                                                         EXPR(llvm::UndefValue::get(PN->getType()), Physical),
                                                         VAR(getVariable(*AI), Ghost)));
             }
+             });
+        }
+
+          ValidationUnit::GetInstance()->intrude([&prev, &AI, &PN]
+                                                         (Dictionary &data, CoreHint &hints) {
+            auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+            auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
+
+            std::shared_ptr<llvmberry::TyLessthanUndefTgt> lessUndefTgt
+                    (new llvmberry::TyLessthanUndefTgt(llvmberry::TyValueType::make(*PN->getType()),
+                                                       std::shared_ptr<llvmberry::TyValue>
+                                                       (new llvmberry::ConsId
+                                                            (llvmberry::TyRegister::make(getVariable(*PN), llvmberry::Physical)))));
+
+            INFRULE(llvmberry::TyPosition::make(SRC, *PN, prev->getName()),
+                    std::shared_ptr<llvmberry::TyInfrule>
+                    (new llvmberry::ConsLessthanUndefTgt(lessUndefTgt)));
+
+            mem2regCmd[getVariable(*PN)].lessUndefTgt.push_back(lessUndefTgt);
+
+
+
+
+            std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
+                    (new llvmberry::TyTransitivityTgt(VAR(getVariable(*AI), Ghost),
+                                                      EXPR(llvm::UndefValue::get(PN->getType()), Physical),
+                                                      VAR(getVariable(*PN), Physical)));
+
+            INFRULE(llvmberry::TyPosition::make(SRC, *PN, prev->getName()),
+                    std::shared_ptr<llvmberry::TyInfrule>
+                            (new llvmberry::ConsTransitivityTgt(transTgt)));
+
+            mem2regCmd[getVariable(*PN)].transTgt.push_back(transTgt);
+
+
+
+        
 
           });
-        } 
+         
         return;  
       }
     }

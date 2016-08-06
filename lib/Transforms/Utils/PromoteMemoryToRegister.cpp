@@ -1664,6 +1664,10 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
 
+       // propagate maydiff
+       llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
+       llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
+
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
       });
 

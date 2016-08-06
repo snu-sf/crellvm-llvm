@@ -251,4 +251,22 @@ void Mem2RegArg::replaceLessthanUndef(std::string key,
   }
   std::cout<<"LessthanUndefEnd"<<std::endl;
 }
+
+  void Mem2RegArg::replaceLessthanUndefTgt(std::string key,
+                                        std::shared_ptr<TyValue> newVal) {
+    if (mem2regCmd->find(key) == mem2regCmd->end())
+      return;
+
+    std::cout<<"LessthanUndefTgt"<<std::endl;
+    std::vector<std::shared_ptr<TyLessthanUndefTgt>> &vec =
+            mem2regCmd->find(key)->second.lessUndefTgt;
+
+    for(size_t i = 0; i < vec.size(); i++) {
+      vec[i]->updateRhs(newVal);
+    }
+    std::cout<<"LessthanUndefEndTgt"<<std::endl;
+  }
+
+
+
 } // llvmberry
