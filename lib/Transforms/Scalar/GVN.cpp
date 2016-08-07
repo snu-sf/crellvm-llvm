@@ -3204,31 +3204,31 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                   llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
                                                     RHS(VI_id, Physical, SRC),
                                                     VAR(Phi_id, Physical)));
+        }
 
-          // TODO: for all uses of CurInst
-          // replace curInst -> phi
-          for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
-            if (!isa<Instruction>(UI->getUser())) {
-              // let the validation fail when the user is not an instruction
-              assert(false && "User is not an instruction");
-            }
-
-            Instruction *userI = dyn_cast<Instruction>(UI->getUser());
-            std::string userI_id = llvmberry::getVariable(*userI);
-
-            std::string prev_block_name = "";
-            if (isa<PHINode>(userI)) {
-              BasicBlock *bb_from =
-                  dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
-              prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-            }
-
-            PROPAGATE(
-                LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
-                BOUNDS(INSTPOS(SRC, CurInst),
-                       llvmberry::TyPosition::make(llvmberry::Source, *userI,
-                                                   prev_block_name)));
+        // TODO: for all uses of CurInst
+        // replace curInst -> phi
+        for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
+          if (!isa<Instruction>(UI->getUser())) {
+            // let the validation fail when the user is not an instruction
+            assert(false && "User is not an instruction");
           }
+
+          Instruction *userI = dyn_cast<Instruction>(UI->getUser());
+          std::string userI_id = llvmberry::getVariable(*userI);
+
+          std::string prev_block_name = "";
+          if (isa<PHINode>(userI)) {
+            BasicBlock *bb_from =
+                dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+            prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+          }
+
+          PROPAGATE(
+              LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
+              BOUNDS(INSTPOS(SRC, CurInst),
+                     llvmberry::TyPosition::make(llvmberry::Source, *userI,
+                                                 prev_block_name)));
         }
 
       });
