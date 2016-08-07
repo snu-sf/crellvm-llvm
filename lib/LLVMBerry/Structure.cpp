@@ -2723,13 +2723,12 @@ void CoreHint::setOptimizationName(const std::string &name) {
   this->opt_name = name;
 }
 
-void intrude(std::function<void()> func) { 
+void intrude(std::function<void()> func) {
   if (optPassWhiteListEnabled &&
-      std::find(optPassWhiteList.begin(), optPassWhiteList.end(), 
-          ValidationUnit::GetCurrentPass())
-        == optPassWhiteList.end())
+      std::find(optPassWhiteList.begin(), optPassWhiteList.end(),
+                ValidationUnit::GetCurrentPass()) == optPassWhiteList.end())
     return;
-  func(); 
+  func();
 }
 
 } // llvmberry

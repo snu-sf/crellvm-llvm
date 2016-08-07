@@ -219,10 +219,11 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
           I.setOperand(0, A);
           I.setOperand(1, V);
 
-          llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&Op0, &I, &B, &C, &V, &Opcode]
-               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) && isa<ConstantInt>(V)) {
+          llvmberry::ValidationUnit::GetInstance()
+              ->intrude([&Op0, &I, &B, &C, &V, &Opcode](
+                    llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) &&
+                isa<ConstantInt>(V)) {
               //    <src>    |     <tgt>
               // Y = X op C1 | Y = X op C1
               // Z = Y op C2 | Z = X op (C1 op C2)
@@ -237,19 +238,20 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
               ConstantInt *V_const = dyn_cast<ConstantInt>(V);
 
               Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
-              
+
               unsigned b_bw = B_const->getBitWidth();
-              
+
               llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
 
-              INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopAssociative::make(
-                  REGISTER(reg0_name, Physical), REGISTER(reg1_name, Physical),
-                  REGISTER(reg2_name, Physical),
-                  llvmberry::getBop(Opcode),
-                  llvmberry::TyConstInt::make(*B_const),
-                  llvmberry::TyConstInt::make(*C_const),
-                  llvmberry::TyConstInt::make(*V_const),
-                  BITSIZE(b_bw)));
+              INFRULE(
+                  INSTPOS(SRC, &I),
+                  llvmberry::ConsBopAssociative::make(
+                      REGISTER(reg0_name, Physical),
+                      REGISTER(reg1_name, Physical),
+                      REGISTER(reg2_name, Physical), llvmberry::getBop(Opcode),
+                      llvmberry::TyConstInt::make(*B_const),
+                      llvmberry::TyConstInt::make(*C_const),
+                      llvmberry::TyConstInt::make(*V_const), BITSIZE(b_bw)));
             } else {
               llvmberry::ValidationUnit::GetInstance()->setIsAborted();
             }

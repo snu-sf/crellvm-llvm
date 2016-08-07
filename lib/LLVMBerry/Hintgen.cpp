@@ -693,13 +693,12 @@ void generateHintForAndOr(llvm::BinaryOperator *Z, llvm::Value *X,
   });
 }
 
-void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z,
-                                   llvm::BinaryOperator *W,
+void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z, llvm::BinaryOperator *W,
                                    llvm::BinaryOperator *Y) {
   assert(ValidationUnit::Exists());
 
-  ValidationUnit::GetInstance()->intrude([&Z, &W, &Y]
-          (Dictionary &data, CoreHint &hints) {
+  ValidationUnit::GetInstance()->intrude([&Z, &W, &Y](Dictionary &data,
+                                                      CoreHint &hints) {
     //       <src>      |      <tgt>
     // W = A + X        | W = A + X
     // Y = B + X        | Y = B + X
@@ -768,18 +767,19 @@ void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z,
         makeFunc = ConsIcmpNeXorXor::make;
       }
     } else {
-      assert(false && "icmp_eq_<bop> optimization : opcode should be one of ADD, SUB, or XOR");
+      assert(false && "icmp_eq_<bop> optimization : opcode should be one of "
+                      "ADD, SUB, or XOR");
     }
-    
+
     ValidationUnit::GetInstance()->setOptimizationName(optname);
-    INFRULE(INSTPOS(SRC, Z), makeFunc(
-        VAL(Z, Physical), VAL(W, Physical), VAL(X, Physical), 
-        VAL(Y, Physical), VAL(A, Physical), VAL(B, Physical), 
-        BITSIZE(bitsize)));
+    INFRULE(INSTPOS(SRC, Z),
+            makeFunc(VAL(Z, Physical), VAL(W, Physical), VAL(X, Physical),
+                     VAL(Y, Physical), VAL(A, Physical), VAL(B, Physical),
+                     BITSIZE(bitsize)));
   });
 }
 
-std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>> false_encoding =
+std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr> > false_encoding =
     std::make_pair(llvmberry::ConsConst::make(0, 64),
                    llvmberry::ConsConst::make(42, 64));
 
