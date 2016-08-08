@@ -1656,6 +1656,27 @@ std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
                      TyValue::make(*si.getOperand(1)), si.getAlignment()));
 }
 
+std::shared_ptr<TyLoadInst> TyLoadInst::makeAlignOne(llvm::Instruction *i) {
+  if (llvm::LoadInst* li = llvm::dyn_cast<llvm::LoadInst>(i)) {
+    return std::shared_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*li->getPointerOperand()->getType()),
+        TyValueType::make(*li->getType()), TyValue::make(*li->getPointerOperand()),
+        1));
+  } else if (llvm::StoreInst* si = llvm::dyn_cast<llvm::StoreInst>(i)) {
+    return std::shared_ptr<TyLoadInst>(
+        new TyLoadInst(TyValueType::make(*si->getOperand(1)->getType()),
+                       TyValueType::make(*si->getOperand(0)->getType()),
+                       TyValue::make(*si->getOperand(1)), 1));
+  } else if (llvm::AllocaInst* ai = llvm::dyn_cast<llvm::AllocaInst>(i)) {
+    return std::shared_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*ai->getType()),
+        TyValueType::make(*ai->getAllocatedType()), TyValue::make(*ai),
+        1));
+  } else {
+    assert("Instruction should be Load, Store, or Alloca" && false);
+  }
+}
+
 std::shared_ptr<TySelectInst>
 TySelectInst::make(const llvm::SelectInst &si) {
   return std::shared_ptr<TySelectInst>(new TySelectInst(

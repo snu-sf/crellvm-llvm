@@ -697,6 +697,7 @@ public:
   static std::shared_ptr<TyLoadInst> make(const llvm::AllocaInst &ai);
   static std::shared_ptr<TyLoadInst> make(const llvm::LoadInst &li);
   static std::shared_ptr<TyLoadInst> make(const llvm::StoreInst &si);
+  static std::shared_ptr<TyLoadInst> makeAlignOne(llvm::Instruction *i);
 
 private:
   std::shared_ptr<TyValueType> pointertype;

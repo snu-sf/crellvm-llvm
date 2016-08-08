@@ -411,7 +411,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       if (StoringGlobalVal) {
         // propagate stored value from alloca to load
         PROPAGATE(
-            LESSDEF(INSN(*AI),
+            LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                     VAR(Ralloca, Ghost),
                     SRC),
         BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
@@ -454,7 +455,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                                                   VAR(Ralloca, Ghost)));
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                llvmberry::ConsTransitivity::make(INSN(*AI),
+                llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                                                   EXPR(UndefVal, Physical),
                                                   VAR(Ralloca, Ghost)));
 
@@ -463,7 +465,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                                                 REGISTER(Rstore, Ghost)));
 
         INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndex[OnlyStore], ""),
-                llvmberry::ConsTransitivity::make(INSN(*OnlyStore),
+                llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(OnlyStore)))),
                                                   EXPR(OnlyStore->getOperand(0), Physical),
                                                   VAR(Rstore, Ghost)));
       }
@@ -544,13 +547,15 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                                                   REGISTER(Rload, Ghost)));
 
           INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                  llvmberry::ConsTransitivity::make(INSN(*AI),
+                  llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                                                     VAR(Ralloca, Ghost),
                                                     VAR(Rload, Ghost)));
 
           INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                   llvmberry::ConsTransitivity::make(VAR(Rload, Physical),
-                                                    INSN(*AI),
+                                                    INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                                                     VAR(Rload, Ghost)));
 
           INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
@@ -774,7 +779,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
         // propagate undef from alloca to load
         PROPAGATE(
-            LESSDEF(INSN(*AI),
+            LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                     VAR(Ralloca, Ghost),
                     SRC),
         BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
@@ -792,7 +798,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                                 REGISTER(Ralloca, Ghost)));
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                llvmberry::ConsTransitivity::make(INSN(*AI),
+                llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                                                   EXPR(UndefVal, Physical),
                                                   VAR(Ralloca, Ghost)));
 
@@ -833,13 +840,15 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                                   REGISTER(Rload, Ghost)));
 
           INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                  llvmberry::ConsTransitivity::make(INSN(*AI),
+                  llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                                                     VAR(Ralloca, Ghost),
                                                     VAR(Rload, Ghost)));
 
           INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                   llvmberry::ConsTransitivity::make(VAR(Rload, Physical),
-                                                    INSN(*AI),
+                                                    INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                                                     VAR(Rload, Ghost)));
 
           INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
