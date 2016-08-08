@@ -164,7 +164,6 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
     }
   } else if (which == "TransitivityTgt_e2") {
     std::cout<<"transTgt2 replace:"+key<<std::endl;
-
     std::string phiKey = "";
     if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
       phiKey = cv->getTyReg()->getName();
@@ -252,4 +251,22 @@ void Mem2RegArg::replaceLessthanUndef(std::string key,
   }
   std::cout<<"LessthanUndefEnd"<<std::endl;
 }
+
+  void Mem2RegArg::replaceLessthanUndefTgt(std::string key,
+                                        std::shared_ptr<TyValue> newVal) {
+    if (mem2regCmd->find(key) == mem2regCmd->end())
+      return;
+
+    std::cout<<"LessthanUndefTgt"<<std::endl;
+    std::vector<std::shared_ptr<TyLessthanUndefTgt>> &vec =
+            mem2regCmd->find(key)->second.lessUndefTgt;
+
+    for(size_t i = 0; i < vec.size(); i++) {
+      vec[i]->updateRhs(newVal);
+    }
+    std::cout<<"LessthanUndefEndTgt"<<std::endl;
+  }
+
+
+
 } // llvmberry

@@ -200,6 +200,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                std::vector<llvm::BasicBlock*> succs,
                                bool isSameBB);
 
+void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::BasicBlock *> VisitedBlock, llvm::AllocaInst *AI, llvm::DenseMap<llvm::PHINode *, unsigned> PhiToAllocaMap, unsigned AllocaNum);
+
 int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
 }
 
