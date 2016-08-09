@@ -2905,8 +2905,16 @@ module BranchInst : sig
   val is_conditional : llvalue -> bool
   val get_condition : llvalue -> llvalue
   val get_successor : llvalue -> int -> llbasicblock
-end    
-                    
+end
+
+(** {7 Operations on SwitchInst} *)
+module SwitchInst : sig
+  val get_condition : llvalue -> llvalue
+  val get_default_dest : llvalue -> llbasicblock
+  val get_successor : llvalue -> int -> llbasicblock
+  val get_case_value : llvalue -> int -> llvalue
+end
+
 (** {7 Operations on GetElementPtrInst} *)
 module GetElementPtrInst : sig
   val is_in_bounds : llvalue -> bool
