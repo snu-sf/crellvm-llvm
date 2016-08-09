@@ -175,8 +175,62 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
   case Instruction::Xor:
     if (Op->hasOneUse()) {
       // (X ^ C1) & C2 --> (X & C2) ^ (C1&C2)
+      llvmberry::ValidationUnit::Begin("and_xor_const",
+                                       TheAnd.getParent()->getParent());
       Value *And = Builder->CreateAnd(X, AndRHS);
+      //   <src>     |   <tgt>
+      // Y = X ^ C1  | Y' = X ^ C1
+      // nop         | Y  = X & C2
+      // Z = Y & C2  | Z  = Y ^ (C1 & C2)
+
+      llvmberry::ValidationUnit::GetInstance()->intrude([&TheAnd, &Op](
+          llvmberry::ValidationUnit::Dictionary &data,
+          llvmberry::CoreHint &hints) {
+        BinaryOperator *Z = &TheAnd;
+        BinaryOperator *Ysrc = dyn_cast<BinaryOperator>(Op);
+
+        // Propagate Y = X ^ C1 in Source
+        llvmberry::propagateInstruction(Ysrc, Z, SRC);
+      });
+
       And->takeName(Op);
+
+      llvmberry::ValidationUnit::GetInstance()
+          ->intrude([&TheAnd, &Op, &And, &X, &OpRHS, &AndRHS](
+                llvmberry::ValidationUnit::Dictionary &data,
+                llvmberry::CoreHint &hints) {
+        llvmberry::name_instructions(*Op->getParent()->getParent());
+
+        BinaryOperator *Z = &TheAnd;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(And);
+        BinaryOperator *Yprime = dyn_cast<BinaryOperator>(Op);
+        ConstantInt *C1 = OpRHS;
+        ConstantInt *C2 = AndRHS;
+        std::string reg_z_name = llvmberry::getVariable(*Z);
+        std::string reg_y_name = llvmberry::getVariable(*Y);
+        std::string reg_yprime_name = llvmberry::getVariable(*Yprime);
+
+        int64_t c1 = C1->getSExtValue();
+        int64_t c2 = C2->getSExtValue();
+        int64_t c3 = c1 & c2;
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        llvmberry::propagateInstruction(Yprime, Z, TGT);
+        llvmberry::propagateInstruction(Y, Z, TGT);
+        llvmberry::insertSrcNopAtTgtI(hints, Y);
+
+        llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Physical);
+
+        INFRULE(
+            INSTPOS(TGT, Z),
+            llvmberry::ConsAndXorConst::make(
+                REGISTER(reg_z_name, Physical), REGISTER(reg_y_name, Physical),
+                REGISTER(reg_yprime_name, Physical), VAL(X, Physical),
+                llvmberry::TyConstInt::make(c1, bitwidth),
+                llvmberry::TyConstInt::make(c2, bitwidth),
+                llvmberry::TyConstInt::make(c3, bitwidth), BITSIZE(bitwidth)));
+            });
       return BinaryOperator::CreateXor(And, Together);
     }
     break;
@@ -1428,14 +1482,17 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
                                       I.getName()+".demorgan");
         
         llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &Op0NotVal, &Op1NotVal, &Or](
-            llvmberry::ValidationUnit::Dictionary &data,
-            llvmberry::CoreHint &hints) {
+            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           //    <src>   |     <tgt>
           // X = A ^ -1 | X =  A  ^ -1
           // Y = B ^ -1 | Y =  B  ^ -1
           // nop        | Z' = A  | B
           // Z = X & Y  | Z =  Z' ^ -1
           BinaryOperator *Z = &I;
+          if (Z->getType()->isVectorTy()) {
+            llvmberry::ValidationUnit::Abort();
+            return;
+          }
           BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
           BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
           BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Or);
@@ -1452,23 +1509,17 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
           llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
 
           llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-          
-          hints.addCommand(llvmberry::ConsPropagate::make(
-                  llvmberry::ConsMaydiff::make(reg_zprime_name, llvmberry::Physical),
-                  llvmberry::ConsGlobal::make()));
+          llvmberry::propagateMaydiffGlobal(reg_zprime_name, llvmberry::Physical); 
           
           llvmberry::propagateInstruction(Zprime, Z, llvmberry::Target);
-
-          hints.addCommand(llvmberry::ConsInfrule::make(
-              llvmberry::TyPosition::make(llvmberry::Target, I),
+          
+          INFRULE(INSTPOS(llvmberry::Target, Z), 
               llvmberry::ConsAndDeMorgan::make(
-                  llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-                  llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
-                  llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-                  llvmberry::TyRegister::make(reg_zprime_name, llvmberry::Physical),
-                  llvmberry::TyValue::make(*A),
-                  llvmberry::TyValue::make(*B),
-                  llvmberry::ConsSize::make(bitwidth))));
+                  REGISTER(reg_z_name, Physical),
+                  REGISTER(reg_x_name, Physical),
+                  REGISTER(reg_y_name, Physical),
+                  REGISTER(reg_zprime_name, Physical),
+                  VAL(A, Physical), VAL(B, Physical), BITSIZE(bitwidth)));
         });
 
         return BinaryOperator::CreateNot(Or);

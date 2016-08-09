@@ -3176,7 +3176,13 @@ LLVMIntPredicate LLVMCmpInstConstGetPredicate(LLVMValueRef CE);
 int LLVMBranchInstIsConditional(LLVMValueRef Inst);
 LLVMValueRef LLVMBranchInstGetCondition(LLVMValueRef Inst);
 LLVMBasicBlockRef LLVMBranchInstGetSuccessor(LLVMValueRef Inst, unsigned idx);
-  
+
+/* Operations on SwitchInst */
+LLVMValueRef LLVMSwitchInstGetCondition(LLVMValueRef Inst);
+LLVMBasicBlockRef LLVMSwitchInstGetDefaultDest(LLVMValueRef Inst);
+LLVMBasicBlockRef LLVMSwitchInstGetSuccessor(LLVMValueRef Inst, unsigned idx);
+LLVMValueRef LLVMSwitchInstGetCaseValue(LLVMValueRef Inst, unsigned idx);
+
 /* Operations on GetElementPtrInst */
 int LLVMGetElementPtrInstIsInBounds(LLVMValueRef Inst);  
 

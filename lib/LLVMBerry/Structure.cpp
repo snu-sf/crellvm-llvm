@@ -842,6 +842,10 @@ std::shared_ptr<TyConstInt> TyConstInt::make(int64_t _int_value, int _value) {
   return std::shared_ptr<TyConstInt>(new TyConstInt(_int_value, _value));
 }
 
+std::shared_ptr<TyConstInt> TyConstInt::make(const llvm::ConstantInt &ci) {
+  return TyConstInt::make(ci.getSExtValue(), ci.getBitWidth());
+}
+
 TyConstFloat::TyConstFloat(double _float_value, enum TyFloatType _float_type)
     : float_value(_float_value), float_type(_float_type) {}
 
@@ -1158,6 +1162,29 @@ void ConsConstNull::serialize(cereal::JSONOutputArchive &archive) const {
   archive.finishNode();
 }
 
+ConsConstDataVector::ConsConstDataVector(
+    std::shared_ptr<TyValueType> _elem_type,
+    std::vector<std::shared_ptr<TyConstant> > &_elements)
+    : elem_type(_elem_type), elements(_elements) {}
+void ConsConstDataVector::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstDataVector");
+  archive.startNode();
+  archive.makeArray();
+  if (auto p = std::dynamic_pointer_cast<ConsVoidType>(elem_type)) {
+    archive.writeName();
+    archive.saveValue("VoidType");
+  } else {
+    archive(CEREAL_NVP(elem_type));
+  }
+  archive.startNode();
+  archive.makeArray();
+  archive(CEREAL_NVP(elements));
+  archive.finishNode();
+  archive.finishNode();
+}
+
 // values
 
 ConsId::ConsId(std::shared_ptr<TyRegister> _register)
@@ -1250,6 +1277,15 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     return std::shared_ptr<TyConstant>(
         new ConsConstNull(ptype->getAddressSpace(),
                           TyValueType::make(*ptype->getPointerElementType())));
+  } else if (const llvm::ConstantDataVector *dv =
+                 llvm::dyn_cast<llvm::ConstantDataVector>(&value)) {
+    const llvm::Type *elemty = dv->getElementType();
+    std::vector<std::shared_ptr<TyConstant> > elems;
+    for (unsigned i = 0; i < dv->getNumElements(); i++) {
+      elems.push_back(TyConstant::make(*dv->getElementAsConstant(i)));
+    }
+    return std::shared_ptr<TyConstant>(
+        new ConsConstDataVector(TyValueType::make(*elemty), elems));
   }
   std::string output;
   llvm::raw_string_ostream rso(output);
@@ -2708,5 +2744,7 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
 void CoreHint::setOptimizationName(const std::string &name) {
   this->opt_name = name;
 }
+
+void intrude(std::function<void()> func) { func(); }
 
 } // llvmberry

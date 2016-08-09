@@ -1598,7 +1598,17 @@ module BranchInst = struct
   external get_condition : llvalue -> llvalue = "LLVMBranchInstGetCondition"
   external get_successor : llvalue -> int -> llbasicblock
                                 = "llvm_branchinst_get_successor"               
-end        
+end
+
+(** {7 Operations on SwitchInst} *)
+module SwitchInst = struct
+  external get_condition : llvalue -> llvalue = "LLVMSwitchInstGetCondition"
+  external get_default_dest : llvalue -> llbasicblock = "LLVMSwitchInstGetDefaultDest"
+  external get_successor : llvalue -> int -> llbasicblock
+    = "llvm_switchinst_get_successor"
+  external get_case_value : llvalue -> int -> llvalue
+    = "llvm_switchinst_get_case_value"
+end
                     
 (** {7 Operations on GetElementPtrInst} *)
 module GetElementPtrInst = struct
