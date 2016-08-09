@@ -1364,6 +1364,43 @@ void ConsAndOrNot1::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(and_or_not1));
 }
 
+TyAndXorConst::TyAndXorConst(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+    std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2,
+    std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz)
+    : z(_z), y(_y), yprime(_yprime), x(_x), c1(_c1), c2(_c2), c3(_c3), sz(_sz) {
+}
+void TyAndXorConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(yprime));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(c1));
+  archive(CEREAL_NVP(c2));
+  archive(CEREAL_NVP(c3));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsAndXorConst::ConsAndXorConst(std::shared_ptr<TyAndXorConst> _and_xor_const)
+    : and_xor_const(_and_xor_const) {}
+std::shared_ptr<TyInfrule> ConsAndXorConst::make(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+    std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2,
+    std::shared_ptr<TyConstInt> _c3, std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyAndXorConst> _val(
+      new TyAndXorConst(_z, _y, _yprime, _x, _c1, _c2, _c3, _sz));
+  return std::shared_ptr<TyInfrule>(new ConsAndXorConst(_val));
+}
+
+void ConsAndXorConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndXorConst");
+  archive(CEREAL_NVP(and_xor_const));
+}
+
 TyBopDistributiveOverSelectinst::TyBopDistributiveOverSelectinst(
     TyBop _opcode, std::shared_ptr<TyRegister> _r,
     std::shared_ptr<TyRegister> _s, std::shared_ptr<TyRegister> _tprime,
