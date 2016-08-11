@@ -229,6 +229,10 @@ void ValidationUnit::StartPass(PASS pass) {
   PassDictionary::Create();
 }
 
+ValidationUnit::PASS ValidationUnit::GetCurrentPass() {
+  return ValidationUnit::_CurrentPass;
+}
+
 void ValidationUnit::EndPass() {
   _CurrentPass = NOTHING;
   PassDictionary::Destroy();

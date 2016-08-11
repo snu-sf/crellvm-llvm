@@ -47,6 +47,7 @@ private:
 public:
   static ValidationUnit *GetInstance();
   static void StartPass(PASS pass);
+  static PASS GetCurrentPass();
   static void EndPass();
   static void Begin(const std::string &optname, llvm::Function *func);
   static bool BeginIfNotExists(const std::string &optname,

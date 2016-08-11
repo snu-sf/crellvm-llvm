@@ -835,7 +835,11 @@ TyConstInt::TyConstInt(int64_t _int_value, int _bitwidth)
     : int_value(_int_value), int_type(new ConsIntType(_bitwidth)) {}
 
 void TyConstInt::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("int_value", int_value), CEREAL_NVP(int_type));
+  std::string str;
+  std::stringstream ss;
+  ss << int_value;
+  ss >> str;
+  archive(cereal::make_nvp("int_value", str), CEREAL_NVP(int_type));
 }
 
 std::shared_ptr<TyConstInt> TyConstInt::make(int64_t _int_value, int _value) {
@@ -2745,6 +2749,12 @@ void CoreHint::setOptimizationName(const std::string &name) {
   this->opt_name = name;
 }
 
-void intrude(std::function<void()> func) { func(); }
+void intrude(std::function<void()> func) {
+  if (optPassWhiteListEnabled &&
+      std::find(optPassWhiteList.begin(), optPassWhiteList.end(),
+                ValidationUnit::GetCurrentPass()) == optPassWhiteList.end())
+    return;
+  func();
+}
 
 } // llvmberry

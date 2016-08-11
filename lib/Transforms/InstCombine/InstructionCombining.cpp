@@ -212,20 +212,21 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
-          llvmberry::ValidationUnit::Begin("associativity_add",
+          llvmberry::ValidationUnit::Begin("bop_associativity",
                                            I.getParent()->getParent());
 
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
           I.setOperand(1, V);
 
-          llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&Op0, &I, &B, &C, &V, &Opcode]
-               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) && isa<ConstantInt>(V) && (Opcode == Instruction::Add)) {
-              // Op0: A op B
-              // I: Op0 op C
-              // V: B op C
+          llvmberry::ValidationUnit::GetInstance()
+              ->intrude([&Op0, &I, &B, &C, &V, &Opcode](
+                    llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) &&
+                isa<ConstantInt>(V)) {
+              //    <src>    |     <tgt>
+              // Y = X op C1 | Y = X op C1
+              // Z = Y op C2 | Z = X op (C1 op C2)
 
               // prepare variables
               std::string reg0_name = llvmberry::getVariable(*(Op0->getOperand(0)));
@@ -237,26 +238,20 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
               ConstantInt *V_const = dyn_cast<ConstantInt>(V);
 
               Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
-              
-              unsigned b_bw = B_const->getBitWidth();
-              unsigned c_bw = C_const->getBitWidth();
-              unsigned v_bw = V_const->getBitWidth();
 
-              int64_t b = B_const->getSExtValue();
-              int64_t c = C_const->getSExtValue();
-              int64_t v = V_const->getSExtValue();
-              
+              unsigned b_bw = B_const->getBitWidth();
+
               llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
 
-              INFRULE(INSTPOS(llvmberry::Source, &I),
-                  llvmberry::ConsAddAssociative::make
-                  (REGISTER(reg0_name, Physical),
-                   REGISTER(reg1_name, Physical),
-                   REGISTER(reg2_name, Physical),
-                   llvmberry::TyConstInt::make(b, b_bw),
-                   llvmberry::TyConstInt::make(c, c_bw),
-                   llvmberry::TyConstInt::make(v, v_bw),
-                   BITSIZE(b_bw)));
+              INFRULE(
+                  INSTPOS(SRC, &I),
+                  llvmberry::ConsBopAssociative::make(
+                      REGISTER(reg0_name, Physical),
+                      REGISTER(reg1_name, Physical),
+                      REGISTER(reg2_name, Physical), llvmberry::getBop(Opcode),
+                      llvmberry::TyConstInt::make(*B_const),
+                      llvmberry::TyConstInt::make(*C_const),
+                      llvmberry::TyConstInt::make(*V_const), BITSIZE(b_bw)));
             } else {
               llvmberry::ValidationUnit::GetInstance()->setIsAborted();
             }

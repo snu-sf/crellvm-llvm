@@ -693,9 +693,95 @@ void generateHintForAndOr(llvm::BinaryOperator *Z, llvm::Value *X,
   });
 }
 
-std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>> false_encoding =
-    std::make_pair(ConsConst::make(0, 64),
-                   ConsConst::make(42, 64));
+void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z, llvm::BinaryOperator *W,
+                                   llvm::BinaryOperator *Y) {
+  assert(ValidationUnit::Exists());
+
+  ValidationUnit::GetInstance()->intrude([&Z, &W, &Y](Dictionary &data,
+                                                      CoreHint &hints) {
+    //       <src>      |      <tgt>
+    // W = A + X        | W = A + X
+    // Y = B + X        | Y = B + X
+    // Z = icmp eq W, Y | Z = icmp eq A, B
+    //       <src>      |      <tgt>
+    // W = A + X        | W = A + X
+    // Y = B + X        | Y = B + X
+    // Z = icmp ne W, Y | Z = icmp ne A, B
+    llvm::Value *X = nullptr;
+    llvm::Value *A = nullptr;
+    llvm::Value *B = nullptr;
+    auto pred = Z->getPredicate();
+    unsigned bitsize = Y->getType()->getIntegerBitWidth();
+    propagateInstruction(W, Z, llvmberry::Source);
+    propagateInstruction(Y, Z, llvmberry::Source);
+    if (W->getOperand(1) == Y->getOperand(1)) {
+      X = W->getOperand(1);
+      A = W->getOperand(0);
+      B = Y->getOperand(0);
+    } else if (W->getOperand(0) == Y->getOperand(0)) {
+      X = W->getOperand(0);
+      A = W->getOperand(1);
+      B = Y->getOperand(1);
+      applyCommutativity(Z, W, llvmberry::Source);
+      applyCommutativity(Z, Y, llvmberry::Source);
+    } else if (W->getOperand(0) == Y->getOperand(1)) {
+      X = W->getOperand(0);
+      A = W->getOperand(1);
+      B = Y->getOperand(0);
+      applyCommutativity(Z, W, llvmberry::Source);
+    } else if (W->getOperand(1) == Y->getOperand(0)) {
+      X = W->getOperand(1);
+      A = W->getOperand(0);
+      B = Y->getOperand(1);
+      applyCommutativity(Z, Y, llvmberry::Source);
+    }
+
+    std::function<std::shared_ptr<TyInfrule>(
+        std::shared_ptr<TyValue>, std::shared_ptr<TyValue>,
+        std::shared_ptr<TyValue>, std::shared_ptr<TyValue>,
+        std::shared_ptr<TyValue>, std::shared_ptr<TyValue>,
+        std::shared_ptr<TySize>)> makeFunc;
+    std::string optname;
+    if (W->getOpcode() == llvm::Instruction::Add) {
+      if (pred == llvm::ICmpInst::ICMP_EQ) {
+        optname = "icmp_eq_add_add";
+        makeFunc = ConsIcmpEqAddAdd::make;
+      } else {
+        optname = "icmp_ne_add_add";
+        makeFunc = ConsIcmpNeAddAdd::make;
+      }
+    } else if (W->getOpcode() == llvm::Instruction::Sub) {
+      if (pred == llvm::ICmpInst::ICMP_EQ) {
+        optname = "icmp_eq_sub_sub";
+        makeFunc = ConsIcmpEqSubSub::make;
+      } else {
+        optname = "icmp_ne_sub_sub";
+        makeFunc = ConsIcmpNeSubSub::make;
+      }
+    } else if (W->getOpcode() == llvm::Instruction::Xor) {
+      if (pred == llvm::ICmpInst::ICMP_EQ) {
+        optname = "icmp_eq_xor_xor";
+        makeFunc = ConsIcmpEqXorXor::make;
+      } else {
+        optname = "icmp_ne_xor_xor";
+        makeFunc = ConsIcmpNeXorXor::make;
+      }
+    } else {
+      assert(false && "icmp_eq_<bop> optimization : opcode should be one of "
+                      "ADD, SUB, or XOR");
+    }
+
+    ValidationUnit::GetInstance()->setOptimizationName(optname);
+    INFRULE(INSTPOS(SRC, Z),
+            makeFunc(VAL(Z, Physical), VAL(W, Physical), VAL(X, Physical),
+                     VAL(Y, Physical), VAL(A, Physical), VAL(B, Physical),
+                     BITSIZE(bitsize)));
+  });
+}
+
+std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr> > false_encoding =
+    std::make_pair(llvmberry::ConsConst::make(0, 64),
+                   llvmberry::ConsConst::make(42, 64));
 
 void generateHintForDCE(CoreHint &hints, llvm::Instruction &I) {
   std::string reg = getVariable(I);
