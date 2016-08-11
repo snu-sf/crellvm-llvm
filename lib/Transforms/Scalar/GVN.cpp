@@ -2393,12 +2393,12 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
     // llvmberry::ValidationUnit::GetInstance()->intrude(
     //     [&Vals](llvmberry::Dictionary &data, llvmberry::CoreHint &hints)
     //     { data.get<llvmberry::ArgForGVNReplace>()->BB = Vals.BB; });
-
+/*
     llvmberry::intrude([&Vals]() {
       llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
       pdata.get<llvmberry::ArgForGVNReplace>()->BB = Vals.BB;
     });
-
+*/
     if (isa<Constant>(Val)) return Val;
   }
 
@@ -2406,19 +2406,22 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
   while (Next) {
     if (DT->dominates(Next->BB, BB)) {
       if (isa<Constant>(Next->Val)) {
+/*        
         llvmberry::intrude([&Next]() {
           llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
           pdata.get<llvmberry::ArgForGVNReplace>()->BB = Next->BB;
         });
+*/        
         return Next->Val;
       }
       if (!Val) {
         Val = Next->Val;
-
+/*
         llvmberry::intrude([&Next]() {
           llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
           pdata.get<llvmberry::ArgForGVNReplace>()->BB = Next->BB;
         });
+*/        
       }
     }
 
@@ -2710,13 +2713,13 @@ bool GVN::processInstruction(Instruction *I) {
   }
 
   // Remove it!
-
+/*
   llvmberry::intrude([this]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace = true;
     pdata.get<llvmberry::ArgForGVNReplace>()->VNptr = &VN;
   });
-
+*/
   patchAndReplaceAllUsesWith(I, repl);
 
   if (MD && repl->getType()->getScalarType()->isPointerTy())
@@ -2731,11 +2734,12 @@ bool GVN::runOnFunction(Function& F) {
     return false;
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::GVN);
+/*  
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.create<llvmberry::ArgForGVNReplace>();
   });
-
+*/
   if (!NoLoads)
     MD = &getAnalysis<MemoryDependenceAnalysis>();
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
@@ -2767,12 +2771,12 @@ bool GVN::runOnFunction(Function& F) {
     Changed |= ShouldContinue;
     ++Iteration;
   }
-
+/*
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.erase<llvmberry::ArgForGVNReplace>();
   });
-
+*/
   llvmberry::ValidationUnit::EndPass();
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::PRE);

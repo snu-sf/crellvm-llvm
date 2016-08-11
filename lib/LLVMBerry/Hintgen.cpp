@@ -1057,18 +1057,16 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
 }
 
 llvm::PHINode* properPHI(llvm::BasicBlock *BB, std::string Target,
-                           llvm::StoreInst *SI, bool isInit,
-                           std::vector<llvm::BasicBlock*> preds) {
+                         llvm::StoreInst *SI, bool isInit,
+                         bool checkSI,
+                         std::vector<llvm::BasicBlock*> preds) {
   llvm::BasicBlock *SIB = SI->getParent();
 
-  if ((BB == SIB) || (BB == SIB))
+  // return NULL if SIB block is same as BB block 
+  if (BB == SIB)
     return NULL;
 
-  // return false if SIB block is not reachable
-  // to BB block
-  if (!isPotentiallyReachable(SIB, BB))
-    return NULL;
-
+  std::cout<<"properPHI start"<<std::endl;
   // if isInit is true, check current BB
   if (isInit) {
     if (llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(BB->begin())) {
@@ -1077,18 +1075,37 @@ llvm::PHINode* properPHI(llvm::BasicBlock *BB, std::string Target,
       while (PHI) {
         std::string Rphi = getVariable(*PHI);
 
-        // this condition relies on llvm naming convention of PHI
+        // fragile: this condition relies on llvm naming convention of PHI
         if (Target == Rphi.substr(0, Rphi.rfind(".")))
           return PHI;
 
         PNI++;
         PHI = llvm::dyn_cast<llvm::PHINode>(PNI);
       }
+
+      if (checkSI) {
+        llvm::BasicBlock::iterator INST = BB->begin();
+
+        while (INST != BB->end()) {
+          if (llvm::StoreInst* SItmp = llvm::dyn_cast<llvm::StoreInst>(INST)) {
+            if (Target == getVariable(*SItmp->getOperand(1)))
+              return NULL;
+            INST++;
+          } else {
+            INST++;
+            continue; 
+          }
+        }
+      }
     }
   }
 
   for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE; BI++) {
     llvm::BasicBlock* BBtmp = *BI;
+
+    // skip if SIB block is not reachable to BBtmp block
+    if (!isPotentiallyReachable(SIB, BBtmp))
+      continue;
 
     std::cout<<"properPHI: "+getBasicBlockIndex(BBtmp)+"<-"+getBasicBlockIndex(BB)+", "+Target+"("+getBasicBlockIndex(SIB)+")"<<std::endl;
     if (std::find(preds.begin(), preds.end(), BBtmp) != preds.end())
@@ -1097,12 +1114,24 @@ llvm::PHINode* properPHI(llvm::BasicBlock *BB, std::string Target,
 
     std::cout<<"properPHI': "+getBasicBlockIndex(BBtmp)+"<-"+getBasicBlockIndex(BB)+", "+Target+"("+getBasicBlockIndex(SIB)+")"<<std::endl;
     if (llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(BBtmp->begin())) {
+      llvm::BasicBlock::iterator INST = BBtmp->begin();
       llvm::BasicBlock::iterator PNI = BBtmp->begin();
+
+      while (INST != BBtmp->end()) {
+        if (llvm::StoreInst* SItmp = llvm::dyn_cast<llvm::StoreInst>(INST)) {
+          if (Target == getVariable(*SItmp->getOperand(1)))
+            return NULL;
+          INST++;
+        } else {
+          INST++;
+          continue; 
+        }
+      }
 
       while (PHI) {
         std::string Rphi = getVariable(*PHI);
 
-        // this condition relies on llvm naming convention of PHI
+        // fragile: this condition relies on llvm naming convention of PHI
         if (Target == Rphi.substr(0, Rphi.rfind("."))) {
           return PHI;
         }
@@ -1112,8 +1141,7 @@ llvm::PHINode* properPHI(llvm::BasicBlock *BB, std::string Target,
       }
     }
 
-    //if (isProperPHI(BBtmp, Target, SI, false, preds))
-    llvm::PHINode* ret = properPHI(BBtmp, Target, SI, false, preds);
+    llvm::PHINode* ret = properPHI(BBtmp, Target, SI, false, checkSI, preds);
     if (ret != NULL)
       return ret;
   }
@@ -1155,10 +1183,11 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
                        TyPosition::make(SRC, *use, useIndex, "")));
 
       std::vector<llvm::BasicBlock*> preds;
-      llvm::PHINode* PHI = properPHI(LI->getParent(), Rstore, SI, true, preds);
+      llvm::PHINode* PHI = properPHI(LI->getParent(), Rstore, SI, true, false, preds);
       //if (llvm::PHINode* PHI =
       //      properPHI(LI->getParent(), Rstore, SI, true, preds)) {
       if (PHI != NULL) {
+        std::cout<<"asfdasdf"<<std::endl;
         std::shared_ptr<TyPropagateLessdef> lessdef =
           TyPropagateLessdef::make
             (VAR(Rload, Ghost),
@@ -1353,7 +1382,7 @@ bool otherPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Src,
       while (PHI) {
         std::string Rphi = getVariable(*PHI);
 
-        // this condition relies on llvm naming convention of PHI
+        // fragile: this condition relies on llvm naming convention of PHI
         if (Target == Rphi.substr(0, Rphi.rfind("."))) {
           return true;
         }
@@ -1430,43 +1459,20 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
             // check if one of incoming values of PHI is
             // stored value of current SI
             if (Predtmp != PHI->getParent() && PAM.count(PHI) &&
-                // this condition relies on llvm naming convention of PHI
+                // fragile: this condition relies on llvm naming convention of PHI
                 Rstore == Rphi.substr(0, Rphi.rfind("."))) {
               std::vector<llvm::BasicBlock*> preds;
-/*              
-              bool otherPhi = otherPHI(Predtmp, SItmp->getParent(),
-                                       Rstore, preds);
 
-              // check predecessor of this block too
-              if (llvm::PHINode *PHItmp = llvm::dyn_cast<llvm::PHINode>(Predtmp->begin())) {
-                llvm::BasicBlock::iterator PNItmp = Predtmp->begin();
-
-                while (PHItmp) {
-                  std::string Rphitmp = getVariable(*PHItmp);
-
-                  // this condition relies on llvm naming convention of PHI
-                  if (Rstore == Rphitmp.substr(0, Rphitmp.rfind("."))) {
-                    std::cout<<"otherPHI: "+Rstore+", "+Rphi+", "+Rphitmp<<std::endl;
-                    otherPhi = true;
-                  }
-
-                  PNItmp++;
-                  PHItmp = llvm::dyn_cast<llvm::PHINode>(PNItmp);
-                }
-              }
-
-              std::cout<<"otherPHI?: "+Rstore+", "+Rphi+"("+std::to_string(otherPhi)+")"<<std::endl;
-*/ 
               // check if there is other PHI between
               // SI block and current PHI block.
               // compiler can choose either 2-1 or 2-2 according to this
-              llvm::PHINode* PHItmp = properPHI(Predtmp, Rstore, SItmp, true, preds);
+              llvm::PHINode* PHItmp = properPHI(Predtmp, Rstore, SItmp, true, true, preds);
 
               // <Condition 2-1>
               // if there is no other PHI between SI and current PHI,
               // we can propagate store to current PHI
-              if (PHItmp == NULL ||
-                  (PHItmp != NULL && (BBtmp == SItmp->getParent()))) {
+              if (PHItmp == NULL /*||
+                  (PHItmp != NULL && (BBtmp == SItmp->getParent()))*/) {
                 generateHintForMem2RegPropagateStore(Predtmp, SItmp, PHI, termIndex[bname]);
               } else {
               // <Condition 2-2>
@@ -1474,7 +1480,6 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
               // propagate PHItmp to current PHI
                 std::string Rphitmp = getVariable(*PHItmp);
 
-                // now working
                 PROPAGATE(
                     LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                               new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
@@ -1564,14 +1569,18 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
 
                 // if use is other PHI
                 if (llvm::isa<llvm::PHINode>(use)) {
-                  llvm::BasicBlock* init = use->getParent();
-                  llvm::BasicBlock* target = PHI->getParent();
-                  std::vector<llvm::BasicBlock*> preds;
+                  llvm::BasicBlock* source = PHI->getParent();
+                  llvm::BasicBlock* target = use->getParent();
                   
-                  for (auto UI2 = pred_begin(init), UE2 = pred_end(init); UI2 != UE2; UI2++) {
-                    std::cout<<"isPred before("+std::string(init->getParent()->getName())+"): "+getBasicBlockIndex(init)+", "+getBasicBlockIndex(target)<<std::endl;
+                  for (auto UI2 = pred_begin(target), UE2 = pred_end(target); UI2 != UE2; UI2++) {
+                    std::cout<<"isPred before("+std::string(target->getParent()->getName())+"): "+getBasicBlockIndex(target)+", "+getBasicBlockIndex(source)<<std::endl;
                     llvm::BasicBlock* usePred = *UI2;
-                    if (isPotentiallyReachable(target, usePred)) {
+                    std::vector<llvm::BasicBlock*> preds;
+                    llvm::PHINode* PHItmp = properPHI(usePred, Rstore, SItmp, true, true, preds);
+
+                    // now working: properPHI
+                    if (PHItmp == PHI &&
+                        isPotentiallyReachable(source, usePred)) {
                       PROPAGATE(
                           LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                                     new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
@@ -1597,7 +1606,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                                VAR(Rphi, Previous),
                                                VAR(getVariable(*use), Physical)));
                      
-                      INFRULE(TyPosition::make(TGT, init->getName(),
+                      INFRULE(TyPosition::make(TGT, target->getName(),
                                                usePred->getName()),
                               std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
                      
@@ -1626,7 +1635,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                  TGT, getBasicBlockIndex(PHI->getParent())),
                              TyPosition::make(SRC, *use, useIndex, "")));
                 } else {
-                  std::cout<<"use is not load or phi("+std::to_string(use->getOpcode())+")"<<std::endl;
+                  std::cout<<"use is not load or phi("+std::string(use->getOpcodeName())+")"<<std::endl;
                 }
               }
             }
@@ -1660,37 +1669,34 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
           std::cout << "Mem2RegPHI load start:"+Ralloca+", "+Rload+", "+Rstore<< std::endl;
 
           std::vector<llvm::BasicBlock*> preds;
-          llvm::PHINode* PHI = properPHI(LI->getParent(), Rstore, SItmp, true, preds);
+          llvm::PHINode* PHI = properPHI(LI->getParent(), Rstore, SItmp, true, false, preds);
           //if (llvm::PHINode* PHI =
           //      properPHI(LI->getParent(), Rstore, SItmp, true, preds)) {
           if (PHI != NULL) {
             std::cout << "Mem2RegPHI load phi: "+getVariable(*PHI)<< std::endl;
-            //if (llvm::PHINode *PHItmp =
-            //        llvm::dyn_cast<llvm::PHINode>(LI->getParent()->begin())) {
-            //  llvm::BasicBlock::iterator PNI = LI->getParent()->begin();
-
-            //  while (PHI) {
             std::string Rphi = getVariable(*PHI);
 
             std::vector<llvm::BasicBlock*> predsbefore;
             predsbefore.push_back(PHI->getParent());
-            llvm::PHINode* PHIbefore = properPHI(LI->getParent(), Rstore, SItmp, false, predsbefore);
+            llvm::PHINode* PHIbefore = properPHI(LI->getParent(), Rstore, SItmp, false, false, predsbefore);
             //if (llvm::PHINode* PHIbefore =
             //      properPHI(LI->getParent(), Rstore, SItmp, false, predsbefore)) {
             if (PHIbefore != NULL) {
-              llvm::BasicBlock* init = PHIbefore->getParent();
+              llvm::BasicBlock* source = PHIbefore->getParent();
               llvm::BasicBlock* target = PHI->getParent();
-              std::vector<llvm::BasicBlock*> preds;
-             
-              if (init != target) {
+            
+              // now working2: properPHI
+              if (source != target) {
                 for (auto UI2 = pred_begin(target), UE2 = pred_end(target); UI2 != UE2; UI2++) {
                   llvm::BasicBlock* usePred = *UI2;
-                  std::cout<<"Block iter isPred before: "+getBasicBlockIndex(init)+", "+getBasicBlockIndex(target)+", "+getBasicBlockIndex(usePred)<<std::endl;
-                  if (isPotentiallyReachable(init, usePred)) {
-                    std::vector<llvm::BasicBlock*> predstmp;
+                  //std::vector<llvm::BasicBlock*> predscheck;
+                  //llvm::PHINode* PHIcheck = properPHI(usePred, Rstore, SItmp, true, true, predscheck);
+                  std::cout<<"Block iter isPred before: "+getBasicBlockIndex(source)+", "+getBasicBlockIndex(target)+", "+getBasicBlockIndex(usePred)<<std::endl;
 
-                    llvm::PHINode* PHItmp = properPHI(usePred, Rstore, SItmp, true, predsbefore);
-                    //if (llvm::PHINode* PHItmp = properPHI(usePred, Rstore, SItmp, true, predsbefore)) {
+                  if (isPotentiallyReachable(source, usePred)) {
+                    std::vector<llvm::BasicBlock*> predscheck;
+
+                    llvm::PHINode* PHItmp = properPHI(usePred, Rstore, SItmp, true, true, predscheck);
                     if (PHItmp != NULL) {
                       if (PHIbefore == PHItmp) {
                         std::cout<<"Block iter propagate"<<std::endl;
@@ -1699,7 +1705,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                       new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
                                     VAR(Rstore, Ghost), SRC),
                             BOUNDS(TyPosition::make_start_of_block(
-                                       TGT, getBasicBlockIndex(init)),
+                                       TGT, getBasicBlockIndex(source)),
                                    TyPosition::make_end_of_block(TGT, *usePred)));
 
                         std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
@@ -1711,7 +1717,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                         PROPAGATE(
                             std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                             BOUNDS(TyPosition::make_start_of_block(
-                                       TGT, getBasicBlockIndex(init)),
+                                       TGT, getBasicBlockIndex(source)),
                                    TyPosition::make_end_of_block(TGT, *usePred)));
 
                         
@@ -1818,7 +1824,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
         std::cout << "Mem2RegPHI prop store check"<< std::endl;
 
             std::vector<llvm::BasicBlock*> preds;
-            llvm::PHINode* PHI = properPHI(LI->getParent(), Rstore, SItmp, true, preds);
+            llvm::PHINode* PHI = properPHI(LI->getParent(), Rstore, SItmp, true, false, preds);
             //if (llvm::PHINode* PHI =
             //      properPHI(LI->getParent(), Rstore, SItmp, true, preds)) {
               //bool isSamePHI = true;
@@ -1876,7 +1882,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
         BI--;
         if (BI != BE && !newStore) {
           std::cout<<"Mem2RegPHI next call"<<std::endl;
-          generateHintForMem2RegPHI(BBtmp, BB, AItmp, SItmp, IItmp,
+          generateHintForMem2RegPHI(BBtmp, Predtmp, AItmp, SItmp, IItmp,
                                     PAM, AL, succs, true);
         }
         BI++;

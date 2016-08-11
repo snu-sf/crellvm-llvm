@@ -1404,8 +1404,6 @@ void PromoteMem2Reg::run() {
       ++I;
     }
   }
-    
-  //llvmberry::ValidationUnit::End();
 
   // At this point, the renamer has added entries to PHI nodes for all reachable
   // code.  Unfortunately, there may be unreachable blocks which the renamer

@@ -57,6 +57,8 @@
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 
+#include "llvm/LLVMBerry/ValidationUnit.h"
+
 #if __cplusplus >= 201103L && !defined(NDEBUG)
 // We only use this for a debug check in C++11
 #include <random>
@@ -4411,9 +4413,11 @@ bool SROA::promoteAllocas(Function &F) {
   NumPromoted += PromotableAllocas.size();
 
   if (DT && !ForceSSAUpdater) {
+    llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
     DEBUG(dbgs() << "Promoting allocas with mem2reg...\n");
     PromoteMemToReg(PromotableAllocas, *DT, nullptr, AC);
     PromotableAllocas.clear();
+    llvmberry::ValidationUnit::EndPass();
     return true;
   }
 
