@@ -2822,14 +2822,6 @@ bool GVN::processBlock(BasicBlock *BB) {
 
   for (BasicBlock::iterator BI = BB->begin(), BE = BB->end();
        BI != BE;) {
-    bool AtStart = BI == BB->begin();
-    BasicBlock::iterator prevBI;
-
-    if (!AtStart) {
-      prevBI = --BI;
-      ++BI;
-    }
-
     ChangedFunction |= processInstruction(BI);
     if (InstrsToErase.empty()) {
       ++BI;
@@ -2838,6 +2830,11 @@ bool GVN::processBlock(BasicBlock *BB) {
 
     // If we need some instructions deleted, do it now.
     NumGVNInstr += InstrsToErase.size();
+
+    // Avoid iterator invalidation.
+    bool AtStart = BI == BB->begin();
+    if (!AtStart)
+      --BI;
 
     for (SmallVectorImpl<Instruction *>::iterator I = InstrsToErase.begin(),
          E = InstrsToErase.end(); I != E; ++I) {
@@ -2856,7 +2853,7 @@ bool GVN::processBlock(BasicBlock *BB) {
     if (AtStart)
       BI = BB->begin();
     else
-      BI = ++prevBI;
+      ++BI;
   }
 
   return ChangedFunction;
