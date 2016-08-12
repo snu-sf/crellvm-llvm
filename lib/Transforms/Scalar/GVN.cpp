@@ -2774,15 +2774,6 @@ bool GVN::runOnFunction(Function& F) {
     ++Iteration;
   }
 
-  llvmberry::intrude([]() {
-    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
-    pdata.erase<llvmberry::ArgForGVNReplace>();
-  });
-
-  llvmberry::ValidationUnit::EndPass();
-
-  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::PRE);
-  
   if (EnablePRE) {
     // Fabricate val-num for dead-code in order to suppress assertion in
     // performPRE().
@@ -2794,8 +2785,6 @@ bool GVN::runOnFunction(Function& F) {
     }
   }
 
-  llvmberry::ValidationUnit::EndPass();
-  
   // FIXME: Should perform GVN again after PRE does something.  PRE can move
   // computations into blocks where they become fully redundant.  Note that
   // we can't do this until PRE's critical edge splitting updates memdep.
@@ -2805,6 +2794,13 @@ bool GVN::runOnFunction(Function& F) {
   // Do not cleanup DeadBlocks in cleanupGlobalSets() as it's called for each
   // iteration. 
   DeadBlocks.clear();
+
+  llvmberry::intrude([]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.erase<llvmberry::ArgForGVNReplace>();
+  });
+
+  llvmberry::ValidationUnit::EndPass();
 
   return Changed;
 }
