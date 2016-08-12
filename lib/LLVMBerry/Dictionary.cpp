@@ -7,29 +7,40 @@ namespace llvmberry {
 SimplifyInstArg::SimplifyInstArg() {
   this->activated = false;
   this->isSwapped = false;
+  this->aborted = false;
 }
 
 void SimplifyInstArg::setHintGenFunc(
     std::string _microoptName,
     std::function<void(llvm::Instruction *)> _hintGenFunc) {
+  if (this->aborted)
+    return;
   this->activated = true;
   this->microoptName = _microoptName;
   this->hintGenFunc = _hintGenFunc;
 }
 
+void SimplifyInstArg::abort() {
+  this->aborted = true;
+}
+
 void SimplifyInstArg::generateHint(llvm::Instruction *arg) const {
   assert(this->activated);
-  auto &func = this->hintGenFunc;
-  ValidationUnit::GetInstance()->intrude(
-      [&func, &arg](llvmberry::ValidationUnit::Dictionary &data,
-                    llvmberry::CoreHint &hint) { func(arg); });
+  if (!this->aborted) {
+    auto &func = this->hintGenFunc;
+    ValidationUnit::GetInstance()->intrude([&func, &arg](
+        llvmberry::ValidationUnit::Dictionary &data,
+        llvmberry::CoreHint &hint) { func(arg); });
+  }
 }
 
 std::string SimplifyInstArg::getMicroOptName() const {
   return this->microoptName;
 }
 
-bool SimplifyInstArg::isActivated() const { return activated; }
+bool SimplifyInstArg::isActivated() const {
+  return !aborted && activated;
+}
 
 StripPointerCastsArg::StripPointerCastsArg() {
   strippedValues = TyStrippedValues(new TyStrippedValuesObj());
@@ -269,4 +280,26 @@ void Mem2RegArg::replaceLessthanUndef(std::string key,
 
 
 
+// PassDictionary
+
+void PassDictionary::Create() {
+  assert(!_Instance && "PassDictionary Instance already exists!");
+  _Instance = new PassDictionary();
+}
+
+PassDictionary &PassDictionary::GetInstance() { return *_Instance; }
+
+void PassDictionary::Destroy() {
+  assert(_Instance && "PassDictionary Instance doesn't exist!");
+  delete _Instance;
+  _Instance = nullptr;
+}
+
+GVNReplaceArg::GVNReplaceArg() {
+  isGVNReplace = false;
+  BB = nullptr;
+  VNptr = nullptr;
+}
+
+PassDictionary *PassDictionary::_Instance = nullptr;
 } // llvmberry

@@ -137,6 +137,8 @@ void generateHintForAddOrAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
 void generateHintForAndOr(llvm::BinaryOperator *Z, llvm::Value *X,
                           llvm::BinaryOperator *Y, llvm::Value *A,
                           bool needsZCommutativity);
+void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z, llvm::BinaryOperator *W,
+                                   llvm::BinaryOperator *Y);
 void generateHintForTrivialDCE(llvm::Instruction &I);
 void generateHintForGVNDCE(llvm::Instruction &I);
 

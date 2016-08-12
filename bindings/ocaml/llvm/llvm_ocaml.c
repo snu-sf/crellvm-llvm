@@ -2786,6 +2786,20 @@ CAMLprim LLVMBasicBlockRef llvm_branchinst_get_successor(LLVMValueRef Inst,
   return LLVMBranchInstGetSuccessor(Inst, Int_val(I));
 }
 
+/*--... Operations on SwitchInst ..........................................-- */
+
+/* llvalue -> int -> llbasicblock */
+CAMLprim LLVMBasicBlockRef llvm_switchinst_get_successor(LLVMValueRef Inst,
+														 value I) {
+  return LLVMSwitchInstGetSuccessor(Inst, Int_val(I));
+}
+
+/* llvalue -> int -> llvalue */
+CAMLprim LLVMValueRef llvm_switchinst_get_case_value(LLVMValueRef Inst,
+													 value I) {
+  return LLVMSwitchInstGetCaseValue(Inst, Int_val(I));
+}
+
 /*--... Operations on GetElementPtrInst ....................................--*/
 
 /* llvalue -> bool */

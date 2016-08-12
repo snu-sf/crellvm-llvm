@@ -212,20 +212,21 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
-          llvmberry::ValidationUnit::Begin("associativity_add",
+          llvmberry::ValidationUnit::Begin("bop_associativity",
                                            I.getParent()->getParent());
 
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
           I.setOperand(1, V);
 
-          llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&Op0, &I, &B, &C, &V, &Opcode]
-               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) && isa<ConstantInt>(V) && (Opcode == Instruction::Add)) {
-              // Op0: A op B
-              // I: Op0 op C
-              // V: B op C
+          llvmberry::ValidationUnit::GetInstance()
+              ->intrude([&Op0, &I, &B, &C, &V, &Opcode](
+                    llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) &&
+                isa<ConstantInt>(V)) {
+              //    <src>    |     <tgt>
+              // Y = X op C1 | Y = X op C1
+              // Z = Y op C2 | Z = X op (C1 op C2)
 
               // prepare variables
               std::string reg0_name = llvmberry::getVariable(*(Op0->getOperand(0)));
@@ -237,26 +238,20 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
               ConstantInt *V_const = dyn_cast<ConstantInt>(V);
 
               Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
-              
-              unsigned b_bw = B_const->getBitWidth();
-              unsigned c_bw = C_const->getBitWidth();
-              unsigned v_bw = V_const->getBitWidth();
 
-              int64_t b = B_const->getSExtValue();
-              int64_t c = C_const->getSExtValue();
-              int64_t v = V_const->getSExtValue();
-              
+              unsigned b_bw = B_const->getBitWidth();
+
               llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
 
-              INFRULE(INSTPOS(llvmberry::Source, &I),
-                  llvmberry::ConsAddAssociative::make
-                  (REGISTER(reg0_name, Physical),
-                   REGISTER(reg1_name, Physical),
-                   REGISTER(reg2_name, Physical),
-                   llvmberry::TyConstInt::make(b, b_bw),
-                   llvmberry::TyConstInt::make(c, c_bw),
-                   llvmberry::TyConstInt::make(v, v_bw),
-                   BITSIZE(b_bw)));
+              INFRULE(
+                  INSTPOS(SRC, &I),
+                  llvmberry::ConsBopAssociative::make(
+                      REGISTER(reg0_name, Physical),
+                      REGISTER(reg1_name, Physical),
+                      REGISTER(reg2_name, Physical), llvmberry::getBop(Opcode),
+                      llvmberry::TyConstInt::make(*B_const),
+                      llvmberry::TyConstInt::make(*C_const),
+                      llvmberry::TyConstInt::make(*V_const), BITSIZE(b_bw)));
             } else {
               llvmberry::ValidationUnit::GetInstance()->setIsAborted();
             }
@@ -2755,34 +2750,30 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
         return false;
   }
 
-  llvmberry::ValidationUnit::Begin("sink_inst",
-                                   I->getParent()->getParent());
 
   BasicBlock::iterator InsertPos = DestBlock->getFirstInsertionPt();
-  
-  llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&I, &InsertPos](llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints){
 
-             insertSrcNopAtTgtI(hints,InsertPos);  //src nop
+  llvmberry::ValidationUnit::GetInstance()
+      ->intrude([&I, &InsertPos, &DestBlock](llvmberry::Dictionary &data,
+                                             llvmberry::CoreHint &hints) {
+          auto si_arg = data.get<llvmberry::ArgForSinkInst>();
+          DominatorTree *DT = si_arg->sinkDT;
+          insertSrcNopAtTgtI(hints, InsertPos); // src nop
              insertTgtNopAtSrcI(hints, I);         //tgt nop
+             std::string reg0_name = llvmberry::getVariable(*I);
 
-             std::string reg0_name = llvmberry::getVariable(*I); 
-
-             hints.addCommand
-                    (llvmberry::ConsPropagate::make   //source propagate
-                             (llvmberry::ConsLessdef::make
-                                      (llvmberry::ConsVar::make
-                                       (reg0_name, llvmberry::Physical),
-                                       llvmberry::ConsRhs::make
-                                       (reg0_name, llvmberry::Physical, llvmberry::Source),
-                                       llvmberry::Source),
-                              llvmberry::ConsBounds::make
-                                      (llvmberry::TyPosition::make
-                                       (llvmberry::Source, *I), 
-                                       llvmberry::TyPosition::make
-                                       (llvmberry::Target, *InsertPos))
-                             ));
-//prev maydiff propagate global -> issue 86
+             hints.addCommand(
+                 llvmberry::ConsPropagate::make // source propagate
+                 (llvmberry::ConsLessdef::make(
+                      llvmberry::ConsVar::make(reg0_name, llvmberry::Physical),
+                      llvmberry::ConsRhs::make(reg0_name, llvmberry::Physical,
+                                               llvmberry::Source),
+                      llvmberry::Source),
+                  llvmberry::ConsBounds::make(
+                      llvmberry::TyPosition::make(llvmberry::Source, *I),
+                      llvmberry::TyPosition::make(llvmberry::Target,
+                                                  *InsertPos))));
+	     //prev maydiff propagate global -> issue 86
             hints.addCommand
                     (llvmberry::ConsPropagate::make
                              (llvmberry::ConsMaydiff::make
@@ -2800,8 +2791,22 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                        llvmberry::TyPosition::make
                                        (llvmberry::Target, *InsertPos))
                              ));
-          }
-          );
+
+            // traversal dominator tree
+            for (auto node = GraphTraits<DominatorTree *>::nodes_begin(DT);
+                 node != GraphTraits<DominatorTree *>::nodes_end(DT); ++node) {
+              BasicBlock *BB = node->getBlock();
+              if ((DestBlock->getName() != BB->getName()) &&
+                  isPotentiallyReachable(I->getParent(), BB) &&
+                  !DT->dominates(DestBlock, BB)) {
+                PROPAGATE(MAYDIFF(reg0_name, llvmberry::Physical),
+                          BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                                     SRC, (BB->getName())),
+                                 llvmberry::TyPosition::make_end_of_block(
+                                     SRC, *(BB->begin()->getParent()))));
+              }
+            }
+        });
   I->moveBefore(InsertPos);
   ++NumSunkInst;
   llvmberry::ValidationUnit::End();
@@ -2867,9 +2872,18 @@ bool InstCombiner::run() {
         // only has us as a predecessors (we'd have to split the critical edge
         // otherwise), we can keep going.
         if (UserIsSuccessor && UserParent->getSinglePredecessor()) {
+          llvmberry::ValidationUnit::Begin("sink_inst",
+                                           I->getParent()->getParent());
+
+          llvmberry::ValidationUnit::GetInstance()->intrude([this](
+              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            DominatorTree *DT = this->getDominatorTree();
+            auto si_arg = data.create<llvmberry::ArgForSinkInst>();
+            si_arg->sinkDT = DT;
+          });
           // Okay, the CFG is simple enough, try to sink this instruction.
           if (TryToSinkInstruction(I, UserParent)) {
-           // llvmberry::ValidationUnit::EndIfExists();
+            
             MadeIRChange = true;
             // We'll add uses of the sunk instruction below, but since sinking
             // can expose opportunities for it's *operands* add them to the
@@ -2877,6 +2891,8 @@ bool InstCombiner::run() {
             for (Use &U : I->operands())
               if (Instruction *OpI = dyn_cast<Instruction>(U.get()))
                 Worklist.Add(OpI);
+          } else {
+            llvmberry::ValidationUnit::Abort();
           }
         }
       }

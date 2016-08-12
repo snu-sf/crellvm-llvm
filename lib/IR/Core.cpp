@@ -3476,6 +3476,26 @@ LLVMBasicBlockRef LLVMBranchInstGetSuccessor(LLVMValueRef Inst, unsigned idx){
   return wrap(unwrap<BranchInst>(Inst)->getSuccessor(idx));
 }
 
+/*--.. Switch instructions ...............................................--*/
+
+LLVMValueRef LLVMSwitchInstGetCondition(LLVMValueRef Inst){
+  return wrap(unwrap<SwitchInst>(Inst)->getCondition());
+}
+
+LLVMBasicBlockRef LLVMSwitchInstGetDefaultDest(LLVMValueRef Inst){
+  return wrap(unwrap<SwitchInst>(Inst)->getDefaultDest());
+}
+
+LLVMBasicBlockRef LLVMSwitchInstGetSuccessor(LLVMValueRef Inst, unsigned idx){
+  assert(idx > 0 && "Use GetDefaultDest instead");
+  return wrap(unwrap<SwitchInst>(Inst)->getSuccessor(idx));
+}
+
+LLVMValueRef LLVMSwitchInstGetCaseValue(LLVMValueRef Inst, unsigned idx){
+  assert(idx > 0 && "Use GetCondition instead");
+  return wrap(unwrap<SwitchInst>(Inst)->getOperand(2*idx));
+}
+
 /*--.. GEP instructions ..................................................--*/
 int LLVMGetElementPtrInstIsInBounds(LLVMValueRef Inst) {
   return unwrap<GEPOperator>(Inst)->isInBounds();

@@ -356,6 +356,7 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyConstInt> make(int64_t _int_value, int _bitwidth);
+  static std::shared_ptr<TyConstInt> make(const llvm::ConstantInt &ci);
 
 private:
   int64_t int_value;
@@ -542,6 +543,17 @@ public:
 private:
   int address_space;
   std::shared_ptr<TyValueType> value_type;
+};
+
+struct ConsConstDataVector : public TyConstant {
+public:
+  ConsConstDataVector(std::shared_ptr<TyValueType> _elem_type,
+                      std::vector<std::shared_ptr<TyConstant> > &_elements);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValueType> elem_type;
+  std::vector<std::shared_ptr<TyConstant> > elements;
 };
 
 struct ConsConstGlobalVarAddr : public TyConstant {
@@ -1424,6 +1436,8 @@ private:
   std::vector<std::shared_ptr<TyPosition>> nop_positions;
   std::vector<std::shared_ptr<TyCommand>> commands;
 };
+
+void intrude(std::function<void()> func);
 
 } // llvmberry
 

@@ -4,6 +4,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
@@ -19,16 +20,18 @@ enum DictKeys {
   // InstSimplify
   ArgForSimplifyAndInst,
   ArgForSimplifyOrInst,
+  ArgForSimplifyShiftInst,
   ArgForSimplifyXorInst,
   // InstCombine
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
   ArgForLoadLoadStore,
+  ArgForSinkInst,
   ArgForVisitICmp,
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
-  ArgForFindLeader
+  ArgForGVNReplace
 };
 
 /*
@@ -46,12 +49,14 @@ template <DictKeys key> struct DictKeysTraits {
   // DictKeysTraits class has no member for arbitrary type
 };
 
-// Used in InstructionSimplify.cpp : SimplifyAndInst(), SimplifyOrInst()
+// Used in InstructionSimplify.cpp : SimplifyAndInst(), SimplifyOrInst(),
+// SimplifyXorInst(), SimplifyShiftInst()
 struct SimplifyInstArg {
 public:
   SimplifyInstArg();
   void setHintGenFunc(std::string microoptName,
                       std::function<void(llvm::Instruction *)> hintGenFunc);
+  void abort();
   void generateHint(llvm::Instruction *arg) const;
   bool isActivated() const;
   std::string getMicroOptName() const;
@@ -59,12 +64,15 @@ public:
 
 private:
   bool activated;
+  bool aborted;
+  llvm::Instruction *I;
   std::string microoptName;
   std::function<void(llvm::Instruction *)> hintGenFunc;
 };
 DEFINE_TRAITS(ArgForSimplifyAndInst, SimplifyInstArg);
 DEFINE_TRAITS(ArgForSimplifyOrInst, SimplifyInstArg);
 DEFINE_TRAITS(ArgForSimplifyXorInst, SimplifyInstArg);
+DEFINE_TRAITS(ArgForSimplifyShiftInst, SimplifyInstArg);
 
 // lib/IR/Value.cpp : Value::stripPointerCasts(), stripPointerCastsAndOffsets()
 struct StripPointerCastsArg {
@@ -200,12 +208,22 @@ public:
 };
 DEFINE_TRAITS(ArgForLoadLoadStore, LoadLoadStoreArg);
 
-// lib/Transforms/Scalar/GVN.cpp : findLeader
-struct FindLeaderArg {
+// lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
+struct SinkInstArg {
 public:
-  const llvm::BasicBlock *BB;
+  llvm::DominatorTree *sinkDT;
 };
-DEFINE_TRAITS(ArgForFindLeader, FindLeaderArg);
+DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
+
+// lib/Transforms/Scalar/GVN.cpp : processInstruction, findLeader
+struct GVNReplaceArg {
+public:
+  GVNReplaceArg();
+  bool isGVNReplace;
+  const llvm::BasicBlock *BB;
+  boost::any VNptr;
+};
+DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
 
 class Dictionary {
 private:
@@ -247,6 +265,18 @@ public:
     assertExists<key>();
     data.erase(key);
   }
+};
+
+// PassDictionary: a dictionary shared throughout a pass
+
+class PassDictionary : public Dictionary {
+private:
+  static PassDictionary *_Instance;
+
+public:
+  static void Create();
+  static PassDictionary &GetInstance();
+  static void Destroy();
 };
 }
 
