@@ -1529,20 +1529,34 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
       ValidationUnit::GetInstance()->intrude([&BB, &AI, &LI, &VisitedBlock]
                                                      (Dictionary &data, CoreHint &hints) {
 
-        llvm::Value *UndefVal = llvm::UndefValue::get(LI->getType());                                             
-        PROPAGATE(
-                LESSDEF(INSN(*AI),
-                        VAR(getVariable(*AI), Ghost),
-                        SRC),
-                BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
-                       TyPosition::make(SRC, *LI)));
-        PROPAGATE(
-                LESSDEF(VAR(getVariable(*AI), Ghost),
-                        EXPR(UndefVal, Physical),
-                        TGT),
-                BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
-                       TyPosition::make(SRC, *LI))); 
-
+        llvm::Value *UndefVal = llvm::UndefValue::get(LI->getType());
+        if (BB == LI->getParent()->getParent()->begin()) {
+          PROPAGATE(
+                  LESSDEF(INSN(*AI),
+                          VAR(getVariable(*AI), Ghost),
+                          SRC),
+                  BOUNDS(TyPosition::make(SRC, *AI),
+                         TyPosition::make(SRC, *LI)));
+          PROPAGATE(
+                  LESSDEF(VAR(getVariable(*AI), Ghost),
+                          EXPR(llvm::UndefValue::get(LI->getType()), Physical),
+                          TGT),
+                  BOUNDS(TyPosition::make(SRC, *AI),
+                         TyPosition::make(SRC, *LI)));
+        } else {
+          PROPAGATE(
+                  LESSDEF(INSN(*AI),
+                          VAR(getVariable(*AI), Ghost),
+                          SRC),
+                  BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
+                         TyPosition::make(SRC, *LI)));
+          PROPAGATE(
+                  LESSDEF(VAR(getVariable(*AI), Ghost),
+                          EXPR(UndefVal, Physical),
+                          TGT),
+                  BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
+                         TyPosition::make(SRC, *LI))); 
+       }
        for(unsigned a = 0; a < VisitedBlock.size(); a++) {
           llvm::BasicBlock *current = VisitedBlock.at(a);
             auto &&termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
