@@ -1029,7 +1029,9 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
 
     // propagate instruction
     if (llvm::isa<llvm::PHINode>(next)) {
-      PROPAGATE(LESSDEF(INSN(*SI), VAR(Rstore, Ghost), SRC),
+      PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                          new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
+                        VAR(Rstore, Ghost), SRC),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
                        TyPosition::make_end_of_block(TGT, *Pred, termIndex[predName])));
 
@@ -1046,7 +1048,9 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
                        TyPosition::make_end_of_block(TGT, *Pred, termIndex[predName])));
     } else {
-      PROPAGATE(LESSDEF(INSN(*SI), VAR(Rstore, Ghost), SRC),
+      PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                          new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
+                        VAR(Rstore, Ghost), SRC),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
                        TyPosition::make(SRC, *next, nextIndex, "")));
 
@@ -1079,10 +1083,12 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
       std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(storeItem[SI].expr,
                                                            REGISTER(Rstore, Ghost)));
 
-      std::shared_ptr<TyTransitivity> transitivity(new TyTransitivity(
-                                                    INSN(*SI),
-                                                    storeItem[SI].expr,
-                                                    VAR(Rstore, Ghost)));
+      std::shared_ptr<TyTransitivity> transitivity(
+          new TyTransitivity(
+                INSN(std::shared_ptr<TyInstruction>(
+                  new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
+                storeItem[SI].expr,
+                VAR(Rstore, Ghost)));
 
       std::shared_ptr<TyPosition> position =
         TyPosition::make(SRC, *SI, instrIndex[SI], "");
@@ -1109,12 +1115,15 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                    REGISTER(Rstore, Ghost)));
 
       INFRULE(position,//TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-              ConsTransitivity::make(INSN(*SI),
+              ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
+                                       new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
                                      VAR(storeItem[SI].op0, Physical),
                                      VAR(storeItem[SI].op0, Ghost)));
 
       INFRULE(position,//TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-              ConsTransitivity::make(INSN(*SI), VAR(storeItem[SI].op0, Ghost),
+              ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
+                                       new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
+                                     VAR(storeItem[SI].op0, Ghost),
                                      VAR(Rstore, Ghost)));
 
       std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
@@ -1218,7 +1227,9 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
               ConsIntroGhost::make(VAR(Rstore, Ghost), REGISTER(Rload, Ghost)));
 
       INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-              ConsTransitivity::make(VAR(Rload, Physical), INSN(*SI),
+              ConsTransitivity::make(VAR(Rload, Physical),
+                                     INSN(std::shared_ptr<TyInstruction>(
+                                       new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
                                      VAR(Rstore, Ghost)));
 
       INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
@@ -1741,7 +1752,9 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
 
                 // now working
                 PROPAGATE(
-                    LESSDEF(INSN(*SItmp), VAR(Rstore, Ghost), SRC),
+                    LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                              new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
+                            VAR(Rstore, Ghost), SRC),
                     BOUNDS(TyPosition::make_start_of_block(
                                TGT, getBasicBlockIndex(PHItmp->getParent())),
                            TyPosition::make_end_of_block(TGT, *Predtmp)));
@@ -1836,7 +1849,9 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                     llvm::BasicBlock* usePred = *UI2;
                     if (isPotentiallyReachable(target, usePred)) {
                       PROPAGATE(
-                          LESSDEF(INSN(*SItmp), VAR(Rstore, Ghost), SRC),
+                          LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                    new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
+                                  VAR(Rstore, Ghost), SRC),
                           BOUNDS(TyPosition::make_start_of_block(
                                      TGT, getBasicBlockIndex(PHI->getParent())),
                                  TyPosition::make_end_of_block(TGT, *usePred)));
@@ -1870,7 +1885,9 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                            (use->getOperand(0) == SItmp->getOperand(1)))*/ {
                   std::cout << "come here please " << std::endl;
                   PROPAGATE(
-                      LESSDEF(INSN(*SItmp), VAR(Rstore, Ghost), SRC),
+                      LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
+                              VAR(Rstore, Ghost), SRC),
                       BOUNDS(TyPosition::make_start_of_block(
                                  TGT, getBasicBlockIndex(PHI->getParent())),
                              TyPosition::make(SRC, *use, useIndex, "")));
@@ -1954,7 +1971,9 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                       if (PHIbefore == PHItmp) {
                         std::cout<<"Block iter propagate"<<std::endl;
                         PROPAGATE(
-                            LESSDEF(INSN(*SItmp), VAR(Rstore, Ghost), SRC),
+                            LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                      new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
+                                    VAR(Rstore, Ghost), SRC),
                             BOUNDS(TyPosition::make_start_of_block(
                                        TGT, getBasicBlockIndex(init)),
                                    TyPosition::make_end_of_block(TGT, *usePred)));
@@ -1993,7 +2012,9 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
             //if (!isSameBB && PAM.count(PHI) &&
             //    (Rstore == Rphi.substr(0, Rphi.rfind(".")))) {
             PROPAGATE(
-                LESSDEF(INSN(*SItmp), VAR(Rstore, Ghost), SRC),
+                LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                          new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
+                        VAR(Rstore, Ghost), SRC),
                 BOUNDS(TyPosition::make_start_of_block(
                            SRC, getBasicBlockIndex(PHI->getParent())),
                        TyPosition::make(SRC, *LI, instrIndex[LI], "")));

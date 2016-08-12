@@ -278,29 +278,6 @@ void Mem2RegArg::replaceLessthanUndef(std::string key,
     std::cout<<"LessthanUndefEndTgt"<<std::endl;
   }
 
-
-
-// PassDictionary
-
-void PassDictionary::Create() {
-  assert(!_Instance && "PassDictionary Instance already exists!");
-  _Instance = new PassDictionary();
-}
-
-PassDictionary &PassDictionary::GetInstance() { return *_Instance; }
-
-void PassDictionary::Destroy() {
-  assert(_Instance && "PassDictionary Instance doesn't exist!");
-  delete _Instance;
-  _Instance = nullptr;
-}
-
-GVNReplaceArg::GVNReplaceArg() {
-  isGVNReplace = false;
-  BB = nullptr;
-  VNptr = nullptr;
-}
-
 // PassDictionary
 
 void PassDictionary::Create() {
