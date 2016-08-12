@@ -2114,6 +2114,12 @@ static void patchReplacementInstruction(Instruction *I, Value *Repl) {
     ReplOp->andIRFlags(Op);
 
   if (Instruction *ReplInst = dyn_cast<Instruction>(Repl)) {
+    // llvmberry: patch for getelementptr inbounds
+    // Mimics llvm trunk, r275532
+    if (auto *SrcGEP = dyn_cast<GetElementPtrInst>(I))
+      if (auto *DestGEP = dyn_cast<GetElementPtrInst>(ReplInst))
+        DestGEP->setIsInBounds(SrcGEP->isInBounds() & DestGEP->isInBounds());
+
     // FIXME: If both the original and replacement value are part of the
     // same control-flow region (meaning that the execution of one
     // guarentees the executation of the other), then we can combine the
