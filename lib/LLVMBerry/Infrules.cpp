@@ -4849,6 +4849,47 @@ void ConsIcmpInverse::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(icmp_inverse));
 }
 
+TyIcmpInverseRhs::TyIcmpInverseRhs(enum TyIcmpPred _predicate,
+                                   std::shared_ptr<TyValueType> _ty,
+                                   std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y,
+                                   std::shared_ptr<TyConstInt> _boolean)
+    : predicate(_predicate), ty(std::move(_ty)), x(std::move(_x)),
+      y(std::move(_y)), boolean(std::move(_boolean)) {}
+
+void TyIcmpInverseRhs::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(cereal::make_nvp("predicate", toString(predicate)));
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(boolean));
+}
+
+ConsIcmpInverseRhs::ConsIcmpInverseRhs(std::shared_ptr<TyIcmpInverseRhs> _icmp_inverse_rhs)
+    : icmp_inverse_rhs(std::move(_icmp_inverse_rhs)) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpInverseRhs::make(llvm::ICmpInst &CI,
+                                                    int bool_val) {
+  enum TyIcmpPred pred = getIcmpPred(CI.getPredicate());
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+  std::shared_ptr<TyConstInt> boolean = TyConstInt::make(bool_val, 1);
+
+  std::shared_ptr<TyIcmpInverseRhs> _icmp_inv_rhs =
+      std::make_shared<TyIcmpInverseRhs>(pred, ty, x, y, boolean);
+
+  return std::make_shared<ConsIcmpInverseRhs>(_icmp_inv_rhs);
+}
+
+void ConsIcmpInverseRhs::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpInverseRhs");
+  archive(CEREAL_NVP(icmp_inverse_rhs));
+}
+
 TyIcmpSwapOperands::TyIcmpSwapOperands(enum TyIcmpPred _predicate,
                              std::shared_ptr<TyValueType> _ty,
                              std::shared_ptr<TyValue> _x,

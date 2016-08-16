@@ -2516,6 +2516,21 @@ private:
   std::shared_ptr<TyConstInt> boolean;
 };
 
+struct TyIcmpInverseRhs {
+public:
+  TyIcmpInverseRhs(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
+                   std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                   std::shared_ptr<TyConstInt> _boolean);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyIcmpPred predicate;
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyConstInt> boolean;
+};
+
 struct TyIcmpSwapOperands {
 public:
   TyIcmpSwapOperands(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
@@ -4931,6 +4946,16 @@ public:
 
 private:
   std::shared_ptr<TyIcmpInverse> icmp_inverse;
+};
+
+struct ConsIcmpInverseRhs : public TyInfrule {
+public:
+  ConsIcmpInverseRhs(std::shared_ptr<TyIcmpInverseRhs> _icmp_inverse_rhs);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI, int boolean);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpInverseRhs> icmp_inverse_rhs;
 };
 
 struct ConsIcmpNeAddAdd : public TyInfrule {
