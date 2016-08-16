@@ -1094,7 +1094,7 @@ void PromoteMem2Reg::run() {
       }
     }
 
-    for (unsigned AllocaNum = 0; AllocaNum != allocs.size(); ++AllocaNum) {
+    for (unsigned AllocaNum = 0; AllocaNum != allocs.size(); AllocaNum++) {
       AllocaInst *AI = allocs[AllocaNum];
       std::string Ralloca = llvmberry::getVariable(*AI);
 
@@ -1376,8 +1376,6 @@ void PromoteMem2Reg::run() {
       ++I;
     }
   }
-    
-  //llvmberry::ValidationUnit::End();
 
   // At this point, the renamer has added entries to PHI nodes for all reachable
   // code.  Unfortunately, there may be unreachable blocks which the renamer
@@ -1699,7 +1697,9 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        auto &blockVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockVec);
         std::vector<llvm::BasicBlock*> succs;
+        blockVec.clear();
         llvmberry::generateHintForMem2RegPHI
           (BB, Pred, Dest, SI, II, PAM, AL, succs, true);
       });

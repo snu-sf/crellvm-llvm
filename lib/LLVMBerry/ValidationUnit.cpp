@@ -103,7 +103,7 @@ ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
 
 // destructor
 ValidationUnit::~ValidationUnit() {
-  if (!isAborted && !_optname.compare("mem2reg"))
+  if (!isAborted)
     this->commit();
   else
     this->abort();
@@ -135,7 +135,7 @@ void ValidationUnit::setIsAborted() {
 
 void ValidationUnit::intrude(
     std::function<void(Dictionary &, CoreHint &)> func) {
-  if (isAborted || _optname.compare("mem2reg"))
+  if (isAborted)
     return;
   if (_corehint.getReturnCode() != CoreHint::ACTUAL)
     return;
@@ -160,8 +160,6 @@ void ValidationUnit::begin() {
   // print src
   llvmberry::name_instructions(*_func);
   _srcfile_buffer = new std::string();
-  if (_optname.compare("mem2reg")) {}
-  else
   writeModuleToBuffer(*module, _srcfile_buffer);
   // writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc.org"));
 
