@@ -1277,6 +1277,32 @@ void ConsAndSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(and_same));
 }
 
+TyAndTrueBool::TyAndTrueBool(std::shared_ptr<TyValue> _x,
+                             std::shared_ptr<TyValue> _y)
+    : x(std::move(_x)), y(std::move(_y)) {}
+
+void TyAndTrueBool::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsAndTrueBool::ConsAndTrueBool(std::shared_ptr<TyAndTrueBool> _and_true_bool)
+    : and_true_bool(std::move(_and_true_bool)) {}
+
+std::shared_ptr<TyInfrule> ConsAndTrueBool::make(std::shared_ptr<TyValue> _x,
+                                                 std::shared_ptr<TyValue> _y) {
+  std::shared_ptr<TyAndTrueBool> _val(
+      new TyAndTrueBool(std::move(_x), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsAndTrueBool(std::move(_val)));
+}
+
+void ConsAndTrueBool::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndTrueBool");
+  archive(CEREAL_NVP(and_true_bool));
+}
+
 TyAndUndef::TyAndUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
                        std::shared_ptr<TySize> _sz)
     : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)) {}
@@ -2855,6 +2881,34 @@ void ConsOrCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("OrCommutativeTgt");
   archive(CEREAL_NVP(or_commutative_tgt));
+}
+
+TyOrFalse::TyOrFalse(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                     std::shared_ptr<TySize> _sz)
+    : x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {}
+
+void TyOrFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrFalse::ConsOrFalse(std::shared_ptr<TyOrFalse> _or_false)
+    : or_false(std::move(_or_false)) {}
+
+std::shared_ptr<TyInfrule> ConsOrFalse::make(std::shared_ptr<TyValue> _x,
+                                             std::shared_ptr<TyValue> _y,
+                                             std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyOrFalse> _val(
+      new TyOrFalse(std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrFalse(std::move(_val)));
+}
+
+void ConsOrFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrFalse");
+  archive(CEREAL_NVP(or_false));
 }
 
 TyOrOr::TyOrOr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
