@@ -2224,6 +2224,12 @@ static void patchReplacementInstruction(Instruction *I, Value *Repl) {
     ReplOp->andIRFlags(Op);
 
   if (Instruction *ReplInst = dyn_cast<Instruction>(Repl)) {
+    // llvmberry: patch for getelementptr inbounds
+    // Mimics llvm trunk, r275532
+    if (auto *SrcGEP = dyn_cast<GetElementPtrInst>(I))
+      if (auto *DestGEP = dyn_cast<GetElementPtrInst>(ReplInst))
+        DestGEP->setIsInBounds(SrcGEP->isInBounds() & DestGEP->isInBounds());
+
     // FIXME: If both the original and replacement value are part of the
     // same control-flow region (meaning that the execution of one
     // guarentees the executation of the other), then we can combine the
@@ -2878,20 +2884,6 @@ bool GVN::runOnFunction(Function& F) {
     ++Iteration;
   }
 
-  llvmberry::intrude([]() {
-    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
-    pdata.erase<llvmberry::ArgForGVNReplace>();
-  });
-
-  llvmberry::ValidationUnit::EndPass();
-
-  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::PRE);
-
-  llvmberry::intrude([]() {
-    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
-    pdata.create<llvmberry::ArgForGVNReplace>();
-  });
-
   if (EnablePRE) {
     // Fabricate val-num for dead-code in order to suppress assertion in
     // performPRE().
@@ -2903,8 +2895,6 @@ bool GVN::runOnFunction(Function& F) {
     }
   }
 
-  llvmberry::ValidationUnit::EndPass();
-  
   // FIXME: Should perform GVN again after PRE does something.  PRE can move
   // computations into blocks where they become fully redundant.  Note that
   // we can't do this until PRE's critical edge splitting updates memdep.
@@ -2914,6 +2904,13 @@ bool GVN::runOnFunction(Function& F) {
   // Do not cleanup DeadBlocks in cleanupGlobalSets() as it's called for each
   // iteration. 
   DeadBlocks.clear();
+
+  llvmberry::intrude([]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.erase<llvmberry::ArgForGVNReplace>();
+  });
+
+  llvmberry::ValidationUnit::EndPass();
 
   return Changed;
 }
@@ -2931,14 +2928,6 @@ bool GVN::processBlock(BasicBlock *BB) {
 
   for (BasicBlock::iterator BI = BB->begin(), BE = BB->end();
        BI != BE;) {
-    bool AtStart = BI == BB->begin();
-    BasicBlock::iterator prevBI;
-
-    if (!AtStart) {
-      prevBI = --BI;
-      ++BI;
-    }
-
     ChangedFunction |= processInstruction(BI);
     if (InstrsToErase.empty()) {
       ++BI;
@@ -2947,6 +2936,11 @@ bool GVN::processBlock(BasicBlock *BB) {
 
     // If we need some instructions deleted, do it now.
     NumGVNInstr += InstrsToErase.size();
+
+    // Avoid iterator invalidation.
+    bool AtStart = BI == BB->begin();
+    if (!AtStart)
+      --BI;
 
     for (SmallVectorImpl<Instruction *>::iterator I = InstrsToErase.begin(),
          E = InstrsToErase.end(); I != E; ++I) {
@@ -2965,7 +2959,7 @@ bool GVN::processBlock(BasicBlock *BB) {
     if (AtStart)
       BI = BB->begin();
     else
-      BI = ++prevBI;
+      ++BI;
   }
 
   return ChangedFunction;
