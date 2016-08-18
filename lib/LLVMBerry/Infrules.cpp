@@ -1277,6 +1277,32 @@ void ConsAndSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(and_same));
 }
 
+TyAndTrueBool::TyAndTrueBool(std::shared_ptr<TyValue> _x,
+                             std::shared_ptr<TyValue> _y)
+    : x(std::move(_x)), y(std::move(_y)) {}
+
+void TyAndTrueBool::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsAndTrueBool::ConsAndTrueBool(std::shared_ptr<TyAndTrueBool> _and_true_bool)
+    : and_true_bool(std::move(_and_true_bool)) {}
+
+std::shared_ptr<TyInfrule> ConsAndTrueBool::make(std::shared_ptr<TyValue> _x,
+                                                 std::shared_ptr<TyValue> _y) {
+  std::shared_ptr<TyAndTrueBool> _val(
+      new TyAndTrueBool(std::move(_x), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsAndTrueBool(std::move(_val)));
+}
+
+void ConsAndTrueBool::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndTrueBool");
+  archive(CEREAL_NVP(and_true_bool));
+}
+
 TyAndUndef::TyAndUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
                        std::shared_ptr<TySize> _sz)
     : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)) {}
@@ -2855,6 +2881,34 @@ void ConsOrCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("OrCommutativeTgt");
   archive(CEREAL_NVP(or_commutative_tgt));
+}
+
+TyOrFalse::TyOrFalse(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                     std::shared_ptr<TySize> _sz)
+    : x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {}
+
+void TyOrFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrFalse::ConsOrFalse(std::shared_ptr<TyOrFalse> _or_false)
+    : or_false(std::move(_or_false)) {}
+
+std::shared_ptr<TyInfrule> ConsOrFalse::make(std::shared_ptr<TyValue> _x,
+                                             std::shared_ptr<TyValue> _y,
+                                             std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyOrFalse> _val(
+      new TyOrFalse(std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrFalse(std::move(_val)));
+}
+
+void ConsOrFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrFalse");
+  archive(CEREAL_NVP(or_false));
 }
 
 TyOrOr::TyOrOr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
@@ -4793,6 +4847,47 @@ void ConsIcmpInverse::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("IcmpInverse");
   archive(CEREAL_NVP(icmp_inverse));
+}
+
+TyIcmpInverseRhs::TyIcmpInverseRhs(enum TyIcmpPred _predicate,
+                                   std::shared_ptr<TyValueType> _ty,
+                                   std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y,
+                                   std::shared_ptr<TyConstInt> _boolean)
+    : predicate(_predicate), ty(std::move(_ty)), x(std::move(_x)),
+      y(std::move(_y)), boolean(std::move(_boolean)) {}
+
+void TyIcmpInverseRhs::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(cereal::make_nvp("predicate", toString(predicate)));
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(boolean));
+}
+
+ConsIcmpInverseRhs::ConsIcmpInverseRhs(std::shared_ptr<TyIcmpInverseRhs> _icmp_inverse_rhs)
+    : icmp_inverse_rhs(std::move(_icmp_inverse_rhs)) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpInverseRhs::make(llvm::ICmpInst &CI,
+                                                    int bool_val) {
+  enum TyIcmpPred pred = getIcmpPred(CI.getPredicate());
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+  std::shared_ptr<TyConstInt> boolean = TyConstInt::make(bool_val, 1);
+
+  std::shared_ptr<TyIcmpInverseRhs> _icmp_inv_rhs =
+      std::make_shared<TyIcmpInverseRhs>(pred, ty, x, y, boolean);
+
+  return std::make_shared<ConsIcmpInverseRhs>(_icmp_inv_rhs);
+}
+
+void ConsIcmpInverseRhs::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpInverseRhs");
+  archive(CEREAL_NVP(icmp_inverse_rhs));
 }
 
 TyIcmpSwapOperands::TyIcmpSwapOperands(enum TyIcmpPred _predicate,
