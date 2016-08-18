@@ -3130,6 +3130,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   llvmberry::intrude([&CurInst, &CurrentBlock, &Phi, &predMap, &PREInstr]() {
     PREAnalysisResult *PREAR =
         new PREAnalysisResult(CurInst, PREInstr, predMap);
+    llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
     std::string CurInst_id = llvmberry::getVariable(*CurInst);
     std::string Phi_id = llvmberry::getVariable(*Phi);
 
@@ -3170,6 +3171,9 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           }
 
           std::string VI_id = llvmberry::getVariable(*VI);
+          hints.appendToDescription("VI_id is: " + VI_id);
+          hints.appendToDescription("VI's getName is: " +
+                                    ((*VI).getName()).str());
 
           // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
           // Currently, assume Rhs(VI) = Rhs(CurInst)
@@ -3209,26 +3213,34 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         // TODO: for all uses of CurInst
         // replace curInst -> phi
         for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
-          if (!isa<Instruction>(UI->getUser())) {
-            // let the validation fail when the user is not an instruction
-            assert(false && "User is not an instruction");
+          if (Instruction *userI = dyn_cast<Instruction>(UI->getUser())) {
+            std::string userI_id = llvmberry::getVariable(*userI);
+
+            std::string prev_block_name = "";
+            if (isa<PHINode>(userI)) {
+              BasicBlock *bb_from =
+                  dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+              prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+            }
+
+            hints.appendToDescription("userI: " + ((*userI).getName()).str());
+            hints.appendToDescription("userI_id: " + userI_id);
+            hints.appendToDescription(
+                "userI's parent's index: " +
+                llvmberry::getBasicBlockIndex(userI->getParent()));
+            hints.appendToDescription("userI hasName: " +
+                                      std::to_string(userI->hasName()));
+
+            PROPAGATE(
+                LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
+                BOUNDS(INSTPOS(SRC, CurInst),
+                       llvmberry::TyPosition::make(llvmberry::Source, *userI,
+                                                   prev_block_name)));
+          } else {
+            hints.appendToDescription("userNotInstruction");
+            hints.setReturnCodeToFail();
+            return;
           }
-
-          Instruction *userI = dyn_cast<Instruction>(UI->getUser());
-          std::string userI_id = llvmberry::getVariable(*userI);
-
-          std::string prev_block_name = "";
-          if (isa<PHINode>(userI)) {
-            BasicBlock *bb_from =
-                dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
-            prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-          }
-
-          PROPAGATE(
-              LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
-              BOUNDS(INSTPOS(SRC, CurInst),
-                     llvmberry::TyPosition::make(llvmberry::Source, *userI,
-                                                 prev_block_name)));
         }
 
       });
