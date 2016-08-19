@@ -634,6 +634,16 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyAndTrueBool {
+public:
+  TyAndTrueBool(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+};
+
 struct TyAndUndef {
 public:
   TyAndUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
@@ -1205,6 +1215,18 @@ public:
 
 private:
   std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrFalse {
+public:
+  TyOrFalse(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+            std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
   std::shared_ptr<TyValue> x;
   std::shared_ptr<TyValue> y;
   std::shared_ptr<TySize> sz;
@@ -2496,6 +2518,21 @@ private:
   std::shared_ptr<TyConstInt> boolean;
 };
 
+struct TyIcmpInverseRhs {
+public:
+  TyIcmpInverseRhs(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
+                   std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                   std::shared_ptr<TyConstInt> _boolean);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyIcmpPred predicate;
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyConstInt> boolean;
+};
+
 struct TyIcmpSwapOperands {
 public:
   TyIcmpSwapOperands(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
@@ -3014,6 +3051,17 @@ public:
 
 private:
   std::shared_ptr<TyAndSame> and_same;
+};
+
+struct ConsAndTrueBool : public TyInfrule {
+public:
+  ConsAndTrueBool(std::shared_ptr<TyAndTrueBool> _and_true_bool);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAndTrueBool> and_true_bool;
 };
 
 struct ConsAndUndef : public TyInfrule {
@@ -3787,6 +3835,18 @@ public:
 
 private:
   std::shared_ptr<TyOrCommutativeTgt> or_commutative_tgt;
+};
+
+struct ConsOrFalse : public TyInfrule {
+public:
+  ConsOrFalse(std::shared_ptr<TyOrFalse> _or_false);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyOrFalse> or_false;
 };
 
 struct ConsOrMone : public TyInfrule {
@@ -4889,6 +4949,16 @@ public:
 
 private:
   std::shared_ptr<TyIcmpInverse> icmp_inverse;
+};
+
+struct ConsIcmpInverseRhs : public TyInfrule {
+public:
+  ConsIcmpInverseRhs(std::shared_ptr<TyIcmpInverseRhs> _icmp_inverse_rhs);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI, int boolean);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpInverseRhs> icmp_inverse_rhs;
 };
 
 struct ConsIcmpNeAddAdd : public TyInfrule {
