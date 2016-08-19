@@ -2213,7 +2213,8 @@ private:
 struct TyZextXor {
 public:
   TyZextXor(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
-            std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyValue> _x);
+            std::shared_ptr<TyValue> _yprime, std::shared_ptr<TyValue> _x,
+            std::shared_ptr<TySize> _s);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -2221,6 +2222,7 @@ private:
   std::shared_ptr<TyValue> y;
   std::shared_ptr<TyValue> yprime;
   std::shared_ptr<TyValue> x;
+  std::shared_ptr<TySize> s;
 };
 
 struct TyZextZext {
@@ -4668,7 +4670,8 @@ public:
   static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z,
                                          std::shared_ptr<TyValue> _y,
                                          std::shared_ptr<TyValue> _yprime,
-                                         std::shared_ptr<TyValue> _x);
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TySize> _s);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:

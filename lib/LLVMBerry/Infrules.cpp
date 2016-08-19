@@ -4676,10 +4676,12 @@ void ConsZextTruncAndXor::serialize(cereal::JSONOutputArchive &archive) const {
 
 TyZextXor::TyZextXor(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
                      std::shared_ptr<TyValue> _yprime,
-                     std::shared_ptr<TyValue> _x)
-    : z(_z), y(_y), yprime(_yprime), x(_x) {}
+                     std::shared_ptr<TyValue> _x,
+                     std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), yprime(_yprime), x(_x), s(_s) {}
 void TyZextXor::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(yprime), CEREAL_NVP(x));
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(yprime), CEREAL_NVP(x), 
+          CEREAL_NVP(s));
 }
 
 ConsZextXor::ConsZextXor(std::shared_ptr<TyZextXor> _zext_xor)
@@ -4687,8 +4689,9 @@ ConsZextXor::ConsZextXor(std::shared_ptr<TyZextXor> _zext_xor)
 std::shared_ptr<TyInfrule> ConsZextXor::make(std::shared_ptr<TyValue> _z,
                                              std::shared_ptr<TyValue> _y,
                                              std::shared_ptr<TyValue> _yprime,
-                                             std::shared_ptr<TyValue> _x) {
-  std::shared_ptr<TyZextXor> _val(new TyZextXor(_z, _y, _yprime, _x));
+                                             std::shared_ptr<TyValue> _x,
+                                             std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TyZextXor> _val(new TyZextXor(_z, _y, _yprime, _x, _s));
   return std::shared_ptr<TyInfrule>(new ConsZextXor(_val));
 }
 void ConsZextXor::serialize(cereal::JSONOutputArchive &archive) const {
