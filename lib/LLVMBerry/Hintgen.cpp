@@ -180,7 +180,7 @@ void applyCommutativity(llvm::Instruction *position,
                                   getFloatType(expression->getType()))));
       case llvm::Instruction::Or:
         INFRULE(
-            INSTPOS(llvmberry::Source, position),
+            INSTPOS(llvmberry::Target, position),
             ConsOrCommutativeTgt::make(REGISTER(regname, Physical),
                                     VAL(expression->getOperand(0), Physical),
                                     VAL(expression->getOperand(1), Physical),

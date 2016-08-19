@@ -294,13 +294,9 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
               llvmberry::propagateInstruction(Y, Z, TGT);
               llvmberry::insertSrcNopAtTgtI(hints, Y);
 
-              hints.addCommand(llvmberry::ConsPropagate::make(
-                  llvmberry::ConsMaydiff::make(reg_yprime_name,
-                                               llvmberry::Physical),
-                  llvmberry::ConsGlobal::make()));
-              hints.addCommand(llvmberry::ConsPropagate::make(
-                  llvmberry::ConsMaydiff::make(reg_y_name, llvmberry::Physical),
-                  llvmberry::ConsGlobal::make()));
+              llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Physical);
+              llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Physical);
+              llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Previous);
               INFRULE(INSTPOS(TGT, Z),
                       llvmberry::ConsAndOrConst2::make(
                           REGISTER(reg_z_name, Physical),
