@@ -104,6 +104,13 @@ void generateHintForReplaceAllUsesWith(
     llvm::Instruction *source, llvm::Value *replaceTo,
     std::string ghost_var = "", std::shared_ptr<TyPosition> source_pos =
                                     std::shared_ptr<TyPosition>(nullptr));
+/* generateHintForReplaceAllUsesWithAtTgt(v1, v2) :
+ *   For each use U of v1, propagates hints at target to prove that
+ * replacing v1 with v2 in U is safe.
+ *   Invariant { v1 >=tgt v2 } must be given at definition of v1
+ */
+void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
+                                            llvm::Value *replaceTo);
 
 /* Hint generation functions for instcombine/instsimplify micro-optimizations
  * that appear multiple times

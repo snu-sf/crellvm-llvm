@@ -368,6 +368,60 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
   });
 }
 
+void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
+                                            llvm::Value *replaceTo) {
+  assert(ValidationUnit::Exists());
+
+  ValidationUnit::GetInstance()->intrude([&source, &replaceTo](
+      Dictionary &data, CoreHint &hints) {
+    llvm::Instruction *I = source;
+    auto I_pos = INSTPOS(TGT, I);
+
+    std::string I_var = getVariable(*I);
+
+    for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+      if (!llvm::isa<llvm::Instruction>(UI->getUser())) {
+        // let the validation fail when the user is not an instruction
+        return;
+      }
+      std::string user = getVariable(*UI->getUser());
+      llvm::Instruction *user_I =
+          llvm::dyn_cast<llvm::Instruction>(UI->getUser());
+
+      std::string prev_block_name = "";
+      if (llvm::isa<llvm::PHINode>(user_I)) {
+        llvm::BasicBlock *bb_from =
+            llvm::dyn_cast<llvm::PHINode>(user_I)->getIncomingBlock(*UI);
+        prev_block_name = getBasicBlockIndex(bb_from);
+      }
+
+      PROPAGATE(LESSDEF(VAR(I_var, Physical), EXPR(replaceTo, Physical), TGT),
+                BOUNDS(I_pos, TyPosition::make(TGT, *user_I, prev_block_name)));
+      if (llvm::isa<llvm::PHINode>(user_I)) {
+        INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
+                ConsTransitivityTgt::make(VAR(I_var, Previous),
+                                          EXPR(replaceTo, Previous),
+                                          VAR(user, Physical)));
+      } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+        llvm::Instruction *user_I_copy = user_I->clone();
+        INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
+                ConsSubstituteTgt::make(REGISTER(I_var, Physical),
+                                        VAL(replaceTo, Physical),
+                                        INSN(*user_I)));
+
+        for (unsigned i = 0; i < user_I_copy->getNumOperands(); i++) {
+          if (user_I->getOperand(i) == source)
+            user_I_copy->setOperand(i, replaceTo);
+        }
+        INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
+                ConsTransitivityTgt::make(INSN(*user_I_copy), INSN(*user_I),
+                                          EXPR(user_I, Physical)));
+        delete user_I_copy;
+      }
+    }
+  });
+}
+
 void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
                                   llvm::BinaryOperator *X, llvm::SelectInst *Y,
                                   bool needs_commutativity, bool is_leftform) {
