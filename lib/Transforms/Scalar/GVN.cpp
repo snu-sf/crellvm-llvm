@@ -3367,26 +3367,34 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         }
 
         for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
-          if (!isa<Instruction>(UI->getUser())) {
-            // let the validation fail when the user is not an instruction
-            assert(false && "User is not an instruction");
+          if (Instruction *userI = dyn_cast<Instruction>(UI->getUser())) {
+            std::string userI_id = llvmberry::getVariable(*userI);
+
+            std::string prev_block_name = "";
+            if (isa<PHINode>(userI)) {
+              BasicBlock *bb_from =
+                  dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+              prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+            }
+
+            hints.appendToDescription("userI: " + ((*userI).getName()).str());
+            hints.appendToDescription("userI_id: " + userI_id);
+            hints.appendToDescription(
+                "userI's parent's index: " +
+                llvmberry::getBasicBlockIndex(userI->getParent()));
+            hints.appendToDescription("userI hasName: " +
+                                      std::to_string(userI->hasName()));
+
+            PROPAGATE(
+                LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
+                BOUNDS(INSTPOS(SRC, CurInst),
+                       llvmberry::TyPosition::make(llvmberry::Source, *userI,
+                                                   prev_block_name)));
+          } else {
+            hints.appendToDescription("userNotInstruction");
+            hints.setReturnCodeToFail();
+            return;
           }
-
-          Instruction *userI = dyn_cast<Instruction>(UI->getUser());
-          std::string userI_id = llvmberry::getVariable(*userI);
-
-          std::string prev_block_name = "";
-          if (isa<PHINode>(userI)) {
-            BasicBlock *bb_from =
-                dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
-            prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-          }
-
-          PROPAGATE(
-              LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
-              BOUNDS(INSTPOS(SRC, CurInst),
-                     llvmberry::TyPosition::make(llvmberry::Source, *userI,
-                                                 prev_block_name)));
         }
 
         return;
