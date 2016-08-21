@@ -740,9 +740,13 @@ public:
   bool isSameForAll;
   bool PrevPRENotEnough;
   std::vector<std::pair<PHINode *, int>> PrevPRE;
+  bool isFromNonLocalLoad;
 
   PREAnalysisResult(Instruction *CurInst, Instruction *PREInstr,
                     SmallVector<std::pair<Value *, BasicBlock *>, 8> predMap) {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    isFromNonLocalLoad =
+        pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad;
     PrevPRENotEnough = false;
     std::vector<Value *> op_CurInst;
     notSameIdx.resize(predMap.size());
@@ -2169,8 +2173,14 @@ bool GVN::processNonLocalLoad(LoadInst *LI) {
     for (GetElementPtrInst::op_iterator OI = GEP->idx_begin(),
                                         OE = GEP->idx_end();
          OI != OE; ++OI)
-      if (Instruction *I = dyn_cast<Instruction>(OI->get()))
+      if (Instruction *I = dyn_cast<Instruction>(OI->get())) {
+        llvmberry::intrude([]() {
+          llvmberry::PassDictionary &pdata =
+              llvmberry::PassDictionary::GetInstance();
+          pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad = true;
+        });
         performScalarPRE(I);
+      }
   }
 
   // Step 2: Analyze the availability of the load
@@ -2850,6 +2860,7 @@ bool GVN::runOnFunction(Function& F) {
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.create<llvmberry::ArgForGVNReplace>();
+    pdata.create<llvmberry::ArgForGVNPREIntro>();
   });
 
   if (!NoLoads)
@@ -2908,6 +2919,7 @@ bool GVN::runOnFunction(Function& F) {
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.erase<llvmberry::ArgForGVNReplace>();
+    pdata.erase<llvmberry::ArgForGVNPREIntro>();
   });
 
   llvmberry::ValidationUnit::EndPass();
@@ -3248,6 +3260,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                                          &Phi_id, &PREAR](
           llvmberry::ValidationUnit::Dictionary &data,
           llvmberry::CoreHint &hints) {
+        if (PREAR->isFromNonLocalLoad) {
+          hints.appendToDescription("isFromNonLocalLoad");
+          hints.setReturnCodeToAdmitted();
+        }
         dbgs() << "CurInst : " << *CurInst << "\n";
         dbgs() << "Phi : " << *Phi << "\n";
         // if is same for all, it does not involve previous PRE and just works
@@ -3454,6 +3470,11 @@ bool GVN::performPRE(Function &F) {
                               BE = CurrentBlock->end();
          BI != BE;) {
       Instruction *CurInst = BI++;
+      llvmberry::intrude([]() {
+        llvmberry::PassDictionary &pdata =
+            llvmberry::PassDictionary::GetInstance();
+        pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad = false;
+      });
       Changed = performScalarPRE(CurInst);
     }
   }
