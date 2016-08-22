@@ -105,7 +105,7 @@ void applyCommutativity(llvm::Instruction *position,
                        : expression->getType()->getIntegerBitWidth();
     std::string regname = getVariable(*expression);
     if (scope == Source) {
-      llvmberry::TyBop bop;
+      TyBop bop;
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
         bop = BopAdd;
@@ -403,7 +403,7 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
     if (needs_commutativity) {
       hints.addCommand(ConsInfrule::make(
           TyPosition::make(Source, *Z),
-          ConsAddCommutative::make(TyRegister::make(reg_z_name, Physical),
+          ConsBopCommutative::make(VAR(reg_z_name, Physical), TyBop::BopAdd,
                                    TyValue::make(*Y), TyValue::make(*a_Z),
                                    ConsSize::make(bitwidth))));
     }
