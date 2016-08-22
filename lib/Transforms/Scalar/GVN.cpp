@@ -734,20 +734,6 @@ namespace {
 }
 
 namespace {
-bool hasSameOperands(Instruction *X, Instruction *Y) {
-  std::vector<Value *> op_X, op_Y;
-  for (auto OI = X->op_begin(), OE = X->op_end(); OI != OE; ++OI)
-    op_X.push_back(OI->get());
-  for (auto OI = Y->op_begin(), OE = Y->op_end(); OI != OE; ++OI)
-    op_Y.push_back(OI->get());
-  if (op_X.size() != op_Y.size())
-    return false;
-  for (int j = 0; j < op_X.size(); j++)
-    if (op_X[j] != op_Y[j])
-      return false;
-  return true;
-}
-
 class PREAnalysisResult {
 public:
   std::vector<std::vector<int>> notSameIdx; // predMap idx -> operand idx
@@ -3195,7 +3181,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           hints.appendToDescription("VI's getName is: " +
                                     ((*VI).getName()).str());
 
-          // Var(VI)p >= Var(Phi) <-- from PhiNode def
           // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
           // Currently, assume Rhs(VI) = Rhs(CurInst)
           // TODO: difference btw BB->getName() and
@@ -3223,20 +3208,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                          llvmberry::Source,
                          llvmberry::getBasicBlockIndex(CurrentBlock)),
                      INSTPOS(SRC, CurInst)));
-
-          // Transitivity [ Var(CurInst) >= Var(CurInstNormalized) >= Rhs(VI) >=
-          // Var(Phi) ]
-          hints.appendToDescription(
-              "hasSameOperands(CurInst, VI): " +
-              std::to_string(hasSameOperands(CurInst, VI)));
-          hints.appendToDescription("CurInst: " + CurInst->getName().str());
-          hints.appendToDescription("VI: " + VI->getName().str());
-          if (!hasSameOperands(CurInst, VI)) {
-            assert(isa<GetElementPtrInst>(CurInst));
-            hints.appendToDescription("gep inbounds remove");
-            hints.setReturnCodeToAdmitted();
-            return;
-          }
 
           // Transitivity [ Var(CurInst) >= Rhs(VI) >= Var(Phi) ]
           INFRULE(INSTPOS(SRC, CurInst),
