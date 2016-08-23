@@ -3201,24 +3201,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                                     VAR(VI_id, Physical),
                                                     VAR(Phi_id, Physical)));
 
-          // Propagate [ Rhs(VI) >= Var(Phi) ] until CurInst
-          PROPAGATE(
-              LESSDEF(RHS(VI_id, Physical, SRC), VAR(Phi_id, Physical), SRC),
-              BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                         llvmberry::Source,
-                         llvmberry::getBasicBlockIndex(CurrentBlock)),
-                     INSTPOS(SRC, CurInst)));
-
-          if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
-            if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
-              if (CurInstGEP->isInBounds() && !VIGEP->isInBounds()) {
-                hints.appendToDescription("gep removal");
-                hints.setReturnCodeToAdmitted();
-                return;
-              }
-            }
-          }
-
+          bool inboundsRemovalOccured = false;
           if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
             if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
               if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
@@ -3226,14 +3209,40 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                 hints.setReturnCodeToFail();
                 return;
               }
-            }
+              if (CurInstGEP->isInBounds() && !VIGEP->isInBounds())
+                inboundsRemovalOccured = true;
+            } else
+              assert(false && "This cannot occur");
           }
 
-          // Transitivity [ Var(CurInst) >= Rhs(VI) >= Var(Phi) ]
+          if (inboundsRemovalOccured) {
+            // CurInst has inbounds
+            // This VI does not have inbounds
+
+            // GEP Inbounds Remove [ RHS(CurInst) >= Rhs(VI) ]
+            INFRULE(llvmberry::TyPosition::make(
+                        SRC, Phi->getParent()->getName(), PB->getName()),
+                    llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
+            // Transitivity [ RHS(CurInst) >= Rhs(VI) >= Var(Phi) ]
+            INFRULE(llvmberry::TyPosition::make(
+                        SRC, Phi->getParent()->getName(), PB->getName()),
+                    llvmberry::ConsTransitivity::make(
+                        RHS(CurInst_id, Physical, SRC),
+                        RHS(VI_id, Physical, SRC), VAR(Phi_id, Physical)));
+          }
+          // Propagate [ Rhs(CurInst) >= Var(Phi) ] until CurInst
+          PROPAGATE(LESSDEF(RHS(CurInst_id, Physical, SRC),
+                            VAR(Phi_id, Physical), SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                               llvmberry::Source,
+                               llvmberry::getBasicBlockIndex(CurrentBlock)),
+                           INSTPOS(SRC, CurInst)));
+
+          // Transitivity [ Var(CurInst) >= Rhs(CurInst) >= Var(Phi) ]
           INFRULE(INSTPOS(SRC, CurInst),
-                  llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
-                                                    RHS(VI_id, Physical, SRC),
-                                                    VAR(Phi_id, Physical)));
+                  llvmberry::ConsTransitivity::make(
+                      VAR(CurInst_id, Physical), RHS(CurInst_id, Physical, SRC),
+                      VAR(Phi_id, Physical)));
         }
 
         // TODO: for all uses of CurInst
