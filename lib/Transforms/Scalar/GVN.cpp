@@ -3209,6 +3209,26 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                          llvmberry::getBasicBlockIndex(CurrentBlock)),
                      INSTPOS(SRC, CurInst)));
 
+          if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
+            if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
+              if (CurInstGEP->isInBounds() && !VIGEP->isInBounds()) {
+                hints.appendToDescription("gep removal");
+                hints.setReturnCodeToAdmitted();
+                return;
+              }
+            }
+          }
+
+          if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
+            if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
+              if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
+                hints.appendToDescription("gep removal - bug");
+                hints.setReturnCodeToFail();
+                return;
+              }
+            }
+          }
+
           // Transitivity [ Var(CurInst) >= Rhs(VI) >= Var(Phi) ]
           INFRULE(INSTPOS(SRC, CurInst),
                   llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
