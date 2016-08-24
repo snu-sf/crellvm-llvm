@@ -742,18 +742,6 @@ public:
   std::vector<std::pair<PHINode *, int>> PrevPRE;
   bool isFromNonLocalLoad;
 
-  static SmallVector<std::pair<Value *, BasicBlock *>, 8>
-  buildPredMap(PHINode *PN) {
-    SmallVector<std::pair<Value *, BasicBlock *>, 8> result;
-    BasicBlock *CurrentBlock = PN->getParent();
-    for (pred_iterator PI = pred_begin(CurrentBlock),
-                       PE = pred_end(CurrentBlock);
-         PI != PE; ++PI) {
-      BasicBlock *PB = *PI;
-      result.push_back(std::make_pair(PN->getIncomingValueForBlock(PB), PB));
-    }
-  }
-
   PREAnalysisResult(Instruction *CurInst, PHINode *PN) {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     isFromNonLocalLoad =
