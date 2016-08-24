@@ -3323,7 +3323,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
           }
 
           Instruction *VI = dyn_cast<Instruction>(V);
-          if (isa<PHINode>(V)) {
+          if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
             hints.appendToDescription(
                 "Phi must be introduced from previous PRE");
             hints.setReturnCodeToAdmitted();
