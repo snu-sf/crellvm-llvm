@@ -742,14 +742,30 @@ public:
   std::vector<std::pair<PHINode *, int>> PrevPRE;
   bool isFromNonLocalLoad;
 
-  PREAnalysisResult(Instruction *CurInst, Instruction *PREInstr,
-                    SmallVector<std::pair<Value *, BasicBlock *>, 8> predMap) {
+  static SmallVector<std::pair<Value *, BasicBlock *>, 8>
+  buildPredMap(PHINode *PN) {
+    SmallVector<std::pair<Value *, BasicBlock *>, 8> result;
+    BasicBlock *CurrentBlock = PN->getParent();
+    for (pred_iterator PI = pred_begin(CurrentBlock),
+                       PE = pred_end(CurrentBlock);
+         PI != PE; ++PI) {
+      BasicBlock *PB = *PI;
+      result.push_back(std::make_pair(PN->getIncomingValueForBlock(PB), PB));
+    }
+  }
+
+  PREAnalysisResult(Instruction *CurInst, PHINode *PN) {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     isFromNonLocalLoad =
         pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad;
     PrevPRENotEnough = false;
     std::vector<Value *> op_CurInst;
-    notSameIdx.resize(predMap.size());
+    unsigned numPredBlocks = 0;
+    BasicBlock *PNBlock = PN->getParent();
+    for (auto PI = pred_begin(PNBlock), PE = pred_end(PNBlock); PI != PE; ++PI)
+      numPredBlocks++;
+
+    notSameIdx.resize(numPredBlocks);
     isSameForAll = true;
     for (Instruction::op_iterator OI = CurInst->op_begin(),
                                   OE = CurInst->op_end();
@@ -757,11 +773,9 @@ public:
       op_CurInst.push_back(OI->get());
     }
 
-    for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-      BasicBlock *PB = predMap[i].second;
-      Value *V = nullptr;
-      if (!(V = predMap[i].first))
-        V = PREInstr;
+    for (unsigned i = 0, e = numPredBlocks; i != e; ++i) {
+      BasicBlock *PB = PN->getIncomingBlock(i);
+      Value *V = PN->getIncomingValue(i);
       if (Instruction *VI = dyn_cast<Instruction>(V)) {
         std::vector<Value *> op_VI;
         for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
@@ -794,11 +808,9 @@ public:
       if (PHINode *PI = dyn_cast<PHINode>(&I)) {
         int hit = 0;
         int idx = -1;
-        for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-          BasicBlock *PB = predMap[i].second;
-          Value *V = nullptr;
-          if (!(V = predMap[i].first))
-            V = PREInstr;
+        for (unsigned i = 0, e = numPredBlocks; i != e; ++i) {
+          BasicBlock *PB = PN->getIncomingBlock(i);
+          Value *V = PN->getIncomingValue(i);
           dbgs() << "V is : " << *V << "\n";
 
           // it may be constant int... ?!
@@ -840,7 +852,7 @@ public:
         }
         // if matched, all prev blocks match
         if (idx != -1) {
-          if (hit == predMap.size()) {
+          if (hit == numPredBlocks) {
             PrevPRE.push_back(std::make_pair(PI, idx));
           } else {
             // hints.appendToDescription("hit : " + std::to_string(hit) +
@@ -3133,9 +3145,8 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   Phi->setDebugLoc(CurInst->getDebugLoc());
 
   // Validation hint generation for PRE
-  llvmberry::intrude([&CurInst, &CurrentBlock, &Phi, &predMap, &PREInstr]() {
-    PREAnalysisResult *PREAR =
-        new PREAnalysisResult(CurInst, PREInstr, predMap);
+  llvmberry::intrude([&CurInst, &CurrentBlock, &Phi]() {
+    PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
     llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
     std::string CurInst_id = llvmberry::getVariable(*CurInst);
     std::string Phi_id = llvmberry::getVariable(*Phi);
@@ -3145,7 +3156,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                        CurInst->getParent()->getParent());
       llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst,
                                                          &CurrentBlock,
-                                                         &predMap, &PREInstr,
                                                          &Phi, &CurInst_id,
                                                          &Phi_id](
           llvmberry::ValidationUnit::Dictionary &data,
@@ -3154,12 +3164,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         // For each pred block, propagate the chain of involved values until the
         // end
         // of the pred block
-
-        for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-          BasicBlock *PB = predMap[i].second;
-          Value *V = nullptr;
-          if (!(V = predMap[i].first))
-            V = PREInstr;
+        for (auto PI = pred_begin(CurrentBlock), PE = pred_end(CurrentBlock);
+             PI != PE; ++PI) {
+          BasicBlock *PB = *PI;
+          Value *V = Phi->getIncomingValueForBlock(PB);
 
           hints.setDescription(
               (hints.getDescription() + "\nV is: " + (*V).getName()).str());
@@ -3250,7 +3258,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                        CurInst->getParent()->getParent());
       llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst,
                                                          &CurrentBlock,
-                                                         &predMap, &PREInstr,
                                                          &Phi, &CurInst_id,
                                                          &Phi_id, &PREAR](
           llvmberry::ValidationUnit::Dictionary &data,
@@ -3275,11 +3282,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         }
         std::vector<std::pair<PHINode *, int>> PrevPRE = PREAR->PrevPRE;
 
-        for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-          BasicBlock *PB = predMap[i].second;
-          Value *V = nullptr;
-          if (!(V = predMap[i].first))
-            V = PREInstr;
+        for (auto PI = pred_begin(CurrentBlock), PE = pred_end(CurrentBlock);
+             PI != PE; ++PI) {
+          BasicBlock *PB = *PI;
+          Value *V = Phi->getIncomingValueForBlock(PB);
 
           if (!isa<Instruction>(V)) {
             // constant int occurs... How can constant int get value number???
