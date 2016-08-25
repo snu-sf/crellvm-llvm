@@ -1026,8 +1026,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
 
-          // if it is not isSameForAll, and PrevPRE is empty, what does this
+          // TODO if it is not isSameForAll, and PrevPRE is empty, what does
+          // this
           // mean..?
+          // Somehow get [ RHS(CurInst) >= Var(VI) ]
           if (PrevPRE.size()) {
             Instruction *VI_evolving = (*VI).clone();
             VI_evolving->insertBefore(PhiBlock->getTerminator());
@@ -1041,6 +1043,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               Instruction *VI_op = dyn_cast<Instruction>((*VI).getOperand(idx));
               std::string VI_op_id = llvmberry::getVariable(*VI_op);
 
+              // Transitivity [ VAR(PrevPhi) >= VAR(VI_op)p >= Var(VI_op) ]
               INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                                   PB->getName()),
                       llvmberry::ConsTransitivity::make(
@@ -1049,6 +1052,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
               dbgs() << "VI_op : " << *VI_op << "\n";
               dbgs() << "VI_evolving : " << *VI_evolving << "\n";
+
+              // SubstituteRev [ VI_evolving_next >= VI_evolving ]
+              // VI_evolving_next = VI_evolving[VI_op := PrevPhi]
               INFRULE(llvmberry::TyPosition::make(SRC, (*PhiBlock).getName(),
                                                   (*PB).getName()),
                       llvmberry::ConsSubstituteRev::make(
@@ -1057,6 +1063,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
               Instruction *VI_evolving_next = (*VI_evolving).clone();
               (*VI_evolving_next).setOperand(idx, PrevPhi);
+
+              // Transitivity [ INSN(VI_evolving_next) >= INSN(VI_evolving) >=
+              // Var(VI) ]
               INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                                   PB->getName()),
                       llvmberry::ConsTransitivity::make(INSN(*VI_evolving_next),
@@ -1067,33 +1076,35 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               VI_evolving = VI_evolving_next;
               VI_evolving->insertBefore(PhiBlock->getTerminator());
             }
+            (*VI_evolving).eraseFromParent();
 
+            // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
             INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                                 PB->getName()),
                     llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
                                                       VAR(VI_id, Previous),
                                                       VAR(Phi_id, Physical)));
 
-            dbgs() << "VI_evolving_end : " << *VI_evolving << "\n";
-            dbgs() << "VI : " << *VI << "\n";
+            // Transitivity [ RHS(CurInst) >= Var(VI) >= Var(Phi) ]
             INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                                 PB->getName()),
-                    llvmberry::ConsTransitivity::make(INSN(*VI_evolving),
-                                                      VAR(VI_id, Physical),
-                                                      VAR(Phi_id, Physical)));
+                    llvmberry::ConsTransitivity::make(
+                        RHS(CurInst_id, Physical, SRC), VAR(VI_id, Physical),
+                        VAR(Phi_id, Physical)));
 
-            PROPAGATE(LESSDEF(INSN(*VI_evolving), VAR(Phi_id, Physical), SRC),
+            // Propagate [ RHS(CurInst) >= VAR(Phi) ]
+            PROPAGATE(LESSDEF(RHS(CurInst_id, Physical, SRC),
+                              VAR(Phi_id, Physical), SRC),
                       BOUNDS(llvmberry::TyPosition::make_start_of_block(
                                  llvmberry::Source,
                                  llvmberry::getBasicBlockIndex(PhiBlock)),
                              INSTPOS(SRC, CurInst)));
 
+            // Transitivity [ Var(CurInst) >= RHS(CurInst) >= Var(Phi) ]
             INFRULE(INSTPOS(SRC, CurInst),
-                    llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
-                                                      INSN(*VI_evolving),
-                                                      VAR(Phi_id, Physical)));
-
-            (*VI_evolving).eraseFromParent();
+                    llvmberry::ConsTransitivity::make(
+                        VAR(CurInst_id, Physical),
+                        RHS(CurInst_id, Physical, SRC), VAR(Phi_id, Physical)));
           }
         }
       }
