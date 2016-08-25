@@ -1017,13 +1017,13 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         // Somehow get [ VAR(CurInst) >= Var(VPHI) ]
         if (PHINode *VPHI = dyn_cast<PHINode>(V))
           generateHintForPRE(CurInst, VPHI);
-        // Somehow get [ RHS(CurInst) >= Var(VI) ]
         else {
           // TODO if it is not isSameForAll, and PrevPRE is empty, what does
           // this
           // mean..?
           if (!PrevPRE.size())
             break;
+
           // Propagate [ RHS(VI) >= VAR(VI) ]
           PROPAGATE(
               LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
@@ -1032,6 +1032,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
           Instruction *VI_evolving = (*VI).clone();
           VI_evolving->insertBefore(PhiBlock->getTerminator());
+
+          // Somehow get [ RHS(CurInst) >= Var(VI) ]
           for (auto k : PrevPRE) {
             dbgs() << "VI_evolving : " << *VI_evolving << "\n";
             PHINode *PrevPhi = k.first;
