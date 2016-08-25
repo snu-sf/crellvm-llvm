@@ -1017,12 +1017,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         if (PHINode *VPHI = dyn_cast<PHINode>(V))
           generateHintForPRE(CurInst, VPHI);
         else {
+          // Propagate [ RHS(VI) >= VAR(VI) ]
           PROPAGATE(
               LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
-              BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
-                                           llvmberry::Source, *PB)));
-          PROPAGATE(
-              LESSDEF(VAR(VI_id, Physical), RHS(VI_id, Physical, SRC), SRC),
               BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
 
@@ -1066,6 +1063,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
               // Transitivity [ INSN(VI_evolving_next) >= INSN(VI_evolving) >=
               // Var(VI) ]
+
+              // At first, INSN(VI_evolving) = RHS(VI) >= Var(VI)
+              // Next, recursively
               INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                                   PB->getName()),
                       llvmberry::ConsTransitivity::make(INSN(*VI_evolving_next),
