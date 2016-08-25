@@ -3133,9 +3133,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   Phi->setDebugLoc(CurInst->getDebugLoc());
 
   // Validation hint generation for PRE
-  llvmberry::intrude([&CurInst, &CurrentBlock, &Phi]() {
+  llvmberry::intrude([&CurInst, &Phi]() {
     PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
     llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
+    BasicBlock *CurrentBlock = CurInst->getParent();
     std::string CurInst_id = llvmberry::getVariable(*CurInst);
     std::string Phi_id = llvmberry::getVariable(*Phi);
 
