@@ -868,7 +868,7 @@ bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
   return true;
 }
 
-// [ Var(CurInst) >= Var(Phi) ] in INSTPOS(CurInst)
+// [ RHS(CurInst) >= Var(Phi) ] in start_of_block(Phi->getParent())
 void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   BasicBlock *PhiBlock = Phi->getParent();
   std::string CurInst_id = llvmberry::getVariable(*CurInst);
@@ -959,19 +959,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                           RHS(CurInst_id, Physical, SRC),
                           RHS(VI_id, Physical, SRC), VAR(Phi_id, Physical)));
             }
-            // Propagate [ Rhs(CurInst) >= Var(Phi) ] until CurInst
-            PROPAGATE(LESSDEF(RHS(CurInst_id, Physical, SRC),
-                              VAR(Phi_id, Physical), SRC),
-                      BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                                 llvmberry::Source,
-                                 llvmberry::getBasicBlockIndex(PhiBlock)),
-                             INSTPOS(SRC, CurInst)));
-
-            // Transitivity [ Var(CurInst) >= Rhs(CurInst) >= Var(Phi) ]
-            INFRULE(INSTPOS(SRC, CurInst),
-                    llvmberry::ConsTransitivity::make(
-                        VAR(CurInst_id, Physical),
-                        RHS(CurInst_id, Physical, SRC), VAR(Phi_id, Physical)));
           }
         });
   } else {
@@ -1012,17 +999,33 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
           return;
         }
 
+        // TODO cleanse Somehow get in comment
+        // TODO change "Var" into "VAR" in comment
+        // TODO make TyPosition::make() blah that used many time into variable
+
         Instruction *VI = dyn_cast<Instruction>(V);
         std::string VI_id = llvmberry::getVariable(*VI);
-        // Somehow get [ VAR(CurInst) >= Var(VPHI) ]
-        if (PHINode *VPHI = dyn_cast<PHINode>(V))
+        // Somehow get [ RHS(CurInst) >= Var(VI) ] in block(Phi, VPHI)
+        if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
+          // Somehow get [ RHS(CurInst) >= Var(VI) ] in start_of_block(VPHI)
           generateHintForPRE(CurInst, VPHI);
+
+          // Propagate [ RHS(CurInst) >= VAR(VI) ]
+          PROPAGATE(LESSDEF(RHS(CurInst_id, Physical, SRC),
+                            VAR(VI_id, Physical), SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                               llvmberry::Source, llvmberry::getBasicBlockIndex(
+                                                      VPHI->getParent())),
+                           llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                       PB->getName())));
+        }
+        // Somehow get [ RHS(CurInst) >= Var(VI) ] in block(Phi, VI)
         else {
           // TODO if it is not isSameForAll, and PrevPRE is empty, what does
           // this
           // mean..?
-          if (!PrevPRE.size())
-            break;
+          // if (!PrevPRE.size())
+          //   break;
 
           // Propagate [ RHS(VI) >= VAR(VI) ]
           PROPAGATE(
@@ -1095,20 +1098,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                             PB->getName()),
                 llvmberry::ConsTransitivity::make(
                     RHS(CurInst_id, Physical, SRC), VAR(VI_id, Physical),
-                    VAR(Phi_id, Physical)));
-
-        // Propagate [ RHS(CurInst) >= VAR(Phi) ]
-        PROPAGATE(
-            LESSDEF(RHS(CurInst_id, Physical, SRC), VAR(Phi_id, Physical), SRC),
-            BOUNDS(
-                llvmberry::TyPosition::make_start_of_block(
-                    llvmberry::Source, llvmberry::getBasicBlockIndex(PhiBlock)),
-                INSTPOS(SRC, CurInst)));
-
-        // Transitivity [ Var(CurInst) >= RHS(CurInst) >= Var(Phi) ]
-        INFRULE(INSTPOS(SRC, CurInst),
-                llvmberry::ConsTransitivity::make(
-                    VAR(CurInst_id, Physical), RHS(CurInst_id, Physical, SRC),
                     VAR(Phi_id, Physical)));
       }
 
@@ -3390,6 +3379,8 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
     else
       llvmberry::ValidationUnit::Begin("GVN_PRE_hard",
                                        CurInst->getParent()->getParent());
+
+    // Somehow get [ RHS(CurInst) >= Var(Phi) ] in start_of_block(Phi)
     generateHintForPRE(CurInst, Phi);
 
     llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi](
@@ -3397,6 +3388,20 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         llvmberry::CoreHint &hints) {
       std::string CurInst_id = llvmberry::getVariable(*CurInst);
       std::string Phi_id = llvmberry::getVariable(*Phi);
+
+      // Propagate [ Rhs(CurInst) >= Var(Phi) ] until CurInst
+      PROPAGATE(
+          LESSDEF(RHS(CurInst_id, Physical, SRC), VAR(Phi_id, Physical), SRC),
+          BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                     llvmberry::Source,
+                     llvmberry::getBasicBlockIndex(Phi->getParent())),
+                 INSTPOS(SRC, CurInst)));
+
+      // Transitivity [ Var(CurInst) >= Rhs(CurInst) >= Var(Phi) ]
+      INFRULE(INSTPOS(SRC, CurInst),
+              llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
+                                                RHS(CurInst_id, Physical, SRC),
+                                                VAR(Phi_id, Physical)));
 
       // TODO: for all uses of CurInst
       // replace curInst -> phi
