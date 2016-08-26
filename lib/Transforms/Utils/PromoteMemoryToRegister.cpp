@@ -1035,12 +1035,20 @@ void PromoteMem2Reg::run() {
 
   std::vector<AllocaInst *> &allocs = Allocas;
   llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&allocs]
+          ([&allocs, &F]
             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
     auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
     auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
+
+
+    for(auto BS = F.begin(), BE = F.end(); BS != BE;) {
+      BasicBlock *BB = BS++;
+      std::string blockName = llvmberry::getBasicBlockIndex(BB);
+      termIndex[blockName] = llvmberry::getTerminatorIndex(BB->getTerminator());
+
+    }
 
     // initialize dictionary datum
     // memorize indices of alloca, store, load, and terminator instructions
@@ -1050,15 +1058,15 @@ void PromoteMem2Reg::run() {
       
       allocas.push_back(AItmp);
       instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
-      termIndex[bname] = llvmberry::getTerminatorIndex
-                            (AItmp->getParent()->getTerminator());
+//      termIndex[bname] = llvmberry::getTerminatorIndex
+//                            (AItmp->getParent()->getTerminator());
 
       // initialize information of each alloca's store and alloca
       for (auto UI = AItmp->user_begin(), E = AItmp->user_end(); UI != E;) {
         Instruction *tmpInst = cast<Instruction>(*UI++);
         bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
-        termIndex[bname] = llvmberry::getTerminatorIndex
-                              (tmpInst->getParent()->getTerminator());
+//        termIndex[bname] = llvmberry::getTerminatorIndex
+//                              (tmpInst->getParent()->getTerminator());
 
         // ignore if user of alloca is not load or store
         if (!(isa<LoadInst>(tmpInst) || isa<StoreInst>(tmpInst)))
@@ -1087,8 +1095,8 @@ void PromoteMem2Reg::run() {
 
           if ((tmpUseinst = dyn_cast<Instruction>(U.getUser()))) {
             bname = llvmberry::getBasicBlockIndex(tmpUseinst->getParent());
-            termIndex[bname] = llvmberry::getTerminatorIndex
-                                  (tmpUseinst->getParent()->getTerminator());
+//            termIndex[bname] = llvmberry::getTerminatorIndex
+//                                  (tmpUseinst->getParent()->getTerminator());
             instrIndex[tmpUseinst] = llvmberry::getCommandIndex(*tmpUseinst);
           }
         }
