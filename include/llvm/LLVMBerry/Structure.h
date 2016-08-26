@@ -1223,9 +1223,9 @@ private:
   enum TyScope scope;
 };
 
-struct TyPropagateAlloca {
+struct TyPropagateUnique {
 public:
-  TyPropagateAlloca(std::shared_ptr<TyRegister> _p, enum TyScope _scope);
+  TyPropagateUnique(std::shared_ptr<TyRegister> _p, enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -1287,16 +1287,16 @@ private:
   std::shared_ptr<TyPropagateDiffblock> propagate_diffblock;
 };
 
-struct ConsAlloca : public TyPropagateObject {
+struct ConsUnique : public TyPropagateObject {
 public:
-  ConsAlloca(std::shared_ptr<TyPropagateAlloca> _propagate_alloca);
+  ConsUnique(std::shared_ptr<TyPropagateUnique> _propagate_unique);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyPropagateObject> make(std::shared_ptr<TyRegister> _p,
                                                  enum TyScope _scope);
 
 private:
-  std::shared_ptr<TyPropagateAlloca> propagate_alloca;
+  std::shared_ptr<TyPropagateUnique> propagate_unique;
 };
 
 struct ConsMaydiff : public TyPropagateObject {

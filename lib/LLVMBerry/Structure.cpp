@@ -2458,11 +2458,11 @@ TyPropagateDiffblock::make(std::shared_ptr<TyValue> _lhs,
       new TyPropagateDiffblock(_lhs, _rhs, _scope));
 }
 
-TyPropagateAlloca::TyPropagateAlloca(std::shared_ptr<TyRegister> _p,
+TyPropagateUnique::TyPropagateUnique(std::shared_ptr<TyRegister> _p,
                                      enum TyScope _scope)
     : p(std::move(_p)), scope(_scope) {}
 
-void TyPropagateAlloca::serialize(cereal::JSONOutputArchive &archive) const {
+void TyPropagateUnique::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(p));
   archive(cereal::make_nvp("scope", ::toString(scope)));
 }
@@ -2533,22 +2533,22 @@ void ConsDiffblock::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(propagate_diffblock));
 }
 
-ConsAlloca::ConsAlloca(std::shared_ptr<TyPropagateAlloca> _propagate_alloca)
-    : propagate_alloca(std::move(_propagate_alloca)) {}
+ConsUnique::ConsUnique(std::shared_ptr<TyPropagateUnique> _propagate_unique)
+    : propagate_unique(std::move(_propagate_unique)) {}
 
 std::shared_ptr<TyPropagateObject>
-ConsAlloca::make(std::shared_ptr<TyRegister> _p, enum TyScope _scope) {
-  std::shared_ptr<TyPropagateAlloca> _val(
-      new TyPropagateAlloca(std::move(_p), _scope));
+ConsUnique::make(std::shared_ptr<TyRegister> _p, enum TyScope _scope) {
+  std::shared_ptr<TyPropagateUnique> _val(
+      new TyPropagateUnique(std::move(_p), _scope));
 
-  return std::shared_ptr<TyPropagateObject>(new ConsAlloca(std::move(_val)));
+  return std::shared_ptr<TyPropagateObject>(new ConsUnique(std::move(_val)));
 }
 
-void ConsAlloca::serialize(cereal::JSONOutputArchive &archive) const {
+void ConsUnique::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
-  archive.saveValue("Alloca");
-  archive(CEREAL_NVP(propagate_alloca));
+  archive.saveValue("Unique");
+  archive(CEREAL_NVP(propagate_unique));
 }
 
 ConsMaydiff::ConsMaydiff(std::shared_ptr<TyRegister> _register_name)

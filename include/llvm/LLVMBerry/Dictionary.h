@@ -111,6 +111,10 @@ public:
   typedef std::shared_ptr<TyAllocasObj> TyAllocas;
   TyAllocas allocas;
 
+  typedef std::map<std::string, std::vector<llvm::Instruction*>> TyDiffblocksObj;
+  typedef std::shared_ptr<TyDiffblocksObj> TyDiffblocks;
+  TyDiffblocks diffBlocks;
+
   typedef std::map<const llvm::Instruction *, unsigned> TyInstrIndexObj;
   typedef std::shared_ptr<TyInstrIndexObj> TyInstrIndex;
   TyInstrIndex instrIndex;
@@ -160,6 +164,10 @@ public:
   typedef std::shared_ptr<TyBlocksObj> TyBlocks;
   TyBlocks blocks;
 
+  typedef std::vector<std::string> TyStrVecObj;
+  typedef std::shared_ptr<TyStrVecObj> TyStrVec;
+  TyStrVec strVec;
+
   typedef std::vector<std::pair<std::string, std::string>> TyBlockPairVecObj;
   typedef std::shared_ptr<TyBlockPairVecObj> TyBlockPairVec;
   TyBlockPairVec blockPairVec;
@@ -167,6 +175,10 @@ public:
   typedef std::vector<std::string> TyBlockVecObj;
   typedef std::shared_ptr<TyBlockVecObj> TyBlockVec;
   TyBlockVec blockVec;
+
+  typedef std::map<std::string, llvm::StoreInst*> TySImapObj;
+  typedef std::shared_ptr<TySImapObj> TySImap;
+  TySImap SImap;
 
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);

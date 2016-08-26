@@ -1626,6 +1626,98 @@ void TyDiffblockNoalias::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(yprime));
 }
 
+ConsDiffblockLoad::ConsDiffblockLoad(
+    std::shared_ptr<TyDiffblockLoad> _diffblock_load)
+    : diffblock_load(std::move(_diffblock_load)) {}
+std::shared_ptr<TyInfrule> ConsDiffblockLoad::make(
+    std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _p,
+    std::shared_ptr<TyValueType> _ty, std::shared_ptr<TySize> _align,
+    std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a) {
+  std::shared_ptr<TyDiffblockLoad> _val(new TyDiffblockLoad(
+      std::move(_x), std::move(_p), std::move(_ty), std::move(_align),
+      std::move(_y), std::move(_a)));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockLoad(std::move(_val)));
+}
+void ConsDiffblockLoad::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockLoad");
+  archive(CEREAL_NVP(diffblock_load));
+}
+
+TyDiffblockLoad::TyDiffblockLoad(std::shared_ptr<TyValue> _x,
+                                 std::shared_ptr<TyValue> _p,
+                                 std::shared_ptr<TyValueType> _ty,
+                                 std::shared_ptr<TySize> _align,
+                                 std::shared_ptr<TyValue> _y,
+                                 std::shared_ptr<TyValue> _a)
+  : x(std::move(_x)), p(std::move(_p)), ty(std::move(_ty)),
+    align(std::move(_align)), y(std::move(_y)), a(std::move(_a)) {}
+void TyDiffblockLoad::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(p));
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(align));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(a));
+}
+
+ConsDiffblockGep::ConsDiffblockGep(
+    std::shared_ptr<TyDiffblockGep> _diffblock_gep)
+    : diffblock_gep(std::move(_diffblock_gep)) {}
+std::shared_ptr<TyInfrule> ConsDiffblockGep::make(
+    std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyExpr> _gepinst,
+    std::shared_ptr<TyValue> _a) {
+  std::shared_ptr<TyDiffblockGep> _val(new TyDiffblockGep(
+      std::move(_x), std::move(_gepinst), std::move(_a)));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockGep(std::move(_val)));
+}
+void ConsDiffblockGep::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockGep");
+  archive(CEREAL_NVP(diffblock_gep));
+}
+
+TyDiffblockGep::TyDiffblockGep(std::shared_ptr<TyValue> _x,
+                               std::shared_ptr<TyExpr> _gepinst,
+                               std::shared_ptr<TyValue> _a)
+  : x(std::move(_x)), gepinst(std::move(_gepinst)), a(std::move(_a)) {}
+void TyDiffblockGep::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(gepinst));
+  archive(CEREAL_NVP(a));
+}
+
+ConsDiffblockBitcast::ConsDiffblockBitcast(
+    std::shared_ptr<TyDiffblockBitcast> _diffblock_bitcast)
+    : diffblock_bitcast(std::move(_diffblock_bitcast)) {}
+std::shared_ptr<TyInfrule> ConsDiffblockBitcast::make(
+    std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyExpr> _bitcastinst,
+    std::shared_ptr<TyValue> _a) {
+  std::shared_ptr<TyDiffblockBitcast> _val(new TyDiffblockBitcast(
+      std::move(_x), std::move(_bitcastinst), std::move(_a)));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockBitcast(std::move(_val)));
+}
+void ConsDiffblockBitcast::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockBitcast");
+  archive(CEREAL_NVP(diffblock_bitcast));
+}
+
+TyDiffblockBitcast::TyDiffblockBitcast(std::shared_ptr<TyValue> _x,
+                               std::shared_ptr<TyExpr> _bitcastinst,
+                               std::shared_ptr<TyValue> _a)
+  : x(std::move(_x)), bitcastinst(std::move(_bitcastinst)), a(std::move(_a)) {}
+void TyDiffblockBitcast::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(bitcastinst));
+  archive(CEREAL_NVP(a));
+}
+
 TySdivMone::TySdivMone(std::shared_ptr<TyRegister> _z,
                        std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz)
     : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)) {}
