@@ -1037,13 +1037,12 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                            llvmberry::Source, *PB)));
 
           Instruction *VI_evolving = (*VI).clone();
-          VI_evolving->insertBefore(PhiBlock->getTerminator());
 
           // Somehow get [ RHS(CurInst) >= Var(VI) ]
           for (auto k : PrevPRE) {
             dbgs() << "VI_evolving : " << *VI_evolving << "\n";
             PHINode *PrevPhi = k.first;
-            dbgs() << "PrevPphi " << *PrevPhi << "\n";
+            dbgs() << "PrevPhi " << *PrevPhi << "\n";
             std::string PrevPhi_id = llvmberry::getVariable(*PrevPhi);
             int idx = k.second;
 
@@ -1082,11 +1081,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                                       INSN(*VI_evolving),
                                                       VAR(VI_id, Physical)));
 
-            (*VI_evolving).eraseFromParent();
+            delete VI_evolving;
             VI_evolving = VI_evolving_next;
-            VI_evolving->insertBefore(PhiBlock->getTerminator());
           }
-          (*VI_evolving).eraseFromParent();
+          delete VI_evolving;
         }
 
         // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
