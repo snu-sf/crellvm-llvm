@@ -883,38 +883,269 @@ bool is_inverse_expression(Expression e1, Expression e2) {
   return false;
 }
 
-void propagateStoreNoalias(llvm::AllocaInst* AI,
-                           llvm::BasicBlock* BB,
-                           llvm::Instruction *useInst,
-                           int useIndex, bool isInit,
-                           std::vector<std::string> succs,
-                           std::vector<std::string> regs) {
+bool isPtrLoad(llvm::Value* V,
+               std::map<std::string, llvm::StoreInst*> SImap) {
+  if (llvm::isa<llvm::GetElementPtrInst>(V) ||
+      llvm::isa<llvm::BitCastInst>(V) ||
+      llvm::isa<llvm::CallInst>(V))
+    return true;
+
+  bool ptrLoad = false;
+  if (llvm::LoadInst* LI = llvm::dyn_cast<llvm::LoadInst>(V)) {
+    std::string key = LI->getOperand(0)->getName();
+
+    if (llvm::isa<llvm::GetElementPtrInst>(LI->getOperand(0)))
+      ptrLoad = true;
+
+    if (SImap[key] != NULL) {
+/*      
+      if (llvm::LoadInst* LItmp =
+            llvm::dyn_cast<llvm::LoadInst>(SImap[key]->getOperand(0)))
+        SImap[key] = SImap[LItmp->getOperand(0)->getName()];
+*/
+      if (isPtrLoad(SImap[key]->getOperand(0), SImap))
+        ptrLoad = true;
+    }
+  }
+
+  for (auto UI = V->use_begin(), E = V->use_end(); UI != E;) {
+    llvm::Use &U = *(UI++);
+
+    if (llvm::StoreInst *SI =
+          llvm::dyn_cast<llvm::StoreInst>(U.getUser())) {
+      if (V->getName() == SI->getOperand(1)->getName() ||
+          (ptrLoad && V->getName() == SI->getOperand(0)->getName()))
+        return true;
+    } else if (llvm::GetElementPtrInst *GEPI =
+                 llvm::dyn_cast<llvm::GetElementPtrInst>(U.getUser())) {
+      std::cout<<"gep: "+std::string(V->getName())+", "+std::string(GEPI->getOperand(0)->getName())<<std::endl;
+      if (V->getName() == GEPI->getOperand(0)->getName())
+        return true;
+    } else if (llvm::BitCastInst *BCI =
+                 llvm::dyn_cast<llvm::BitCastInst>(U.getUser())) {
+      std::cout<<"bc: "+std::string(V->getName())+", "+std::string(BCI->getOperand(0)->getName())<<std::endl;
+      if (V->getName() == BCI->getOperand(0)->getName())
+        return true;
+    } else {
+      continue;
+    }
+  }
+
+  return false;
+}
+
+void propagateToUse(llvm::Instruction* I, std::string key,
+                    llvm::StoreInst* SI, llvm::Instruction *useInst,
+                    int useIndex) {
+  ValidationUnit::GetInstance()->intrude([&I, &key, &SI, &useInst, &useIndex]
+      (Dictionary &data, CoreHint &hints) {
+    auto &diffBlocks = *(data.get<ArgForMem2Reg>()->diffBlocks);
+
+    for (auto DBII = diffBlocks[key].begin(); DBII != diffBlocks[key].end();) {
+      llvm::Instruction* DBI = *(DBII++);
+      llvm::Value* V;
+
+      if (llvm::StoreInst* SItmp = llvm::dyn_cast<llvm::StoreInst>(DBI))
+        V = SItmp->getOperand(0);
+      else
+        V = DBI;
+
+std::cout<<std::string(I->getName())+", "+key+": "+std::string(V->getName())<<std::endl;
+
+      //for (auto UI = I->use_begin(), E = I->use_end(); UI != E;) {
+      //  llvm::Use &U = *(UI++);
+      //  llvm::Instruction *use =
+      //      llvm::dyn_cast<llvm::Instruction>(U.getUser());
+        
+        PROPAGATE(DIFFBLOCK(VAL(I, Physical), VAL(V, Physical), SRC),
+                  BOUNDS(TyPosition::make(SRC, *DBI, getCommandIndex(*DBI), ""),
+                         TyPosition::make(SRC, *useInst, useIndex, "")));
+
+        diffBlocks[I->getName()].push_back(DBI);
+      //}
+
+      if (llvm::LoadInst* LI = llvm::dyn_cast<llvm::LoadInst>(I)) {
+        if (llvm::GetElementPtrInst* GEPI =
+              llvm::dyn_cast<llvm::GetElementPtrInst>(LI->getOperand(0))) {
+          PROPAGATE(DIFFBLOCK(VAL(LI, Physical), VAL(V, Physical), SRC),
+                    BOUNDS(TyPosition::make(SRC, *DBI, getCommandIndex(*DBI), ""),
+                           TyPosition::make(SRC, *useInst, useIndex, "")));
+        }
+
+        if (SI == NULL)
+          break;
+
+        INFRULE(TyPosition::make(SRC, *LI, getCommandIndex(*LI), ""),
+                ConsDiffblockLoad::make(VAL(LI, Physical),
+                                        VAL(LI->getOperand(0), Physical),
+                                        TYPEOF(LI),
+                                        ConsSize::make(1),
+                                        VAL(SI->getOperand(0), Physical),
+                                        VAL(V, Physical)));
+      } else if (llvm::GetElementPtrInst* GEPI =
+                  llvm::dyn_cast<llvm::GetElementPtrInst>(I)) {
+        INFRULE(TyPosition::make(SRC, *GEPI, getCommandIndex(*GEPI), ""),
+                ConsDiffblockGep::make(VAL(GEPI, Physical),
+                                       INSN(*GEPI),
+                                       VAL(V, Physical)));
+      } else if (llvm::BitCastInst* BCI =
+                  llvm::dyn_cast<llvm::BitCastInst>(I)) {
+        INFRULE(TyPosition::make(SRC, *BCI, getCommandIndex(*BCI), ""),
+                ConsDiffblockBitcast::make(VAL(BCI, Physical),
+                                           INSN(*BCI),
+                                           VAL(V, Physical)));
+      }
+    }
+  });
+}
+
+void propagateDiffblockSub(llvm::Instruction* I,
+                           llvm::Instruction* useInst,
+                           int useIndex) {
+  ValidationUnit::GetInstance()->intrude([&I, &useInst, &useIndex]
+      (Dictionary &data, CoreHint &hints) {
+    auto &allocas = *(data.get<ArgForMem2Reg>()->allocas);
+    auto &diffBlocks = *(data.get<ArgForMem2Reg>()->diffBlocks);
+    auto &strVec = *(data.get<ArgForMem2Reg>()->strVec);
+    auto &SImap = *(data.get<ArgForMem2Reg>()->SImap);
+
+    if (llvm::LoadInst* LI =
+         llvm::dyn_cast<llvm::LoadInst>(I)) {
+      std::string keyName = LI->getOperand(0)->getName();
+
+      if (SImap[keyName] == NULL)
+        return;
+
+      if (isPtrLoad(LI, SImap)) {
+        std::cout<<"loadinst: "+std::string(LI->getName())<<std::endl;
+        if (std::find(strVec.begin(), strVec.end(), LI->getName()) == strVec.end()) {
+          strVec.push_back(LI->getName());
+
+          llvm::StoreInst* SI = SImap[keyName];
+          bool isChanged = true;
+          while (isChanged) {
+            if (llvm::LoadInst* LItmp =
+                  llvm::dyn_cast<llvm::LoadInst>(SI->getOperand(0))) {
+              if (SImap[LItmp->getOperand(0)->getName()] != NULL)
+                SI = SImap[LItmp->getOperand(0)->getName()];
+/*            
+            if (llvm::LoadInst* LItmp =
+                  llvm::dyn_cast<llvm::LoadInst>(SImap[keyName]->getOperand(0))) {
+              if (SImap[LItmp->getOperand(0)->getName()] != NULL)
+                SImap[keyName] = SImap[LItmp->getOperand(0)->getName()];
+*/                
+              else
+                isChanged = false;
+            } else
+              isChanged = false;
+          }
+          //llvm::StoreInst* SI = SImap[keyName];          
+
+          if (llvm::isa<llvm::GetElementPtrInst>(LI->getOperand(0)))
+            propagateToUse(LI, LI->getOperand(0)->getName(), NULL, useInst, useIndex);
+          else
+            propagateToUse(LI, SI->getOperand(0)->getName(), SI, useInst, useIndex);
+        }
+      }
+    } else if (llvm::GetElementPtrInst* GEPI =
+                llvm::dyn_cast<llvm::GetElementPtrInst>(I)) {
+      std::string keyName = GEPI->getOperand(0)->getName();
+
+        std::cout<<"gepinst: "+std::string(GEPI->getName())<<std::endl;
+      if (std::find(strVec.begin(), strVec.end(), GEPI->getName()) == strVec.end()) {
+        strVec.push_back(GEPI->getName());
+
+        propagateToUse(GEPI, keyName, NULL, useInst, useIndex);
+      }
+    } else if (llvm::BitCastInst* BCI =
+                llvm::dyn_cast<llvm::BitCastInst>(I)) {
+      std::string keyName = BCI->getOperand(0)->getName();
+
+        std::cout<<"bitcastinst: "+std::string(BCI->getName())<<std::endl;
+      if (std::find(strVec.begin(), strVec.end(), BCI->getName()) == strVec.end()) {
+        strVec.push_back(BCI->getName());
+
+        propagateToUse(BCI, keyName, NULL, useInst, useIndex);
+      }
+    } else if (llvm::StoreInst* SI =
+                llvm::dyn_cast<llvm::StoreInst>(I)) {
+      std::string keyName = std::string(SI->getOperand(0)->getName()) + "->" +
+                            std::string(SI->getOperand(1)->getName());
+      if (SI->getOperand(0)->getName() == "")
+        return;
+
+        std::cout<<"storeinst: "+std::string(keyName)<<std::endl;
+      if (std::find(strVec.begin(), strVec.end(), keyName) == strVec.end()) {
+        strVec.push_back(keyName);
+
+        if (llvm::isa<llvm::Argument>(SI->getOperand(0)) ||
+            llvm::isa<llvm::GlobalVariable>(SI->getOperand(0)) ||
+            isPtrLoad(SI->getOperand(0), SImap)) {
+          for (auto i = allocas.begin(); i != allocas.end(); ++i) {
+            llvm::AllocaInst *AI = *i;
+
+            PROPAGATE(DIFFBLOCK(VAL(AI, Physical), VAL(SI->getOperand(0), Physical), SRC),
+                      BOUNDS(TyPosition::make(SRC, *AI, getCommandIndex(*AI), ""),
+                             TyPosition::make(SRC, *useInst, useIndex, "")));
+
+            diffBlocks[AI->getName()].push_back(SI);
+            diffBlocks[SI->getOperand(0)->getName()].push_back(AI);
+          }
+
+          SImap[SI->getOperand(1)->getName()] = SI;
+        }
+      }
+    } else if (llvm::CallInst* CI =
+                llvm::dyn_cast<llvm::CallInst>(I)) {
+      // now working : how to deal with call instruction
+      if (CI->getName() != "") {
+        std::cout<<"callinst: "+std::string(CI->getName())<<std::endl;
+        if (std::find(strVec.begin(), strVec.end(), CI->getName()) != strVec.end())
+          return;
+        strVec.push_back(CI->getName());
+
+        for (auto i = allocas.begin(); i != allocas.end(); ++i) {
+          llvm::AllocaInst *AI = *i;
+
+          PROPAGATE(DIFFBLOCK(VAL(AI, Physical), VAL(CI, Physical), SRC),
+                    BOUNDS(TyPosition::make(SRC, *AI, getCommandIndex(*AI), ""),
+                           TyPosition::make(SRC, *useInst, useIndex, "")));
+
+          diffBlocks[AI->getName()].push_back(CI);
+          diffBlocks[CI->getName()].push_back(AI);
+        }
+      }
+    }
+  });
+}
+
+void propagateDiffblock(llvm::AllocaInst* AI,
+                        llvm::BasicBlock* BB,
+                        llvm::Instruction* useInst,
+                        int useIndex, bool isInit,
+                        std::vector<std::string> succs,
+                        std::vector<std::string> regs) {
   ValidationUnit::GetInstance()->intrude([&AI, &BB, &useInst, &useIndex,
                                           &isInit, &succs, &regs]
       (Dictionary &data, CoreHint &hints) {
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
+    auto &strVec = *(data.get<ArgForMem2Reg>()->strVec);
 
     if (isInit) {
       for (auto II = BB->begin();
            !llvm::isa<llvm::TerminatorInst>(II);) {
         llvm::Instruction *I = II++;
 
+        //propagateDiffblockSub(I, useInst, useIndex);
         if (llvm::StoreInst *SI =
               llvm::dyn_cast<llvm::StoreInst>(I)) {
-          // if we already deal with this SI, skip this SI
-          if (std::find(regs.begin(), regs.end(),
-                        SI->getOperand(1)->getName()) != regs.end())
+          if (std::find(strVec.begin(), strVec.end(),
+                        SI->getOperand(1)->getName()) != strVec.end())
             continue;
           
-          PROPAGATE(NOALIAS(POINTER(AI), POINTER(SI->getOperand(1)), SRC),
+          PROPAGATE(DIFFBLOCK(VAL(AI, Physical), VAL(SI->getOperand(1), Physical), SRC),
                     BOUNDS(TyPosition::make(SRC, *SI, getCommandIndex(*SI), ""),
                            TyPosition::make(SRC, *SI, getCommandIndex(*SI)+1, "")));
-          
-          INFRULE(TyPosition::make(SRC, *SI, getCommandIndex(*SI), ""),
-                  ConsDiffblockNoalias::make(VAL(AI, Physical),
-                                             VAL(SI->getOperand(1), Physical),
-                                             POINTER(AI),
-                                             POINTER(SI->getOperand(1))));
         } else {
           continue;
         }
@@ -935,61 +1166,44 @@ void propagateStoreNoalias(llvm::AllocaInst* AI,
       blockPairVec.push_back(std::make_pair(getBasicBlockIndex(BB), getBasicBlockIndex(BBtmp)));
 
       for (auto II = BBtmp->begin(); !llvm::isa<llvm::TerminatorInst>(II);) {
-        llvm::Instruction *I = II++;
+        llvm::Instruction* I = II++;
 
-    //std::cout<<"storeNoalias check1: "+getBasicBlockIndex(BBtmp)<<std::endl;
-        if (llvm::StoreInst *SI =
-              llvm::dyn_cast<llvm::StoreInst>(I)) {
-          //std::cout<<"storeNoalias check2: "<<std::string(SI->getOperand(1)->getName())<<std::endl;
-          // if we already deal with this SI, skip this SI
-          if (std::find(regs.begin(), regs.end(),
-                        SI->getOperand(1)->getName()) != regs.end())
-            continue;
-
-          if (isPotentiallyReachable(SI->getParent(), useInst->getParent()) ||
-              (SI->getParent()==useInst->getParent() &&
-               getCommandIndex(*SI)<getCommandIndex(*useInst))) {
-            
-            PROPAGATE(NOALIAS(POINTER(AI), POINTER(SI->getOperand(1)), SRC),
-                      BOUNDS(TyPosition::make(SRC, *SI, getCommandIndex(*SI), ""),
-                             TyPosition::make(SRC, *SI, getCommandIndex(*SI)+1, "")));
-            
-            INFRULE(TyPosition::make(SRC, *SI, getCommandIndex(*SI), ""),
-                    ConsDiffblockNoalias::make(VAL(AI, Physical),
-                                               VAL(SI->getOperand(1), Physical),
-                                               POINTER(AI),
-                                               POINTER(SI->getOperand(1))));
-          }
-        } else {
-          continue;
-        }
+        propagateDiffblockSub(I, useInst, useIndex);
       }
-      propagateStoreNoalias(AI, BBtmp, useInst, useIndex, false, succs, regs);
+      propagateDiffblock(AI, BBtmp, useInst, useIndex, false, succs, regs);
     }
   });
     //std::cout<<"storeNoalias end"<<std::endl;
 }
 
-void generateHintForMem2RegPropagateNoalias(llvm::AllocaInst *AI,
-                                            llvm::Instruction *useInst,
-                                            int useIndex) {
+void generateHintForMem2RegPropagateAIDiffblock(llvm::AllocaInst *AI,
+                                              llvm::Instruction *useInst,
+                                              int useIndex) {
   ValidationUnit::GetInstance()->intrude([&AI, &useInst, &useIndex](
       Dictionary &data, CoreHint &hints) {
     auto &allocas = *(data.get<ArgForMem2Reg>()->allocas);
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &diffBlocks = *(data.get<ArgForMem2Reg>()->diffBlocks);
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
+    auto &strVec = *(data.get<ArgForMem2Reg>()->strVec);
+    auto &SImap = *(data.get<ArgForMem2Reg>()->SImap);
     std::vector<std::string> regs;
+    std::vector<std::string> tmp;
+    std::string Ralloca = getVariable(*AI);
 
     regs.push_back(AI->getName());
+    strVec.push_back(AI->getName());
     for (auto i = allocas.begin(); i != allocas.end(); ++i) {
       llvm::AllocaInst *AItmp = *i;
 
       if (AI == AItmp)
         continue;
-
       regs.push_back(AItmp->getName());
+      strVec.push_back(AItmp->getName());
+      diffBlocks[AI->getName()].push_back(AItmp);
 
       if (instrIndex[AI] < instrIndex[AItmp]) {
+/*
         PROPAGATE(NOALIAS(POINTER(AI), POINTER(AItmp), SRC),
                   BOUNDS(TyPosition::make(SRC, *AItmp, instrIndex[AItmp], ""),
                          TyPosition::make(SRC, *useInst, useIndex, "")));
@@ -999,7 +1213,16 @@ void generateHintForMem2RegPropagateNoalias(llvm::AllocaInst *AI,
                                            VAL(AItmp, Physical),
                                            POINTER(AI),
                                            POINTER(AItmp)));
+*/
+
+        PROPAGATE(DIFFBLOCK(VAL(AI, Physical), VAL(AItmp, Physical), SRC),
+                  BOUNDS(TyPosition::make(SRC, *AItmp, instrIndex[AItmp], ""),
+                         TyPosition::make(SRC, *useInst, useIndex, "")));
       } else {
+        PROPAGATE(DIFFBLOCK(VAL(AItmp, Physical), VAL(AI, Physical), SRC),
+                  BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                         TyPosition::make(SRC, *useInst, useIndex, "")));
+/*        
         PROPAGATE(NOALIAS(POINTER(AItmp), POINTER(AI), SRC),
                   BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
                          TyPosition::make(SRC, *useInst, useIndex, "")));
@@ -1009,11 +1232,14 @@ void generateHintForMem2RegPropagateNoalias(llvm::AllocaInst *AI,
                                            VAL(AI, Physical),
                                            POINTER(AItmp),
                                            POINTER(AI)));
+*/                                           
       }
     }
     std::vector<std::string> succs;
+    //std::map<std::string, llvm::StoreInst*> SImap;
+    SImap.clear();
     blockPairVec.clear();
-    propagateStoreNoalias(AI, AI->getParent(), useInst, useIndex, true, succs, regs);
+    propagateDiffblock(AI, AI->getParent(), useInst, useIndex, true, succs, regs);
   });
     std::cout<<"PropagateNoalias end"<<std::endl;
 }
@@ -1493,6 +1719,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
     do {
       bool newStore = false;
       std::cout<<"Mem2RegPHI checkstart: "+llvmberry::getBasicBlockIndex(BB)+"->"+llvmberry::getBasicBlockIndex(BBtmp)<<std::endl;
+      blockVec.push_back(getBasicBlockIndex(BBtmp)+"->"+getBasicBlockIndex(BBtmp));
       if (!isSameBB) {
         Predtmp = BB;
         BBtmp = *BI++;
@@ -1504,12 +1731,12 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
 
         // do not check same block again
         // now working
-        //if (std::find(blockVec.begin(), blockVec.end(), getBasicBlockIndex(BBtmp)) != blockVec.end())
-        //  continue;
-        //blockVec.push_back(getBasicBlockIndex(BBtmp));
-        if (std::find(succs.begin(), succs.end(), BBtmp) != succs.end())
+        if (std::find(blockVec.begin(), blockVec.end(), getBasicBlockIndex(Predtmp)+"->"+getBasicBlockIndex(BBtmp)) != blockVec.end())
           continue;
-        succs.push_back(BBtmp);
+        blockVec.push_back(getBasicBlockIndex(Predtmp)+"->"+getBasicBlockIndex(BBtmp));
+        //if (std::find(succs.begin(), succs.end(), BBtmp) != succs.end())
+        //  continue;
+        //succs.push_back(BBtmp);
 
         std::cout<<"Mem2RegPHI checkend: "+getBasicBlockIndex(Predtmp)+"->"+getBasicBlockIndex(BBtmp)<<std::endl;
         // if this successor block has PHI,
@@ -1524,7 +1751,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
             // <Condition 1>
             // check if one of incoming values of PHI is
             // stored value of current SI
-            if (Predtmp != PHI->getParent() && PAM.count(PHI) &&
+            if (/*Predtmp != PHI->getParent() && */PAM.count(PHI) &&
                 // fragile: this condition relies on llvm naming convention of PHI
                 Rstore == Rphi.substr(0, Rphi.rfind("."))) {
               std::vector<llvm::BasicBlock*> preds;
@@ -1879,10 +2106,11 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
             //  }
             //}
           }
-
-          PROPAGATE(ALLOCA(REGISTER(Ralloca, Physical), SRC),
+/*
+          PROPAGATE(FRESH(REGISTER(Ralloca, Physical), SRC),
                     BOUNDS(TyPosition::make(SRC, *AItmp, instrIndex[AItmp], ""),
                            TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+*/
 
           PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC),
                     BOUNDS(TyPosition::make(SRC, *AItmp, instrIndex[AItmp], ""),

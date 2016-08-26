@@ -1031,9 +1031,11 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
               } else {
                 assert("ptr1_alloca or ptr3_alloca must dominate another!" && false);
               }
+              /*
               PROPAGATE(llvmberry::ConsAlloca::make(
                     REGISTER(llvmberry::getVariable(*alloca_ahead), Physical), llvmberry::Source),
                   BOUNDS(INSTPOS(llvmberry::Source, alloca_ahead), INSTPOS(llvmberry::Source, alloca_behind)));
+              */    
             } else if (GlobalVariable *ptr1_gv = llvm::dyn_cast<GlobalVariable>(ptr1src)) {
               INFRULE(INSTPOS(llvmberry::Source, ptr3_alloca),
                 llvmberry::ConsDiffblockGlobalAlloca::make(
@@ -1472,8 +1474,7 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
         std::string regname = llvmberry::getVariable(*Ptr);
         AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
         llvmberry::insertTgtNopAtSrcI(hints, &SI);
-        PROPAGATE(ALLOCA(REGISTER(regname, Physical), SRC),
-            BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
+
         PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
             BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
       });

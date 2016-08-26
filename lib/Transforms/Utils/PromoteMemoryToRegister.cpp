@@ -43,6 +43,7 @@
 #include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 #include "llvm/LLVMBerry/Dictionary.h"
+#include "llvm/Support/Debug.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "mem2reg"
@@ -76,10 +77,10 @@ bool llvm::isAllocaPromotable(const AllocaInst *AI) {
           II->getIntrinsicID() != Intrinsic::lifetime_end)
         return false;
     } else if (const BitCastInst *BCI = dyn_cast<BitCastInst>(U)) {
-      if (BCI->getType() != Type::getInt8PtrTy(U->getContext(), AS))
-        return false;
-      if (!onlyUsedByLifetimeMarkers(BCI))
-        return false;
+      if (BCI->getType() != Type::getInt8PtrTy(U->getContext(), AS)) {
+        return false; }
+      if (!onlyUsedByLifetimeMarkers(BCI)) {
+        return false;}
     } else if (const GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(U)) {
       if (GEPI->getType() != Type::getInt8PtrTy(U->getContext(), AS))
         return false;
@@ -494,8 +495,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
       // add hints per every use of LI
       for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
-        llvm::Use &U = *(UI++);
-        llvm::Instruction *use = dyn_cast<Instruction>(U.getUser());
+        Use &U = *(UI++);
+        Instruction *use = dyn_cast<Instruction>(U.getUser());
 
         // set index of use
         int useIndex = 
@@ -699,8 +700,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
 
         // find next store, and final use of alloca
-        llvm::Instruction* next;
-        llvm::Instruction* use = AI; 
+        Instruction* next;
+        Instruction* use = AI; 
 
         bool checkNext = false;
         for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
@@ -805,8 +806,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
         // add hints per user of load
         for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
-          llvm::Use &U = *(UI++);
-          llvm::Instruction *use = dyn_cast<Instruction>(U.getUser());
+          Use &U = *(UI++);
+          Instruction *use = dyn_cast<Instruction>(U.getUser());
 
           // set index of use
           int useIndex = 
@@ -908,8 +909,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
         // add hints per user of load
         for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
-          llvm::Use &U = *(UI++);
-          llvm::Instruction *use = dyn_cast<Instruction>(U.getUser());
+          Use &U = *(UI++);
+          Instruction *use = dyn_cast<Instruction>(U.getUser());
 
           // set index of use
           int useIndex = 
@@ -1037,9 +1038,11 @@ void PromoteMem2Reg::run() {
           ([&allocs]
             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
+    auto &diffBlocks = *(data.get<llvmberry::ArgForMem2Reg>()->diffBlocks);
     auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
     auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
+    auto &strVec = *(data.get<llvmberry::ArgForMem2Reg>()->strVec);
 
     // initialize dictionary datum
     // memorize indices of alloca, store, load, and terminator instructions
@@ -1082,7 +1085,7 @@ void PromoteMem2Reg::run() {
         // save information of instruction's use
         Instruction *tmpUseinst;
         for (auto UI2 = tmpInst->use_begin(), E2 = tmpInst->use_end(); UI2 != E2; UI2++) {
-          llvm::Use &U = *UI2;
+          Use &U = *UI2;
 
           if ((tmpUseinst = dyn_cast<Instruction>(U.getUser()))) {
             bname = llvmberry::getBasicBlockIndex(tmpUseinst->getParent());
@@ -1094,17 +1097,52 @@ void PromoteMem2Reg::run() {
       }
     }
 
+    strVec.clear();
+    diffBlocks.clear();
     for (unsigned AllocaNum = 0; AllocaNum != allocs.size(); AllocaNum++) {
       AllocaInst *AI = allocs[AllocaNum];
       std::string Ralloca = llvmberry::getVariable(*AI);
+      Function *F = AI->getParent()->getParent();
+      BasicBlock *EB;
 
+      for (auto BI = F->begin(), BE = F->end(); BI != BE;) {
+        EB = BI++;
+      }
+
+      std::string EBname = llvmberry::getBasicBlockIndex(EB);
+      Instruction* EI = EB->getTerminator();
+
+      PROPAGATE(UNIQUE(REGISTER(Ralloca, Physical),
+                       SRC),
+                BOUNDS(llvmberry::TyPosition::make
+                        (SRC, *AI, instrIndex[AI], ""),
+                       llvmberry::TyPosition::make
+                        (SRC, *EI, termIndex[EBname], "")));
+
+      PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
+                        SRC),
+                BOUNDS(llvmberry::TyPosition::make
+                        (SRC, *AI, instrIndex[AI], ""),
+                       llvmberry::TyPosition::make
+                        (SRC, *EI, termIndex[EBname], "")));
+
+      //llvmberry::generateHintForMem2RegPropagateAIDiffblock
+      //  (AI, EI, termIndex[EBname]);
+/*
       // find block name of alloca's end user
       for (auto UI = AI->use_begin(), E = AI->use_end(); UI != E;) {
         Use &U = *(UI++);
         Instruction* userEnd = dyn_cast<Instruction>(U.getUser());
-        std::string endBname = llvmberry::getBasicBlockIndex(userEnd->getParent());
+        int index;
 
-        // propagate alloca, private, noalias
+        if (llvm::isa<llvm::TerminatorInst>(userEnd)) {
+          std::string endBname = llvmberry::getBasicBlockIndex(userEnd->getParent());
+          index = termIndex[endBname];
+        } else {
+          index = instrIndex[userEnd];
+        }
+
+        // propagate alloca, private, noalias        
         PROPAGATE(ALLOCA(REGISTER(Ralloca, Physical),
                          SRC),
                   BOUNDS(llvmberry::TyPosition::make
@@ -1117,11 +1155,12 @@ void PromoteMem2Reg::run() {
                   BOUNDS(llvmberry::TyPosition::make
                           (SRC, *AI, instrIndex[AI], ""),
                          llvmberry::TyPosition::make
-                          (SRC, *userEnd, termIndex[endBname], "")));
+                          (SRC, *userEnd, index, "")));
 
         llvmberry::generateHintForMem2RegPropagateNoalias
-          (AI, userEnd, termIndex[endBname]);
+          (AI, userEnd, index);
       }
+*/      
     }
   }); 
 
@@ -1722,7 +1761,7 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         auto &blockVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockVec);
-        std::vector<llvm::BasicBlock*> succs;
+        std::vector<BasicBlock*> succs;
         blockVec.clear();
         llvmberry::generateHintForMem2RegPHI
           (BB, Pred, Dest, SI, II, PAM, AL, succs, true);

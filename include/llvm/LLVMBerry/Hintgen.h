@@ -33,7 +33,9 @@
   llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE)                                             \
   llvmberry::ConsNoalias::make(ptr1, ptr2, SCOPE)
-#define ALLOCA(reg, SCOPE) llvmberry::ConsAlloca::make(reg, SCOPE)
+#define DIFFBLOCK(v1, v2, SCOPE)                                               \
+  llvmberry::ConsDiffblock::make(v1, v2, SCOPE)
+#define UNIQUE(reg, SCOPE) llvmberry::ConsUnique::make(reg, SCOPE)
 #define PRIVATE(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
 #define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, tag)
 // VAL, ID macros make TyValue object
@@ -178,9 +180,9 @@ Expression create_expression(llvm::Instruction *I, bool &swapped,
 
 bool is_inverse_expression(Expression e1, Expression e2);
 
-void generateHintForMem2RegPropagateNoalias(llvm::AllocaInst *AI,
-                                            llvm::Instruction *useInst,
-                                            int useIndex);
+void generateHintForMem2RegPropagateAIDiffblock(llvm::AllocaInst *AI,
+                                                llvm::Instruction *useInst,
+                                                int useIndex);
 
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst *SI,
