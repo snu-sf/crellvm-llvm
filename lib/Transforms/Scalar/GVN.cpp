@@ -986,6 +986,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         return;
       }
       std::vector<std::pair<PHINode *, int>> PrevPRE = PREAR->PrevPRE;
+      hints.appendToDescription("CurInst is: " + ((*CurInst).getName()).str());
 
       for (auto PI = pred_begin(PhiBlock), PE = pred_end(PhiBlock); PI != PE;
            ++PI) {
@@ -1005,6 +1006,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
         Instruction *VI = dyn_cast<Instruction>(V);
         std::string VI_id = llvmberry::getVariable(*VI);
+        hints.appendToDescription("VI_id is: " + VI_id);
+
         // Somehow get [ RHS(CurInst) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
           // Somehow get [ RHS(CurInst) >= Var(VI) ] in start_of_block(VPHI)
