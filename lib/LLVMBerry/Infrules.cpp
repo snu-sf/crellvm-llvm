@@ -5157,6 +5157,7 @@ ConsIcmpNeAddAdd::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _w,
       new TyIcmpNeAddAdd(_z, _w, _x, _y, _a, _b, _s));
   return std::shared_ptr<TyInfrule>(new ConsIcmpNeAddAdd(_val));
 }
+
 void ConsIcmpNeAddAdd::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();

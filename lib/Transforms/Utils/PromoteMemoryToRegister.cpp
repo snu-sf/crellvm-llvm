@@ -700,8 +700,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
 
         // find next store, and final use of alloca
-        Instruction* next;
-        Instruction* use = AI; 
+        llvm::Instruction* next;
+        llvm::Instruction* use = SI; 
 
         bool checkNext = false;
         for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
@@ -1097,8 +1097,8 @@ void PromoteMem2Reg::run() {
       }
     }
 
-    strVec.clear();
-    diffBlocks.clear();
+    //strVec.clear();
+    //diffBlocks.clear();
     for (unsigned AllocaNum = 0; AllocaNum != allocs.size(); AllocaNum++) {
       AllocaInst *AI = allocs[AllocaNum];
       std::string Ralloca = llvmberry::getVariable(*AI);
@@ -1285,6 +1285,20 @@ void PromoteMem2Reg::run() {
     unsigned CurrentVersion = 0;
     for (unsigned i = 0, e = PHIBlocks.size(); i != e; ++i)
       QueuePhiNode(PHIBlocks[i], AllocaNum, CurrentVersion);
+  
+ 
+    llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&F, &AI, this, &AllocaNum]
+                     (llvmberry::Dictionary &data,
+                      llvmberry::CoreHint &hints) {
+
+              BasicBlock *start = F.begin();
+              std::vector<BasicBlock *> VistedBlock;
+
+              dbgs()<< "this function is shit  " << F.getName() << "\n";
+              llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI, PhiToAllocaMap, AllocaNum);
+            });
+  
   }
 
   if (Allocas.empty()) {
@@ -1382,58 +1396,17 @@ void PromoteMem2Reg::run() {
              E = NewPhiNodes.end();
          I != E;) {
       PHINode *PN = I->second;
-
-      llvmberry::ValidationUnit::GetInstance()->intrude
-             ([&PN, this]
-              (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        if (!(PN->getNumIncomingValues() == getNumPreds(PN->getParent()))) {
-          BasicBlock *BB = PN->getParent();
-          SmallVector<BasicBlock *, 16> Preds(pred_begin(BB), pred_end(BB));
-
-          std::sort(Preds.begin(), Preds.end());
-
-          // Now we loop through all BB's which have entries in SomePHI and remove
-          // them from the Preds list.
-          for (unsigned i = 0, e = PN->getNumIncomingValues(); i != e; ++i) {
-            // Do a log(n) search of the Preds list for the entry we want.
-            SmallVectorImpl<BasicBlock *>::iterator EntIt = std::lower_bound(
-                   Preds.begin(), Preds.end(), PN->getIncomingBlock(i));
-            assert(EntIt != Preds.end() && *EntIt == PN->getIncomingBlock(i) &&
-                  "PHI node has entry for a block which is not a predecessor!");
-
-            // Remove the entry
-            Preds.erase(EntIt);
-          }
-
-          auto &blocks = *(data.get<llvmberry::ArgForMem2Reg>()->blocks);
-          blocks = Preds;
-        }
-      });
-  
       // If this PHI node merges one value and/or undefs, get the value.
       if (Value *V = SimplifyInstruction(PN, DL, nullptr, &DT, AC)) {
         if (AST && PN->getType()->isPointerTy())
           AST->deleteValue(PN);
+        
 
         llvmberry::ValidationUnit::GetInstance()->intrude
                         ([&PN, &V]
                                  (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-          auto &blocks = *(data.get<llvmberry::ArgForMem2Reg>()->blocks);
-          Value* UndefVal = UndefValue::get(PN->getType());
-
-          for (unsigned pred = 0, e = blocks.size(); pred != e; ++pred) {
-            INFRULE(llvmberry::TyPosition::make(TGT, PN->getParent()->getName(), blocks[pred]->getName()),
-                    llvmberry::ConsLessthanUndefTgt::make(VALTYPE(PN->getType()), VAL(V, Physical)));
-
-            INFRULE(llvmberry::TyPosition::make(TGT, PN->getParent()->getName(), blocks[pred]->getName()),
-                    llvmberry::ConsTransitivityTgt::make(VAR(llvmberry::getVariable(*PN), Ghost),
-                                                         EXPR(UndefVal, Physical),
-                                                         EXPR(V, Physical)));
-          }
-
-          llvmberry::generateHintForMem2RegReplaceHint(V, PN);
-        });
-
+        llvmberry::generateHintForMem2RegReplaceHint(V, PN);
+        });        
         PN->replaceAllUsesWith(V);
         PN->eraseFromParent();
         NewPhiNodes.erase(I++);
@@ -1736,6 +1709,10 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
 
+       // propagate maydiff
+       llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
+       llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
+
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
       });
 
@@ -1761,7 +1738,7 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         auto &blockVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockVec);
-        std::vector<BasicBlock*> succs;
+        std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> > succs;
         blockVec.clear();
         llvmberry::generateHintForMem2RegPHI
           (BB, Pred, Dest, SI, II, PAM, AL, succs, true);

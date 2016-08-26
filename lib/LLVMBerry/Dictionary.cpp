@@ -61,11 +61,11 @@ VisitICmpArg::VisitICmpArg() {
 Mem2RegArg::Mem2RegArg()
     : allocas(new TyAllocasObj()), diffBlocks(new TyDiffblocksObj()),
       instrIndex(new TyInstrIndexObj()), termIndex(new TyTermIndexObj()),
-      values(new TyValuesObj()), storeItem(new TyStoreItemObj()),
-      mem2regCmd(new TyMem2RegCmdObj()), transTgt(new TyTransTgtObj()),
-      blocks(new TyBlocksObj()), strVec(new TyStrVecObj()),
-      blockPairVec(new TyBlockPairVecObj()), blockVec(new TyBlockVecObj()),
-      SImap(new TySImapObj()) {}
+      values(new TyValuesObj()), reachedEdge(new TyReachedEdgeObj()),
+      storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
+      transTgt(new TyTransTgtObj()), blocks(new TyBlocksObj()),
+      strVec(new TyStrVecObj()), blockPairVec(new TyBlockPairVecObj()),
+      blockVec(new TyBlockVecObj()), SImap(new TySImapObj()) {}
 
 bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                             std::shared_ptr<TyExpr> e2) {
@@ -178,7 +178,6 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
     }
   } else if (which == "TransitivityTgt_e2") {
     std::cout<<"transTgt2 replace:"+key<<std::endl;
-
     std::string phiKey = "";
     if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
       phiKey = cv->getTyReg()->getName();
@@ -266,6 +265,21 @@ void Mem2RegArg::replaceLessthanUndef(std::string key,
   }
   std::cout<<"LessthanUndefEnd"<<std::endl;
 }
+
+  void Mem2RegArg::replaceLessthanUndefTgt(std::string key,
+                                        std::shared_ptr<TyValue> newVal) {
+    if (mem2regCmd->find(key) == mem2regCmd->end())
+      return;
+
+    std::cout<<"LessthanUndefTgt"<<std::endl;
+    std::vector<std::shared_ptr<TyLessthanUndefTgt>> &vec =
+            mem2regCmd->find(key)->second.lessUndefTgt;
+
+    for(size_t i = 0; i < vec.size(); i++) {
+      vec[i]->updateRhs(newVal);
+    }
+    std::cout<<"LessthanUndefEndTgt"<<std::endl;
+  }
 
 // PassDictionary
 

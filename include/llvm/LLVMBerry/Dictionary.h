@@ -127,6 +127,10 @@ public:
   typedef std::shared_ptr<TyValuesObj> TyValues;
   TyValues values;
 
+  typedef std::map<std::string, std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> >> TyReachedEdgeObj;
+  typedef std::shared_ptr<TyReachedEdgeObj> TyReachedEdge;
+  TyReachedEdge reachedEdge;  
+
   struct StoreTriple {
     std::shared_ptr<TyValue> value;
     std::shared_ptr<TyExpr> expr;
@@ -144,7 +148,9 @@ public:
     std::vector<std::shared_ptr<TyTransitivityTgt>> transTgt;
     std::vector<std::shared_ptr<TyIntroGhost>> ghost;
     std::vector<std::shared_ptr<TyLessthanUndef>> lessUndef; 
-  };
+    std::vector<std::shared_ptr<TyLessthanUndefTgt>> lessUndefTgt;
+
+   };
 
   typedef std::map<std::string, Tuple> TyMem2RegCmdObj;
   typedef std::shared_ptr<TyMem2RegCmdObj> TyMem2RegCmd;
@@ -182,6 +188,8 @@ public:
   void replaceCmdRhs(std::string which, std::string key,
                      std::shared_ptr<TyExpr> newExpr);
   void replaceLessthanUndef(std::string key,
+                            std::shared_ptr<TyValue> newVal);
+  void replaceLessthanUndefTgt(std::string key,
                             std::shared_ptr<TyValue> newVal);
 
   Mem2RegArg();
