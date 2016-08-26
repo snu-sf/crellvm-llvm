@@ -43,6 +43,7 @@
 #include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 #include "llvm/LLVMBerry/Dictionary.h"
+#include "llvm/Support/Debug.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "mem2reg"
@@ -700,7 +701,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
         // find next store, and final use of alloca
         llvm::Instruction* next;
-        llvm::Instruction* use = AI; 
+        llvm::Instruction* use = SI; 
 
         bool checkNext = false;
         for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
@@ -1256,6 +1257,7 @@ void PromoteMem2Reg::run() {
               BasicBlock *start = F.begin();
               std::vector<BasicBlock *> VistedBlock;
 
+              dbgs()<< "this function is shit  " << F.getName() << "\n";
               llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI, PhiToAllocaMap, AllocaNum);
             });
   
@@ -1698,7 +1700,7 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         auto &blockVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockVec);
-        std::vector<llvm::BasicBlock*> succs;
+        std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> > succs;
         blockVec.clear();
         llvmberry::generateHintForMem2RegPHI
           (BB, Pred, Dest, SI, II, PAM, AL, succs, true);

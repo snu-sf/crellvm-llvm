@@ -123,6 +123,10 @@ public:
   typedef std::shared_ptr<TyValuesObj> TyValues;
   TyValues values;
 
+  typedef std::map<std::string, std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> >> TyReachedEdgeObj;
+  typedef std::shared_ptr<TyReachedEdgeObj> TyReachedEdge;
+  TyReachedEdge reachedEdge;  
+
   struct StoreTriple {
     std::shared_ptr<TyValue> value;
     std::shared_ptr<TyExpr> expr;

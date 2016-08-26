@@ -2,6 +2,7 @@
 #include "llvm/LLVMBerry/Dictionary.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/Support/Debug.h"
 
 namespace llvmberry {
 // insert nop at tgt where I is at src
@@ -1470,7 +1471,9 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
     llvm::Instruction *Inst = IN;
 
     if(llvm::PHINode *PN = llvm::dyn_cast<llvm::PHINode>(Inst)) {
-      if(PhiToAllocaMap[PN] == AllocaNum) {
+    //  if(PhiToAllocaMap[PN] == AllocaNum) {
+      if(AI->getName() == PN->getName().substr(0, PN->getName().rfind("."))) {
+      llvm::dbgs()<< "you die i die -==0-0- " << *PN << "\n";
 //      llvm::BasicBlock *prev = *VisitedBlock.rbegin(); 
         while(!VisitedBlock.empty()) {
           llvm::BasicBlock *current = *VisitedBlock.rbegin();
@@ -1556,7 +1559,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
             mem2regCmd[getVariable(*PN)].transTgt.push_back(transTgt);
 
           });
-  */       
+  */      
+        llvm::dbgs()<< "return before block " << BB->getName() << "\n";
         return;  
       }
     }
@@ -1564,12 +1568,15 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
     else if(llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(Inst)){
       if(SI->getOperand(1)->getName() == AI->getName()) {
         std::cout << "its store end this " << std::endl;
+        llvm::dbgs()<< "shit -==0-0- " << *SI << "\n";
+        llvm::dbgs()<< "return before block " << BB->getName() << "\n";
         return;
       }
     }
     else if(llvm::LoadInst *LI = llvm::dyn_cast<llvm::LoadInst>(Inst)) {
       if(LI->getOperand(0)->getName() == AI->getName()) {
     std::cout << "propagate to load keep going going going" << std::endl;
+    llvm::dbgs()<< "what the hell " << *LI << "\n";
       ValidationUnit::GetInstance()->intrude([&BB, &AI, &LI, &VisitedBlock]
                                                      (Dictionary &data, CoreHint &hints) {
 
@@ -1655,12 +1662,15 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
 
     for(auto BI = succ_begin(BB), BE = succ_end(BB); BI != BE; ++BI) {
       llvm::BasicBlock *succ = *BI;
-      if(succ == BB->getParent()->end())
-        return;
+      if(succ == BB->getParent()->end()) {
+        llvm::dbgs()<< "return before block" << BB->getName() << "\n";
+        return;}
       if(std::find(VisitedBlock.begin(), VisitedBlock.end(), succ) != VisitedBlock.end())
         continue;
       generateHintForMem2RegPHIdelete(succ, VisitedBlock, AI, PhiToAllocaMap, AllocaNum);
     }
+    llvm::dbgs()<< "return before block" << BB->getName() << "\n";
+  return;
 }
 
 bool otherPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Src,
@@ -1709,7 +1719,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                llvm::BasicBlock::iterator II,
                                llvm::DenseMap<llvm::PHINode *, unsigned> PAM,
                                llvm::DenseMap<llvm::AllocaInst *, unsigned> AL,
-                               std::vector<llvm::BasicBlock*> succs,
+                               std::vector<std::pair<llvm::BasicBlock *, llvm::BasicBlock *> > succs,
                                bool isSameBB) {
   ValidationUnit::GetInstance()->intrude([&BB, &Pred, &AI, &SI, &II, &PAM, &AL,
                                           &succs, &isSameBB](Dictionary &data,
@@ -1725,6 +1735,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
     auto &blockVec = *(data.get<ArgForMem2Reg>()->blockVec);
+    auto &reachedEdge = *(data.get<ArgForMem2Reg>()->reachedEdge);
     std::string bname = getBasicBlockIndex(SItmp->getParent());
     std::string Ralloca = getVariable(*AItmp);
     std::string Rstore = getVariable(*SItmp->getOperand(1));
@@ -1752,9 +1763,10 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
         //if (std::find(blockVec.begin(), blockVec.end(), getBasicBlockIndex(BBtmp)) != blockVec.end())
         //  continue;
         //blockVec.push_back(getBasicBlockIndex(BBtmp));
-        if (std::find(succs.begin(), succs.end(), BBtmp) != succs.end())
+        std::pair <llvm::BasicBlock *, llvm::BasicBlock *> tmp = std::make_pair(Predtmp, BBtmp);
+        if (std::find(reachedEdge[Ralloca].begin(), reachedEdge[Ralloca].end(), tmp) != reachedEdge[Ralloca].end())
           continue;
-        succs.push_back(BBtmp);
+        reachedEdge[Ralloca].push_back(tmp);
 
         std::cout<<"Mem2RegPHI checkend: "+getBasicBlockIndex(Predtmp)+"->"+getBasicBlockIndex(BBtmp)<<std::endl;
         // if this successor block has PHI,
