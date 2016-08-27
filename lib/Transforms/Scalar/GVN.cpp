@@ -745,7 +745,7 @@ public:
   PREAnalysisResult(Instruction *CurInst, PHINode *PN) {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     isFromNonLocalLoad =
-        pdata.get<llvmberry::ArgForGVNPRE>()->isFromNonLocalLoad;
+        pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad;
     PrevPRENotEnough = false;
     std::vector<Value *> op_CurInst;
     unsigned numPredBlocks = 0;
@@ -2415,7 +2415,7 @@ bool GVN::processNonLocalLoad(LoadInst *LI) {
         llvmberry::intrude([]() {
           llvmberry::PassDictionary &pdata =
               llvmberry::PassDictionary::GetInstance();
-          pdata.get<llvmberry::ArgForGVNPRE>()->isFromNonLocalLoad = true;
+          pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad = true;
         });
         performScalarPRE(I);
       }
@@ -3098,7 +3098,7 @@ bool GVN::runOnFunction(Function& F) {
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.create<llvmberry::ArgForGVNReplace>();
-    pdata.create<llvmberry::ArgForGVNPRE>();
+    pdata.create<llvmberry::ArgForGVNPREIntro>();
   });
 
   if (!NoLoads)
@@ -3157,7 +3157,7 @@ bool GVN::runOnFunction(Function& F) {
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.erase<llvmberry::ArgForGVNReplace>();
-    pdata.erase<llvmberry::ArgForGVNPRE>();
+    pdata.erase<llvmberry::ArgForGVNPREIntro>();
   });
 
   llvmberry::ValidationUnit::EndPass();
@@ -3493,7 +3493,7 @@ bool GVN::performPRE(Function &F) {
       llvmberry::intrude([]() {
         llvmberry::PassDictionary &pdata =
             llvmberry::PassDictionary::GetInstance();
-        pdata.get<llvmberry::ArgForGVNPRE>()->isFromNonLocalLoad = false;
+        pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad = false;
       });
       Changed = performScalarPRE(CurInst);
     }

@@ -6,7 +6,6 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/LLVMBerry/Structure.h"
-#include "llvm/ADT/DenseMap.h"
 
 #include <memory>
 
@@ -31,7 +30,7 @@ enum DictKeys {
   ArgForMem2Reg,
   // GVN
   ArgForGVNReplace,
-  ArgForGVNPRE
+  ArgForGVNPREIntro
 };
 
 /*
@@ -190,15 +189,12 @@ public:
 };
 DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
 
-// lib/Transforms/Scalar/GVN.cpp
-struct GVNPREArg {
-  // to check whether perFormScalaPRE is from processNonLocalLoad
+// lib/Transforms/Scalar/GVN.cpp : to check whether perFormScalaPRE is from
+// processNonLocalLoad
+struct GVNPREIntroArg {
   bool isFromNonLocalLoad;
-  // store previous PRE informations, this is needed when CurInst's has an
-  // operand that is result of PRE .pre-phi
-  llvm::DenseMap<llvm::PHINode *, llvm::Instruction *> PrevPRETable;
 };
-DEFINE_TRAITS(ArgForGVNPRE, GVNPREArg);
+DEFINE_TRAITS(ArgForGVNPREIntro, GVNPREIntroArg);
 
 class Dictionary {
 private:
