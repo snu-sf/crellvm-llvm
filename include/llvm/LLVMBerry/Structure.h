@@ -98,6 +98,7 @@ class CoreHint;
 
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
+llvm::Instruction *getPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB);
 int getCommandIndex(const llvm::Value &value);
 int getTerminatorIndex(const llvm::TerminatorInst *instr);
 bool name_instructions(llvm::Function &F);
