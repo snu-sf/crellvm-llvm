@@ -880,7 +880,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         [&CurInst, &Phi, &PhiBlock, &CurInst_id,
          &Phi_id](llvmberry::ValidationUnit::Dictionary &data,
                   llvmberry::CoreHint &hints) {
-
+          dbgs() << "PRE: " << *CurInst << " ------------> " << *Phi << "\n";
           // For each pred block, propagate the chain of involved values until
           // the
           // end
@@ -899,6 +899,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             assert(isa<Instruction>(V) &&
                    "Value not an instruction: not yet handled.");
             Instruction *VI = dyn_cast<Instruction>(V);
+            dbgs() << "VI : " << *VI << "\n";
             if (!propagateInstrUntilBlockEnd(hints, VI, PB)) {
               hints.appendToDescription("propagateInstrUntilBlockEnd");
               hints.setReturnCodeToFail();
@@ -971,8 +972,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         hints.appendToDescription("isFromNonLocalLoad");
         hints.setReturnCodeToAdmitted();
       }
-      dbgs() << "CurInst : " << *CurInst << "\n";
-      dbgs() << "Phi : " << *Phi << "\n";
+      dbgs() << "PRE Hard: " << *CurInst << " ------------> " << *Phi << "\n";
       // if is same for all, it does not involve previous PRE and just works
       // it is treated below
       for (int i = 0; i < PREAR->notSameIdx.size(); i++)
@@ -1006,6 +1006,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
         Instruction *VI = dyn_cast<Instruction>(V);
         std::string VI_id = llvmberry::getVariable(*VI);
+        dbgs() << "VI : " << *VI << "\n";
         hints.appendToDescription("VI_id is: " + VI_id);
 
         // Somehow get [ RHS(CurInst) >= Var(VI) ] in block(Phi, VPHI)
@@ -3440,6 +3441,14 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   });
 
   CurInst->replaceAllUsesWith(Phi);
+
+  llvmberry::intrude([&CurInst, &Phi]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    std::map<llvm::PHINode *, llvm::Instruction *> PrevPRETable =
+        pdata.get<llvmberry::ArgForGVNPRE>()->PrevPRETable;
+    // This clone will later be removed at the end of runOnFunction
+    PrevPRETable.insert(std::make_pair(Phi, CurInst->clone()));
+  });
 
   llvmberry::ValidationUnit::End();
 

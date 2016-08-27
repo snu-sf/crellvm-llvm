@@ -6,8 +6,9 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/LLVMBerry/Structure.h"
-#include "llvm/ADT/DenseMap.h"
+/* #include "llvm/ADT/DenseMap.h" */
 
+#include <map>
 #include <memory>
 
 namespace llvmberry {
@@ -196,7 +197,12 @@ struct GVNPREArg {
   bool isFromNonLocalLoad;
   // store previous PRE informations, this is needed when CurInst's has an
   // operand that is result of PRE .pre-phi
-  llvm::DenseMap<llvm::PHINode *, llvm::Instruction *> PrevPRETable;
+  std::map<llvm::PHINode *, llvm::Instruction *> PrevPRETable;
+
+  ~GVNPREArg() {
+    for (auto I : PrevPRETable)
+      delete I.second;
+  }
 };
 DEFINE_TRAITS(ArgForGVNPRE, GVNPREArg);
 
