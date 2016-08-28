@@ -1007,20 +1007,25 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         std::string VI_id = llvmberry::getVariable(*VI);
         hints.appendToDescription("VI_id is: " + VI_id);
 
-        // Somehow get [ INSN(CurInst) >= Var(VI) ] in block(Phi, VPHI)
-        if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
-          // Somehow get [ INSN(CurInst) >= Var(VI) ] in start_of_block(VPHI)
-          generateHintForPRE(CurInst, VPHI);
+        dbgs() << "CurInst: " << *CurInst << "\n";
+        dbgs() << "PB: " << *PB << "\n";
+        Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
 
-          // Propagate [ INSN(CurInst) >= VAR(VI) ]
-          PROPAGATE(LESSDEF(INSN(*CurInst), VAR(VI_id, Physical), SRC),
+        // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
+        if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
+          // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
+          // start_of_block(VPHI)
+          generateHintForPRE(CurInstInPB, VPHI);
+
+          // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
+          PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
                     BOUNDS(llvmberry::TyPosition::make_start_of_block(
                                llvmberry::Source, llvmberry::getBasicBlockIndex(
                                                       VPHI->getParent())),
                            llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                                        PB->getName())));
         }
-        // Somehow get [ INSN(CurInst) >= Var(VI) ] in block(Phi, VI)
+        // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VI)
         else {
           // TODO if it is not isSameForAll, and PrevPRE is empty, what does
           // this
@@ -1036,7 +1041,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
           Instruction *VI_evolving = (*VI).clone();
 
-          // Somehow get [ INSN(CurInst) >= Var(VI) ]
+          // Somehow get [ INSN(CurInstInPB) >= Var(VI) ]
           for (auto k : PrevPRE) {
             dbgs() << "VI_evolving : " << *VI_evolving << "\n";
             PHINode *PrevPhi = k.first;
@@ -1092,12 +1097,22 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                                   VAR(VI_id, Previous),
                                                   VAR(Phi_id, Physical)));
 
-        // Transitivity [ INSN(CurInst) >= Var(VI) >= Var(Phi) ]
+        // Transitivity [ INSN(CurInstInPB) >= Var(VI) >= Var(Phi) ]
         INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                             PB->getName()),
-                llvmberry::ConsTransitivity::make(INSN(*CurInst),
+                llvmberry::ConsTransitivity::make(INSN(*CurInstInPB),
                                                   VAR(VI_id, Physical),
                                                   VAR(Phi_id, Physical)));
+
+        llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
+
+        // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi) ]
+        INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                            PB->getName()),
+                llvmberry::ConsTransitivity::make(
+                    INSN(*CurInst), INSN(*CurInstInPB), VAR(Phi_id, Physical)));
+
+        delete CurInstInPB;
       }
 
       return;

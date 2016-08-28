@@ -188,6 +188,9 @@ void generateHintForMem2RegPropagateLoad(llvm::StoreInst *SI,
                                          llvm::Instruction *use, int useIndex);
 
 int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
+
+void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
+                                TyScope scope);
 }
 
 #endif
