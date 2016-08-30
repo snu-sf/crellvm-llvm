@@ -2458,12 +2458,13 @@ TyPropagateDiffblock::make(std::shared_ptr<TyValue> _lhs,
       new TyPropagateDiffblock(_lhs, _rhs, _scope));
 }
 
-TyPropagateUnique::TyPropagateUnique(std::shared_ptr<TyRegister> _p,
+//TyPropagateUnique::TyPropagateUnique(std::shared_ptr<TyRegister> _p,
+TyPropagateUnique::TyPropagateUnique(std::string _register_name,
                                      enum TyScope _scope)
-    : p(std::move(_p)), scope(_scope) {}
+    : register_name(_register_name), scope(_scope) {}
 
 void TyPropagateUnique::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(p));
+  archive(CEREAL_NVP(register_name));
   archive(cereal::make_nvp("scope", ::toString(scope)));
 }
 
@@ -2537,9 +2538,10 @@ ConsUnique::ConsUnique(std::shared_ptr<TyPropagateUnique> _propagate_unique)
     : propagate_unique(std::move(_propagate_unique)) {}
 
 std::shared_ptr<TyPropagateObject>
-ConsUnique::make(std::shared_ptr<TyRegister> _p, enum TyScope _scope) {
+//ConsUnique::make(std::shared_ptr<TyRegister> _p, enum TyScope _scope) {
+ConsUnique::make(std::string _register_name, enum TyScope _scope) {
   std::shared_ptr<TyPropagateUnique> _val(
-      new TyPropagateUnique(std::move(_p), _scope));
+      new TyPropagateUnique(_register_name, _scope));
 
   return std::shared_ptr<TyPropagateObject>(new ConsUnique(std::move(_val)));
 }

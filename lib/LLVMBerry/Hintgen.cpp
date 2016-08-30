@@ -1602,9 +1602,8 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
     data.get<ArgForMem2Reg>()->replaceLessthanUndef(ReplName,
                                                     TyValue::make(*ReplVal));
 
-      data.get<ArgForMem2Reg>()->replaceLessthanUndefTgt(ReplName,
-                                                      TyValue::make(*ReplVal));
-
+    data.get<ArgForMem2Reg>()->replaceLessthanUndefTgt(ReplName,
+                                                       TyValue::make(*ReplVal));
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(ReplName, Physical);
 
