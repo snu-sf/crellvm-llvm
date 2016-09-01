@@ -870,6 +870,8 @@ bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
 
 // [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi->getParent())
 void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
+  // dbgs() << "CurInst : " << *CurInst << "\n";
+  // dbgs() << "Phi : " << *Phi << "\n";
   BasicBlock *PhiBlock = Phi->getParent();
   std::string CurInst_id = llvmberry::getVariable(*CurInst);
   std::string Phi_id = llvmberry::getVariable(*Phi);
@@ -880,7 +882,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         [&CurInst, &Phi, &PhiBlock, &CurInst_id,
          &Phi_id](llvmberry::ValidationUnit::Dictionary &data,
                   llvmberry::CoreHint &hints) {
-
+          if (isa<CallInst>(CurInst)) {
+            hints.appendToDescription("CurInstIsCall");
+            hints.setReturnCodeToAdmitted();
+          }
           // For each pred block, propagate the chain of involved values until
           // the
           // end
@@ -894,7 +899,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                 (hints.getDescription() + "\nV is: " + (*V).getName()).str());
             hints.appendToDescription("CurInst is: " +
                                       ((*CurInst).getName()).str());
-            dbgs() << "my test :" << *V << "\n";
 
             assert(isa<Instruction>(V) &&
                    "Value not an instruction: not yet handled.");
@@ -966,6 +970,11 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                                        &Phi_id, &PREAR](
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
+      if (isa<CallInst>(CurInst)) {
+        hints.appendToDescription("CurInstIsCall");
+        hints.setReturnCodeToAdmitted();
+      }
+
       if (PREAR->isFromNonLocalLoad) {
         hints.appendToDescription("isFromNonLocalLoad");
         hints.setReturnCodeToAdmitted();
@@ -1043,7 +1052,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
           // Somehow get [ INSN(CurInstInPB) >= Var(VI) ]
           for (auto k : PrevPRE) {
-            dbgs() << "VI_evolving : " << *VI_evolving << "\n";
+            // dbgs() << "VI_evolving : " << *VI_evolving << "\n";
             PHINode *PrevPhi = k.first;
             dbgs() << "PrevPhi " << *PrevPhi << "\n";
             std::string PrevPhi_id = llvmberry::getVariable(*PrevPhi);
@@ -1059,8 +1068,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                                       VAR(VI_op_id, Previous),
                                                       VAR(VI_op_id, Physical)));
 
-            dbgs() << "VI_op : " << *VI_op << "\n";
-            dbgs() << "VI_evolving : " << *VI_evolving << "\n";
+            // dbgs() << "VI_op : " << *VI_op << "\n";
+            // dbgs() << "VI_evolving : " << *VI_evolving << "\n";
 
             // SubstituteRev [ VI_evolving_next >= VI_evolving ]
             // VI_evolving_next = VI_evolving[VI_op := PrevPhi]
