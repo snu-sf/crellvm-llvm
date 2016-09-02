@@ -3297,294 +3297,294 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   Phi->setDebugLoc(CurInst->getDebugLoc());
 
   // Validation hint generation for PRE
-  // llvmberry::ValidationUnit::Begin("GVN_PRE", CurInst->getParent()->getParent());
+  llvmberry::ValidationUnit::Begin("GVN_PRE", CurInst->getParent()->getParent());
 
-  // llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &CurrentBlock,
-  //                                                    &predMap, &PREInstr, &Phi,
-  //                                                    this](
-  //     llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
-  //   std::string CurInst_id = llvmberry::getVariable(*CurInst);
-  //   std::string Phi_id = llvmberry::getVariable(*Phi);
-  //   std::vector<Instruction *> op_CurInst;
-  //   std::vector<std::vector<int>> notSameIdx(
-  //       predMap.size(), std::vector<int>(0)); // predMap idx -> operand idx
-  //   bool isSameForAll = true;
-  //   for (Instruction::op_iterator OI = CurInst->op_begin(),
-  //                                 OE = CurInst->op_end();
-  //        OI != OE; ++OI) {
-  //     op_CurInst.push_back(dyn_cast<Instruction>(OI));
-  //   }
-  //   for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-  //     BasicBlock *PB = predMap[i].second;
-  //     Value *V = nullptr;
-  //     if (!(V = predMap[i].first))
-  //       V = PREInstr;
-  //     assert(isa<Instruction>(V) &&
-  //            "Value not an instruction: not yet handled.");
-  //     Instruction *VI = dyn_cast<Instruction>(V);
-  //     std::vector<Instruction *> op_VI;
-  //     for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
-  //          OI != OE; ++OI)
-  //       op_VI.push_back(dyn_cast<Instruction>(OI));
+  llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &CurrentBlock,
+                                                     &predMap, &PREInstr, &Phi,
+                                                     this](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    std::string CurInst_id = llvmberry::getVariable(*CurInst);
+    std::string Phi_id = llvmberry::getVariable(*Phi);
+    std::vector<Instruction *> op_CurInst;
+    std::vector<std::vector<int>> notSameIdx(
+        predMap.size(), std::vector<int>(0)); // predMap idx -> operand idx
+    bool isSameForAll = true;
+    for (Instruction::op_iterator OI = CurInst->op_begin(),
+                                  OE = CurInst->op_end();
+         OI != OE; ++OI) {
+      op_CurInst.push_back(dyn_cast<Instruction>(OI));
+    }
+    for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
+      BasicBlock *PB = predMap[i].second;
+      Value *V = nullptr;
+      if (!(V = predMap[i].first))
+        V = PREInstr;
+      assert(isa<Instruction>(V) &&
+             "Value not an instruction: not yet handled.");
+      Instruction *VI = dyn_cast<Instruction>(V);
+      std::vector<Instruction *> op_VI;
+      for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
+           OI != OE; ++OI)
+        op_VI.push_back(dyn_cast<Instruction>(OI));
 
-  //     bool isSame = true;
-  //     if (op_CurInst.size() != op_VI.size())
-  //       assert("Um.. what is this case??" && false);
-  //     for (int j = 0; j < op_CurInst.size(); j++) {
-  //       bool tmp = (op_CurInst[j] == op_VI[j]);
-  //       if (!tmp)
-  //         notSameIdx[i].push_back(j);
-  //       isSame &= tmp;
-  //     }
-  //     hints.appendToDescription("VI: " + (*VI).getName().str());
-  //     hints.appendToDescription("RHS of CurInst and VI is same: " +
-  //                               std::to_string(isSame));
-  //     isSameForAll &= isSame;
-  //   }
+      bool isSame = true;
+      if (op_CurInst.size() != op_VI.size())
+        assert("Um.. what is this case??" && false);
+      for (int j = 0; j < op_CurInst.size(); j++) {
+        bool tmp = (op_CurInst[j] == op_VI[j]);
+        if (!tmp)
+          notSameIdx[i].push_back(j);
+        isSame &= tmp;
+      }
+      hints.appendToDescription("VI: " + (*VI).getName().str());
+      hints.appendToDescription("RHS of CurInst and VI is same: " +
+                                std::to_string(isSame));
+      isSameForAll &= isSame;
+    }
 
-  //   if (!isSameForAll) {
-  //     llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
-  //         "GVN_PRE_hard");
-  //     // if is same for all, it does not involve previous PRE and just works
-  //     // it is treated below
-  //     for (int i = 0; i < notSameIdx.size(); i++)
-  //       for (int j = 0; j < notSameIdx[i].size(); j++)
-  //         hints.appendToDescription("notSameIdx " + std::to_string(i) + ": " +
-  //                                   std::to_string(j));
+    if (!isSameForAll) {
+      llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+          "GVN_PRE_hard");
+      // if is same for all, it does not involve previous PRE and just works
+      // it is treated below
+      for (int i = 0; i < notSameIdx.size(); i++)
+        for (int j = 0; j < notSameIdx[i].size(); j++)
+          hints.appendToDescription("notSameIdx " + std::to_string(i) + ": " +
+                                    std::to_string(j));
 
-  //     std::vector<std::pair<PHINode *, int>> PrevPRE;
-  //     for (Instruction &I : *CurrentBlock)
-  //       if (PHINode *PI = dyn_cast<PHINode>(&I)) {
-  //         int hit = 0;
-  //         int idx = -1;
-  //         for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-  //           BasicBlock *PB = predMap[i].second;
-  //           Value *V = nullptr;
-  //           if (!(V = predMap[i].first))
-  //             V = PREInstr;
-  //           Instruction *VI = dyn_cast<Instruction>(V);
+      std::vector<std::pair<PHINode *, int>> PrevPRE;
+      for (Instruction &I : *CurrentBlock)
+        if (PHINode *PI = dyn_cast<PHINode>(&I)) {
+          int hit = 0;
+          int idx = -1;
+          for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
+            BasicBlock *PB = predMap[i].second;
+            Value *V = nullptr;
+            if (!(V = predMap[i].first))
+              V = PREInstr;
+            Instruction *VI = dyn_cast<Instruction>(V);
 
-  //           for (int j = 0; j < VI->getNumOperands(); j++) {
-  //             if (dyn_cast<Instruction>(VI->getOperand(j)) ==
-  //                 PI->getIncomingValueForBlock(PB)) {
-  //               hit++;
-  //               // if matched, match to same idx
-  //               if (idx == -1)
-  //                 idx = j;
-  //               else if (idx == j) {
-  //               } else {
-  //                 // this may occur because of 1+x <=> x+1
-  //                 hints.appendToDescription("idx : " + std::to_string(idx) +
-  //                                           " | j : " + std::to_string(j));
-  //                 return;
-  //               }
-  //               hints.appendToDescription(
-  //                   "PI: " + (*PI).getName().str() + " | VI: " +
-  //                   (*VI).getName().str() + " | OI: " +
-  //                   (*dyn_cast<Instruction>(VI->getOperand(j)))
-  //                       .getName()
-  //                       .str());
-  //             }
-  //           }
-  //         }
-  //         // if matched, all prev blocks match
-  //         if (idx != -1) {
-  //           if (hit == predMap.size()) {
-  //             PrevPRE.push_back(std::make_pair(PI, idx));
-  //           } else {
-  //             hints.appendToDescription("hit : " + std::to_string(hit) +
-  //                                       " | predMap.size() : " +
-  //                                       std::to_string(predMap.size()));
-  //             return;
-  //           }
-  //         }
-  //       }
+            for (int j = 0; j < VI->getNumOperands(); j++) {
+              if (dyn_cast<Instruction>(VI->getOperand(j)) ==
+                  PI->getIncomingValueForBlock(PB)) {
+                hit++;
+                // if matched, match to same idx
+                if (idx == -1)
+                  idx = j;
+                else if (idx == j) {
+                } else {
+                  // this may occur because of 1+x <=> x+1
+                  hints.appendToDescription("idx : " + std::to_string(idx) +
+                                            " | j : " + std::to_string(j));
+                  return;
+                }
+                hints.appendToDescription(
+                    "PI: " + (*PI).getName().str() + " | VI: " +
+                    (*VI).getName().str() + " | OI: " +
+                    (*dyn_cast<Instruction>(VI->getOperand(j)))
+                        .getName()
+                        .str());
+              }
+            }
+          }
+          // if matched, all prev blocks match
+          if (idx != -1) {
+            if (hit == predMap.size()) {
+              PrevPRE.push_back(std::make_pair(PI, idx));
+            } else {
+              hints.appendToDescription("hit : " + std::to_string(hit) +
+                                        " | predMap.size() : " +
+                                        std::to_string(predMap.size()));
+              return;
+            }
+          }
+        }
 
-  //     for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-  //       BasicBlock *PB = predMap[i].second;
-  //       Value *V = nullptr;
-  //       if (!(V = predMap[i].first))
-  //         V = PREInstr;
+      for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
+        BasicBlock *PB = predMap[i].second;
+        Value *V = nullptr;
+        if (!(V = predMap[i].first))
+          V = PREInstr;
 
-  //       Instruction *VI = dyn_cast<Instruction>(V);
-  //       std::string VI_id = llvmberry::getVariable(*VI);
+        Instruction *VI = dyn_cast<Instruction>(V);
+        std::string VI_id = llvmberry::getVariable(*VI);
 
-  //       PROPAGATE(
-  //           LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
-  //           BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
-  //                                        llvmberry::Source, *PB)));
-  //       PROPAGATE(
-  //           LESSDEF(VAR(VI_id, Physical), RHS(VI_id, Physical, SRC), SRC),
-  //           BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
-  //                                        llvmberry::Source, *PB)));
+        PROPAGATE(
+            LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
+                                         llvmberry::Source, *PB)));
+        PROPAGATE(
+            LESSDEF(VAR(VI_id, Physical), RHS(VI_id, Physical, SRC), SRC),
+            BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
+                                         llvmberry::Source, *PB)));
 
-  //       Instruction *VI_evolving = (*VI).clone();
-  //       VI_evolving->insertBefore(CurrentBlock->getTerminator());
+        Instruction *VI_evolving = (*VI).clone();
+        VI_evolving->insertBefore(CurrentBlock->getTerminator());
 
-  //       for (auto k : PrevPRE) {
-  //         PHINode *PrevPhi = k.first;
-  //         std::string PrevPhi_id = llvmberry::getVariable(*PrevPhi);
-  //         int idx = k.second;
+        for (auto k : PrevPRE) {
+          PHINode *PrevPhi = k.first;
+          std::string PrevPhi_id = llvmberry::getVariable(*PrevPhi);
+          int idx = k.second;
 
-  //         Instruction *VI_op = dyn_cast<Instruction>((*VI).getOperand(idx));
-  //         std::string VI_op_id = llvmberry::getVariable(*VI_op);
+          Instruction *VI_op = dyn_cast<Instruction>((*VI).getOperand(idx));
+          std::string VI_op_id = llvmberry::getVariable(*VI_op);
 
-  //         INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
-  //                                             PB->getName()),
-  //                 llvmberry::ConsTransitivity::make(VAR(PrevPhi_id, Physical),
-  //                                                   VAR(VI_op_id, Previous),
-  //                                                   VAR(VI_op_id, Physical)));
+          INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                              PB->getName()),
+                  llvmberry::ConsTransitivity::make(VAR(PrevPhi_id, Physical),
+                                                    VAR(VI_op_id, Previous),
+                                                    VAR(VI_op_id, Physical)));
 
-  //         INFRULE(llvmberry::TyPosition::make(SRC, (*CurrentBlock).getName(),
-  //                                             (*PB).getName()),
-  //                 llvmberry::ConsSubstituteRev::make(
-  //                     REGISTER(VI_op_id, Physical), VAL(PrevPhi, Physical),
-  //                     llvmberry::ConsInsn::make(*VI_evolving)));
+          INFRULE(llvmberry::TyPosition::make(SRC, (*CurrentBlock).getName(),
+                                              (*PB).getName()),
+                  llvmberry::ConsSubstituteRev::make(
+                      REGISTER(VI_op_id, Physical), VAL(PrevPhi, Physical),
+                      llvmberry::ConsInsn::make(*VI_evolving)));
 
-  //         Instruction *VI_evolving_next = (*VI_evolving).clone();
-  //         (*VI_evolving_next).setOperand(idx, PrevPhi);
-  //         INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
-  //                                             PB->getName()),
-  //                 llvmberry::ConsTransitivity::make(INSN(*VI_evolving_next),
-  //                                                   INSN(*VI_evolving),
-  //                                                   VAR(VI_id, Physical)));
+          Instruction *VI_evolving_next = (*VI_evolving).clone();
+          (*VI_evolving_next).setOperand(idx, PrevPhi);
+          INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                              PB->getName()),
+                  llvmberry::ConsTransitivity::make(INSN(*VI_evolving_next),
+                                                    INSN(*VI_evolving),
+                                                    VAR(VI_id, Physical)));
 
-  //         (*VI_evolving).eraseFromParent();
-  //         VI_evolving = VI_evolving_next;
-  //         VI_evolving->insertBefore(CurrentBlock->getTerminator());
-  //       }
+          (*VI_evolving).eraseFromParent();
+          VI_evolving = VI_evolving_next;
+          VI_evolving->insertBefore(CurrentBlock->getTerminator());
+        }
 
-  //       INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
-  //                                           PB->getName()),
-  //               llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-  //                                                 VAR(VI_id, Previous),
-  //                                                 VAR(Phi_id, Physical)));
+        INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                            PB->getName()),
+                llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
+                                                  VAR(VI_id, Previous),
+                                                  VAR(Phi_id, Physical)));
 
-  //       INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
-  //                                           PB->getName()),
-  //               llvmberry::ConsTransitivity::make(INSN(*VI_evolving),
-  //                                                 VAR(VI_id, Physical),
-  //                                                 VAR(Phi_id, Physical)));
+        INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                            PB->getName()),
+                llvmberry::ConsTransitivity::make(INSN(*VI_evolving),
+                                                  VAR(VI_id, Physical),
+                                                  VAR(Phi_id, Physical)));
 
-  //       PROPAGATE(LESSDEF(INSN(*VI_evolving), VAR(Phi_id, Physical), SRC),
-  //                 BOUNDS(llvmberry::TyPosition::make_start_of_block(
-  //                            llvmberry::Source,
-  //                            llvmberry::getBasicBlockIndex(CurrentBlock)),
-  //                        INSTPOS(SRC, CurInst)));
+        PROPAGATE(LESSDEF(INSN(*VI_evolving), VAR(Phi_id, Physical), SRC),
+                  BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                             llvmberry::Source,
+                             llvmberry::getBasicBlockIndex(CurrentBlock)),
+                         INSTPOS(SRC, CurInst)));
 
-  //       INFRULE(INSTPOS(SRC, CurInst),
-  //               llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
-  //                                                 INSN(*VI_evolving),
-  //                                                 VAR(Phi_id, Physical)));
+        INFRULE(INSTPOS(SRC, CurInst),
+                llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
+                                                  INSN(*VI_evolving),
+                                                  VAR(Phi_id, Physical)));
 
-  //       (*VI_evolving).eraseFromParent();
-  //     }
+        (*VI_evolving).eraseFromParent();
+      }
 
-  //     for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
-  //       if (!isa<Instruction>(UI->getUser())) {
-  //         // let the validation fail when the user is not an instruction
-  //         assert(false && "User is not an instruction");
-  //       }
+      for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
+        if (!isa<Instruction>(UI->getUser())) {
+          // let the validation fail when the user is not an instruction
+          assert(false && "User is not an instruction");
+        }
 
-  //       Instruction *userI = dyn_cast<Instruction>(UI->getUser());
-  //       std::string userI_id = llvmberry::getVariable(*userI);
+        Instruction *userI = dyn_cast<Instruction>(UI->getUser());
+        std::string userI_id = llvmberry::getVariable(*userI);
 
-  //       std::string prev_block_name = "";
-  //       if (isa<PHINode>(userI)) {
-  //         BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
-  //         prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-  //       }
+        std::string prev_block_name = "";
+        if (isa<PHINode>(userI)) {
+          BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+          prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+        }
 
-  //       PROPAGATE(
-  //           LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
-  //           BOUNDS(INSTPOS(SRC, CurInst),
-  //                  llvmberry::TyPosition::make(llvmberry::Source, *userI,
-  //                                              prev_block_name)));
-  //     }
+        PROPAGATE(
+            LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, CurInst),
+                   llvmberry::TyPosition::make(llvmberry::Source, *userI,
+                                               prev_block_name)));
+      }
 
-  //     return;
-  //   }
+      return;
+    }
 
-  //   // For each pred block, propagate the chain of involved values until the end
-  //   // of the pred block
+    // For each pred block, propagate the chain of involved values until the end
+    // of the pred block
 
-  //   for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
-  //     BasicBlock *PB = predMap[i].second;
-  //     Value *V = nullptr;
-  //     if (!(V = predMap[i].first))
-  //       V = PREInstr;
+    for (unsigned i = 0, e = predMap.size(); i != e; ++i) {
+      BasicBlock *PB = predMap[i].second;
+      Value *V = nullptr;
+      if (!(V = predMap[i].first))
+        V = PREInstr;
 
-  //     hints.setDescription(
-  //         (hints.getDescription() + "\nV is: " + (*V).getName()).str());
-  //     hints.appendToDescription("CurInst is: " + ((*CurInst).getName()).str());
-  //     dbgs() << "my test :" << *V << "\n";
-  //     propagateInstrUntilBlockEnd_rec(hints, V, PB);
+      hints.setDescription(
+          (hints.getDescription() + "\nV is: " + (*V).getName()).str());
+      hints.appendToDescription("CurInst is: " + ((*CurInst).getName()).str());
+      dbgs() << "my test :" << *V << "\n";
+      propagateInstrUntilBlockEnd_rec(hints, V, PB);
 
-  //     assert (isa<Instruction>(V) && "Value not an instruction: not yet handled.");
-  //     Instruction *VI = dyn_cast<Instruction>(V);
+      assert (isa<Instruction>(V) && "Value not an instruction: not yet handled.");
+      Instruction *VI = dyn_cast<Instruction>(V);
 
-  //     std::string VI_id = llvmberry::getVariable(*VI);
+      std::string VI_id = llvmberry::getVariable(*VI);
 
-  //     // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-  //     // Currently, assume Rhs(VI) = Rhs(CurInst)
-  //     // TODO: difference btw BB->getName() and llvmberry::getBasicBlockIndex?
-  //     INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
-  //                                         PB->getName()),
-  //             llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-  //                                               VAR(VI_id, Previous),
-  //                                               VAR(Phi_id, Physical)));
+      // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
+      // Currently, assume Rhs(VI) = Rhs(CurInst)
+      // TODO: difference btw BB->getName() and llvmberry::getBasicBlockIndex?
+      INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                          PB->getName()),
+              llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
+                                                VAR(VI_id, Previous),
+                                                VAR(Phi_id, Physical)));
 
-  //     // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
-  //     // Currently, assume Rhs(VI) = Rhs(CurInst)
-  //     // TODO: difference btw BB->getName() and llvmberry::getBasicBlockIndex?
-  //     INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
-  //                                         PB->getName()),
-  //             llvmberry::ConsTransitivity::make(RHS(VI_id, Physical, SRC),
-  //                                               VAR(VI_id, Physical),
-  //                                               VAR(Phi_id, Physical)));
+      // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
+      // Currently, assume Rhs(VI) = Rhs(CurInst)
+      // TODO: difference btw BB->getName() and llvmberry::getBasicBlockIndex?
+      INFRULE(llvmberry::TyPosition::make(SRC, CurrentBlock->getName(),
+                                          PB->getName()),
+              llvmberry::ConsTransitivity::make(RHS(VI_id, Physical, SRC),
+                                                VAR(VI_id, Physical),
+                                                VAR(Phi_id, Physical)));
 
-  //     // Propagate [ Rhs(VI) >= Var(Phi) ] until CurInst
-  //     PROPAGATE(LESSDEF(RHS(VI_id, Physical, SRC), VAR(Phi_id, Physical), SRC),
-  //               BOUNDS(llvmberry::TyPosition::make_start_of_block(
-  //                          llvmberry::Source,
-  //                          llvmberry::getBasicBlockIndex(CurrentBlock)),
-  //                      INSTPOS(SRC, CurInst)));
+      // Propagate [ Rhs(VI) >= Var(Phi) ] until CurInst
+      PROPAGATE(LESSDEF(RHS(VI_id, Physical, SRC), VAR(Phi_id, Physical), SRC),
+                BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                           llvmberry::Source,
+                           llvmberry::getBasicBlockIndex(CurrentBlock)),
+                       INSTPOS(SRC, CurInst)));
 
-  //     // Transitivity [ Var(CurInst) >= Rhs(VI) >= Var(Phi) ]
-  //     INFRULE(INSTPOS(SRC, CurInst),
-  //             llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
-  //                                               RHS(VI_id, Physical, SRC),
-  //                                               VAR(Phi_id, Physical)));
+      // Transitivity [ Var(CurInst) >= Rhs(VI) >= Var(Phi) ]
+      INFRULE(INSTPOS(SRC, CurInst),
+              llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
+                                                RHS(VI_id, Physical, SRC),
+                                                VAR(Phi_id, Physical)));
       
 
-  //     // TODO: for all uses of CurInst
-  //     // replace curInst -> phi
-  //     for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
-  //       if (!isa<Instruction>(UI->getUser())) {
-  //         // let the validation fail when the user is not an instruction
-  //         assert(false && "User is not an instruction");
-  //       }
+      // TODO: for all uses of CurInst
+      // replace curInst -> phi
+      for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
+        if (!isa<Instruction>(UI->getUser())) {
+          // let the validation fail when the user is not an instruction
+          assert(false && "User is not an instruction");
+        }
 
-  //       Instruction *userI = dyn_cast<Instruction>(UI->getUser());
-  //       std::string userI_id = llvmberry::getVariable(*userI);
+        Instruction *userI = dyn_cast<Instruction>(UI->getUser());
+        std::string userI_id = llvmberry::getVariable(*userI);
 
-  //       std::string prev_block_name = "";
-  //       if (isa<PHINode>(userI)) {
-  //         BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
-  //         prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-  //       }
+        std::string prev_block_name = "";
+        if (isa<PHINode>(userI)) {
+          BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+          prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+        }
 
-  //       PROPAGATE(LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
-  //                 BOUNDS(INSTPOS(SRC, CurInst),
-  //                        llvmberry::TyPosition::make(llvmberry::Source, *userI,
-  //                                                    prev_block_name)));
-  //     }
-  //   }
+        PROPAGATE(LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
+                  BOUNDS(INSTPOS(SRC, CurInst),
+                         llvmberry::TyPosition::make(llvmberry::Source, *userI,
+                                                     prev_block_name)));
+      }
+    }
 
-  // });
+  });
   CurInst->replaceAllUsesWith(Phi);
 
-  // llvmberry::ValidationUnit::End();
+  llvmberry::ValidationUnit::End();
   
   if (Phi->getType()->getScalarType()->isPointerTy()) {
     // Because we have added a PHI-use of the pointer value, it has now
