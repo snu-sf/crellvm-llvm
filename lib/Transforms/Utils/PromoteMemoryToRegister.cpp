@@ -1283,19 +1283,16 @@ void PromoteMem2Reg::run() {
     for (unsigned i = 0, e = PHIBlocks.size(); i != e; ++i)
       QueuePhiNode(PHIBlocks[i], AllocaNum, CurrentVersion);
   
- 
     llvmberry::ValidationUnit::GetInstance()->intrude
             ([&F, &AI, this, &AllocaNum]
                      (llvmberry::Dictionary &data,
                       llvmberry::CoreHint &hints) {
+      BasicBlock *start = F.begin();
+      std::vector<BasicBlock *> VistedBlock;
 
-              BasicBlock *start = F.begin();
-              std::vector<BasicBlock *> VistedBlock;
-
-              dbgs()<< "this function is shit  " << F.getName() << "\n";
-              llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI, PhiToAllocaMap, AllocaNum);
-            });
-  
+      dbgs()<< "this function is shit  " << F.getName() << "\n";
+      llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI, PhiToAllocaMap, AllocaNum);
+    });
   }
 
   if (Allocas.empty()) {
@@ -1398,12 +1395,12 @@ void PromoteMem2Reg::run() {
         if (AST && PN->getType()->isPointerTy())
           AST->deleteValue(PN);
         
-
         llvmberry::ValidationUnit::GetInstance()->intrude
                         ([&PN, &V]
                                  (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        llvmberry::generateHintForMem2RegReplaceHint(V, PN);
-        });        
+          llvmberry::generateHintForMem2RegReplaceHint(V, PN);
+        });
+
         PN->replaceAllUsesWith(V);
         PN->eraseFromParent();
         NewPhiNodes.erase(I++);
@@ -1706,9 +1703,9 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
 
-       // propagate maydiff
-       llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
-       llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
+        // propagate maydiff
+        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
 
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
       });
