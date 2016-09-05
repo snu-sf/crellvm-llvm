@@ -1738,7 +1738,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
             if(AI->getParent() != current) {
 
               PROPAGATE(
-                      LESSDEF(INSN(*AI),
+                      LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                    new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                               VAR(getVariable(*AI), Ghost),
                               SRC),
                       BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
@@ -1754,7 +1755,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
             }
             else {
               PROPAGATE(
-                      LESSDEF(INSN(*AI),
+                      LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                    new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                               VAR(getVariable(*AI), Ghost),
                               SRC),
                       BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
@@ -1831,8 +1833,10 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
 
         llvm::Value *UndefVal = llvm::UndefValue::get(LI->getType());
         if (BB == LI->getParent()->getParent()->begin()) {
+      
           PROPAGATE(
-                  LESSDEF(INSN(*AI),
+                  LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                           VAR(getVariable(*AI), Ghost),
                           SRC),
                   BOUNDS(TyPosition::make(SRC, *AI),
@@ -1845,7 +1849,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
                          TyPosition::make(SRC, *LI)));
         } else {
           PROPAGATE(
-                  LESSDEF(INSN(*AI),
+                  LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                           VAR(getVariable(*AI), Ghost),
                           SRC),
                   BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
@@ -1863,12 +1868,14 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
             auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
             if(AI->getParent() != current) {
 
-              PROPAGATE(
-                      LESSDEF(INSN(*AI),
-                              VAR(getVariable(*AI), Ghost),
-                              SRC),
+
+            PROPAGATE(
+                    LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                  new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                            VAR(getVariable(*AI), Ghost),
+                            SRC),
                       BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                             TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
               PROPAGATE(
                       LESSDEF(VAR(getVariable(*AI), Ghost),
                               EXPR(UndefVal, Physical),
@@ -1878,8 +1885,10 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
 
             }
             else {
+
               PROPAGATE(
-                      LESSDEF(INSN(*AI),
+                      LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                    new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                               VAR(getVariable(*AI), Ghost),
                               SRC),
                       BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
@@ -1897,7 +1906,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
                                                       REGISTER(getVariable(*AI), Ghost)));
 
               INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                      llvmberry::ConsTransitivity::make(INSN(*AI),
+                      llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
+                                                            new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                                                         EXPR(UndefVal, Physical),
                                                         VAR(getVariable(*AI), Ghost)));
             }

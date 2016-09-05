@@ -180,9 +180,11 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
     std::cout<<"transTgt2 replace:"+key<<std::endl;
     std::string phiKey = "";
     if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
-      phiKey = cv->getTyReg()->getName();
+      phiKey = "%" + std::string(cv->getTyReg()->getName());
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
+
+    std::shared_ptr<TyExpr> keyExprGhost = ConsVar::make(key, Ghost);
 
     std::vector<std::shared_ptr<TyTransitivityTgt>> &vec =
       mem2regCmd->find(key)->second.transTgt;
@@ -196,6 +198,16 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
           (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
         std::cout<<"check: "<<vec[i]->getExpr2()<<std::endl;
       }
+
+      if (equalsIfConsVar(vec[i]->getExpr2(), keyExprGhost)) {
+        std::cout<<"check: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
+        vec[i]->updateExpr2(newExpr);
+
+        if (phiKey != "")
+          (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
+        std::cout<<"check: "<<vec[i]->getExpr2()<<std::endl;
+      }
+
     }
   } else if (which == "TransitivityTgt_e3") {
     std::cout<<"transTgt3 replace:"+key<<std::endl;
