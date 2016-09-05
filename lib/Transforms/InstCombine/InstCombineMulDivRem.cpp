@@ -468,8 +468,9 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
           // replace Z = X * Y to Z = Y * X
           hints.addCommand(llvmberry::ConsInfrule::make(
               llvmberry::TyPosition::make(llvmberry::Source, *Z),
-              llvmberry::ConsMulCommutative::make(
-                  llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+              llvmberry::ConsBopCommutative::make(
+                  VAR(reg_z_name, Physical),
+                  llvmberry::TyBop::BopMul,
                   llvmberry::TyValue::make(*X),
                   llvmberry::TyValue::make(*Y),
                   llvmberry::ConsSize::make(bitwidth))));
