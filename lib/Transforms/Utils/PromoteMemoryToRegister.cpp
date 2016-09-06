@@ -1075,8 +1075,6 @@ void PromoteMem2Reg::run() {
 
         if (isa<StoreInst>(tmpInst)) {
           StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
-          std::string keySI = bname+"-"+std::to_string(instrIndex[SI])+"-%"+
-                              std::string(SI->getOperand(1)->getName());
 
           storeItem[SI].value = std::move(llvmberry::TyValue::make(*(SI->getOperand(0))));
           storeItem[SI].expr = std::move(llvmberry::TyExpr::make(*(SI->getOperand(0)),
@@ -1088,14 +1086,11 @@ void PromoteMem2Reg::run() {
         }
 
         // save information of instruction's use
-        Instruction *tmpUseinst;
-        for (auto UI2 = tmpInst->use_begin(), E2 = tmpInst->use_end(); UI2 != E2; UI2++) {
-          Use &U = *UI2;
+        for (auto UI2 = tmpInst->use_begin(), E2 = tmpInst->use_end(); UI2 != E2;) {
+          Use &U = *(UI2++);
 
-          if ((tmpUseinst = dyn_cast<Instruction>(U.getUser()))) {
-            bname = llvmberry::getBasicBlockIndex(tmpUseinst->getParent());
+          if (Instruction* tmpUseinst = dyn_cast<Instruction>(U.getUser()))
             instrIndex[tmpUseinst] = llvmberry::getCommandIndex(*tmpUseinst);
-          }
         }
       }
     }
@@ -1115,7 +1110,8 @@ void PromoteMem2Reg::run() {
       std::string EBname = llvmberry::getBasicBlockIndex(EB);
       Instruction* EI = EB->getTerminator();
 
-      PROPAGATE(UNIQUE(REGISTER(Ralloca, Physical),
+      //PROPAGATE(UNIQUE(REGISTER(Ralloca, Physical),
+      PROPAGATE(UNIQUE(Ralloca,
                        SRC),
                 BOUNDS(llvmberry::TyPosition::make
                         (SRC, *AI, instrIndex[AI], ""),
