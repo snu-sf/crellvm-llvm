@@ -175,38 +175,6 @@ void TyAddSub::serialize(cereal::JSONOutputArchive &archive) const {
           CEREAL_NVP(sz));
 }
 
-TyAddCommutative::TyAddCommutative(std::shared_ptr<TyRegister> _z,
-                                   std::shared_ptr<TyValue> _x,
-                                   std::shared_ptr<TyValue> _y,
-                                   std::shared_ptr<TySize> _sz)
-    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {
-}
-
-void TyAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
-}
-
-ConsAddCommutative::ConsAddCommutative(
-    std::shared_ptr<TyAddCommutative> _add_comm)
-    : add_commutative(std::move(_add_comm)) {}
-
-void ConsAddCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-
-  archive.saveValue("AddCommutative");
-  archive(CEREAL_NVP(add_commutative));
-}
-
-std::shared_ptr<TyInfrule> ConsAddCommutative::make(
-    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
-    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) {
-  std::shared_ptr<TyAddCommutative> _add_comm(new TyAddCommutative(
-      std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::shared_ptr<TyInfrule>(
-      new ConsAddCommutative(std::move(_add_comm)));
-}
-
 TyAddCommutativeTgt::TyAddCommutativeTgt(std::shared_ptr<TyRegister> _z,
                                          std::shared_ptr<TyValue> _x,
                                          std::shared_ptr<TyValue> _y,
@@ -275,6 +243,38 @@ std::shared_ptr<TyInfrule> ConsBopAssociative::make(
   std::shared_ptr<TyBopAssociative> _add_assoc(
       new TyBopAssociative(_x, _y, _z, _bop, _c1, _c2, _c3, _sz));
   return std::shared_ptr<TyInfrule>(new ConsBopAssociative(_add_assoc));
+}
+
+TyBopCommutative::TyBopCommutative(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                                   std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y,
+                                   std::shared_ptr<TySize> _sz)
+    : e(_e), bop(_bop), x(_x), y(_y), sz(_sz) {}
+
+void TyBopCommutative::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(e), cereal::make_nvp("bop", llvmberry::toString(bop)),
+          CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
+}
+
+ConsBopCommutative::ConsBopCommutative(
+    std::shared_ptr<TyBopCommutative> _bop_commutative)
+    : bop_commutative(_bop_commutative) {}
+
+void ConsBopCommutative::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("BopCommutative");
+  archive(CEREAL_NVP(bop_commutative));
+}
+
+std::shared_ptr<TyInfrule> ConsBopCommutative::make(
+    std::shared_ptr<TyExpr> _e, TyBop _bop,
+    std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+    std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyBopCommutative> _bop_comm(
+      new TyBopCommutative(_e, _bop, _x, _y, _sz));
+  return std::shared_ptr<TyInfrule>(new ConsBopCommutative(_bop_comm));
 }
 
 TyAddDistSub::TyAddDistSub(std::shared_ptr<TyRegister> _z,
@@ -571,36 +571,6 @@ void ConsAddZextBool::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("AddZextBool");
   archive(CEREAL_NVP(add_zext_bool));
-}
-
-TyAndCommutative::TyAndCommutative(std::shared_ptr<TyRegister> _z,
-                                   std::shared_ptr<TyValue> _x,
-                                   std::shared_ptr<TyValue> _y,
-                                   std::shared_ptr<TySize> _sz)
-    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {
-}
-void TyAndCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsAndCommutative::ConsAndCommutative(
-    std::shared_ptr<TyAndCommutative> _and_commutative)
-    : and_commutative(std::move(_and_commutative)) {}
-std::shared_ptr<TyInfrule> ConsAndCommutative::make(
-    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
-    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) {
-  std::shared_ptr<TyAndCommutative> _val(new TyAndCommutative(
-      std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::shared_ptr<TyInfrule>(new ConsAndCommutative(std::move(_val)));
-}
-void ConsAndCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("AndCommutative");
-  archive(CEREAL_NVP(and_commutative));
 }
 
 TyAndDeMorgan::TyAndDeMorgan(std::shared_ptr<TyRegister> _z,
@@ -1275,6 +1245,32 @@ void ConsAndSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("AndSame");
   archive(CEREAL_NVP(and_same));
+}
+
+TyAndTrueBool::TyAndTrueBool(std::shared_ptr<TyValue> _x,
+                             std::shared_ptr<TyValue> _y)
+    : x(std::move(_x)), y(std::move(_y)) {}
+
+void TyAndTrueBool::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsAndTrueBool::ConsAndTrueBool(std::shared_ptr<TyAndTrueBool> _and_true_bool)
+    : and_true_bool(std::move(_and_true_bool)) {}
+
+std::shared_ptr<TyInfrule> ConsAndTrueBool::make(std::shared_ptr<TyValue> _x,
+                                                 std::shared_ptr<TyValue> _y) {
+  std::shared_ptr<TyAndTrueBool> _val(
+      new TyAndTrueBool(std::move(_x), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsAndTrueBool(std::move(_val)));
+}
+
+void ConsAndTrueBool::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndTrueBool");
+  archive(CEREAL_NVP(and_true_bool));
 }
 
 TyAndUndef::TyAndUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
@@ -2715,36 +2711,6 @@ void ConsLessthanUndefTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lessthan_undef_tgt));
 }
 
-TyMulCommutative::TyMulCommutative(std::shared_ptr<TyRegister> _z,
-                                   std::shared_ptr<TyValue> _x,
-                                   std::shared_ptr<TyValue> _y,
-                                   std::shared_ptr<TySize> _sz)
-    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {
-}
-void TyMulCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsMulCommutative::ConsMulCommutative(
-    std::shared_ptr<TyMulCommutative> _mul_commutative)
-    : mul_commutative(std::move(_mul_commutative)) {}
-std::shared_ptr<TyInfrule> ConsMulCommutative::make(
-    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
-    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) {
-  std::shared_ptr<TyMulCommutative> _val(new TyMulCommutative(
-      std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::shared_ptr<TyInfrule>(new ConsMulCommutative(std::move(_val)));
-}
-void ConsMulCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("MulCommutative");
-  archive(CEREAL_NVP(mul_commutative));
-}
-
 TyMulNeg::TyMulNeg(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _mx,
                    std::shared_ptr<TyValue> _my, std::shared_ptr<TyValue> _x,
                    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz)
@@ -2893,36 +2859,6 @@ void ConsOrAndXor::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(or_and_xor));
 }
 
-TyOrCommutative::TyOrCommutative(std::shared_ptr<TyRegister> _z,
-                                 std::shared_ptr<TyValue> _x,
-                                 std::shared_ptr<TyValue> _y,
-                                 std::shared_ptr<TySize> _sz)
-    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {
-}
-void TyOrCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsOrCommutative::ConsOrCommutative(
-    std::shared_ptr<TyOrCommutative> _or_commutative)
-    : or_commutative(std::move(_or_commutative)) {}
-std::shared_ptr<TyInfrule> ConsOrCommutative::make(
-    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
-    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) {
-  std::shared_ptr<TyOrCommutative> _val(new TyOrCommutative(
-      std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::shared_ptr<TyInfrule>(new ConsOrCommutative(std::move(_val)));
-}
-void ConsOrCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("OrCommutative");
-  archive(CEREAL_NVP(or_commutative));
-}
-
 TyOrCommutativeTgt::TyOrCommutativeTgt(std::shared_ptr<TyRegister> _z,
                                        std::shared_ptr<TyValue> _x,
                                        std::shared_ptr<TyValue> _y,
@@ -2951,6 +2887,34 @@ void ConsOrCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("OrCommutativeTgt");
   archive(CEREAL_NVP(or_commutative_tgt));
+}
+
+TyOrFalse::TyOrFalse(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                     std::shared_ptr<TySize> _sz)
+    : x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {}
+
+void TyOrFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrFalse::ConsOrFalse(std::shared_ptr<TyOrFalse> _or_false)
+    : or_false(std::move(_or_false)) {}
+
+std::shared_ptr<TyInfrule> ConsOrFalse::make(std::shared_ptr<TyValue> _x,
+                                             std::shared_ptr<TyValue> _y,
+                                             std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyOrFalse> _val(
+      new TyOrFalse(std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrFalse(std::move(_val)));
+}
+
+void ConsOrFalse::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrFalse");
+  archive(CEREAL_NVP(or_false));
 }
 
 TyOrOr::TyOrOr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
@@ -4273,36 +4237,6 @@ void ConsIntroEq::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(intro_eq));
 }
 
-TyXorCommutative::TyXorCommutative(std::shared_ptr<TyRegister> _z,
-                                   std::shared_ptr<TyValue> _x,
-                                   std::shared_ptr<TyValue> _y,
-                                   std::shared_ptr<TySize> _sz)
-    : z(std::move(_z)), x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {
-}
-void TyXorCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z));
-  archive(CEREAL_NVP(x));
-  archive(CEREAL_NVP(y));
-  archive(CEREAL_NVP(sz));
-}
-
-ConsXorCommutative::ConsXorCommutative(
-    std::shared_ptr<TyXorCommutative> _xor_commutative)
-    : xor_commutative(std::move(_xor_commutative)) {}
-std::shared_ptr<TyInfrule> ConsXorCommutative::make(
-    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _x,
-    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz) {
-  std::shared_ptr<TyXorCommutative> _val(new TyXorCommutative(
-      std::move(_z), std::move(_x), std::move(_y), std::move(_sz)));
-  return std::shared_ptr<TyInfrule>(new ConsXorCommutative(std::move(_val)));
-}
-void ConsXorCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("XorCommutative");
-  archive(CEREAL_NVP(xor_commutative));
-}
-
 TyXorCommutativeTgt::TyXorCommutativeTgt(std::shared_ptr<TyRegister> _z,
                                          std::shared_ptr<TyValue> _x,
                                          std::shared_ptr<TyValue> _y,
@@ -4889,6 +4823,47 @@ void ConsIcmpInverse::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("IcmpInverse");
   archive(CEREAL_NVP(icmp_inverse));
+}
+
+TyIcmpInverseRhs::TyIcmpInverseRhs(enum TyIcmpPred _predicate,
+                                   std::shared_ptr<TyValueType> _ty,
+                                   std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y,
+                                   std::shared_ptr<TyConstInt> _boolean)
+    : predicate(_predicate), ty(std::move(_ty)), x(std::move(_x)),
+      y(std::move(_y)), boolean(std::move(_boolean)) {}
+
+void TyIcmpInverseRhs::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(cereal::make_nvp("predicate", toString(predicate)));
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(boolean));
+}
+
+ConsIcmpInverseRhs::ConsIcmpInverseRhs(std::shared_ptr<TyIcmpInverseRhs> _icmp_inverse_rhs)
+    : icmp_inverse_rhs(std::move(_icmp_inverse_rhs)) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpInverseRhs::make(llvm::ICmpInst &CI,
+                                                    int bool_val) {
+  enum TyIcmpPred pred = getIcmpPred(CI.getPredicate());
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+  std::shared_ptr<TyConstInt> boolean = TyConstInt::make(bool_val, 1);
+
+  std::shared_ptr<TyIcmpInverseRhs> _icmp_inv_rhs =
+      std::make_shared<TyIcmpInverseRhs>(pred, ty, x, y, boolean);
+
+  return std::make_shared<ConsIcmpInverseRhs>(_icmp_inv_rhs);
+}
+
+void ConsIcmpInverseRhs::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpInverseRhs");
+  archive(CEREAL_NVP(icmp_inverse_rhs));
 }
 
 TyIcmpSwapOperands::TyIcmpSwapOperands(enum TyIcmpPred _predicate,

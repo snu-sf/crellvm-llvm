@@ -180,33 +180,36 @@ Expression create_expression(llvm::Instruction *I, bool &swapped,
 
 bool is_inverse_expression(Expression e1, Expression e2);
 
-void generateHintForMem2RegPropagateAIDiffblock(llvm::AllocaInst *AI,
-                                                llvm::Instruction *useInst,
+void generateHintForMem2RegPropagateAIDiffblock(llvm::AllocaInst* AI,
+                                                llvm::Instruction* useInst,
                                                 int useIndex);
 
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
-                                          llvm::StoreInst *SI,
-                                          llvm::Instruction *next,
+                                          llvm::StoreInst* SI,
+                                          llvm::Instruction* next,
                                           int nextIndex);
 
-void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
-                                         llvm::LoadInst *LI,
+void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
+                                         llvm::PHINode* tmp,
+                                         llvm::LoadInst* LI,
                                          llvm::Instruction *use, int useIndex);
 
-void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
-                                       llvm::Instruction *I);
+void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal,
+                                       llvm::Instruction* I);
 
-void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
-                               llvm::AllocaInst *AI, llvm::StoreInst *SI,
+void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
+                               llvm::AllocaInst* AI, llvm::StoreInst* SI,
                                llvm::BasicBlock::iterator II,
-                               llvm::DenseMap<llvm::PHINode *, unsigned> PAM,
-                               llvm::DenseMap<llvm::AllocaInst *, unsigned> AL,
-                               std::vector<std::pair<llvm::BasicBlock *, llvm::BasicBlock *> >succs,
+                               llvm::DenseMap<llvm::PHINode*, unsigned> PAM,
+                               llvm::DenseMap<llvm::AllocaInst*, unsigned> AL,
+                               std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> >succs,
                                bool isSameBB);
 
-void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::BasicBlock *> VisitedBlock, llvm::AllocaInst *AI, llvm::DenseMap<llvm::PHINode *, unsigned> PhiToAllocaMap, unsigned AllocaNum);
+void generateHintForMem2RegPHIdelete(llvm::BasicBlock*BB, std::vector<llvm::BasicBlock*> VisitedBlock, 
+                                     llvm::AllocaInst* AI, llvm::DenseMap<llvm::PHINode*, unsigned> PhiToAllocaMap, 
+                                     unsigned AllocaNum);
 
-int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
+int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
 }
 
 #endif

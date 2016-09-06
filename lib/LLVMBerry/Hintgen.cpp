@@ -106,51 +106,35 @@ void applyCommutativity(llvm::Instruction *position,
                        : expression->getType()->getIntegerBitWidth();
     std::string regname = getVariable(*expression);
     if (scope == Source) {
+      TyBop bop;
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsAddCommutative::make(TyRegister::make(regname, Physical),
-                                     TyValue::make(*expression->getOperand(0)),
-                                     TyValue::make(*expression->getOperand(1)),
-                                     ConsSize::make(bitwidth))));
+        bop = BopAdd;
         break;
       case llvm::Instruction::And:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsAndCommutative::make(TyRegister::make(regname, Physical),
-                                     TyValue::make(*expression->getOperand(0)),
-                                     TyValue::make(*expression->getOperand(1)),
-                                     ConsSize::make(bitwidth))));
+        bop = BopAnd;
         break;
       case llvm::Instruction::Mul:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsMulCommutative::make(TyRegister::make(regname, Physical),
-                                     TyValue::make(*expression->getOperand(0)),
-                                     TyValue::make(*expression->getOperand(1)),
-                                     ConsSize::make(bitwidth))));
+        bop = BopMul;
         break;
       case llvm::Instruction::Or:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsOrCommutative::make(TyRegister::make(regname, Physical),
-                                    TyValue::make(*expression->getOperand(0)),
-                                    TyValue::make(*expression->getOperand(1)),
-                                    ConsSize::make(bitwidth))));
+        bop = BopOr;
         break;
       case llvm::Instruction::Xor:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsXorCommutative::make(TyRegister::make(regname, Physical),
-                                     TyValue::make(*expression->getOperand(0)),
-                                     TyValue::make(*expression->getOperand(1)),
-                                     ConsSize::make(bitwidth))));
+        bop = BopXor;
         break;
       default:
         assert("applyCommutativity() : we don't support commutativity rule for "
                "this binary operator");
       }
+
+      hints.addCommand(ConsInfrule::make(
+          TyPosition::make(Source, *position),
+          ConsBopCommutative::make(VAR(regname, Physical),
+                                   bop,
+                                   TyValue::make(*expression->getOperand(0)),
+                                   TyValue::make(*expression->getOperand(1)),
+                                   ConsSize::make(bitwidth))));
     } else if (scope == Target) {
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
@@ -420,7 +404,7 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
     if (needs_commutativity) {
       hints.addCommand(ConsInfrule::make(
           TyPosition::make(Source, *Z),
-          ConsAddCommutative::make(TyRegister::make(reg_z_name, Physical),
+          ConsBopCommutative::make(VAR(reg_z_name, Physical), TyBop::BopAdd,
                                    TyValue::make(*Y), TyValue::make(*a_Z),
                                    ConsSize::make(bitwidth))));
     }
@@ -1513,10 +1497,13 @@ llvm::Instruction* properPHI(llvm::BasicBlock *BB, std::string Target,
   return NULL;
 }
 
-void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
-                                         llvm::LoadInst *LI,
-                                         llvm::Instruction *use, int useIndex) {
+void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
+                                         llvm::PHINode* tmp,
+                                         llvm::LoadInst* LI,
+                                         llvm::Instruction* use, int useIndex) {
   std::cout<<"PropLoad begin"<<std::endl;
+  assert(I != NULL && "Input Instruction should not be NULL");
+
   ValidationUnit::GetInstance()->intrude([&I, &LI, &use, &useIndex](
       Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
@@ -1524,10 +1511,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
     std::string Rload = getVariable(*LI);
 
-    if (llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
-      //if (llvm::isa<llvm::ConstantPointerNull>(SI->getOperand(0)))
-      //  return;
-
+    if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
       std::string Rstore = getVariable(*(SI->getOperand(1)));
 
       INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
@@ -1602,6 +1586,48 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction *I,
           mem2regCmd[getVariable(*(SI->getOperand(0)))].transTgt.push_back(transTgt);
         }
       }
+    } else if (llvm::AllocaInst* AI = llvm::dyn_cast<llvm::AllocaInst>(I)) {
+      std::string Ralloca = getVariable(*AI);
+
+      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+              ConsIntroGhost::make(VAR(Ralloca, Ghost), REGISTER(Rload, Ghost)));
+
+      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+              ConsTransitivity::make(VAR(Rload, Physical),
+                                     INSN(std::shared_ptr<TyInstruction>(
+                                       new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                                     VAR(Ralloca, Ghost)));
+
+      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+              ConsTransitivity::make(VAR(Rload, Physical), VAR(Ralloca, Ghost),
+                                     VAR(Rload, Ghost)));
+
+      PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
+                BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                       TyPosition::make(SRC, *use, useIndex, "")));
+
+      // now working:: not sure
+        std::shared_ptr<TyPropagateLessdef> lessdef =
+          TyPropagateLessdef::make
+            (VAR(Rload, Ghost),
+             VAR(Rload, Physical),
+             TGT);
+
+        mem2regCmd[Rload].lessdef.push_back(lessdef);
+
+        PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+                  BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                         TyPosition::make(SRC, *use, useIndex, "")));
+
+        std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
+                                                      VAR(Rload, Ghost),
+                                                      VAR(Ralloca, Ghost),
+                                                      VAR(Rload, Physical)));
+
+        INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
+
+        mem2regCmd[Rload].transTgt.push_back(transTgt);
     }
   });
     std::cout<<"PropLoad end"<<std::endl;
@@ -2445,7 +2471,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
               if ((LI->getParent() == use->getParent() &&
                    instrIndex[LI] < instrIndex[use]) ||
                   (isPotentiallyReachable(LI->getParent(), use->getParent()))) {
-                generateHintForMem2RegPropagateLoad(SItmp, LI, use, useIndex);
+                generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, use, useIndex);
               }
             }
           }
