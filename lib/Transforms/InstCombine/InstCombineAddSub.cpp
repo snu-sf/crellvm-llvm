@@ -1351,8 +1351,9 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       // from "z = my + x", create "z = x + my"
       hints.addCommand(llvmberry::ConsInfrule::make(
           llvmberry::TyPosition::make(llvmberry::Source, I),
-          llvmberry::ConsAddCommutative::make(
-              llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
+          llvmberry::ConsBopCommutative::make(
+              VAR(reg_z_name, Physical),
+              llvmberry::TyBop::BopAdd,
               llvmberry::TyValue::make(*LHS), llvmberry::TyValue::make(*RHS),
               llvmberry::ConsSize::make(bitwidth))));
 
@@ -2170,8 +2171,9 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
         hints.addCommand(llvmberry::ConsInfrule::make(
             llvmberry::TyPosition::make(llvmberry::Source, *reg_y_instr),
-            llvmberry::ConsAddCommutative::make(
-                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
+            llvmberry::ConsBopCommutative::make(
+                VAR(reg_y_name, Physical),
+                llvmberry::TyBop::BopAdd,
                 llvmberry::TyValue::make(*Op0), llvmberry::TyValue::make(*Y),
                 llvmberry::ConsSize::make(bitwith))));
         hints.addCommand(llvmberry::ConsInfrule::make(

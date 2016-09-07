@@ -105,51 +105,35 @@ void applyCommutativity(llvm::Instruction *position,
                        : expression->getType()->getIntegerBitWidth();
     std::string regname = getVariable(*expression);
     if (scope == Source) {
+      TyBop bop;
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsAddCommutative::make(TyRegister::make(regname, Physical),
-                                     TyValue::make(*expression->getOperand(0)),
-                                     TyValue::make(*expression->getOperand(1)),
-                                     ConsSize::make(bitwidth))));
+        bop = BopAdd;
         break;
       case llvm::Instruction::And:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsAndCommutative::make(TyRegister::make(regname, Physical),
-                                     TyValue::make(*expression->getOperand(0)),
-                                     TyValue::make(*expression->getOperand(1)),
-                                     ConsSize::make(bitwidth))));
+        bop = BopAnd;
         break;
       case llvm::Instruction::Mul:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsMulCommutative::make(TyRegister::make(regname, Physical),
-                                     TyValue::make(*expression->getOperand(0)),
-                                     TyValue::make(*expression->getOperand(1)),
-                                     ConsSize::make(bitwidth))));
+        bop = BopMul;
         break;
       case llvm::Instruction::Or:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsOrCommutative::make(TyRegister::make(regname, Physical),
-                                    TyValue::make(*expression->getOperand(0)),
-                                    TyValue::make(*expression->getOperand(1)),
-                                    ConsSize::make(bitwidth))));
+        bop = BopOr;
         break;
       case llvm::Instruction::Xor:
-        hints.addCommand(ConsInfrule::make(
-            TyPosition::make(Source, *position),
-            ConsXorCommutative::make(TyRegister::make(regname, Physical),
-                                     TyValue::make(*expression->getOperand(0)),
-                                     TyValue::make(*expression->getOperand(1)),
-                                     ConsSize::make(bitwidth))));
+        bop = BopXor;
         break;
       default:
         assert("applyCommutativity() : we don't support commutativity rule for "
                "this binary operator");
       }
+
+      hints.addCommand(ConsInfrule::make(
+          TyPosition::make(Source, *position),
+          ConsBopCommutative::make(VAR(regname, Physical),
+                                   bop,
+                                   TyValue::make(*expression->getOperand(0)),
+                                   TyValue::make(*expression->getOperand(1)),
+                                   ConsSize::make(bitwidth))));
     } else if (scope == Target) {
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
@@ -473,7 +457,7 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
     if (needs_commutativity) {
       hints.addCommand(ConsInfrule::make(
           TyPosition::make(Source, *Z),
-          ConsAddCommutative::make(TyRegister::make(reg_z_name, Physical),
+          ConsBopCommutative::make(VAR(reg_z_name, Physical), TyBop::BopAdd,
                                    TyValue::make(*Y), TyValue::make(*a_Z),
                                    ConsSize::make(bitwidth))));
     }

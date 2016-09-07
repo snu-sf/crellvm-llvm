@@ -2751,7 +2751,8 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   if (match(Op1, m_Xor(m_Value(A), m_Value(B)))) {
     if (Op0 == A || Op0 == B) {
       llvmberry::ValidationUnit::Begin("or_xor3", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A, &B, SwappedForXor](
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A, &B,
+                                                         SwappedForXor](
           llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         //   <src>   |   <tgt>
         // Y = A ^ B | Y = A ^ B
@@ -2771,8 +2772,11 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
             Op0 == B ? VAL(A, Physical) : VAL(B, Physical), 
             BITSIZE(bitwidth)));
         if (Op0 == B) {
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrCommutative::make(
-            REGISTER(llvmberry::getVariable(*Z), Physical), VAL(B, Physical), VAL(A, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(SRC, Z),
+                  llvmberry::ConsBopCommutative::make(
+                      VAR(llvmberry::getVariable(*Z), Physical),
+                      llvmberry::TyBop::BopOr, VAL(B, Physical),
+                      VAL(A, Physical), BITSIZE(bitwidth)));
         }
       });
 
