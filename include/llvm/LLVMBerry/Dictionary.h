@@ -24,6 +24,7 @@ enum DictKeys {
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
   ArgForLoadLoadStore,
+  ArgForSelectIcmpConst,
   ArgForSinkInst,
   ArgForVisitICmp,
   // Mem2Reg
@@ -171,6 +172,22 @@ public:
 };
 DEFINE_TRAITS(ArgForLoadLoadStore, LoadLoadStoreArg);
 
+// lib/Transform/InstCombine/InstCombineSelect.cpp : visitSelectInstWithICmp
+struct SelectIcmpConstArg {
+public:
+  SelectIcmpConstArg();
+  bool activated;
+  bool isGtToLt;
+  bool isUnsigned;
+  bool selectCommutative;
+  llvm::SelectInst *Z;
+  llvm::ICmpInst *Y;
+  llvm::Value *X;
+  llvm::ConstantInt *C, *Cprime;
+  std::shared_ptr<TyPosition> Y_org_pos;
+};
+
+DEFINE_TRAITS(ArgForSelectIcmpConst, SelectIcmpConstArg);
 // lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
 struct SinkInstArg {
 public:
