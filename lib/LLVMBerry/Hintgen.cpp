@@ -1013,7 +1013,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
       INFRULE(position,//TyPosition::make(SRC, *SI, instrIndex[SI], ""),
               std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
 
-      if (SI->getOperand(0)->getName()!="")
+      if (SI->getOperand(0)->getName() != "")
         mem2regCmd[getVariable(*(SI->getOperand(0)))].transTgt.push_back(transTgt);
        
     }
@@ -1265,10 +1265,8 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
         llvm::isa<llvm::PHINode>(ReplInst))
       ReplName = getVariable(*ReplInst);
     
-    if (ReplName == "")
-      return;
-
-    if (mem2regCmd.find(ReplName) == mem2regCmd.end())
+    if ((ReplName == "") ||
+        (mem2regCmd.find(ReplName) == mem2regCmd.end()))
       return;
 
     data.get<ArgForMem2Reg>()->replaceCmdRhs("Lessdef", ReplName,
@@ -1315,6 +1313,9 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
             (new TyTransitivityTgt(std::shared_ptr<TyExpr>(new ConsVar(cv3->getTyReg())),
                                    VAR(ReplName, Ghost),
                                    TyExpr::make(*ReplVal, Physical)));
+
+          if (ReplVal->getName() != "")
+            mem2regCmd[getVariable(*ReplVal)].transTgt.push_back(transitivitytgt);
 
           INFRULE(vec[i].first,
                   std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
@@ -1411,37 +1412,6 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB, std::vector<llvm::Bas
             }
              });
         }
-/*
-          ValidationUnit::GetInstance()->intrude([&prev, &AI, &PN]
-                                                         (Dictionary &data, CoreHint &hints) {
-            auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-            auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-
-            std::shared_ptr<llvmberry::TyLessthanUndefTgt> lessUndefTgt
-                    (new llvmberry::TyLessthanUndefTgt(llvmberry::TyValueType::make(*AI->getType()),
-                                                       std::shared_ptr<llvmberry::TyValue>
-                                                       (new llvmberry::ConsId
-                                                            (llvmberry::TyRegister::make(getVariable(*PN), llvmberry::Physical)))));
-
-            INFRULE(llvmberry::TyPosition::make(SRC, *PN, prev->getName()),
-                    std::shared_ptr<llvmberry::TyInfrule>
-                    (new llvmberry::ConsLessthanUndefTgt(lessUndefTgt)));
-
-            mem2regCmd[getVariable(*PN)].lessUndefTgt.push_back(lessUndefTgt);
-
-            std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
-                    (new llvmberry::TyTransitivityTgt(VAR(getVariable(*AI), Ghost),
-                                                      EXPR(llvm::UndefValue::get(AI->getType()), Physical),
-                                                      VAR(getVariable(*PN), Physical)));
-
-            INFRULE(llvmberry::TyPosition::make(SRC, *PN, prev->getName()),
-                    std::shared_ptr<llvmberry::TyInfrule>
-                            (new llvmberry::ConsTransitivityTgt(transTgt)));
-
-            mem2regCmd[getVariable(*PN)].transTgt.push_back(transTgt);
-
-          });
-  */      
         llvm::dbgs()<< "return before block " << BB->getName() << "\n";
         return;  
       }

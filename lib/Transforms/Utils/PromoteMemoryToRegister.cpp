@@ -568,10 +568,21 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                                                       new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                                                     VAR(Rload, Ghost)));
 
+          std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
+            (new llvmberry::TyTransitivityTgt(VAR(Rload, Ghost),
+                                              VAR(Ralloca, Ghost),
+                                              EXPR(OnlyStore->getOperand(0), Physical)));
+
           INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                  llvmberry::ConsTransitivityTgt::make(VAR(Rload, Ghost),
-                                                       VAR(Ralloca, Ghost),
-                                                       EXPR(OnlyStore->getOperand(0), Physical)));
+                  std::shared_ptr<llvmberry::TyInfrule>
+                    (new llvmberry::ConsTransitivityTgt(transTgt)));
+
+          mem2regCmd[Rload].transTgt.push_back(transTgt);
+
+          //INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+          //        llvmberry::ConsTransitivityTgt::make(VAR(Rload, Ghost),
+          //                                             VAR(Ralloca, Ghost),
+          //                                             EXPR(OnlyStore->getOperand(0), Physical)));
         }
       }
 
