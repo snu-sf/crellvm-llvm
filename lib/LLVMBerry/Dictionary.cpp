@@ -65,7 +65,7 @@ Mem2RegArg::Mem2RegArg()
       storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
       transTgt(new TyTransTgtObj()), blocks(new TyBlocksObj()),
       strVec(new TyStrVecObj()), blockPairVec(new TyBlockPairVecObj()),
-      blockVec(new TyBlockVecObj()), SImap(new TySImapObj()) {}
+      SImap(new TySImapObj()), isReachable(new TyReachableObj()) {}
 
 bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                             std::shared_ptr<TyExpr> e2) {
