@@ -180,9 +180,8 @@ Expression create_expression(llvm::Instruction *I, bool &swapped,
 
 bool is_inverse_expression(Expression e1, Expression e2);
 
-void generateHintForMem2RegPropagateAIDiffblock(llvm::AllocaInst* AI,
-                                                llvm::Instruction* useInst,
-                                                int useIndex);
+void makeReachableBlockMap(llvm::BasicBlock* Src,
+                           llvm::BasicBlock* Tgt);
 
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst* SI,

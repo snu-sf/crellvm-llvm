@@ -3802,7 +3802,7 @@ void TyTransitivityTgt::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 std::shared_ptr<TyExpr> TyTransitivityTgt::getExpr1() {
-  return e2;
+  return e1;
 }
 
 std::shared_ptr<TyExpr> TyTransitivityTgt::getExpr2() {

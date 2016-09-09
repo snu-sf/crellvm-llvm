@@ -172,13 +172,14 @@ public:
   typedef std::shared_ptr<TyBlockPairVecObj> TyBlockPairVec;
   TyBlockPairVec blockPairVec;
 
-  typedef std::vector<std::string> TyBlockVecObj;
-  typedef std::shared_ptr<TyBlockVecObj> TyBlockVec;
-  TyBlockVec blockVec;
-
   typedef std::map<std::string, llvm::StoreInst*> TySImapObj;
   typedef std::shared_ptr<TySImapObj> TySImap;
   TySImap SImap;
+
+  typedef std::map<llvm::BasicBlock*,
+                   std::vector<llvm::BasicBlock*>> TyReachableObj;
+  typedef std::shared_ptr<TyReachableObj> TyReachable;
+  TyReachable isReachable;
 
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
