@@ -1022,32 +1022,32 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
 }
 
 //llvm::PHINode* properPHI(llvm::BasicBlock *BB, std::string Target,
-llvm::Instruction* properPHI(llvm::BasicBlock *BB, std::string Target,
-                         llvm::StoreInst *SI, bool isInit,
+llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
+                         //llvm::StoreInst *SI, bool isInit,
+                         llvm::Instruction* I, bool isInit,
                          bool checkSI, Dictionary data) {
-  std::cout << "properPHI begin(" + std::string(BB->getParent()->getName()) +  "): " << getBasicBlockIndex(BB) + ", " + Target + ", " + getBasicBlockIndex(SI->getParent()) << std::endl;
+  std::cout << "properPHI begin(" + std::string(BB->getParent()->getName()) +  "): " << getBasicBlockIndex(BB) + ", " + Target + ", " + getBasicBlockIndex(I->getParent()) << std::endl;
   auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
   auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
-  llvm::BasicBlock *SIB = SI->getParent();
+  llvm::BasicBlock *IB = I->getParent();
 
-  // return NULL if SIB block is same as BB block 
-  if (BB == SIB)
+  // return NULL if IB block is same as BB block 
+  if (BB == IB)
     return NULL;
 
   // if isInit is true, check current BB
   if (isInit) {
     if (checkSI) {
-      llvm::BasicBlock::iterator INST = BB->begin();
+      llvm::BasicBlock::iterator II = BB->begin();
 
-      while (INST != BB->end()) {
-        if (llvm::StoreInst* SItmp = llvm::dyn_cast<llvm::StoreInst>(INST)) {
-            std::cout << "properPHI debug1: " + Target + ", " + getVariable(*SItmp->getOperand(1)) << std::endl;
-          if (Target == getVariable(*SItmp->getOperand(1))) {
-            std::cout << "properPHI debug2: " + Target + ", " + getVariable(*SItmp->getOperand(1)) << std::endl;
-            return SItmp;
+      while (II != BB->end()) {
+        if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(II++)) {
+            std::cout << "properPHI debug1: " + Target + ", " + getVariable(*SI->getOperand(1)) << std::endl;
+          if (Target == getVariable(*SI->getOperand(1))) {
+            std::cout << "properPHI debug2: " + Target + ", " + getVariable(*SI->getOperand(1)) << std::endl;
+            return SI;
           }
         }
-        INST++;
       }
     }
 
@@ -1070,27 +1070,26 @@ llvm::Instruction* properPHI(llvm::BasicBlock *BB, std::string Target,
   for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE;) {
     llvm::BasicBlock* BBtmp = *(BI++);
 
-    // skip if SIB block is not reachable to BBtmp block
-    //if (!isPotentiallyReachable(SIB, BBtmp))
-    if (std::find(isReachable[SIB].begin(), isReachable[SIB].end(), BBtmp) == isReachable[SIB].end())
+    // skip if IB block is not reachable to BBtmp block
+    //if (!isPotentiallyReachable(IB, BBtmp))
+    if (std::find(isReachable[IB].begin(), isReachable[IB].end(), BBtmp) == isReachable[IB].end())
       continue;
 
-    std::cout<<"properPHI: "+getBasicBlockIndex(BBtmp)+"->"+getBasicBlockIndex(BB)+", "+Target+"("+getBasicBlockIndex(SIB)+")"<<std::endl;
+    std::cout<<"properPHI: "+getBasicBlockIndex(BBtmp)+"->"+getBasicBlockIndex(BB)+", "+Target+"("+getBasicBlockIndex(IB)+")"<<std::endl;
     if (std::find(blockPairVec.begin(), blockPairVec.end(), std::make_pair(getBasicBlockIndex(BB), getBasicBlockIndex(BBtmp))) != blockPairVec.end())
       continue;
     blockPairVec.push_back(std::make_pair(getBasicBlockIndex(BB), getBasicBlockIndex(BBtmp)));
 
-    llvm::BasicBlock::iterator INST = BBtmp->begin();
-    while (INST != BBtmp->end()) {
-      if (llvm::StoreInst* SItmp = llvm::dyn_cast<llvm::StoreInst>(INST)) {
-        std::cout<<"properPHI check store: " + Target + ", " + std::string(SItmp->getOperand(1)->getName()) << std::endl;
-        if (Target == getVariable(*SItmp->getOperand(1)))
-          return SItmp;
+    llvm::BasicBlock::iterator II = BBtmp->begin();
+    while (II != BBtmp->end()) {
+      if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(II++)) {
+        std::cout<<"properPHI check store: " + Target + ", " + std::string(SI->getOperand(1)->getName()) << std::endl;
+        if (Target == getVariable(*SI->getOperand(1)))
+          return SI;
       }
-      INST++;
     }
 
-    //std::cout<<"properPHI': "+getBasicBlockIndex(BBtmp)+"<-"+getBasicBlockIndex(BB)+", "+Target+"("+getBasicBlockIndex(SIB)+")"<<std::endl;
+    //std::cout<<"properPHI': "+getBasicBlockIndex(BBtmp)+"<-"+getBasicBlockIndex(BB)+", "+Target+"("+getBasicBlockIndex(IB)+")"<<std::endl;
     if (llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(BBtmp->begin())) {
       llvm::BasicBlock::iterator PNI = BBtmp->begin();
 
@@ -1107,12 +1106,11 @@ llvm::Instruction* properPHI(llvm::BasicBlock *BB, std::string Target,
       }
     }
 
-    //llvm::PHINode* ret = properPHI(BBtmp, Target, SI, false, checkSI, preds, data);
-    llvm::Instruction* ret = properPHI(BBtmp, Target, SI, false, checkSI, data);
+    //llvm::PHINode* ret = properPHI(BBtmp, Target, I, false, checkSI, preds, data);
+    llvm::Instruction* ret = properPHI(BBtmp, Target, I, false, checkSI, data);
     if (ret != NULL)
       return ret;
   }
-
   return NULL;
 }
 
@@ -2023,11 +2021,22 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
   std::cout<<"Mem2RegPHI end"<<std::endl;
 }
 
-int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex) {
-  if (llvm::isa<llvm::TerminatorInst>(*instr))
+int getIndexofMem2Reg(llvm::Instruction* I,
+                      int instrIndex, int termIndex) {
+  if (llvm::isa<llvm::TerminatorInst>(I))
     return termIndex;
   else
     return instrIndex;
 }
 
+bool hasBitcastOrGEP(llvm::AllocaInst* AI) {
+  for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
+    llvm::Instruction* I = llvm::cast<llvm::Instruction>(*UI++);
+
+    if (llvm::isa<llvm::BitCastInst>(I) ||
+        llvm::isa<llvm::GetElementPtrInst>(I))
+      return true;
+  }
+  return false;
+}
 } // llvmberry
