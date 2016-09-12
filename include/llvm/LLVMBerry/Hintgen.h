@@ -204,11 +204,19 @@ void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
                                std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> >succs,
                                bool isSameBB);
 
-void generateHintForMem2RegPHIdelete(llvm::BasicBlock*BB, std::vector<llvm::BasicBlock*> VisitedBlock, 
-                                     llvm::AllocaInst* AI, llvm::DenseMap<llvm::PHINode*, unsigned> PhiToAllocaMap, 
+void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB, 
+                                     std::vector<llvm::BasicBlock*> VisitedBlock, 
+                                     llvm::AllocaInst* AI,
+                                     llvm::DenseMap<llvm::PHINode*, unsigned> PhiToAllocaMap, 
                                      unsigned AllocaNum);
 
+llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
+                             llvm::Instruction* I, bool isInit,
+                             bool checkSI, Dictionary data);
+
 int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
+
+bool hasBitcastOrGEP(llvm::AllocaInst* AI);
 }
 
 #endif
