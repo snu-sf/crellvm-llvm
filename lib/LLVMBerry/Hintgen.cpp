@@ -193,13 +193,12 @@ void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
   assert(ValidationUnit::Exists());
 
   ValidationUnit::GetInstance()->intrude(
-      [&position, &v_smallest, &v_mid, &v_greatest,
-       &scope, &position_scopetag](ValidationUnit::Dictionary &data, 
-          CoreHint &hints) {
+      [&position, &v_smallest, &v_mid, &v_greatest, &scope, &position_scopetag](
+          ValidationUnit::Dictionary &data, CoreHint &hints) {
         INFRULE(INSTPOS(position_scopetag, position),
-            ConsTransitivity::make(TyExpr::make(*v_greatest, Physical),
-                                   TyExpr::make(*v_mid, Physical),
-                                   TyExpr::make(*v_smallest, Physical)));
+                ConsTransitivity::make(TyExpr::make(*v_greatest, Physical),
+                                       TyExpr::make(*v_mid, Physical),
+                                       TyExpr::make(*v_smallest, Physical)));
       });
 }
 
@@ -281,9 +280,9 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
     source_pos = INSTPOS(SRC, source);
   }
 
-  ValidationUnit::GetInstance()->intrude([&source, &replaceTo, &ghostvar,
-                                          &source_pos](
-      ValidationUnit::Dictionary &data, CoreHint &hints) {
+  ValidationUnit::GetInstance()
+      ->intrude([&source, &replaceTo, &ghostvar, &source_pos](
+            ValidationUnit::Dictionary &data, CoreHint &hints) {
     llvm::Instruction *I = source;
 
     std::string to_rem = getVariable(*I);
@@ -330,11 +329,11 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
                          TyPosition::make(TGT, *user_I, prev_block_name)));
 
         if (llvm::isa<llvm::PHINode>(user_I)) {
-          // src : user = phi [ to_rem, prev_block_name ] 
+          // src : user = phi [ to_rem, prev_block_name ]
           // tgt : user = phi [replaceTo, prev_block_name ]
-          // In src : Transitivity ; 
+          // In src : Transitivity ;
           //    user >= to_rem(physical) >= to_rem(previous) >= ghostvar
-          // In tgt : TransitivityTgt ; 
+          // In tgt : TransitivityTgt ;
           //    ghostva >= replaceTo(physical) >= replaceTo(previous) >= user
           INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
                   ConsTransitivity::make(VAR(user, Physical),
@@ -369,7 +368,7 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
         }
       }
     }
-  });
+        });
 }
 
 void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,

@@ -30,8 +30,8 @@
   llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE)                                             \
   llvmberry::ConsNoalias::make(ptr1, ptr2, SCOPE)
-#define ALLOCA(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE) 
-  /* XXX : ALLOCA macro will be removed later */
+#define ALLOCA(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
+/* XXX : ALLOCA macro will be removed later */
 #define PRIVATE(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
 #define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, tag)
 // VAL, ID macros make TyValue object
