@@ -184,16 +184,22 @@ void applyCommutativity(llvm::Instruction *position,
 void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
                        llvm::Value *v_mid, llvm::Value *v_smallest,
                        TyScope scope) {
+  applyTransitivity(position, v_greatest, v_mid, v_smallest, scope, scope);
+}
+
+void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
+                       llvm::Value *v_mid, llvm::Value *v_smallest,
+                       TyScope scope, TyScope position_scopetag) {
   assert(ValidationUnit::Exists());
 
   ValidationUnit::GetInstance()->intrude(
       [&position, &v_smallest, &v_mid, &v_greatest,
-       &scope](ValidationUnit::Dictionary &data, CoreHint &hints) {
-        hints.addCommand(ConsInfrule::make(
-            INSTPOS(scope, position),
+       &scope, &position_scopetag](ValidationUnit::Dictionary &data, 
+          CoreHint &hints) {
+        INFRULE(INSTPOS(position_scopetag, position),
             ConsTransitivity::make(TyExpr::make(*v_greatest, Physical),
                                    TyExpr::make(*v_mid, Physical),
-                                   TyExpr::make(*v_smallest, Physical))));
+                                   TyExpr::make(*v_smallest, Physical)));
       });
 }
 
@@ -324,14 +330,28 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
                          TyPosition::make(TGT, *user_I, prev_block_name)));
 
         if (llvm::isa<llvm::PHINode>(user_I)) {
+          // src : user = phi [ to_rem, prev_block_name ] 
+          // tgt : user = phi [replaceTo, prev_block_name ]
+          // In src : Transitivity ; 
+          //    user >= to_rem(physical) >= to_rem(previous) >= ghostvar
+          // In tgt : TransitivityTgt ; 
+          //    ghostva >= replaceTo(physical) >= replaceTo(previous) >= user
+          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
+                  ConsTransitivity::make(VAR(user, Physical),
+                                         VAR(to_rem, Previous),
+                                         VAR(to_rem, Physical)));
           INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
                   ConsTransitivity::make(VAR(user, Physical),
                                          VAR(to_rem, Physical),
                                          VAR(ghostvar, Ghost)));
           INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
-                  ConsTransitivity::make(VAR(user, Physical),
-                                         VAR(ghostvar, Ghost),
-                                         EXPR(replaceTo, Physical)));
+                  ConsTransitivityTgt::make(EXPR(replaceTo, Physical),
+                                            EXPR(replaceTo, Previous),
+                                            VAR(user, Physical)));
+          INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
+                  ConsTransitivityTgt::make(VAR(ghostvar, Ghost),
+                                            EXPR(replaceTo, Physical),
+                                            VAR(user, Physical)));
         } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
           INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
                   ConsSubstitute::make(REGISTER(to_rem, Physical),

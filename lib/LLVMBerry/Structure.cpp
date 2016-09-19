@@ -2372,7 +2372,10 @@ void ConsInsn::serialize(cereal::JSONOutputArchive &archive) const {
 TyPropagateLessdef::TyPropagateLessdef(std::shared_ptr<TyExpr> _lhs,
                                        std::shared_ptr<TyExpr> _rhs,
                                        enum TyScope _scope)
-    : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
+    : lhs(_lhs), rhs(_rhs), scope(_scope) {
+  assert(_lhs);
+  assert(_rhs);
+}
 
 void TyPropagateLessdef::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs),
@@ -2430,15 +2433,6 @@ TyPropagateDiffblock::make(std::shared_ptr<TyValue> _lhs,
                            std::shared_ptr<TyValue> _rhs, enum TyScope _scope) {
   return std::shared_ptr<TyPropagateDiffblock>(
       new TyPropagateDiffblock(_lhs, _rhs, _scope));
-}
-
-TyPropagateAlloca::TyPropagateAlloca(std::shared_ptr<TyRegister> _p,
-                                     enum TyScope _scope)
-    : p(std::move(_p)), scope(_scope) {}
-
-void TyPropagateAlloca::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(p));
-  archive(cereal::make_nvp("scope", ::toString(scope)));
 }
 
 TyPropagatePrivate::TyPropagatePrivate(std::shared_ptr<TyRegister> _p,
@@ -2505,24 +2499,6 @@ void ConsDiffblock::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Diffblock");
   archive(CEREAL_NVP(propagate_diffblock));
-}
-
-ConsAlloca::ConsAlloca(std::shared_ptr<TyPropagateAlloca> _propagate_alloca)
-    : propagate_alloca(std::move(_propagate_alloca)) {}
-
-std::shared_ptr<TyPropagateObject>
-ConsAlloca::make(std::shared_ptr<TyRegister> _p, enum TyScope _scope) {
-  std::shared_ptr<TyPropagateAlloca> _val(
-      new TyPropagateAlloca(std::move(_p), _scope));
-
-  return std::shared_ptr<TyPropagateObject>(new ConsAlloca(std::move(_val)));
-}
-
-void ConsAlloca::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("Alloca");
-  archive(CEREAL_NVP(propagate_alloca));
 }
 
 ConsMaydiff::ConsMaydiff(std::shared_ptr<TyRegister> _register_name)
