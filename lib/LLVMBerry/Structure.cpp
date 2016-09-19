@@ -1655,19 +1655,19 @@ TyFloatBinaryOperator::make(const llvm::BinaryOperator &bopinst) {
 std::shared_ptr<TyICmpInst> TyICmpInst::make(const llvm::ICmpInst &icmpInst) {
   llvmberry::TyIcmpPred predicate =
       llvmberry::getIcmpPred(icmpInst.getPredicate());
-  return std::shared_ptr<TyICmpInst>(
-      new TyICmpInst(predicate, TyValueType::make(*icmpInst.getType()),
-                     TyValue::make(*icmpInst.getOperand(0)),
-                     TyValue::make(*icmpInst.getOperand(1))));
+  return std::shared_ptr<TyICmpInst>(new TyICmpInst(
+      predicate, TyValueType::make(*icmpInst.getOperand(0)->getType()),
+      TyValue::make(*icmpInst.getOperand(0)),
+      TyValue::make(*icmpInst.getOperand(1))));
 }
 
 std::shared_ptr<TyFCmpInst> TyFCmpInst::make(const llvm::FCmpInst &fcmpInst) {
   llvmberry::TyFcmpPred predicate =
       llvmberry::getFcmpPred(fcmpInst.getPredicate());
-  return std::shared_ptr<TyFCmpInst>(
-      new TyFCmpInst(predicate, TyValueType::make(*fcmpInst.getType()),
-                     TyValue::make(*fcmpInst.getOperand(0)),
-                     TyValue::make(*fcmpInst.getOperand(1))));
+  return std::shared_ptr<TyFCmpInst>(new TyFCmpInst(
+      predicate, TyValueType::make(*fcmpInst.getOperand(0)->getType()),
+      TyValue::make(*fcmpInst.getOperand(0)),
+      TyValue::make(*fcmpInst.getOperand(1))));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::AllocaInst &ai) {
