@@ -205,10 +205,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
                                bool isSameBB);
 
 void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB, 
-                                     std::vector<llvm::BasicBlock*> VisitedBlock, 
-                                     llvm::AllocaInst* AI,
-                                     llvm::DenseMap<llvm::PHINode*, unsigned> PhiToAllocaMap, 
-                                     unsigned AllocaNum);
+                                     std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> VisitedBlock, 
+                                     llvm::AllocaInst* AI);
 
 llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
                              llvm::Instruction* I, bool isInit,
