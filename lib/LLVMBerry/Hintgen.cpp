@@ -1351,16 +1351,11 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
             std::pair<std::pair<llvm::BasicBlock*,
                                 llvm::BasicBlock*>,
                       bool> blockPairTag = std::make_pair(*VisitedBlock.rbegin(), false);
-            std::pair<std::pair<llvm::BasicBlock*,
-                                llvm::BasicBlock*>,
-                      bool> blockPairTag2 = std::make_pair(*VisitedBlock.rbegin(), true);
+            
             llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
-            //llvm::BasicBlock *pre = (*VisitedBlock.rbegin()).second;
             llvm::Value *UndefVal = llvm::UndefValue::get(PN->getType());
 
             if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
-                //std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2) != reachedEdgeTag.end()) {
-              //blockPairTag.second = true;
               std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                               llvm::BasicBlock*>,
                                     bool>>::iterator it =
@@ -1461,6 +1456,20 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
             for (unsigned a = 0; a < VisitedBlock.size(); a++) {
               llvm::BasicBlock *current = (VisitedBlock.at(a)).first;
 
+            std::pair<std::pair<llvm::BasicBlock*,
+                                llvm::BasicBlock*>,
+                      bool> blockPairTag = std::make_pair(VisitedBlock.at(a), false);
+
+            if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
+              std::vector<std::pair<std::pair<llvm::BasicBlock*,
+                                              llvm::BasicBlock*>,
+                                    bool>>::iterator it =
+              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag);
+
+              int pos = std::distance(reachedEdgeTag.begin(), it);
+              reachedEdgeTag.at(pos).second = true;
+            }
+
               if (AI->getParent() != current) {
                 PROPAGATE(
                         LESSDEF(INSN(std::shared_ptr<TyInstruction>(
@@ -1530,8 +1539,23 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
         while (!VisitedBlock.empty()) {
           llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
           llvm::Value *UndefVal = llvm::UndefValue::get(AI->getType());
-          VisitedBlock.pop_back();
 
+          std::pair<std::pair<llvm::BasicBlock*,
+                              llvm::BasicBlock*>,
+                    bool> blockPairTag = std::make_pair(*VisitedBlock.rbegin(), false);
+
+          if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
+            std::vector<std::pair<std::pair<llvm::BasicBlock*,
+                                            llvm::BasicBlock*>,
+                                  bool>>::iterator it =
+            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag);
+
+            int pos = std::distance(reachedEdgeTag.begin(), it);
+            reachedEdgeTag.at(pos).second = true;
+          }
+
+          VisitedBlock.pop_back();
+          
           if (AI->getParent() != current) {
             PROPAGATE(
                     LESSDEF(INSN(std::shared_ptr<TyInstruction>(
@@ -1573,12 +1597,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                                       VAR(getVariable(*AI), Ghost)));
           }
         }
-        
-        /*
-        VisitedBlock.push_back(Bpair);
-        generateHintForMem2RegPHIdelete(succ, VisitedBlock, AI);
-        VisitedBlock.pop_back();
-        */
+
       } else {
         reachedEdgeTag.push_back(BpairFalse);
         VisitedBlock.push_back(Bpair);
