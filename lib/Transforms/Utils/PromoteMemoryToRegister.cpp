@@ -1352,10 +1352,12 @@ void PromoteMem2Reg::run() {
             ([&F, &AI, this, &AllocaNum]
                      (llvmberry::Dictionary &data,
                       llvmberry::CoreHint &hints) {
+      auto &reachedEdgeTag = *(data.get<llvmberry::ArgForMem2Reg>()->reachedEdgeTag);
       BasicBlock *start = F.begin();
-      std::vector<BasicBlock *> VistedBlock;
+      std::vector<std::pair<BasicBlock*, BasicBlock*>> VistedBlock;
 
-      llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI, PhiToAllocaMap, AllocaNum);
+      llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI);
+      reachedEdgeTag.clear();
     });
   }
 
@@ -1739,7 +1741,7 @@ NextIteration:
                 Instruction *User = cast<Instruction>(*UI++);
 
                 if (LoadInst *LI = dyn_cast<LoadInst>(User)) {
-                  if(APN->getParent() == LI->getParent() || DT.dominates(APN->getParent(), LI->getParent())) {
+                  if (APN->getParent() == LI->getParent() || DT.dominates(APN->getParent(), LI->getParent())) {
                     PROPAGATE(
                             LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                                     new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
