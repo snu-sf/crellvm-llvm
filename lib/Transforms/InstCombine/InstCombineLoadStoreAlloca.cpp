@@ -785,11 +785,10 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
     llvmberry::ValidationUnit::GetInstance()
         ->intrude([&NewInst, &LI, &AvailableVal, &Op, this](
               llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-            if (NewInst != AvailableVal) {
-              Instruction *inst = dyn_cast<Instruction>(NewInst);
-              assert(inst);
-              llvmberry::insertSrcNopAtTgtI(hints, inst);
-            }
+      if (NewInst != AvailableVal) {
+        if(Instruction *inst = dyn_cast<Instruction>(NewInst))
+          llvmberry::insertSrcNopAtTgtI(hints, inst);
+      }
 
       auto falv_arg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
       auto lls_arg = data.create<llvmberry::ArgForLoadLoadStore>();
@@ -818,24 +817,27 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
         v1_inst = si;
         v1 = si->getValueOperand();
         ptr1 = si->getPointerOperand();
-        load_align = si->getAlignment();
+        load_align = 1;//si->getAlignment();
       } else {
         LoadInst *li = dyn_cast<LoadInst>(AvailableVal);
         v1_inst = li;
         v1 = v1_inst;
         assert(v1_inst);
         ptr1 = li->getPointerOperand();
-        load_align = li->getAlignment();
+        load_align = 1;//li->getAlignment();
       }
+      auto v1_inst_pos = INSTPOS(TGT, v1_inst);
+
       // Step 0. prove that ptr2src and ptr1src are equivalent
       if (ptr1src == ptr2src) {
         // They are equivalent.
-        INFRULE(INSTPOS(SRC, v1_inst),
-                llvmberry::ConsIntroEq::make(EXPR(ptr1src, Physical)));
+        INFRULE2(INSTPOS(SRC, v1_inst),
+                llvmberry::ConsIntroEq::make(EXPR(ptr1src, Physical)),
+                "ptr1src == ptr2src");
         // <ptr1src> >= <ptr1src>
         PROPAGATE(
             LESSDEF(EXPR(ptr1src, Physical), EXPR(ptr1src, Physical), SRC),
-            BOUNDS(INSTPOS(TGT, v1_inst), LIpos));
+            BOUNDS(v1_inst_pos, LIpos));
       } else {
         // They are identical in representation, but distinct
         // ex)
@@ -857,14 +859,16 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                   llvmberry::TyPosition::make(SRC, *phi1, bbi1->getName());
               // Transitivity :
               // phi1name >= vi1(prev) >= phi2name
-              INFRULE(rulepos, llvmberry::ConsTransitivity::make(
+              INFRULE2(rulepos, llvmberry::ConsTransitivity::make(
                                    VAR(phi1name, Physical), EXPR(vi1, Previous),
-                                   VAR(phi2name, Physical)));
+                                   VAR(phi2name, Physical)),
+                                   "ptr1src/ptr2src is phi 1");
               // Transitivity :
               // phi2name >= vi1(prev) >= phi1name
-              INFRULE(rulepos, llvmberry::ConsTransitivity::make(
+              INFRULE2(rulepos, llvmberry::ConsTransitivity::make(
                                    VAR(phi2name, Physical), EXPR(vi1, Previous),
-                                   VAR(phi1name, Physical)));
+                                   VAR(phi1name, Physical)),
+                                   "ptr1src/ptr2src is phi 2");
             }
 
             auto phi1pos = INSTPOS(SRC, phi1);
@@ -899,37 +903,39 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                   // gepi1 has inbounds
                   // Apply gep_inbounds_add
                   // <ptr2src's rhs>(gep) >= <ptr1src's rhs>(gep inbounds)
-                  INFRULE(INSTPOS(SRC, v1_inst),
-                          llvmberry::ConsGepInboundsAdd::make(
+                  INFRULE(v1_inst_pos, llvmberry::ConsGepInboundsAdd::make(
                               VAL(v1, Physical), VAL(gepi1, Physical),
                               VALTYPE(v1->getType()), BITSIZE(load_align),
                               INSN(*gepi1)));
                   // Propagate (gep) >= (gep inbounds)
                   PROPAGATE(LESSDEF(INSN(*gepi2), INSN(*gepi1), SRC),
-                            BOUNDS(llvmberry::TyPosition::make(SRC, *v1_inst),
-                                   llvmberry::TyPosition::make(SRC, LI)));
+                            BOUNDS(v1_inst_pos, LIpos));
                 }
                 // <ptr2src's rhs> >= <ptr1src's rhs> >= <ptr1src>
-                INFRULE(LIpos, llvmberry::ConsTransitivity::make(
+                INFRULE2(LIpos, llvmberry::ConsTransitivity::make(
                                    INSN(*gepi2), INSN(*gepi1),
-                                   VAR(ptr1srcname, Physical)));
+                                   VAR(ptr1srcname, Physical)),
+                                   "ptr1src/ptr2src is gep 1");
                 // <ptr2src> >= <ptr2src's rhs> >= <ptr1src's rhs>(gep)
-                INFRULE(LIpos, llvmberry::ConsTransitivity::make(
+                INFRULE2(LIpos, llvmberry::ConsTransitivity::make(
                                    VAR(ptr2srcname, Physical), INSN(*gepi2),
-                                   INSN(*gepi1)));
+                                   INSN(*gepi1)),
+                                   "ptr1src/ptr2src is gep 2");
               }
             }
 
-            // (ptr1srcname >= <ptr1src's rhs> >= ptr2srcname) -> (ptr1srcname
-            // >= ptr2srcname)
-            INFRULE(LIpos, llvmberry::ConsTransitivity::make(
+            // (ptr1srcname >= <ptr1src's rhs> >= ptr2srcname) -> 
+            // (ptr1srcname >= ptr2srcname)
+            INFRULE2(LIpos, llvmberry::ConsTransitivity::make(
                                VAR(ptr1srcname, Physical), INSN(*i1),
-                               VAR(ptr2srcname, Physical)));
-            // (ptr2srcname >= <ptr1src's rhs> >= ptr1srcname) -> (ptr2srcname
-            // >= ptr1srcname)
-            INFRULE(LIpos, llvmberry::ConsTransitivity::make(
+                               VAR(ptr2srcname, Physical)),
+                               "ptr1src >= <rhs> >= ptr2src");
+            // (ptr2srcname >= <ptr1src's rhs> >= ptr1srcname) -> 
+            // (ptr2srcname >= ptr1srcname)
+            INFRULE2(LIpos, llvmberry::ConsTransitivity::make(
                                VAR(ptr2srcname, Physical), INSN(*i1),
-                               VAR(ptr1srcname, Physical)));
+                               VAR(ptr1srcname, Physical)),
+                               "ptr2src >= <rhs> >= ptr1src");
           }
         } else {
           assert("load-load optimization : unknown case ; ptr1src and ptr2src are not equivalent, and also not Instruction" && false);
@@ -939,9 +945,9 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       auto applyGepZeroAndPropagate = [&hints, &LI](
           Value *gep, bool is_v1, Value *src, Instruction *ruleposI,
           Instruction *loadposI) {
-        auto rulepos = INSTPOS(llvmberry::Source, ruleposI);
-        auto loadpos = INSTPOS(llvmberry::Source, loadposI);
-        auto LIpos = INSTPOS(llvmberry::Source, &LI);
+        auto rulepos = INSTPOS(llvmberry::Target, ruleposI);
+        auto loadpos = INSTPOS(llvmberry::Target, loadposI);
+        auto LIpos = INSTPOS(llvmberry::Target, &LI);
 
         // Make vprime >= getelementptr vprime,
         //      getelementptr vprime >= vprime.
@@ -955,11 +961,13 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                                VAL(gepinstI->getPointerOperand(), Physical),
                                INSN(*gepinstI)));
           // gepinst->getPointerOperand >= gepinst
-          INFRULE(rulepos, llvmberry::ConsTransitivity::make(
-                               vprime, INSN(*gepinstI), gepinst));
+          INFRULE2(rulepos, llvmberry::ConsTransitivity::make(
+                               vprime, INSN(*gepinstI), gepinst),
+                               "ptr >= gep ptr");
           // gepinst >= gepinst->getPointerOperand
-          INFRULE(rulepos, llvmberry::ConsTransitivity::make(
-                               gepinst, INSN(*gepinstI), vprime));
+          INFRULE2(rulepos, llvmberry::ConsTransitivity::make(
+                               gepinst, INSN(*gepinstI), vprime),
+                               "gep ptr >= ptr");
         } else {
           // applyGepZeroAndPropagate will make
           // src >= vprime >= getelementptr vprime
@@ -976,24 +984,26 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             PROPAGATE(LESSDEF(vprime, gepinst, llvmberry::Source),
                       BOUNDS(rulepos, LIpos));
           // src >= gepinst->getPointerOperand() >= gepinst
-          INFRULE(loadpos, llvmberry::ConsTransitivity::make(
-                               EXPR(src, Physical), vprime, gepinst));
+          INFRULE2(loadpos, llvmberry::ConsTransitivity::make(
+                               EXPR(src, Physical), vprime, gepinst),
+                               "ptr1src >= gep ptr");
         } else {
           // Propagate gepinst >= gepinst->getOperand()
           if (ruleposI != &LI) // this is LI, because of store orthogonality
             PROPAGATE(LESSDEF(gepinst, vprime, llvmberry::Source),
                       BOUNDS(rulepos, LIpos));
           // gepinst >= gepinst->getPointerOperand() >= src
-          INFRULE(loadpos, llvmberry::ConsTransitivity::make(
-                               gepinst, vprime, EXPR(src, Physical)));
+          INFRULE2(loadpos, llvmberry::ConsTransitivity::make(
+                               gepinst, vprime, EXPR(src, Physical)),
+                               "gep ptr >= ptr1src");
         }
       };
       auto applyBitCastPtrAndPropagate = [&hints, &LI](
           Value *bi, bool is_v1, Value *src, Instruction *ruleposI,
           Instruction *loadposI) {
-        auto rulepos = INSTPOS(llvmberry::Source, ruleposI);
-        auto loadpos = INSTPOS(llvmberry::Source, loadposI);
-        auto LIpos = INSTPOS(llvmberry::Source, &LI);
+        auto rulepos = INSTPOS(llvmberry::Target, ruleposI);
+        auto loadpos = INSTPOS(llvmberry::Target, loadposI);
+        auto LIpos = INSTPOS(llvmberry::Target, &LI);
 
         // Make vprime >= bitcast vprime,
         //      bitcast vprime >= vprime.
@@ -1007,11 +1017,13 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                   llvmberry::ConsBitcastptr::make(
                       VAL(bcinstI->getOperand(0), Physical), INSN(*bcinstI)));
           // bcinst->getOperand >= bcinst
-          INFRULE(rulepos, llvmberry::ConsTransitivity::make(
-                               vprime, INSN(*bcinstI), bcinst));
+          INFRULE2(rulepos, llvmberry::ConsTransitivity::make(
+                               vprime, INSN(*bcinstI), bcinst),
+                               "ptr >= bitcast ptr");
           // bcinst >= bcinst->getOperand
-          INFRULE(rulepos, llvmberry::ConsTransitivity::make(
-                               bcinst, INSN(*bcinstI), vprime));
+          INFRULE2(rulepos, llvmberry::ConsTransitivity::make(
+                               bcinst, INSN(*bcinstI), vprime),
+                               "bitcast ptr >= ptr");
         } else {
           // applyBitCastPtrAndPropagate will make
           // src >= vprime >= bitcast vprime
@@ -1028,16 +1040,18 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             PROPAGATE(LESSDEF(vprime, bcinst, llvmberry::Source),
                       BOUNDS(rulepos, LIpos));
           // src >= bcinst->getOperand() >= bcinst
-          INFRULE(loadpos, llvmberry::ConsTransitivity::make(
-                               EXPR(src, Physical), vprime, bcinst));
+          INFRULE2(loadpos, llvmberry::ConsTransitivity::make(
+                               EXPR(src, Physical), vprime, bcinst),
+                               "ptr1src >= bitcast ptr");
         } else {
           // Propagate bcinst >= bcinst->getOperand()
           if (ruleposI != &LI)
             PROPAGATE(LESSDEF(bcinst, vprime, llvmberry::Source),
                       BOUNDS(rulepos, LIpos));
           // bcinst >= bcinst->getPointerOperand() >= src
-          INFRULE(loadpos, llvmberry::ConsTransitivity::make(
-                               bcinst, vprime, EXPR(src, Physical)));
+          INFRULE2(loadpos, llvmberry::ConsTransitivity::make(
+                               bcinst, vprime, EXPR(src, Physical)),
+                               "bitcast ptr >= ptr2src");
         }
       };
       auto applyAddrSpacePtrAndPropagate = [&hints, &LI](
@@ -1094,6 +1108,13 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
         PROPAGATE(LESSDEF(EXPR(ptr1src, Physical), EXPR(ptr1, Physical),
                           llvmberry::Source),
                   BOUNDS(INSTPOS(llvmberry::Source, v1_inst), LIpos));
+      } else {
+        INFRULE2(v1_inst_pos,
+          llvmberry::ConsIntroEq::make(VAL(ptr1src, Physical)),
+          "v1_inst_pos == v1_inst_pos");
+        PROPAGATE(LESSDEF(EXPR(ptr1src, Physical), EXPR(ptr1src, Physical),
+                          llvmberry::Source),
+                  BOUNDS(v1_inst_pos, LIpos));
       }
       // step 1-(2). prove %ptr2 >= %ptr2src
       assert(ptr2EquivalentValues->at(0) == ptr2);
@@ -1119,6 +1140,9 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
           else if (opcode == Instruction::AddrSpaceCast)
             applyAddrSpacePtrAndPropagate(v, false, ptr2src, rulepos, &LI);
         } while (ptr2itr != ptr2beg);
+      } else {
+        INFRULE2(LIpos, llvmberry::ConsIntroEq::make(VAL(ptr2src, Physical)),
+            "ptr2src == ptr2src");
       }
       // step 1-(3). prove %ptr2 >= %ptr1 by transitivity
       // (%ptr2 >= %ptr2src >= %ptr1src >= %ptr1)
@@ -1248,8 +1272,9 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
           } else {
             // ptr3src >= ptr3src
             assert(ptr3src == ptr3);
-            INFRULE(INSTPOS(llvmberry::Source, diffblock_propagate_end),
-              llvmberry::ConsIntroEq::make(VAL(ptr3src, Physical)));
+            INFRULE2(INSTPOS(llvmberry::Source, diffblock_propagate_end),
+              llvmberry::ConsIntroEq::make(VAL(ptr3src, Physical)),
+              "ptr3src == ptr3src");
           }
           // Now, apply DiffblockLessthan. : it makes ptr1src _||_ ptr3src => ptr1 _||_ ptr3
           INFRULE(INSTPOS(llvmberry::Source, diffblock_propagate_end),
@@ -1286,136 +1311,160 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
               "alysis reported that two pointers are equivalent. However curre"
               "ntly we cannot prove that two pointers are equivalent even if"
               " alias analysis info is given.");
-          if (hints.getReturnCode() == llvmberry::CoreHint::ACTUAL)
+          if (hints.getReturnCode() == llvmberry::CoreHint::ACTUAL) {
             hints.setReturnCodeToAdmitted();
+            return;
+          }
         }
       }
 
-      lls_arg->v1_inst = v1_inst;
-      lls_arg->v1 = v1;
-      lls_arg->ptr1 = ptr1;
-      lls_arg->ptr1src = ptr1src;
-      lls_arg->ptr2 = ptr2;
-      lls_arg->ptr2src = ptr2src;
-      lls_arg->v2_org_position = INSTPOS(llvmberry::Target, &LI);
-            // step 3, 4, 5 must be done below..
-          });
-
-    llvmberry::ValidationUnit::GetInstance()
-        ->intrude([&NewInst, &AvailableVal, &LI](llvmberry::Dictionary &data,
-                                                 llvmberry::CoreHint &hints) {
-            if (hints.getReturnCode() == llvmberry::CoreHint::ADMITTED)
-              return;
-      auto falv_arg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-      auto lls_arg = data.get<llvmberry::ArgForLoadLoadStore>();
-
-      Instruction *v1_inst = lls_arg->v1_inst;
-      Value *v1 = lls_arg->v1;
-      Value *ptr1 = lls_arg->ptr1;
-      Value *ptr2 = lls_arg->ptr2;
-      std::shared_ptr<llvmberry::TyPosition> LI_org_pos = lls_arg->v2_org_position;
-      assert(v1 && "load-load optimization : v1 should not be null.");
-
       if (NewInst != AvailableVal) {
-        // step 3. Prove %v2 >= \hat{k}.
-        Instruction *inst = dyn_cast<Instruction>(NewInst);
-        assert(inst);
-        auto inst_pos = INSTPOS(TGT, inst);
-
-        PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*inst), 
-              llvmberry::Physical),
-            llvmberry::ConsGlobal::make());
-        PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*inst),
-                                               llvmberry::Previous),
-                  llvmberry::ConsGlobal::make());
+        // step 3. Prove %v2 >= \hat{k} >= %v1.
         // Step 3-(1). propagate *(%ptr1) >= %v1.
         PROPAGATE(LESSDEF(INSN(*v1_inst), EXPR(v1, Physical), SRC),
-            BOUNDS(INSTPOS(SRC, v1_inst), LI_org_pos));
-        // Step 3-(2). Create \hat{k}, make *(%ptr1) >= \hat{k}
-        //   <cast %v1> >= ^k,   ^k >= <cast %v1>
-        INFRULE(INSTPOS(TGT, inst),
-          llvmberry::ConsIntroGhost::make(INSN(*inst), REGISTER("^k", Ghost)));
-        //   Propagate "<cast %v1> >= ^k" from nop to %v2 in src
-        PROPAGATE(LESSDEF(INSN(*inst), VAR("^k", Ghost), SRC),
-                  BOUNDS(inst_pos, LI_org_pos));
-        //   Apply Transitivity to ^k >= bitcast %v1 >= %v1' from %v1' in tgt
-        INFRULE(inst_pos,
-                llvmberry::ConsTransitivityTgt::make(
-                    VAR("^k", Ghost), INSN(*inst), EXPR(inst, Physical)));
-        // Propagate ^k >= %v1' from %v1' to %v2 in tgt
-        PROPAGATE(LESSDEF(VAR("^k", Ghost),
-                          VAR(llvmberry::getVariable(*inst), Physical), TGT),
-                  BOUNDS(inst_pos, LI_org_pos));
+            BOUNDS(v1_inst_pos, LIpos));
+        
+        bool is_cast_inst = isa<Instruction>(NewInst);
+        std::shared_ptr<llvmberry::TyExpr> casted_form_inst;
+        std::shared_ptr<llvmberry::TyExpr> casted_form_val;
+        auto k_reg = REGISTER("^k", Ghost);
+        auto k_var = VAR("^k", Ghost);
 
-        if (BitCastInst *bi = dyn_cast<BitCastInst>(inst)) {
-          // Make *(%ptr1) >= ^k from (*(%ptr1) >= %v1) && (bitcast %v1 >= ^k) at %v2 in src
-          INFRULE(LI_org_pos,
-            llvmberry::ConsBitcastLoad::make(
+        if (!is_cast_inst) {
+          // casting is constant expr!
+          llvm::Constant *CAV = dyn_cast<Constant>(AvailableVal);
+          llvm::Constant *CNewVal = dyn_cast<Constant>(NewInst);
+
+          if(CAV && CNewVal &&
+              CAV->getType()->isPointerTy() && 
+              CNewVal->getType()->isIntegerTy() &&
+              CAV->isNullValue() && CNewVal->isNullValue()){
+            // v1 is nullptr, v2 is 0. 
+            auto CAVTy = VALTYPE(CAV->getType()); // ptr null
+            auto CNewValTy = VALTYPE(CNewVal->getType()); // int 0
+            // make expr (ptrtoint null).
+            auto ptrtoint_inst = std::shared_ptr<llvmberry::TyInstruction>(
+                llvmberry::ConsPtrToIntInst::make(CAVTy, VAL(CAV, Physical), CNewValTy));
+            casted_form_inst = std::shared_ptr<llvmberry::TyExpr>(
+                new llvmberry::ConsInsn(ptrtoint_inst));
+            casted_form_val = EXPR(CNewVal, Physical);
+            // Add ptrtoint nullptr >=tgt 0.
+            INFRULE(LIpos, llvmberry::ConsPtrtointZero::make(
+                  CAVTy, CNewValTy));
+            // Make ptrtoint %v1 >=src ^k >=tgt ptrtoint %v1
+            INFRULE(LIpos, llvmberry::ConsIntroGhost::make(casted_form_inst, k_reg));
+
+            // Make *(%ptr1) >= ^k from (*(%ptr1) >=src %v1) && (ptrtoint %v1 >=src ^k)
+            INFRULE(LIpos, llvmberry::ConsPtrtointLoad::make(
                 VAL(ptr1, Physical),
-                VALTYPE(bi->getSrcTy()),
-                VAL(AvailableVal, Physical),
-                VALTYPE(bi->getDestTy()),
-                ID("^k", Ghost),
-                BITSIZE(LI.getAlignment())));
-        } else if (PtrToIntInst *ptii = dyn_cast<PtrToIntInst>(inst)) {
-          INFRULE(LI_org_pos,
-            llvmberry::ConsPtrtointLoad::make(
-                VAL(ptr1, Physical),
-                VALTYPE(ptii->getSrcTy()),
-                VAL(AvailableVal, Physical),
-                VALTYPE(ptii->getDestTy()),
-                ID("^k", Ghost),
-                BITSIZE(LI.getAlignment())));
-        } else if (IntToPtrInst *itpi = dyn_cast<IntToPtrInst>(inst)) {
-          // Add load ptr1 >= ^k from
-          // (load ptr1 >= v1),
-          // (inttoptr v1 >= ^k).
-          INFRULE(LI_org_pos,
-            llvmberry::ConsInttoptrLoad::make(
-                VAL(ptr1, Physical),
-                VALTYPE(itpi->getSrcTy()),
-                VAL(AvailableVal, Physical),
-                VALTYPE(itpi->getDestTy()),
-                ID("^k", Ghost),
-                BITSIZE(LI.getAlignment())));
+                CAVTy, VAL(CAV, Physical),
+                CNewValTy, ID("^k", Ghost),
+                BITSIZE(load_align)));
+            // Make ^k >=src ptrtoint %v1 >= (%v1' in tgt)
+            INFRULE2(LIpos, llvmberry::ConsTransitivityTgt::make(
+                k_var, casted_form_inst, casted_form_val),
+                "^k >= ptrtoint null >= 0 (step 3)");
+          } else {
+            // At least in Python/SPEC this case didn't happen..
+          }
         } else {
-          assert(false && "Unknown casting instruction appeared in load-load optimization!");
+          Instruction *inst = dyn_cast<Instruction>(NewInst);
+          casted_form_inst = INSN(*inst);
+          casted_form_val = EXPR(inst, Physical);
+          std::string casted_form_var = llvmberry::getVariable(*inst);
+          std::shared_ptr<llvmberry::TyPosition> inst_pos = INSTPOS(TGT, inst);
+
+          // Step 3-(2). Create cast v1 >=src \hat{k} >=tgt cast v1
+          INFRULE(inst_pos, llvmberry::ConsIntroGhost::make(casted_form_inst, k_reg));
+
+          PROPAGATE(llvmberry::ConsMaydiff::make(casted_form_var,
+                llvmberry::Physical), llvmberry::ConsGlobal::make());
+          PROPAGATE(llvmberry::ConsMaydiff::make(casted_form_var,
+                llvmberry::Previous), llvmberry::ConsGlobal::make());
+          //   Propagate "<cast %v1> >= ^k" from nop to %v2 in src
+          PROPAGATE(LESSDEF(casted_form_inst, k_var, SRC),
+                  BOUNDS(inst_pos, LIpos));
+          //   Apply Transitivity to ^k >= bitcast %v1 >= %v1' from %v1' in tgt
+          INFRULE2(inst_pos, llvmberry::ConsTransitivityTgt::make(
+                      k_var, casted_form_inst, casted_form_val),
+                      "^k >= %v (step 3)");
+          // Propagate ^k >= %v1' from %v1' to %v2 in tgt
+          PROPAGATE(LESSDEF(k_var, VAR(llvmberry::getVariable(*inst), Physical), TGT),
+                  BOUNDS(inst_pos, LIpos));
+          if (BitCastInst *bi = dyn_cast<BitCastInst>(NewInst)) {
+            // Make *(%ptr1) >= ^k from (*(%ptr1) >= %v1) && (bitcast %v1 >= ^k) at %v2 in src
+            INFRULE(LIpos,
+              llvmberry::ConsBitcastLoad::make(
+                  VAL(ptr1, Physical),
+                  VALTYPE(bi->getSrcTy()),
+                  VAL(AvailableVal, Physical),
+                  VALTYPE(bi->getDestTy()),
+                  ID("^k", Ghost),
+                  BITSIZE(load_align)));
+          } else if (PtrToIntInst *ptii = dyn_cast<PtrToIntInst>(NewInst)) {
+            // Make *(%ptr1) >= ^k from (*(%ptr1) >= %v1) && (ptrtoint %v1 >= ^k)
+            INFRULE(LIpos,
+              llvmberry::ConsPtrtointLoad::make(
+                  VAL(ptr1, Physical),
+                  VALTYPE(ptii->getSrcTy()),
+                  VAL(AvailableVal, Physical),
+                  VALTYPE(ptii->getDestTy()),
+                  ID("^k", Ghost),
+                  BITSIZE(load_align)));
+          } else if (IntToPtrInst *itpi = dyn_cast<IntToPtrInst>(NewInst)) {
+            // Add load ptr1 >= ^k from
+            // (load ptr1 >= v1),
+            // (inttoptr v1 >= ^k).
+            INFRULE(LIpos,
+              llvmberry::ConsInttoptrLoad::make(
+                  VAL(ptr1, Physical),
+                  VALTYPE(itpi->getSrcTy()),
+                  VAL(AvailableVal, Physical),
+                  VALTYPE(itpi->getDestTy()),
+                  ID("^k", Ghost),
+                  BITSIZE(load_align)));
+          } else {
+            assert(false && "Unknown casting instruction appeared in load-load optimization!");
+          }
         }
+
         // Step 3-(3). make *(ptr2) >= \hat{k} from %ptr2 >= %ptr1, *(%ptr1) >= \hat{k}
-        INFRULE(LI_org_pos,
+        INFRULE(LIpos,
           llvmberry::ConsTransitivityPointerLhs::make(
               VAL(ptr2, Physical), // p
               VAL(ptr1, Physical), // q
               ID("^k", Ghost), // k ; load q >= \hat{k}
               VALTYPE(LI.getType()),
-              BITSIZE(LI.getAlignment())));
+              BITSIZE(load_align)));
         // Step 3-(4). make %v2 >= hat{k} from %v2 >= *(%ptr2), *(%ptr2) >= \hat{k}
-        INFRULE(LI_org_pos,
+        INFRULE2(LIpos,
           llvmberry::ConsTransitivity::make(
-              VAR(llvmberry::getVariable(LI), Physical), INSN(LI), VAR("^k", Ghost)));
+              VAR(llvmberry::getVariable(LI), Physical), INSN(LI), k_var),
+              "%v2 >= ^k (step 3)");
 
-        llvmberry::generateHintForReplaceAllUsesWith(&LI, NewInst, "^k", LI_org_pos);
+        llvmberry::generateHintForReplaceAllUsesWith(&LI, NewInst, "^k", LIpos);
       } else {
         // step 3. prove %v2 >= %v1 
         // step 3-(1). propagate *(%ptr1) >= %v1.
         PROPAGATE(LESSDEF(INSN(*v1_inst), EXPR(v1, Physical), llvmberry::Source),
-            BOUNDS(INSTPOS(llvmberry::Source, v1_inst),
-                INSTPOS(llvmberry::Source, &LI)));
-        // step 3-(2). prove %v2 >= *(ptr2) >= %v1
-        INFRULE(INSTPOS(llvmberry::Source, &LI),
+            BOUNDS(v1_inst_pos, LIpos));
+        // step 3-(2). prove %v2 >= *(ptr2) >= %v1 from
+        //     ptr2 >= ptr1,
+        //     load ptr1 >= v1
+        INFRULE(LIpos,
           llvmberry::ConsTransitivityPointerLhs::make(
               VAL(ptr2, Physical), // p
               VAL(ptr1, Physical), // q
               VAL(v1, Physical), // v ; load q >= v
               VALTYPE(LI.getType()),
-              BITSIZE(LI.getAlignment())));
+              BITSIZE(load_align)));
         // step 3-(3). prove %v2 >= %v1
-        INFRULE(INSTPOS(llvmberry::Source, &LI),
-          llvmberry::ConsTransitivity::make(
-              VAR(llvmberry::getVariable(LI), Physical), INSN(LI), EXPR(v1, Physical)));
+        INFRULE2(LIpos, llvmberry::ConsTransitivity::make(
+              VAR(llvmberry::getVariable(LI), Physical), INSN(LI), EXPR(v1, Physical)),
+              "%v2 >= %v1 (from step 3");
          llvmberry::generateHintForReplaceAllUsesWith(&LI, NewInst);
       }
-          });
+    });
 
     Instruction *res = ReplaceInstUsesWith(LI, NewInst);
 
