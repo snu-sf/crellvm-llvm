@@ -2806,6 +2806,9 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                      SRC, *(BB->begin()->getParent()))));
               }
             }
+            if (isa<CallInst>(I)) {
+              hints.setReturnCodeToAdmitted();
+            }
         });
   I->moveBefore(InsertPos);
   ++NumSunkInst;
