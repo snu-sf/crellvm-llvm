@@ -27,6 +27,7 @@ enum DictKeys {
   ArgForSelectIcmpConst,
   ArgForSinkInst,
   ArgForVisitICmp,
+  ArgForDeadCodeElim,
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
@@ -194,6 +195,14 @@ public:
   llvm::DominatorTree *sinkDT;
 };
 DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
+
+// lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
+struct DeadCodeElimArg {
+public:
+  std::vector<llvm::StructType *> namedts;
+  llvm::Module *M;
+};
+DEFINE_TRAITS(ArgForDeadCodeElim, DeadCodeElimArg);
 
 // lib/Transforms/Scalar/GVN.cpp : processInstruction, findLeader
 struct GVNReplaceArg {
