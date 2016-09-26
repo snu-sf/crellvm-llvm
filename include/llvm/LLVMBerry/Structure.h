@@ -1335,14 +1335,12 @@ public:
 struct TyPropagate {
 public:
   TyPropagate(std::shared_ptr<TyPropagateObject> _propagate,
-              std::shared_ptr<TyPropagateRange> _propagate_range,
-              const std::string &desc="");
+              std::shared_ptr<TyPropagateRange> _propagate_range);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
   std::shared_ptr<TyPropagateObject> propagate;
   std::shared_ptr<TyPropagateRange> propagate_range;
-  std::string desc;
 };
 
 /* hint command */
@@ -1377,18 +1375,15 @@ private:
 struct ConsInfrule : public TyCommand {
 public:
   ConsInfrule(std::shared_ptr<TyPosition> _position,
-              std::shared_ptr<TyInfrule> _infrule,
-              const std::string &_desc="");
+              std::shared_ptr<TyInfrule> _infrule);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyCommand> make(std::shared_ptr<TyPosition> _position,
-                                         std::shared_ptr<TyInfrule> _infrule,
-                                         const std::string &_desc="");
+                                         std::shared_ptr<TyInfrule> _infrule);
 
 private:
   std::shared_ptr<TyPosition> position;
   std::shared_ptr<TyInfrule> infrule;
-  std::string desc;
 };
 
 /* core hint */

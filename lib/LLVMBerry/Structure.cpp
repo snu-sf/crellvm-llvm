@@ -2581,9 +2581,8 @@ std::shared_ptr<TyPropagateRange> ConsGlobal::make() {
 }
 
 TyPropagate::TyPropagate(std::shared_ptr<TyPropagateObject> _propagate,
-                         std::shared_ptr<TyPropagateRange> _propagate_range,
-                         const std::string &_desc)
-    : propagate(_propagate), propagate_range(_propagate_range), desc(_desc) {}
+                         std::shared_ptr<TyPropagateRange> _propagate_range)
+    : propagate(_propagate), propagate_range(_propagate_range) {}
 
 void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(propagate));
@@ -2592,7 +2591,6 @@ void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   } else {
     archive(CEREAL_NVP(propagate_range));
   }
-  archive(CEREAL_NVP(desc));
 }
 
 ConsPropagate::ConsPropagate(std::shared_ptr<TyPropagate> _propagate)
@@ -2620,9 +2618,8 @@ ConsPropagate::make(std::shared_ptr<TyPropagateObject> _obj,
 }
 
 ConsInfrule::ConsInfrule(std::shared_ptr<TyPosition> _position,
-                         std::shared_ptr<TyInfrule> _infrule,
-                         const std::string &_desc)
-    : position(_position), infrule(_infrule), desc(_desc) {}
+                         std::shared_ptr<TyInfrule> _infrule)
+    : position(_position), infrule(_infrule) {}
 
 void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -2633,16 +2630,14 @@ void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive(CEREAL_NVP(position));
   archive(CEREAL_NVP(infrule));
-  archive(CEREAL_NVP(desc));
   archive.finishNode();
 }
 
 std::shared_ptr<TyCommand>
 ConsInfrule::make(std::shared_ptr<TyPosition> _position,
-                  std::shared_ptr<TyInfrule> _infrule,
-                  const std::string &_desc) {
+                  std::shared_ptr<TyInfrule> _infrule) {
   return std::shared_ptr<TyCommand>(
-      new ConsInfrule(_position, _infrule, _desc));
+      new ConsInfrule(_position, _infrule));
 }
 
 // core hint
