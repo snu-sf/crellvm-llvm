@@ -2650,6 +2650,25 @@ void ConsPtrtointLoad::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(ptrtoint_load));
 }
 
+TyPtrtointZero::TyPtrtointZero(std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValueType> _intty) : ptrty(_ptrty), intty(_intty){
+}
+void TyPtrtointZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(ptrty), CEREAL_NVP(intty));
+}
+
+ConsPtrtointZero::ConsPtrtointZero(std::shared_ptr<TyPtrtointZero> _ptrtoint_zero) : ptrtoint_zero(_ptrtoint_zero){
+}
+std::shared_ptr<TyInfrule> ConsPtrtointZero::make(std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValueType> _intty){
+  std::shared_ptr<TyPtrtointZero> _val(new TyPtrtointZero(_ptrty, _intty));
+  return std::shared_ptr<TyInfrule>(new ConsPtrtointZero(_val));
+}
+void ConsPtrtointZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("PtrtointZero");
+  archive(CEREAL_NVP(ptrtoint_zero));
+}
+
 TyLessthanUndef::TyLessthanUndef(std::shared_ptr<TyValueType> _ty,
                                  std::shared_ptr<TyValue> _v)
     : ty(std::move(_ty)), v(std::move(_v)) {}

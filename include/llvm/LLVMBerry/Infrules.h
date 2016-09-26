@@ -1104,6 +1104,16 @@ private:
   std::shared_ptr<TySize> a;
 };
 
+struct TyPtrtointZero{
+public : 
+  TyPtrtointZero(std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValueType> _intty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValueType> ptrty;
+  std::shared_ptr<TyValueType> intty;
+};
+
 struct TyLessthanUndef {
 public:
   TyLessthanUndef(std::shared_ptr<TyValueType> _ty,
@@ -3976,6 +3986,16 @@ public:
 
 private:
   std::shared_ptr<TyPtrtointLoad> ptrtoint_load;
+};
+
+struct ConsPtrtointZero : public TyInfrule{
+public : 
+  ConsPtrtointZero(std::shared_ptr<TyPtrtointZero> _ptrtoint_zero);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValueType> _intty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyPtrtointZero> ptrtoint_zero;
 };
 
 struct ConsLessthanUndef : TyInfrule {

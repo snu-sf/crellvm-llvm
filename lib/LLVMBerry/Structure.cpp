@@ -1674,21 +1674,22 @@ std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::AllocaInst &ai) {
   return std::shared_ptr<TyLoadInst>(new TyLoadInst(
       TyValueType::make(*ai.getType()),
       TyValueType::make(*ai.getAllocatedType()), TyValue::make(ai),
-      ai.getAlignment()));
+      1/*ai.getAlignment()*/));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
   return std::shared_ptr<TyLoadInst>(new TyLoadInst(
       TyValueType::make(*li.getPointerOperand()->getType()),
       TyValueType::make(*li.getType()), TyValue::make(*li.getPointerOperand()),
-      li.getAlignment()));
+      1/*li.getAlignment()*/));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
   return std::shared_ptr<TyLoadInst>(
       new TyLoadInst(TyValueType::make(*si.getOperand(1)->getType()),
                      TyValueType::make(*si.getOperand(0)->getType()),
-                     TyValue::make(*si.getOperand(1)), si.getAlignment()));
+                     TyValue::make(*si.getOperand(1)), 
+                     1/*si.getAlignment()*/));
 }
 
 std::shared_ptr<TySelectInst>
@@ -2580,9 +2581,9 @@ std::shared_ptr<TyPropagateRange> ConsGlobal::make() {
 }
 
 TyPropagate::TyPropagate(std::shared_ptr<TyPropagateObject> _propagate,
-                         std::shared_ptr<TyPropagateRange> _propagate_range)
-    : propagate(std::move(_propagate)),
-      propagate_range(std::move(_propagate_range)) {}
+                         std::shared_ptr<TyPropagateRange> _propagate_range,
+                         const std::string &_desc)
+    : propagate(_propagate), propagate_range(_propagate_range), desc(_desc) {}
 
 void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(propagate));
@@ -2591,6 +2592,7 @@ void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   } else {
     archive(CEREAL_NVP(propagate_range));
   }
+  archive(CEREAL_NVP(desc));
 }
 
 ConsPropagate::ConsPropagate(std::shared_ptr<TyPropagate> _propagate)
@@ -2618,8 +2620,9 @@ ConsPropagate::make(std::shared_ptr<TyPropagateObject> _obj,
 }
 
 ConsInfrule::ConsInfrule(std::shared_ptr<TyPosition> _position,
-                         std::shared_ptr<TyInfrule> _infrule)
-    : position(std::move(_position)), infrule(std::move(_infrule)) {}
+                         std::shared_ptr<TyInfrule> _infrule,
+                         const std::string &_desc)
+    : position(_position), infrule(_infrule), desc(_desc) {}
 
 void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -2630,14 +2633,16 @@ void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive(CEREAL_NVP(position));
   archive(CEREAL_NVP(infrule));
+  archive(CEREAL_NVP(desc));
   archive.finishNode();
 }
 
 std::shared_ptr<TyCommand>
 ConsInfrule::make(std::shared_ptr<TyPosition> _position,
-                  std::shared_ptr<TyInfrule> _infrule) {
+                  std::shared_ptr<TyInfrule> _infrule,
+                  const std::string &_desc) {
   return std::shared_ptr<TyCommand>(
-      new ConsInfrule(std::move(_position), std::move(_infrule)));
+      new ConsInfrule(_position, _infrule, _desc));
 }
 
 // core hint

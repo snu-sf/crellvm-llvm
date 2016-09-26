@@ -13,6 +13,8 @@
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
 #define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
+#define INFRULE2(pos, x, desc)                                                 \
+  hints.addCommand(llvmberry::ConsInfrule::make(pos, x, desc))
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
 #define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
 #define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
