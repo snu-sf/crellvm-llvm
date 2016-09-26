@@ -123,13 +123,17 @@ public:
   typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
   TyTermIndex termIndex;
 
-  typedef std::map<std::string, std::shared_ptr<TyExpr>> TyValuesObj;
-  typedef std::shared_ptr<TyValuesObj> TyValues;
-  TyValues values;
-
-  typedef std::map<std::string, std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> >> TyReachedEdgeObj;
+  typedef std::map<std::string,
+                   std::vector<std::pair<llvm::BasicBlock*,
+                                         llvm::BasicBlock*>>> TyReachedEdgeObj;
   typedef std::shared_ptr<TyReachedEdgeObj> TyReachedEdge;
   TyReachedEdge reachedEdge;  
+
+  typedef std::vector<std::pair<std::pair<llvm::BasicBlock*,
+                                          llvm::BasicBlock*>,
+                                bool>> TyReachedEdgeTagObj;
+  typedef std::shared_ptr<TyReachedEdgeTagObj> TyReachedEdgeTag;
+  TyReachedEdgeTag reachedEdgeTag;
 
   struct StoreTriple {
     std::shared_ptr<TyValue> value;
@@ -149,8 +153,7 @@ public:
     std::vector<std::shared_ptr<TyIntroGhost>> ghost;
     std::vector<std::shared_ptr<TyLessthanUndef>> lessUndef; 
     std::vector<std::shared_ptr<TyLessthanUndefTgt>> lessUndefTgt;
-
-   };
+  };
 
   typedef std::map<std::string, Tuple> TyMem2RegCmdObj;
   typedef std::shared_ptr<TyMem2RegCmdObj> TyMem2RegCmd;
@@ -160,10 +163,6 @@ public:
   typedef std::shared_ptr<TyTransTgtObj> TyTransTgt;
   TyTransTgt transTgt;
 
-  typedef llvm::SmallVector<llvm::BasicBlock *, 16> TyBlocksObj;
-  typedef std::shared_ptr<TyBlocksObj> TyBlocks;
-  TyBlocks blocks;
-
   typedef std::vector<std::string> TyStrVecObj;
   typedef std::shared_ptr<TyStrVecObj> TyStrVec;
   TyStrVec strVec;
@@ -171,10 +170,6 @@ public:
   typedef std::vector<std::pair<std::string, std::string>> TyBlockPairVecObj;
   typedef std::shared_ptr<TyBlockPairVecObj> TyBlockPairVec;
   TyBlockPairVec blockPairVec;
-
-  typedef std::map<std::string, llvm::StoreInst*> TySImapObj;
-  typedef std::shared_ptr<TySImapObj> TySImap;
-  TySImap SImap;
 
   typedef std::map<llvm::BasicBlock*,
                    std::vector<llvm::BasicBlock*>> TyReachableObj;
