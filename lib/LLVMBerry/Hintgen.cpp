@@ -1821,6 +1821,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                   }
                 } else if (llvm::isa<llvm::LoadInst>(use) &&
                            (use->getOperand(0) == SItmp->getOperand(1))) {
+                  llvm::dbgs() << "Lets check that PHI to LI is this PHI : " << *PHI << " LI is : " << *use << "\n";
                   PROPAGATE(
                       LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                                 new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
@@ -1882,7 +1883,6 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
             llvm::PHINode* PHIbefore = NULL;
             if (llvm::Instruction* Itmp = properPHI(LI->getParent(), Rstore, SItmp, false, false, data))
               PHIbefore = llvm::dyn_cast<llvm::PHINode>(Itmp);
-
             if (PHIbefore != NULL) {
               llvm::BasicBlock* source = PHIbefore->getParent();
               llvm::BasicBlock* target = PHI->getParent();
@@ -1939,7 +1939,6 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
               }
             }
 */
-
             PROPAGATE(
                 LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                           new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),

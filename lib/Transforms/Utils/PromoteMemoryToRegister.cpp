@@ -1722,6 +1722,8 @@ NextIteration:
           auto &termIndex =  *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
           auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
           auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
+          auto &blockPairVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockPairVec);
+
           Value* UndefVal = UndefValue::get(APN->getType());
 
           if (IncomingVals[AllocaNo] == UndefVal) {
@@ -1739,9 +1741,15 @@ NextIteration:
             if (AI != NULL) {
               for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
                 Instruction *User = cast<Instruction>(*UI++);
-
+            blockPairVec.clear();
                 if (LoadInst *LI = dyn_cast<LoadInst>(User)) {
-                  if (APN->getParent() == LI->getParent() || DT.dominates(APN->getParent(), LI->getParent())) {
+                  PHINode *check = NULL;
+                  Instruction *tmp;
+                  if ((tmp = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, false, data)))
+                    check = dyn_cast<PHINode>(tmp);
+                  if (APN->getParent() == LI->getParent() || (DT.dominates(APN->getParent(), LI->getParent()) &&
+                                                              (check == APN || check == NULL))) {
+                    llvm::dbgs() << " It should not be NULL : " << *APN << " LI is : " << *LI << "\n" ; 
                     PROPAGATE(
                             LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                                     new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
@@ -1759,8 +1767,9 @@ NextIteration:
                                    llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
 
                     mem2regCmd[Rphi].lessdef.push_back(lessdef);
-
-                    // add hints per every use of LI
+                    }
+                    
+                  // add hints per every use of LI
                     for (auto UI2 = LI->use_begin(), E2 = LI->use_end(); UI2 != E2;) {
                       llvm::Use &U = *(UI2++);
                       llvm::Instruction *use =
@@ -1784,7 +1793,6 @@ NextIteration:
                 }
               }
             }
-          }
 
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
