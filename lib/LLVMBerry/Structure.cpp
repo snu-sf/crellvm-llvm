@@ -1259,9 +1259,15 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     else
       assert("Unknown floating point type" && false);
 
-    return std::shared_ptr<TyConstant>(
-        new ConsConstFloat(TyConstFloat::make(apf.convertToDouble(), fty)));
-
+    if (fty == llvmberry::DoubleType) {
+      return std::shared_ptr<TyConstant>(
+          new ConsConstFloat(TyConstFloat::make(apf.convertToDouble(), fty)));
+    } else if (fty == llvmberry::FloatType) {
+      return std::shared_ptr<TyConstant>(
+          new ConsConstFloat(TyConstFloat::make(apf.convertToFloat(), fty)));
+    } else {
+      return nullptr;
+    }
   } else if (const llvm::GlobalVariable *gv =
                  llvm::dyn_cast<llvm::GlobalVariable>(&value)) {
     return std::shared_ptr<TyConstant>(
