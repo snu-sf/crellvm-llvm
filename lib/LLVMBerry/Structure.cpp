@@ -1219,12 +1219,15 @@ void ConsConstVal::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 ConsConstExpr::ConsConstExpr(std::shared_ptr<TyConstantExpr> _constant_expr)
-    : constant_expr(std::move(_constant_expr)) {}
+    : constant_expr(_constant_expr) {}
 void ConsConstExpr::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("ConstExpr");
   archive(CEREAL_NVP(constant_expr));
+}
+std::shared_ptr<TyConstant> ConsConstExpr::make(const llvm::ConstantExpr &gv) {
+  return TyConstant::make(gv);
 }
 
 std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
