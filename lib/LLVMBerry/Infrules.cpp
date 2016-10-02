@@ -1095,31 +1095,6 @@ void ConsBitcastptr::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(bitcastptr));
 }
 
-TyBitcastptrConst::TyBitcastptrConst(
-    std::shared_ptr<TyConstant> _vprime,
-    std::shared_ptr<TyConstantExpr> _bitcastinst)
-    : vprime(_vprime), bitcastinst(_bitcastinst) {}
-void TyBitcastptrConst::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(vprime), CEREAL_NVP(bitcastinst));
-}
-
-ConsBitcastptrConst::ConsBitcastptrConst(
-    std::shared_ptr<TyBitcastptrConst> _bitcastptr_const)
-    : bitcastptr_const(_bitcastptr_const) {}
-std::shared_ptr<TyInfrule>
-ConsBitcastptrConst::make(std::shared_ptr<TyConstant> _vprime,
-                          std::shared_ptr<TyConstantExpr> _bitcastinst) {
-  std::shared_ptr<TyBitcastptrConst> _val(
-      new TyBitcastptrConst(_vprime, _bitcastinst));
-  return std::shared_ptr<TyInfrule>(new ConsBitcastptrConst(_val));
-}
-void ConsBitcastptrConst::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("BitcastptrConst");
-  archive(CEREAL_NVP(bitcastptr_const));
-}
-
 TyAndMone::TyAndMone(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
                      std::shared_ptr<TySize> _sz)
     : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)) {}
@@ -2137,29 +2112,6 @@ void ConsGepzero::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("Gepzero");
   archive(CEREAL_NVP(gepzero));
-}
-
-TyGepzeroConst::TyGepzeroConst(std::shared_ptr<TyConstant> _vprime,
-                               std::shared_ptr<TyConstantExpr> _gepinst)
-    : vprime(_vprime), gepinst(_gepinst) {}
-void TyGepzeroConst::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(vprime), CEREAL_NVP(gepinst));
-}
-
-ConsGepzeroConst::ConsGepzeroConst(
-    std::shared_ptr<TyGepzeroConst> _gepzero_const)
-    : gepzero_const(_gepzero_const) {}
-std::shared_ptr<TyInfrule>
-ConsGepzeroConst::make(std::shared_ptr<TyConstant> _vprime,
-                       std::shared_ptr<TyConstantExpr> _gepinst) {
-  std::shared_ptr<TyGepzeroConst> _val(new TyGepzeroConst(_vprime, _gepinst));
-  return std::shared_ptr<TyInfrule>(new ConsGepzeroConst(_val));
-}
-void ConsGepzeroConst::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("GepzeroConst");
-  archive(CEREAL_NVP(gepzero_const));
 }
 
 TyGepInboundsAdd::TyGepInboundsAdd(std::shared_ptr<TyValue> _v,

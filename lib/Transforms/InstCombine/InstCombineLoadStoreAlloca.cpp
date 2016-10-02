@@ -964,9 +964,14 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
           // src >= vprime >= getelementptr vprime
           ConstantExpr *ce = dyn_cast<ConstantExpr>(gep);
           assert(ce && "ptr is neither Instruction nor ConstantExpr");
-          INFRULE(rulepos, llvmberry::ConsGepzeroConst::make(
-                               llvmberry::TyConstant::make(*ce->getOperand(0)),
-                               llvmberry::TyConstantExpr::make(*ce)));
+          auto v_const = llvmberry::TyConstant::make(*ce->getOperand(0));
+          auto gep_cobj = llvmberry::ConsConstExpr::make(*ce);
+          auto gep_cval = std::shared_ptr<llvmberry::ConsConstVal>(
+              new llvmberry::ConsConstVal(gep_cobj));
+          INFRULE(rulepos, llvmberry::ConsGepzero::make(
+               std::shared_ptr<llvmberry::ConsConstVal>(
+                   new llvmberry::ConsConstVal(v_const)),
+               llvmberry::TyExpr::make(gep_cval)));
           vprime = EXPR(ce->getOperand(0), Physical);
         }
         if (is_v1) {
@@ -1016,9 +1021,14 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
           // src >= vprime >= bitcast vprime
           ConstantExpr *ce = dyn_cast<ConstantExpr>(bi);
           assert(ce && "ptr is neither Instruction nor ConstantExpr");
-          INFRULE(rulepos, llvmberry::ConsBitcastptrConst::make(
-                               llvmberry::TyConstant::make(*ce->getOperand(0)),
-                               llvmberry::TyConstantExpr::make(*ce)));
+          auto v_const = llvmberry::TyConstant::make(*ce->getOperand(0));
+          auto bitcast_cobj = llvmberry::ConsConstExpr::make(*ce);
+          auto bitcast_cval = std::shared_ptr<llvmberry::ConsConstVal>(
+              new llvmberry::ConsConstVal(bitcast_cobj));
+          INFRULE(rulepos, llvmberry::ConsBitcastptr::make(
+                  std::shared_ptr<llvmberry::ConsConstVal>(
+                      new llvmberry::ConsConstVal(v_const)),
+                  llvmberry::TyExpr::make(bitcast_cval)));
           vprime = EXPR(ce->getOperand(0), Physical);
         }
         if (is_v1) {

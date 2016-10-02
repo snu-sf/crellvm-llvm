@@ -550,17 +550,6 @@ private:
   std::shared_ptr<TyExpr> bitcastinst;
 };
 
-struct TyBitcastptrConst {
-public:
-  TyBitcastptrConst(std::shared_ptr<TyConstant> _vprime,
-                    std::shared_ptr<TyConstantExpr> _bitcastinst);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  std::shared_ptr<TyConstant> vprime;
-  std::shared_ptr<TyConstantExpr> bitcastinst;
-};
-
 struct TyAndMone {
 public:
   TyAndMone(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
@@ -1030,17 +1019,6 @@ public:
 private:
   std::shared_ptr<TyValue> vprime;
   std::shared_ptr<TyExpr> gepinst;
-};
-
-struct TyGepzeroConst {
-public:
-  TyGepzeroConst(std::shared_ptr<TyConstant> _vprime,
-                 std::shared_ptr<TyConstantExpr> _gepinst);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  std::shared_ptr<TyConstant> vprime;
-  std::shared_ptr<TyConstantExpr> gepinst;
 };
 
 struct TyGepInboundsAdd {
@@ -3668,18 +3646,6 @@ private:
   std::shared_ptr<TyBitcastptr> bitcastptr;
 };
 
-struct ConsBitcastptrConst : public TyInfrule {
-public:
-  ConsBitcastptrConst(std::shared_ptr<TyBitcastptrConst> _bitcastptr_const);
-  static std::shared_ptr<TyInfrule>
-  make(std::shared_ptr<TyConstant> _vprime,
-       std::shared_ptr<TyConstantExpr> _bitcastinst);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  std::shared_ptr<TyBitcastptrConst> bitcastptr_const;
-};
-
 struct ConsDiffblockUnique : public TyInfrule {
 public:
   ConsDiffblockUnique(std::shared_ptr<TyDiffblockUnique> _diffblock_unique);
@@ -3910,18 +3876,6 @@ public:
 
 private:
   std::shared_ptr<TyFptruncFpext> fptrunc_fpext;
-};
-
-struct ConsGepzeroConst : public TyInfrule {
-public:
-  ConsGepzeroConst(std::shared_ptr<TyGepzeroConst> _gepzero_const);
-  static std::shared_ptr<TyInfrule>
-  make(std::shared_ptr<TyConstant> _vprime,
-       std::shared_ptr<TyConstantExpr> _gepinst);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  std::shared_ptr<TyGepzeroConst> gepzero_const;
 };
 
 struct ConsGepzero : public TyInfrule {
