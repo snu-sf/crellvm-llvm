@@ -1072,26 +1072,21 @@ void ConsBitcastZext::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(bitcast_zext));
 }
 
-TyBitcastptr::TyBitcastptr(std::shared_ptr<TyValue> _v,
-                           std::shared_ptr<TyValue> _vprime,
+TyBitcastptr::TyBitcastptr(std::shared_ptr<TyValue> _vprime,
                            std::shared_ptr<TyExpr> _bitcastinst)
-    : v(std::move(_v)), vprime(std::move(_vprime)),
-      bitcastinst(std::move(_bitcastinst)) {}
+    : vprime(_vprime), bitcastinst(_bitcastinst) {}
 void TyBitcastptr::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(v));
   archive(CEREAL_NVP(vprime));
   archive(CEREAL_NVP(bitcastinst));
 }
 
 ConsBitcastptr::ConsBitcastptr(std::shared_ptr<TyBitcastptr> _bitcastptr)
-    : bitcastptr(std::move(_bitcastptr)) {}
+    : bitcastptr(_bitcastptr) {}
 std::shared_ptr<TyInfrule>
-ConsBitcastptr::make(std::shared_ptr<TyValue> _v,
-                     std::shared_ptr<TyValue> _vprime,
+ConsBitcastptr::make(std::shared_ptr<TyValue> _vprime,
                      std::shared_ptr<TyExpr> _bitcastinst) {
-  std::shared_ptr<TyBitcastptr> _val(new TyBitcastptr(
-      std::move(_v), std::move(_vprime), std::move(_bitcastinst)));
-  return std::shared_ptr<TyInfrule>(new ConsBitcastptr(std::move(_val)));
+  std::shared_ptr<TyBitcastptr> _val(new TyBitcastptr(_vprime, _bitcastinst));
+  return std::shared_ptr<TyInfrule>(new ConsBitcastptr(_val));
 }
 void ConsBitcastptr::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -1505,32 +1500,28 @@ void ConsBopDistributiveOverSelectinst2::serialize(
   archive(CEREAL_NVP(bop_distributive_over_selectinst2));
 }
 
-TyDiffblockGlobalAlloca::TyDiffblockGlobalAlloca(
-    std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyRegister> _y)
-    : gx(std::move(_gx)), y(std::move(_y)) {}
-void
-TyDiffblockGlobalAlloca::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(gx));
+TyDiffblockUnique::TyDiffblockUnique(std::shared_ptr<TyRegister> _x,
+                                     std::shared_ptr<TyRegister> _y)
+    : x(_x), y(_y) {}
+void TyDiffblockUnique::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
   archive(CEREAL_NVP(y));
 }
 
-ConsDiffblockGlobalAlloca::ConsDiffblockGlobalAlloca(
-    std::shared_ptr<TyDiffblockGlobalAlloca> _diffblock_global_alloca)
-    : diffblock_global_alloca(std::move(_diffblock_global_alloca)) {}
+ConsDiffblockUnique::ConsDiffblockUnique(
+    std::shared_ptr<TyDiffblockUnique> _diffblock_unique)
+    : diffblock_unique(_diffblock_unique) {}
 std::shared_ptr<TyInfrule>
-ConsDiffblockGlobalAlloca::make(std::shared_ptr<TyConstant> _gx,
-                                std::shared_ptr<TyRegister> _y) {
-  std::shared_ptr<TyDiffblockGlobalAlloca> _val(
-      new TyDiffblockGlobalAlloca(std::move(_gx), std::move(_y)));
-  return std::shared_ptr<TyInfrule>(
-      new ConsDiffblockGlobalAlloca(std::move(_val)));
+ConsDiffblockUnique::make(std::shared_ptr<TyRegister> _x,
+                          std::shared_ptr<TyRegister> _y) {
+  std::shared_ptr<TyDiffblockUnique> _val(new TyDiffblockUnique(_x, _y));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockUnique(_val));
 }
-void
-ConsDiffblockGlobalAlloca::serialize(cereal::JSONOutputArchive &archive) const {
+void ConsDiffblockUnique::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
-  archive.saveValue("DiffblockGlobalAlloca");
-  archive(CEREAL_NVP(diffblock_global_alloca));
+  archive.saveValue("DiffblockUnique");
+  archive(CEREAL_NVP(diffblock_unique));
 }
 
 TyDiffblockGlobalGlobal::TyDiffblockGlobalGlobal(
@@ -1559,6 +1550,32 @@ ConsDiffblockGlobalGlobal::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("DiffblockGlobalGlobal");
   archive(CEREAL_NVP(diffblock_global_global));
+}
+
+TyDiffblockGlobalUnique::TyDiffblockGlobalUnique(
+    std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyRegister> _y)
+    : gx(_gx), y(_y) {}
+void
+TyDiffblockGlobalUnique::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(gx), CEREAL_NVP(y));
+}
+
+ConsDiffblockGlobalUnique::ConsDiffblockGlobalUnique(
+    std::shared_ptr<TyDiffblockGlobalUnique> _diffblock_global_unique)
+    : diffblock_global_unique(_diffblock_global_unique) {}
+std::shared_ptr<TyInfrule>
+ConsDiffblockGlobalUnique::make(std::shared_ptr<TyConstant> _gx,
+                                std::shared_ptr<TyRegister> _y) {
+  std::shared_ptr<TyDiffblockGlobalUnique> _val(
+      new TyDiffblockGlobalUnique(_gx, _y));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockGlobalUnique(_val));
+}
+void
+ConsDiffblockGlobalUnique::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockGlobalUnique");
+  archive(CEREAL_NVP(diffblock_global_unique));
 }
 
 ConsDiffblockLessthan::ConsDiffblockLessthan(
@@ -2075,31 +2092,55 @@ void ConsFptruncFpext::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(fptrunc_fpext));
 }
 
-TyGepzero::TyGepzero(std::shared_ptr<TyValue> _v,
-                     std::shared_ptr<TyValue> _vprime,
+TyGepzero::TyGepzero(std::shared_ptr<TyValue> _vprime,
                      std::shared_ptr<TyExpr> _gepinst)
-    : v(std::move(_v)), vprime(std::move(_vprime)),
-      gepinst(std::move(_gepinst)) {}
+    : vprime(_vprime), gepinst(_gepinst) {}
 void TyGepzero::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(v));
   archive(CEREAL_NVP(vprime));
   archive(CEREAL_NVP(gepinst));
 }
 
 ConsGepzero::ConsGepzero(std::shared_ptr<TyGepzero> _gepzero)
-    : gepzero(std::move(_gepzero)) {}
-std::shared_ptr<TyInfrule> ConsGepzero::make(std::shared_ptr<TyValue> _v,
-                                             std::shared_ptr<TyValue> _vprime,
+    : gepzero(_gepzero) {}
+std::shared_ptr<TyInfrule> ConsGepzero::make(std::shared_ptr<TyValue> _vprime,
                                              std::shared_ptr<TyExpr> _gepinst) {
-  std::shared_ptr<TyGepzero> _val(
-      new TyGepzero(std::move(_v), std::move(_vprime), std::move(_gepinst)));
-  return std::shared_ptr<TyInfrule>(new ConsGepzero(std::move(_val)));
+  std::shared_ptr<TyGepzero> _val(new TyGepzero(_vprime, _gepinst));
+  return std::shared_ptr<TyInfrule>(new ConsGepzero(_val));
 }
 void ConsGepzero::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("Gepzero");
   archive(CEREAL_NVP(gepzero));
+}
+
+TyGepInboundsAdd::TyGepInboundsAdd(std::shared_ptr<TyValue> _v,
+                                   std::shared_ptr<TyValue> _ptr,
+                                   std::shared_ptr<TyValueType> _loadty,
+                                   std::shared_ptr<TySize> _al,
+                                   std::shared_ptr<TyExpr> _e)
+    : v(_v), ptr(_ptr), loadty(_loadty), al(_al), e(_e) {}
+void TyGepInboundsAdd::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(v), CEREAL_NVP(ptr), CEREAL_NVP(loadty), CEREAL_NVP(al),
+          CEREAL_NVP(e));
+}
+
+ConsGepInboundsAdd::ConsGepInboundsAdd(
+    std::shared_ptr<TyGepInboundsAdd> _gep_inbounds_add)
+    : gep_inbounds_add(_gep_inbounds_add) {}
+std::shared_ptr<TyInfrule> ConsGepInboundsAdd::make(
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _ptr,
+    std::shared_ptr<TyValueType> _loadty, std::shared_ptr<TySize> _al,
+    std::shared_ptr<TyExpr> _e) {
+  std::shared_ptr<TyGepInboundsAdd> _val(
+      new TyGepInboundsAdd(_v, _ptr, _loadty, _al, _e));
+  return std::shared_ptr<TyInfrule>(new ConsGepInboundsAdd(_val));
+}
+void ConsGepInboundsAdd::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("GepInboundsAdd");
+  archive(CEREAL_NVP(gep_inbounds_add));
 }
 
 TyGepInboundsRemove::TyGepInboundsRemove(std::shared_ptr<TyExpr> _gepinst)
@@ -2559,6 +2600,25 @@ void ConsPtrtointLoad::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("PtrtointLoad");
   archive(CEREAL_NVP(ptrtoint_load));
+}
+
+TyPtrtointZero::TyPtrtointZero(std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValueType> _intty) : ptrty(_ptrty), intty(_intty){
+}
+void TyPtrtointZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(ptrty), CEREAL_NVP(intty));
+}
+
+ConsPtrtointZero::ConsPtrtointZero(std::shared_ptr<TyPtrtointZero> _ptrtoint_zero) : ptrtoint_zero(_ptrtoint_zero){
+}
+std::shared_ptr<TyInfrule> ConsPtrtointZero::make(std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValueType> _intty){
+  std::shared_ptr<TyPtrtointZero> _val(new TyPtrtointZero(_ptrty, _intty));
+  return std::shared_ptr<TyInfrule>(new ConsPtrtointZero(_val));
+}
+void ConsPtrtointZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("PtrtointZero");
+  archive(CEREAL_NVP(ptrtoint_zero));
 }
 
 TyLessthanUndef::TyLessthanUndef(std::shared_ptr<TyValueType> _ty,
@@ -4584,18 +4644,22 @@ void ConsIntroGhost::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(intro_ghost));
 }
 
-TyIntroEq::TyIntroEq(std::shared_ptr<TyValue> _x) : x(std::move(_x)) {}
+TyIntroEq::TyIntroEq(std::shared_ptr<TyExpr> _x) : x(_x) {}
 
 void TyIntroEq::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(x));
 }
 
 ConsIntroEq::ConsIntroEq(std::shared_ptr<TyIntroEq> _intro_eq)
-    : intro_eq(std::move(_intro_eq)) {}
+    : intro_eq(_intro_eq) {}
 
 std::shared_ptr<TyInfrule> ConsIntroEq::make(std::shared_ptr<TyValue> _x) {
-  std::shared_ptr<TyIntroEq> _val(new TyIntroEq(std::move(_x)));
-  return std::shared_ptr<TyInfrule>(new ConsIntroEq(std::move(_val)));
+  return ConsIntroEq::make(TyExpr::make(_x));
+}
+
+std::shared_ptr<TyInfrule> ConsIntroEq::make(std::shared_ptr<TyExpr> _x) {
+  std::shared_ptr<TyIntroEq> _val(new TyIntroEq(_x));
+  return std::shared_ptr<TyInfrule>(new ConsIntroEq(_val));
 }
 
 void ConsIntroEq::serialize(cereal::JSONOutputArchive &archive) const {

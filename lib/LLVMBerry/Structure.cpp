@@ -1219,12 +1219,15 @@ void ConsConstVal::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 ConsConstExpr::ConsConstExpr(std::shared_ptr<TyConstantExpr> _constant_expr)
-    : constant_expr(std::move(_constant_expr)) {}
+    : constant_expr(_constant_expr) {}
 void ConsConstExpr::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("ConstExpr");
   archive(CEREAL_NVP(constant_expr));
+}
+std::shared_ptr<TyConstant> ConsConstExpr::make(const llvm::ConstantExpr &gv) {
+  return TyConstant::make(gv);
 }
 
 std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
@@ -1674,21 +1677,22 @@ std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::AllocaInst &ai) {
   return std::shared_ptr<TyLoadInst>(new TyLoadInst(
       TyValueType::make(*ai.getType()),
       TyValueType::make(*ai.getAllocatedType()), TyValue::make(ai),
-      ai.getAlignment()));
+      1/*ai.getAlignment()*/));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::LoadInst &li) {
   return std::shared_ptr<TyLoadInst>(new TyLoadInst(
       TyValueType::make(*li.getPointerOperand()->getType()),
       TyValueType::make(*li.getType()), TyValue::make(*li.getPointerOperand()),
-      li.getAlignment()));
+      1/*li.getAlignment()*/));
 }
 
 std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
   return std::shared_ptr<TyLoadInst>(
       new TyLoadInst(TyValueType::make(*si.getOperand(1)->getType()),
                      TyValueType::make(*si.getOperand(0)->getType()),
-                     TyValue::make(*si.getOperand(1)), si.getAlignment()));
+                     TyValue::make(*si.getOperand(1)), 
+                     1/*si.getAlignment()*/));
 }
 
 std::shared_ptr<TySelectInst>
@@ -2372,7 +2376,10 @@ void ConsInsn::serialize(cereal::JSONOutputArchive &archive) const {
 TyPropagateLessdef::TyPropagateLessdef(std::shared_ptr<TyExpr> _lhs,
                                        std::shared_ptr<TyExpr> _rhs,
                                        enum TyScope _scope)
-    : lhs(std::move(_lhs)), rhs(std::move(_rhs)), scope(_scope) {}
+    : lhs(_lhs), rhs(_rhs), scope(_scope) {
+  assert(_lhs);
+  assert(_rhs);
+}
 
 void TyPropagateLessdef::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lhs), CEREAL_NVP(rhs),
@@ -2430,15 +2437,6 @@ TyPropagateDiffblock::make(std::shared_ptr<TyValue> _lhs,
                            std::shared_ptr<TyValue> _rhs, enum TyScope _scope) {
   return std::shared_ptr<TyPropagateDiffblock>(
       new TyPropagateDiffblock(_lhs, _rhs, _scope));
-}
-
-TyPropagateAlloca::TyPropagateAlloca(std::shared_ptr<TyRegister> _p,
-                                     enum TyScope _scope)
-    : p(std::move(_p)), scope(_scope) {}
-
-void TyPropagateAlloca::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(p));
-  archive(cereal::make_nvp("scope", ::toString(scope)));
 }
 
 TyPropagatePrivate::TyPropagatePrivate(std::shared_ptr<TyRegister> _p,
@@ -2505,24 +2503,6 @@ void ConsDiffblock::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Diffblock");
   archive(CEREAL_NVP(propagate_diffblock));
-}
-
-ConsAlloca::ConsAlloca(std::shared_ptr<TyPropagateAlloca> _propagate_alloca)
-    : propagate_alloca(std::move(_propagate_alloca)) {}
-
-std::shared_ptr<TyPropagateObject>
-ConsAlloca::make(std::shared_ptr<TyRegister> _p, enum TyScope _scope) {
-  std::shared_ptr<TyPropagateAlloca> _val(
-      new TyPropagateAlloca(std::move(_p), _scope));
-
-  return std::shared_ptr<TyPropagateObject>(new ConsAlloca(std::move(_val)));
-}
-
-void ConsAlloca::serialize(cereal::JSONOutputArchive &archive) const {
-  archive.makeArray();
-  archive.writeName();
-  archive.saveValue("Alloca");
-  archive(CEREAL_NVP(propagate_alloca));
 }
 
 ConsMaydiff::ConsMaydiff(std::shared_ptr<TyRegister> _register_name)
@@ -2605,8 +2585,7 @@ std::shared_ptr<TyPropagateRange> ConsGlobal::make() {
 
 TyPropagate::TyPropagate(std::shared_ptr<TyPropagateObject> _propagate,
                          std::shared_ptr<TyPropagateRange> _propagate_range)
-    : propagate(std::move(_propagate)),
-      propagate_range(std::move(_propagate_range)) {}
+    : propagate(_propagate), propagate_range(_propagate_range) {}
 
 void TyPropagate::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(propagate));
@@ -2643,7 +2622,7 @@ ConsPropagate::make(std::shared_ptr<TyPropagateObject> _obj,
 
 ConsInfrule::ConsInfrule(std::shared_ptr<TyPosition> _position,
                          std::shared_ptr<TyInfrule> _infrule)
-    : position(std::move(_position)), infrule(std::move(_infrule)) {}
+    : position(_position), infrule(_infrule) {}
 
 void ConsInfrule::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -2661,7 +2640,7 @@ std::shared_ptr<TyCommand>
 ConsInfrule::make(std::shared_ptr<TyPosition> _position,
                   std::shared_ptr<TyInfrule> _infrule) {
   return std::shared_ptr<TyCommand>(
-      new ConsInfrule(std::move(_position), std::move(_infrule)));
+      new ConsInfrule(_position, _infrule));
 }
 
 // core hint

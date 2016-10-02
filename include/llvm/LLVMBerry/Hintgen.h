@@ -25,12 +25,13 @@
   llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
-// LESSDEF, NOALIAS, ALLOCA, PRIVATE, MAYDIFF make TyPropagateObject instance
+// LESSDEF, NOALIAS, PRIVATE, MAYDIFF make TyPropagateObject instance
 #define LESSDEF(left, right, SCOPE)                                            \
   llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE)                                             \
   llvmberry::ConsNoalias::make(ptr1, ptr2, SCOPE)
-#define ALLOCA(reg, SCOPE) llvmberry::ConsAlloca::make(reg, SCOPE)
+#define ALLOCA(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
+/* XXX : ALLOCA macro will be removed later */
 #define PRIVATE(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
 #define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, tag)
 // VAL, ID macros make TyValue object
@@ -60,11 +61,17 @@ namespace llvmberry {
 void applyCommutativity(llvm::Instruction *position,
                         llvm::BinaryOperator *expression, TyScope scope);
 /* applyTransitivity(I, v1, v2, v3, scope) :
- *   Applies transitivity rule (v1 >= v2 >= v3) to the position I
+ *   Applies transitivity rule (v1 >= v2 >= v3) to the position (I, scope)
  */
 void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
                        llvm::Value *v_mid, llvm::Value *v_smallest,
                        TyScope scope);
+/* applyTransitivity(I, v1, v2, v3, scope, scopetag) :
+ *   Applies transitivity rule (v1 >= v2 >= v3) to the position (I, scopetag)
+ */
+void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
+                       llvm::Value *v_mid, llvm::Value *v_smallest,
+                       TyScope scope, TyScope position_scopetag);
 /* propagateInstruction(I1, I2, scope, propagateEquivalence) :
  *   if propagateEquivalence == false :
  *     Propagates I1 >= rhs(I1) from I1 to I2 if scope == Source, or
