@@ -324,6 +324,7 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
                   BOUNDS(INSTPOS(TGT, I),
                          TyPosition::make(TGT, *user_I, prev_block_name)));
 
+
         if (llvm::isa<llvm::PHINode>(user_I)) {
           INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
                   ConsTransitivity::make(VAR(user, Physical),
@@ -926,7 +927,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
 
       PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-                       TyPosition::make_end_of_block(TGT, *Pred, termIndex[predName])));
+                /*here */       TyPosition::make_end_of_block(SRC, *Pred, termIndex[predName])));
     } else {
       PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                           new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
@@ -1342,6 +1343,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
     auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
+    auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
 
     for(auto IN = BB->begin(), IE = BB->end(); IN != IE; ++IN) {
       llvm::Instruction *Inst = IN;
@@ -1508,6 +1510,25 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                                         EXPR(UndefVal, Physical),
                                                         VAR(getVariable(*AI), Ghost)));
             }
+
+            for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
+              llvm::Use &U = *(UI++);
+              llvm::Instruction *use =
+                  llvm::dyn_cast<llvm::Instruction>(U.getUser());
+
+              // set index of use
+              int useIndex = getIndexofMem2Reg(
+                  use, instrIndex[use],
+                  termIndex[getBasicBlockIndex(use->getParent())]);
+              if ((LI->getParent() == use->getParent() &&
+                   instrIndex[LI] < instrIndex[use]) ||
+                  (std::find(isReachable[LI->getParent()].begin(),
+                             isReachable[LI->getParent()].end(),
+                             use->getParent()) != isReachable[LI->getParent()].end())) {
+                generateHintForMem2RegPropagateLoad(AI, NULL, LI, use, useIndex);
+              }
+            }             
+
           }
         }
       }
@@ -1699,14 +1720,14 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                               new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
                             VAR(Rstore, Ghost), SRC),
                     BOUNDS(TyPosition::make_start_of_block(
-                               TGT, getBasicBlockIndex(PHItmp->getParent())),
-                           TyPosition::make_end_of_block(TGT, *Predtmp)));
+                /* here */               SRC, getBasicBlockIndex(PHItmp->getParent())),
+                           TyPosition::make_end_of_block(SRC, *Predtmp, termIndex[getBasicBlockIndex(Predtmp)])));
 
                 PROPAGATE(
                     LESSDEF(VAR(Rstore, Ghost), VAR(Rphitmp, Physical), TGT),
                     BOUNDS(TyPosition::make_start_of_block(
-                               TGT, getBasicBlockIndex(PHItmp->getParent())),
-                           TyPosition::make_end_of_block(TGT, *Predtmp)));
+                     /*here*/          SRC, getBasicBlockIndex(PHItmp->getParent())),
+                           TyPosition::make_end_of_block(SRC, *Predtmp, termIndex[getBasicBlockIndex(Predtmp)])));
 
                 std::shared_ptr<TyTransitivityTgt> transitivitytgt
                   (new TyTransitivityTgt(VAR(Rstore, Ghost),
@@ -1792,8 +1813,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                     new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
                                   VAR(Rstore, Ghost), SRC),
                           BOUNDS(TyPosition::make_start_of_block(
-                                     TGT, getBasicBlockIndex(PHI->getParent())),
-                                 TyPosition::make_end_of_block(TGT, *usePred)));
+                   /*here*/                  SRC, getBasicBlockIndex(PHI->getParent())),
+                                 TyPosition::make_end_of_block(SRC, *usePred, termIndex[getBasicBlockIndex(usePred)])));
 
                       std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
                                                                     (VAR(Rstore,Ghost),
@@ -1804,8 +1825,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                       PROPAGATE(
                           std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                           BOUNDS(TyPosition::make_start_of_block(
-                                     TGT, getBasicBlockIndex(PHI->getParent())),
-                                 TyPosition::make_end_of_block(TGT, *usePred)));
+                           /*here*/          SRC, getBasicBlockIndex(PHI->getParent())),
+                                 TyPosition::make_end_of_block(SRC, *usePred, termIndex[getBasicBlockIndex(usePred)])));
 
                       std::shared_ptr<TyTransitivityTgt> transitivitytgt
                         (new TyTransitivityTgt(VAR(Rstore, Ghost),
@@ -1827,7 +1848,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                 new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
                               VAR(Rstore, Ghost), SRC),
                       BOUNDS(TyPosition::make_start_of_block(
-                                 TGT, getBasicBlockIndex(PHI->getParent())),
+                          /* here*/       SRC, getBasicBlockIndex(PHI->getParent())),
                              TyPosition::make(SRC, *use, useIndex, "")));
 
                   std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
@@ -1838,7 +1859,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
           
                   PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                       BOUNDS(TyPosition::make_start_of_block(
-                                 TGT, getBasicBlockIndex(PHI->getParent())),
+                       /*here*/          SRC, getBasicBlockIndex(PHI->getParent())),
                              TyPosition::make(SRC, *use, useIndex, "")));
                 } else {
                   std::cout<<"use is not load or phi("+std::string(use->getOpcodeName())+")"<<std::endl;
@@ -2075,4 +2096,4 @@ bool hasBitcastOrGEP(llvm::AllocaInst* AI) {
   }
   return false;
 }
-} // llvmberry
+} // llvmberry:
