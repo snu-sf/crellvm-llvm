@@ -538,10 +538,81 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           (NULL, OnlyStore, LI, instrIndex[LI]);
       }
 
-      // add hints per every use of LI
+      // now working : remove duplicate hint generation code
+      std::vector<Instruction*> availInst;
+      availInst.clear();
+
       for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
         Use &U = *(UI++);
-        Instruction *use = dyn_cast<Instruction>(U.getUser());
+        Instruction* use = dyn_cast<Instruction>(U.getUser());
+        BasicBlock* useBB = use->getParent();
+        bool flag = false;
+        bool findReachable = false;
+
+        for (auto UI2 = availInst.begin(),
+                   E2 = availInst.end(); UI2 != E2;) {
+          Instruction* checkI = *UI2;
+          BasicBlock* checkBB = checkI->getParent();
+          std::vector<BasicBlock*>::iterator it =
+            std::find(isReachable[useBB].begin(),
+                      isReachable[useBB].end(),
+                      checkBB);
+
+          if (useBB == checkBB) {
+            if (instrIndex[use] > instrIndex[checkI]) {
+              int pos = std::distance(availInst.begin(), UI2);
+
+              availInst.erase(availInst.begin()+pos);
+              flag = true;
+              break;
+            }
+          }
+
+          if (!DT.dominates(useBB, checkBB)) {
+            flag = true;
+
+            if (DT.dominates(checkBB, useBB)) {
+              int pos = std::distance(availInst.begin(), UI2);
+
+              availInst.erase(availInst.begin()+pos);
+            }
+          } else {
+            findReachable = true;
+          }
+
+/*
+          if (it != isReachable[useBB].end()) {
+            findReachable = true;
+
+            if (useBB == checkBB) {
+              if (instrIndex[use] > instrIndex[checkI]) {
+                int pos = std::distance(availInst.begin(), UI2);
+
+                availInst.erase(availInst.begin()+pos);
+                flag = true;
+              }
+            } else {
+              if (std::find(isReachable[checkBB].begin(),
+                            isReachable[checkBB].end(),
+                            useBB) == isReachable[checkBB].end()) {
+                flag = true;
+              }
+            }
+          }
+*/
+          UI2++;
+        }
+
+        if (!findReachable || flag)
+          availInst.push_back(use);
+      }
+
+      // add hints per every use of LI
+      //for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
+      for (auto UI = availInst.begin(), E = availInst.end(); UI != E;) {
+        //Use &U = *(UI++);
+        //Instruction *use = dyn_cast<Instruction>(U.getUser());
+        Instruction* use = *(UI++);
 
         // set index of use
         int useIndex = 
