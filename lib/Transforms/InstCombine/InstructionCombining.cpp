@@ -1980,8 +1980,6 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
           llvmberry::insertTgtNopAtSrcI(hints, SI);
           PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
               BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
-          PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
-              BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
         }
         llvmberry::insertTgtNopAtSrcI(hints, &MI);
         llvmberry::propagateMaydiffGlobal(regname, llvmberry::Physical);

@@ -709,6 +709,7 @@ public:
   static std::shared_ptr<TyLoadInst> make(const llvm::AllocaInst &ai);
   static std::shared_ptr<TyLoadInst> make(const llvm::LoadInst &li);
   static std::shared_ptr<TyLoadInst> make(const llvm::StoreInst &si);
+  static std::shared_ptr<TyLoadInst> makeAlignOne(llvm::Instruction *i);
 
 private:
   std::shared_ptr<TyValueType> pointertype;
@@ -1222,6 +1223,18 @@ private:
   enum TyScope scope;
 };
 
+struct TyPropagateUnique {
+public:
+  //TyPropagateUnique(std::shared_ptr<TyRegister> _p, enum TyScope _scope);
+  TyPropagateUnique(std::string _register_name, enum TyScope _scope);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  //std::shared_ptr<TyRegister> p;
+  std::string register_name;
+  enum TyScope scope;
+};
+
 struct TyPropagatePrivate {
 public:
   TyPropagatePrivate(std::shared_ptr<TyRegister> _p, enum TyScope _scope);
@@ -1276,6 +1289,35 @@ private:
   std::shared_ptr<TyPropagateDiffblock> propagate_diffblock;
 };
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+struct ConsAlloca : public TyPropagateObject {
+public:
+  ConsAlloca(std::shared_ptr<TyPropagateAlloca> _propagate_alloca);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyPropagateObject> make(std::shared_ptr<TyRegister> _p,
+                                                 enum TyScope _scope);
+
+private:
+  std::shared_ptr<TyPropagateAlloca> propagate_alloca;
+};
+
+=======
+struct ConsUnique : public TyPropagateObject {
+public:
+  ConsUnique(std::shared_ptr<TyPropagateUnique> _propagate_unique);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  //static std::shared_ptr<TyPropagateObject> make(std::shared_ptr<TyRegister> _p,
+  static std::shared_ptr<TyPropagateObject> make(std::string _register_name,
+                                                 enum TyScope _scope);
+
+private:
+  std::shared_ptr<TyPropagateUnique> propagate_unique;
+};
+
+>>>>>>> mem2reg/mem2reg
 struct ConsMaydiff : public TyPropagateObject {
 public:
   ConsMaydiff(std::shared_ptr<TyRegister> _register_name);

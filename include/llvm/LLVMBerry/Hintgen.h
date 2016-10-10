@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/IR/CFG.h"
+#include "llvm/Analysis/CFG.h"
 
 #define PHIPOS(SCOPE, PN, prevI)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(),                \
@@ -25,13 +28,15 @@
   llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
-// LESSDEF, NOALIAS, PRIVATE, MAYDIFF make TyPropagateObject instance
+// LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
+// TyPropagateObject instance
 #define LESSDEF(left, right, SCOPE)                                            \
   llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE)                                             \
   llvmberry::ConsNoalias::make(ptr1, ptr2, SCOPE)
-#define ALLOCA(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
-/* XXX : ALLOCA macro will be removed later */
+#define DIFFBLOCK(v1, v2, SCOPE)                                               \
+  llvmberry::ConsDiffblock::make(v1, v2, SCOPE)
+#define UNIQUE(reg, SCOPE) llvmberry::ConsUnique::make(reg, SCOPE)
 #define PRIVATE(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
 #define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, tag)
 // VAL, ID macros make TyValue object
@@ -160,19 +165,109 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
     false_encoding;
 
+<<<<<<< HEAD
 void generateHintForMem2RegPropagateNoalias(llvm::AllocaInst *AI,
                                             llvm::Instruction *useInst,
                                             int useIndex);
+||||||| merged common ancestors
+/* Generating symbolic expressions from instructions
+ * for GVN
+ */
 
-void generateHintForMem2RegPropagateStore(llvm::StoreInst *SI,
-                                          llvm::Instruction *next,
+struct Expression {
+  uint32_t opcode;
+  llvm::Type *type;
+  llvm::SmallVector<uint32_t, 4> varargs;
+
+  Expression(uint32_t o = ~2U) : opcode(o) {}
+
+  bool operator==(const Expression &other) const {
+    if (opcode != other.opcode)
+      return false;
+    if (opcode == ~0U || opcode == ~1U)
+      return true;
+    if (type != other.type)
+      return false;
+    if (varargs != other.varargs)
+      return false;
+    return true;
+  }
+};
+
+Expression create_expression(llvm::Instruction *I, bool &swapped,
+                             llvm::SmallVector<uint32_t, 4> va);
+
+bool is_inverse_expression(Expression e1, Expression e2);
+
+void generateHintForMem2RegPropagateNoalias(llvm::AllocaInst *AI,
+                                            llvm::Instruction *useInst,
+                                            int useIndex);
+=======
+/* Generating symbolic expressions from instructions
+ * for GVN
+ */
+
+struct Expression {
+  uint32_t opcode;
+  llvm::Type *type;
+  llvm::SmallVector<uint32_t, 4> varargs;
+
+  Expression(uint32_t o = ~2U) : opcode(o) {}
+
+  bool operator==(const Expression &other) const {
+    if (opcode != other.opcode)
+      return false;
+    if (opcode == ~0U || opcode == ~1U)
+      return true;
+    if (type != other.type)
+      return false;
+    if (varargs != other.varargs)
+      return false;
+    return true;
+  }
+};
+
+Expression create_expression(llvm::Instruction *I, bool &swapped,
+                             llvm::SmallVector<uint32_t, 4> va);
+
+bool is_inverse_expression(Expression e1, Expression e2);
+
+void makeReachableBlockMap(llvm::BasicBlock* Src,
+                           llvm::BasicBlock* Tgt);
+>>>>>>> mem2reg/mem2reg
+
+void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
+                                          llvm::StoreInst* SI,
+                                          llvm::Instruction* next,
                                           int nextIndex);
 
-void generateHintForMem2RegPropagateLoad(llvm::StoreInst *SI,
-                                         llvm::LoadInst *LI,
+void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
+                                         llvm::PHINode* tmp,
+                                         llvm::LoadInst* LI,
                                          llvm::Instruction *use, int useIndex);
 
-int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
+void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal,
+                                       llvm::Instruction* I);
+
+void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
+                               llvm::AllocaInst* AI, llvm::StoreInst* SI,
+                               llvm::BasicBlock::iterator II,
+                               llvm::DenseMap<llvm::PHINode*, unsigned> PAM,
+                               llvm::DenseMap<llvm::AllocaInst*, unsigned> AL,
+                               std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> >succs,
+                               bool isSameBB);
+
+void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB, 
+                                     std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> VisitedBlock, 
+                                     llvm::AllocaInst* AI);
+
+llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
+                             llvm::Instruction* I, bool isInit,
+                             bool checkSI, Dictionary data);
+
+int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
+
+bool hasBitcastOrGEP(llvm::AllocaInst* AI);
 }
 
 #endif

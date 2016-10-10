@@ -1669,6 +1669,13 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
         std::string regname = llvmberry::getVariable(*Ptr);
         AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
         llvmberry::insertTgtNopAtSrcI(hints, &SI);
+<<<<<<< HEAD
+||||||| merged common ancestors
+        PROPAGATE(ALLOCA(REGISTER(regname, Physical), SRC),
+            BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
+=======
+
+>>>>>>> mem2reg/mem2reg
         PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
             BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
       });
