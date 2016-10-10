@@ -1072,26 +1072,21 @@ void ConsBitcastZext::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(bitcast_zext));
 }
 
-TyBitcastptr::TyBitcastptr(std::shared_ptr<TyValue> _v,
-                           std::shared_ptr<TyValue> _vprime,
+TyBitcastptr::TyBitcastptr(std::shared_ptr<TyValue> _vprime,
                            std::shared_ptr<TyExpr> _bitcastinst)
-    : v(std::move(_v)), vprime(std::move(_vprime)),
-      bitcastinst(std::move(_bitcastinst)) {}
+    : vprime(_vprime), bitcastinst(_bitcastinst) {}
 void TyBitcastptr::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(v));
   archive(CEREAL_NVP(vprime));
   archive(CEREAL_NVP(bitcastinst));
 }
 
 ConsBitcastptr::ConsBitcastptr(std::shared_ptr<TyBitcastptr> _bitcastptr)
-    : bitcastptr(std::move(_bitcastptr)) {}
+    : bitcastptr(_bitcastptr) {}
 std::shared_ptr<TyInfrule>
-ConsBitcastptr::make(std::shared_ptr<TyValue> _v,
-                     std::shared_ptr<TyValue> _vprime,
+ConsBitcastptr::make(std::shared_ptr<TyValue> _vprime,
                      std::shared_ptr<TyExpr> _bitcastinst) {
-  std::shared_ptr<TyBitcastptr> _val(new TyBitcastptr(
-      std::move(_v), std::move(_vprime), std::move(_bitcastinst)));
-  return std::shared_ptr<TyInfrule>(new ConsBitcastptr(std::move(_val)));
+  std::shared_ptr<TyBitcastptr> _val(new TyBitcastptr(_vprime, _bitcastinst));
+  return std::shared_ptr<TyInfrule>(new ConsBitcastptr(_val));
 }
 void ConsBitcastptr::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -1505,32 +1500,28 @@ void ConsBopDistributiveOverSelectinst2::serialize(
   archive(CEREAL_NVP(bop_distributive_over_selectinst2));
 }
 
-TyDiffblockGlobalAlloca::TyDiffblockGlobalAlloca(
-    std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyRegister> _y)
-    : gx(std::move(_gx)), y(std::move(_y)) {}
-void
-TyDiffblockGlobalAlloca::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(gx));
+TyDiffblockUnique::TyDiffblockUnique(std::shared_ptr<TyRegister> _x,
+                                     std::shared_ptr<TyRegister> _y)
+    : x(_x), y(_y) {}
+void TyDiffblockUnique::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
   archive(CEREAL_NVP(y));
 }
 
-ConsDiffblockGlobalAlloca::ConsDiffblockGlobalAlloca(
-    std::shared_ptr<TyDiffblockGlobalAlloca> _diffblock_global_alloca)
-    : diffblock_global_alloca(std::move(_diffblock_global_alloca)) {}
+ConsDiffblockUnique::ConsDiffblockUnique(
+    std::shared_ptr<TyDiffblockUnique> _diffblock_unique)
+    : diffblock_unique(_diffblock_unique) {}
 std::shared_ptr<TyInfrule>
-ConsDiffblockGlobalAlloca::make(std::shared_ptr<TyConstant> _gx,
-                                std::shared_ptr<TyRegister> _y) {
-  std::shared_ptr<TyDiffblockGlobalAlloca> _val(
-      new TyDiffblockGlobalAlloca(std::move(_gx), std::move(_y)));
-  return std::shared_ptr<TyInfrule>(
-      new ConsDiffblockGlobalAlloca(std::move(_val)));
+ConsDiffblockUnique::make(std::shared_ptr<TyRegister> _x,
+                          std::shared_ptr<TyRegister> _y) {
+  std::shared_ptr<TyDiffblockUnique> _val(new TyDiffblockUnique(_x, _y));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockUnique(_val));
 }
-void
-ConsDiffblockGlobalAlloca::serialize(cereal::JSONOutputArchive &archive) const {
+void ConsDiffblockUnique::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
-  archive.saveValue("DiffblockGlobalAlloca");
-  archive(CEREAL_NVP(diffblock_global_alloca));
+  archive.saveValue("DiffblockUnique");
+  archive(CEREAL_NVP(diffblock_unique));
 }
 
 TyDiffblockGlobalGlobal::TyDiffblockGlobalGlobal(
@@ -1559,6 +1550,32 @@ ConsDiffblockGlobalGlobal::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("DiffblockGlobalGlobal");
   archive(CEREAL_NVP(diffblock_global_global));
+}
+
+TyDiffblockGlobalUnique::TyDiffblockGlobalUnique(
+    std::shared_ptr<TyConstant> _gx, std::shared_ptr<TyRegister> _y)
+    : gx(_gx), y(_y) {}
+void
+TyDiffblockGlobalUnique::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(gx), CEREAL_NVP(y));
+}
+
+ConsDiffblockGlobalUnique::ConsDiffblockGlobalUnique(
+    std::shared_ptr<TyDiffblockGlobalUnique> _diffblock_global_unique)
+    : diffblock_global_unique(_diffblock_global_unique) {}
+std::shared_ptr<TyInfrule>
+ConsDiffblockGlobalUnique::make(std::shared_ptr<TyConstant> _gx,
+                                std::shared_ptr<TyRegister> _y) {
+  std::shared_ptr<TyDiffblockGlobalUnique> _val(
+      new TyDiffblockGlobalUnique(_gx, _y));
+  return std::shared_ptr<TyInfrule>(new ConsDiffblockGlobalUnique(_val));
+}
+void
+ConsDiffblockGlobalUnique::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("DiffblockGlobalUnique");
+  archive(CEREAL_NVP(diffblock_global_unique));
 }
 
 ConsDiffblockLessthan::ConsDiffblockLessthan(
@@ -2167,31 +2184,55 @@ void ConsFptruncFpext::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(fptrunc_fpext));
 }
 
-TyGepzero::TyGepzero(std::shared_ptr<TyValue> _v,
-                     std::shared_ptr<TyValue> _vprime,
+TyGepzero::TyGepzero(std::shared_ptr<TyValue> _vprime,
                      std::shared_ptr<TyExpr> _gepinst)
-    : v(std::move(_v)), vprime(std::move(_vprime)),
-      gepinst(std::move(_gepinst)) {}
+    : vprime(_vprime), gepinst(_gepinst) {}
 void TyGepzero::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(v));
   archive(CEREAL_NVP(vprime));
   archive(CEREAL_NVP(gepinst));
 }
 
 ConsGepzero::ConsGepzero(std::shared_ptr<TyGepzero> _gepzero)
-    : gepzero(std::move(_gepzero)) {}
-std::shared_ptr<TyInfrule> ConsGepzero::make(std::shared_ptr<TyValue> _v,
-                                             std::shared_ptr<TyValue> _vprime,
+    : gepzero(_gepzero) {}
+std::shared_ptr<TyInfrule> ConsGepzero::make(std::shared_ptr<TyValue> _vprime,
                                              std::shared_ptr<TyExpr> _gepinst) {
-  std::shared_ptr<TyGepzero> _val(
-      new TyGepzero(std::move(_v), std::move(_vprime), std::move(_gepinst)));
-  return std::shared_ptr<TyInfrule>(new ConsGepzero(std::move(_val)));
+  std::shared_ptr<TyGepzero> _val(new TyGepzero(_vprime, _gepinst));
+  return std::shared_ptr<TyInfrule>(new ConsGepzero(_val));
 }
 void ConsGepzero::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
   archive.saveValue("Gepzero");
   archive(CEREAL_NVP(gepzero));
+}
+
+TyGepInboundsAdd::TyGepInboundsAdd(std::shared_ptr<TyValue> _v,
+                                   std::shared_ptr<TyValue> _ptr,
+                                   std::shared_ptr<TyValueType> _loadty,
+                                   std::shared_ptr<TySize> _al,
+                                   std::shared_ptr<TyExpr> _e)
+    : v(_v), ptr(_ptr), loadty(_loadty), al(_al), e(_e) {}
+void TyGepInboundsAdd::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(v), CEREAL_NVP(ptr), CEREAL_NVP(loadty), CEREAL_NVP(al),
+          CEREAL_NVP(e));
+}
+
+ConsGepInboundsAdd::ConsGepInboundsAdd(
+    std::shared_ptr<TyGepInboundsAdd> _gep_inbounds_add)
+    : gep_inbounds_add(_gep_inbounds_add) {}
+std::shared_ptr<TyInfrule> ConsGepInboundsAdd::make(
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _ptr,
+    std::shared_ptr<TyValueType> _loadty, std::shared_ptr<TySize> _al,
+    std::shared_ptr<TyExpr> _e) {
+  std::shared_ptr<TyGepInboundsAdd> _val(
+      new TyGepInboundsAdd(_v, _ptr, _loadty, _al, _e));
+  return std::shared_ptr<TyInfrule>(new ConsGepInboundsAdd(_val));
+}
+void ConsGepInboundsAdd::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("GepInboundsAdd");
+  archive(CEREAL_NVP(gep_inbounds_add));
 }
 
 TyGepInboundsRemove::TyGepInboundsRemove(std::shared_ptr<TyExpr> _gepinst)
@@ -2651,6 +2692,25 @@ void ConsPtrtointLoad::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("PtrtointLoad");
   archive(CEREAL_NVP(ptrtoint_load));
+}
+
+TyPtrtointZero::TyPtrtointZero(std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValueType> _intty) : ptrty(_ptrty), intty(_intty){
+}
+void TyPtrtointZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(ptrty), CEREAL_NVP(intty));
+}
+
+ConsPtrtointZero::ConsPtrtointZero(std::shared_ptr<TyPtrtointZero> _ptrtoint_zero) : ptrtoint_zero(_ptrtoint_zero){
+}
+std::shared_ptr<TyInfrule> ConsPtrtointZero::make(std::shared_ptr<TyValueType> _ptrty, std::shared_ptr<TyValueType> _intty){
+  std::shared_ptr<TyPtrtointZero> _val(new TyPtrtointZero(_ptrty, _intty));
+  return std::shared_ptr<TyInfrule>(new ConsPtrtointZero(_val));
+}
+void ConsPtrtointZero::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("PtrtointZero");
+  archive(CEREAL_NVP(ptrtoint_zero));
 }
 
 TyLessthanUndef::TyLessthanUndef(std::shared_ptr<TyValueType> _ty,
@@ -3249,6 +3309,444 @@ void ConsOrZero::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("OrZero");
   archive(CEREAL_NVP(or_zero));
+}
+
+TySelectIcmpEq::TySelectIcmpEq(std::shared_ptr<TyValue> _z,
+                               std::shared_ptr<TyValue> _y,
+                               std::shared_ptr<TyValue> _x,
+                               std::shared_ptr<TyValue> _v,
+                               std::shared_ptr<TyConstant> _c,
+                               std::shared_ptr<TyValueType> _cty)
+    : z(_z), y(_y), x(_x), v(_v), c(_c), cty(_cty) {}
+void TySelectIcmpEq::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(x), CEREAL_NVP(v),
+          CEREAL_NVP(c), CEREAL_NVP(cty));
+}
+ConsSelectIcmpEq::ConsSelectIcmpEq(
+    std::shared_ptr<TySelectIcmpEq> _select_icmp_eq)
+    : select_icmp_eq(_select_icmp_eq) {}
+std::shared_ptr<TyInfrule>
+ConsSelectIcmpEq::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
+                       std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _v,
+                       std::shared_ptr<TyConstant> _c,
+                       std::shared_ptr<TyValueType> _cty) {
+  std::shared_ptr<TySelectIcmpEq> _val(
+      new TySelectIcmpEq(_z, _y, _x, _v, _c, _cty));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpEq(_val));
+}
+void ConsSelectIcmpEq::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpEq");
+  archive(CEREAL_NVP(select_icmp_eq));
+}
+
+TySelectIcmpEqXor1::TySelectIcmpEqXor1(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyValue> _w,
+    std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime,
+    std::shared_ptr<TySize> _s)
+    : z(_z), zprime(_zprime), v(_v), x(_x), u(_u), w(_w), c(_c),
+      cprime(_cprime), s(_s) {}
+void TySelectIcmpEqXor1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(v), CEREAL_NVP(x),
+          CEREAL_NVP(u), CEREAL_NVP(w), CEREAL_NVP(c), CEREAL_NVP(cprime),
+          CEREAL_NVP(s));
+}
+ConsSelectIcmpEqXor1::ConsSelectIcmpEqXor1(
+    std::shared_ptr<TySelectIcmpEqXor1> _select_icmp_eq_xor1)
+    : select_icmp_eq_xor1(_select_icmp_eq_xor1) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpEqXor1::make(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyValue> _w,
+    std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime,
+    std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpEqXor1> _val(
+      new TySelectIcmpEqXor1(_z, _zprime, _v, _x, _u, _w, _c, _cprime, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpEqXor1(_val));
+}
+void ConsSelectIcmpEqXor1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpEqXor1");
+  archive(CEREAL_NVP(select_icmp_eq_xor1));
+}
+
+TySelectIcmpEqXor2::TySelectIcmpEqXor2(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyValue> _w,
+    std::shared_ptr<TyConstInt> _c, std::shared_ptr<TySize> _s)
+    : z(_z), zprime(_zprime), v(_v), x(_x), u(_u), w(_w), c(_c), s(_s) {}
+void TySelectIcmpEqXor2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(v), CEREAL_NVP(x),
+          CEREAL_NVP(u), CEREAL_NVP(w), CEREAL_NVP(c), CEREAL_NVP(s));
+}
+ConsSelectIcmpEqXor2::ConsSelectIcmpEqXor2(
+    std::shared_ptr<TySelectIcmpEqXor2> _select_icmp_eq_xor2)
+    : select_icmp_eq_xor2(_select_icmp_eq_xor2) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpEqXor2::make(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyValue> _w,
+    std::shared_ptr<TyConstInt> _c, std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpEqXor2> _val(
+      new TySelectIcmpEqXor2(_z, _zprime, _v, _x, _u, _w, _c, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpEqXor2(_val));
+}
+void ConsSelectIcmpEqXor2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpEqXor2");
+  archive(CEREAL_NVP(select_icmp_eq_xor2));
+}
+
+TySelectIcmpNe::TySelectIcmpNe(std::shared_ptr<TyValue> _z,
+                               std::shared_ptr<TyValue> _y,
+                               std::shared_ptr<TyValue> _x,
+                               std::shared_ptr<TyValue> _v,
+                               std::shared_ptr<TyConstant> _c,
+                               std::shared_ptr<TyValueType> _cty)
+    : z(_z), y(_y), x(_x), v(_v), c(_c), cty(_cty) {}
+void TySelectIcmpNe::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(x), CEREAL_NVP(v),
+          CEREAL_NVP(c), CEREAL_NVP(cty));
+}
+ConsSelectIcmpNe::ConsSelectIcmpNe(
+    std::shared_ptr<TySelectIcmpNe> _select_icmp_ne)
+    : select_icmp_ne(_select_icmp_ne) {}
+std::shared_ptr<TyInfrule>
+ConsSelectIcmpNe::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
+                       std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _v,
+                       std::shared_ptr<TyConstant> _c,
+                       std::shared_ptr<TyValueType> _cty) {
+  std::shared_ptr<TySelectIcmpNe> _val(
+      new TySelectIcmpNe(_z, _y, _x, _v, _c, _cty));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpNe(_val));
+}
+void ConsSelectIcmpNe::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpNe");
+  archive(CEREAL_NVP(select_icmp_ne));
+}
+
+TySelectIcmpNeXor1::TySelectIcmpNeXor1(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyValue> _w,
+    std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime,
+    std::shared_ptr<TySize> _s)
+    : z(_z), zprime(_zprime), v(_v), x(_x), u(_u), w(_w), c(_c),
+      cprime(_cprime), s(_s) {}
+void TySelectIcmpNeXor1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(v), CEREAL_NVP(x),
+          CEREAL_NVP(u), CEREAL_NVP(w), CEREAL_NVP(c), CEREAL_NVP(cprime),
+          CEREAL_NVP(s));
+}
+ConsSelectIcmpNeXor1::ConsSelectIcmpNeXor1(
+    std::shared_ptr<TySelectIcmpNeXor1> _select_icmp_ne_xor1)
+    : select_icmp_ne_xor1(_select_icmp_ne_xor1) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpNeXor1::make(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyValue> _w,
+    std::shared_ptr<TyConstInt> _c, std::shared_ptr<TyConstInt> _cprime,
+    std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpNeXor1> _val(
+      new TySelectIcmpNeXor1(_z, _zprime, _v, _x, _u, _w, _c, _cprime, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpNeXor1(_val));
+}
+void ConsSelectIcmpNeXor1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpNeXor1");
+  archive(CEREAL_NVP(select_icmp_ne_xor1));
+}
+
+TySelectIcmpNeXor2::TySelectIcmpNeXor2(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyValue> _w,
+    std::shared_ptr<TyConstInt> _c, std::shared_ptr<TySize> _s)
+    : z(_z), zprime(_zprime), v(_v), x(_x), u(_u), w(_w), c(_c), s(_s) {}
+void TySelectIcmpNeXor2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(v), CEREAL_NVP(x),
+          CEREAL_NVP(u), CEREAL_NVP(w), CEREAL_NVP(c), CEREAL_NVP(s));
+}
+ConsSelectIcmpNeXor2::ConsSelectIcmpNeXor2(
+    std::shared_ptr<TySelectIcmpNeXor2> _select_icmp_ne_xor2)
+    : select_icmp_ne_xor2(_select_icmp_ne_xor2) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpNeXor2::make(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyValue> _w,
+    std::shared_ptr<TyConstInt> _c, std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpNeXor2> _val(
+      new TySelectIcmpNeXor2(_z, _zprime, _v, _x, _u, _w, _c, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpNeXor2(_val));
+}
+void ConsSelectIcmpNeXor2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpNeXor2");
+  archive(CEREAL_NVP(select_icmp_ne_xor2));
+}
+
+TySelectIcmpSgtConst::TySelectIcmpSgtConst(std::shared_ptr<TyRegister> _z,
+                                           std::shared_ptr<TyValue> _y,
+                                           std::shared_ptr<TyValue> _x,
+                                           std::shared_ptr<TyConstInt> _c,
+                                           std::shared_ptr<TyConstInt> _cprime,
+                                           bool _selcomm,
+                                           std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), x(_x), c(_c), cprime(_cprime), selcomm(_selcomm), s(_s) {}
+void TySelectIcmpSgtConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(x), CEREAL_NVP(c),
+          CEREAL_NVP(cprime), CEREAL_NVP(selcomm), CEREAL_NVP(s));
+}
+ConsSelectIcmpSgtConst::ConsSelectIcmpSgtConst(
+    std::shared_ptr<TySelectIcmpSgtConst> _select_icmp_sgt_const)
+    : select_icmp_sgt_const(_select_icmp_sgt_const) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpSgtConst::make(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _y,
+    std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TyConstInt> _cprime, bool _selcomm,
+    std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpSgtConst> _val(
+      new TySelectIcmpSgtConst(_z, _y, _x, _c, _cprime, _selcomm, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpSgtConst(_val));
+}
+void
+ConsSelectIcmpSgtConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpSgtConst");
+  archive(CEREAL_NVP(select_icmp_sgt_const));
+}
+
+TySelectIcmpSgtXor1::TySelectIcmpSgtXor1(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _s)
+    : z(_z), zprime(_zprime), v(_v), x(_x), u(_u), c(_c), cprime(_cprime),
+      s(_s) {}
+void TySelectIcmpSgtXor1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(v), CEREAL_NVP(x),
+          CEREAL_NVP(u), CEREAL_NVP(c), CEREAL_NVP(cprime), CEREAL_NVP(s));
+}
+ConsSelectIcmpSgtXor1::ConsSelectIcmpSgtXor1(
+    std::shared_ptr<TySelectIcmpSgtXor1> _select_icmp_sgt_xor1)
+    : select_icmp_sgt_xor1(_select_icmp_sgt_xor1) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpSgtXor1::make(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpSgtXor1> _val(
+      new TySelectIcmpSgtXor1(_z, _zprime, _v, _x, _u, _c, _cprime, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpSgtXor1(_val));
+}
+void
+ConsSelectIcmpSgtXor1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpSgtXor1");
+  archive(CEREAL_NVP(select_icmp_sgt_xor1));
+}
+
+TySelectIcmpSgtXor2::TySelectIcmpSgtXor2(std::shared_ptr<TyValue> _z,
+                                         std::shared_ptr<TyValue> _zprime,
+                                         std::shared_ptr<TyValue> _v,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _u,
+                                         std::shared_ptr<TyConstInt> _c,
+                                         std::shared_ptr<TySize> _s)
+    : z(_z), zprime(_zprime), v(_v), x(_x), u(_u), c(_c), s(_s) {}
+void TySelectIcmpSgtXor2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(v), CEREAL_NVP(x),
+          CEREAL_NVP(u), CEREAL_NVP(c), CEREAL_NVP(s));
+}
+ConsSelectIcmpSgtXor2::ConsSelectIcmpSgtXor2(
+    std::shared_ptr<TySelectIcmpSgtXor2> _select_icmp_sgt_xor2)
+    : select_icmp_sgt_xor2(_select_icmp_sgt_xor2) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpSgtXor2::make(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpSgtXor2> _val(
+      new TySelectIcmpSgtXor2(_z, _zprime, _v, _x, _u, _c, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpSgtXor2(_val));
+}
+void
+ConsSelectIcmpSgtXor2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpSgtXor2");
+  archive(CEREAL_NVP(select_icmp_sgt_xor2));
+}
+
+TySelectIcmpSltConst::TySelectIcmpSltConst(std::shared_ptr<TyRegister> _z,
+                                           std::shared_ptr<TyValue> _y,
+                                           std::shared_ptr<TyValue> _x,
+                                           std::shared_ptr<TyConstInt> _c,
+                                           std::shared_ptr<TyConstInt> _cprime,
+                                           bool _selcomm,
+                                           std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), x(_x), c(_c), cprime(_cprime), selcomm(_selcomm), s(_s) {}
+void TySelectIcmpSltConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(x), CEREAL_NVP(c),
+          CEREAL_NVP(cprime), CEREAL_NVP(selcomm), CEREAL_NVP(s));
+}
+ConsSelectIcmpSltConst::ConsSelectIcmpSltConst(
+    std::shared_ptr<TySelectIcmpSltConst> _select_icmp_slt_const)
+    : select_icmp_slt_const(_select_icmp_slt_const) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpSltConst::make(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _y,
+    std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TyConstInt> _cprime, bool _selcomm,
+    std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpSltConst> _val(
+      new TySelectIcmpSltConst(_z, _y, _x, _c, _cprime, _selcomm, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpSltConst(_val));
+}
+void
+ConsSelectIcmpSltConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpSltConst");
+  archive(CEREAL_NVP(select_icmp_slt_const));
+}
+
+TySelectIcmpSltXor1::TySelectIcmpSltXor1(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _s)
+    : z(_z), zprime(_zprime), v(_v), x(_x), u(_u), c(_c), cprime(_cprime),
+      s(_s) {}
+void TySelectIcmpSltXor1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(v), CEREAL_NVP(x),
+          CEREAL_NVP(u), CEREAL_NVP(c), CEREAL_NVP(cprime), CEREAL_NVP(s));
+}
+ConsSelectIcmpSltXor1::ConsSelectIcmpSltXor1(
+    std::shared_ptr<TySelectIcmpSltXor1> _select_icmp_slt_xor1)
+    : select_icmp_slt_xor1(_select_icmp_slt_xor1) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpSltXor1::make(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TyConstInt> _cprime, std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpSltXor1> _val(
+      new TySelectIcmpSltXor1(_z, _zprime, _v, _x, _u, _c, _cprime, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpSltXor1(_val));
+}
+void
+ConsSelectIcmpSltXor1::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpSltXor1");
+  archive(CEREAL_NVP(select_icmp_slt_xor1));
+}
+
+TySelectIcmpSltXor2::TySelectIcmpSltXor2(std::shared_ptr<TyValue> _z,
+                                         std::shared_ptr<TyValue> _zprime,
+                                         std::shared_ptr<TyValue> _v,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _u,
+                                         std::shared_ptr<TyConstInt> _c,
+                                         std::shared_ptr<TySize> _s)
+    : z(_z), zprime(_zprime), v(_v), x(_x), u(_u), c(_c), s(_s) {}
+void TySelectIcmpSltXor2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(zprime), CEREAL_NVP(v), CEREAL_NVP(x),
+          CEREAL_NVP(u), CEREAL_NVP(c), CEREAL_NVP(s));
+}
+ConsSelectIcmpSltXor2::ConsSelectIcmpSltXor2(
+    std::shared_ptr<TySelectIcmpSltXor2> _select_icmp_slt_xor2)
+    : select_icmp_slt_xor2(_select_icmp_slt_xor2) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpSltXor2::make(
+    std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime,
+    std::shared_ptr<TyValue> _v, std::shared_ptr<TyValue> _x,
+    std::shared_ptr<TyValue> _u, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpSltXor2> _val(
+      new TySelectIcmpSltXor2(_z, _zprime, _v, _x, _u, _c, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpSltXor2(_val));
+}
+void
+ConsSelectIcmpSltXor2::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpSltXor2");
+  archive(CEREAL_NVP(select_icmp_slt_xor2));
+}
+
+TySelectIcmpUgtConst::TySelectIcmpUgtConst(std::shared_ptr<TyRegister> _z,
+                                           std::shared_ptr<TyValue> _y,
+                                           std::shared_ptr<TyValue> _x,
+                                           std::shared_ptr<TyConstInt> _c,
+                                           std::shared_ptr<TyConstInt> _cprime,
+                                           bool _selcomm,
+                                           std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), x(_x), c(_c), cprime(_cprime), selcomm(_selcomm), s(_s) {}
+void TySelectIcmpUgtConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(x), CEREAL_NVP(c),
+          CEREAL_NVP(cprime), CEREAL_NVP(selcomm), CEREAL_NVP(s));
+}
+ConsSelectIcmpUgtConst::ConsSelectIcmpUgtConst(
+    std::shared_ptr<TySelectIcmpUgtConst> _select_icmp_ugt_const)
+    : select_icmp_ugt_const(_select_icmp_ugt_const) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpUgtConst::make(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _y,
+    std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TyConstInt> _cprime, bool _selcomm,
+    std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpUgtConst> _val(
+      new TySelectIcmpUgtConst(_z, _y, _x, _c, _cprime, _selcomm, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpUgtConst(_val));
+}
+void
+ConsSelectIcmpUgtConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpUgtConst");
+  archive(CEREAL_NVP(select_icmp_ugt_const));
+}
+ConsSelectIcmpUltConst::ConsSelectIcmpUltConst(
+    std::shared_ptr<TySelectIcmpUltConst> _select_icmp_ult_const)
+    : select_icmp_ult_const(_select_icmp_ult_const) {}
+std::shared_ptr<TyInfrule> ConsSelectIcmpUltConst::make(
+    std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _y,
+    std::shared_ptr<TyValue> _x, std::shared_ptr<TyConstInt> _c,
+    std::shared_ptr<TyConstInt> _cprime, bool _selcomm,
+    std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TySelectIcmpUltConst> _val(
+      new TySelectIcmpUltConst(_z, _y, _x, _c, _cprime, _selcomm, _s));
+  return std::shared_ptr<TyInfrule>(new ConsSelectIcmpUltConst(_val));
+}
+void
+ConsSelectIcmpUltConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SelectIcmpUltConst");
+  archive(CEREAL_NVP(select_icmp_ult_const));
+}
+
+TySelectIcmpUltConst::TySelectIcmpUltConst(std::shared_ptr<TyRegister> _z,
+                                           std::shared_ptr<TyValue> _y,
+                                           std::shared_ptr<TyValue> _x,
+                                           std::shared_ptr<TyConstInt> _c,
+                                           std::shared_ptr<TyConstInt> _cprime,
+                                           bool _selcomm,
+                                           std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), x(_x), c(_c), cprime(_cprime), selcomm(_selcomm), s(_s) {}
+void TySelectIcmpUltConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(x), CEREAL_NVP(c),
+          CEREAL_NVP(cprime), CEREAL_NVP(selcomm), CEREAL_NVP(s));
 }
 
 TyTruncBitcast::TyTruncBitcast(std::shared_ptr<TyValue> _src,
@@ -3958,6 +4456,32 @@ void ConsSubstituteRev::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(substitute_rev));
 }
 
+TySubstituteTgt::TySubstituteTgt(std::shared_ptr<TyRegister> _x,
+                                 std::shared_ptr<TyValue> _y,
+                                 std::shared_ptr<TyExpr> _e)
+    : x(_x), y(_y), e(_e) {}
+void TySubstituteTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(e));
+}
+
+ConsSubstituteTgt::ConsSubstituteTgt(
+    std::shared_ptr<TySubstituteTgt> _substitute_tgt)
+    : substitute_tgt(_substitute_tgt) {}
+std::shared_ptr<TyInfrule>
+ConsSubstituteTgt::make(std::shared_ptr<TyRegister> _x,
+                        std::shared_ptr<TyValue> _y,
+                        std::shared_ptr<TyExpr> _e) {
+  std::shared_ptr<TySubstituteTgt> _val(new TySubstituteTgt(_x, _y, _e));
+  return std::shared_ptr<TyInfrule>(new ConsSubstituteTgt(_val));
+}
+
+void ConsSubstituteTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SubstituteTgt");
+  archive(CEREAL_NVP(substitute_tgt));
+}
+
 TyTruncZext::TyTruncZext(std::shared_ptr<TyValue> _src,
                          std::shared_ptr<TyValue> _mid,
                          std::shared_ptr<TyValue> _dst,
@@ -4216,18 +4740,22 @@ void ConsIntroGhost::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(intro_ghost));
 }
 
-TyIntroEq::TyIntroEq(std::shared_ptr<TyValue> _x) : x(std::move(_x)) {}
+TyIntroEq::TyIntroEq(std::shared_ptr<TyExpr> _x) : x(_x) {}
 
 void TyIntroEq::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(x));
 }
 
 ConsIntroEq::ConsIntroEq(std::shared_ptr<TyIntroEq> _intro_eq)
-    : intro_eq(std::move(_intro_eq)) {}
+    : intro_eq(_intro_eq) {}
 
 std::shared_ptr<TyInfrule> ConsIntroEq::make(std::shared_ptr<TyValue> _x) {
-  std::shared_ptr<TyIntroEq> _val(new TyIntroEq(std::move(_x)));
-  return std::shared_ptr<TyInfrule>(new ConsIntroEq(std::move(_val)));
+  return ConsIntroEq::make(TyExpr::make(_x));
+}
+
+std::shared_ptr<TyInfrule> ConsIntroEq::make(std::shared_ptr<TyExpr> _x) {
+  std::shared_ptr<TyIntroEq> _val(new TyIntroEq(_x));
+  return std::shared_ptr<TyInfrule>(new ConsIntroEq(_val));
 }
 
 void ConsIntroEq::serialize(cereal::JSONOutputArchive &archive) const {
@@ -4706,10 +5234,12 @@ void ConsZextTruncAndXor::serialize(cereal::JSONOutputArchive &archive) const {
 
 TyZextXor::TyZextXor(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _y,
                      std::shared_ptr<TyValue> _yprime,
-                     std::shared_ptr<TyValue> _x)
-    : z(_z), y(_y), yprime(_yprime), x(_x) {}
+                     std::shared_ptr<TyValue> _x,
+                     std::shared_ptr<TySize> _s)
+    : z(_z), y(_y), yprime(_yprime), x(_x), s(_s) {}
 void TyZextXor::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(yprime), CEREAL_NVP(x));
+  archive(CEREAL_NVP(z), CEREAL_NVP(y), CEREAL_NVP(yprime), CEREAL_NVP(x), 
+          CEREAL_NVP(s));
 }
 
 ConsZextXor::ConsZextXor(std::shared_ptr<TyZextXor> _zext_xor)
@@ -4717,8 +5247,9 @@ ConsZextXor::ConsZextXor(std::shared_ptr<TyZextXor> _zext_xor)
 std::shared_ptr<TyInfrule> ConsZextXor::make(std::shared_ptr<TyValue> _z,
                                              std::shared_ptr<TyValue> _y,
                                              std::shared_ptr<TyValue> _yprime,
-                                             std::shared_ptr<TyValue> _x) {
-  std::shared_ptr<TyZextXor> _val(new TyZextXor(_z, _y, _yprime, _x));
+                                             std::shared_ptr<TyValue> _x,
+                                             std::shared_ptr<TySize> _s) {
+  std::shared_ptr<TyZextXor> _val(new TyZextXor(_z, _y, _yprime, _x, _s));
   return std::shared_ptr<TyInfrule>(new ConsZextXor(_val));
 }
 void ConsZextXor::serialize(cereal::JSONOutputArchive &archive) const {

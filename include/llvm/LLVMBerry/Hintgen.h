@@ -28,7 +28,7 @@
   llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
-// LESSDEF, NOALIAS, ALLOCA, PRIVATE, MAYDIFF make TyPropagateObject instance
+// LESSDEF, NOALIAS, PRIVATE, MAYDIFF make TyPropagateObject instance
 #define LESSDEF(left, right, SCOPE)                                            \
   llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE)                                             \
@@ -65,11 +65,17 @@ namespace llvmberry {
 void applyCommutativity(llvm::Instruction *position,
                         llvm::BinaryOperator *expression, TyScope scope);
 /* applyTransitivity(I, v1, v2, v3, scope) :
- *   Applies transitivity rule (v1 >= v2 >= v3) to the position I
+ *   Applies transitivity rule (v1 >= v2 >= v3) to the position (I, scope)
  */
 void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
                        llvm::Value *v_mid, llvm::Value *v_smallest,
                        TyScope scope);
+/* applyTransitivity(I, v1, v2, v3, scope, scopetag) :
+ *   Applies transitivity rule (v1 >= v2 >= v3) to the position (I, scopetag)
+ */
+void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
+                       llvm::Value *v_mid, llvm::Value *v_smallest,
+                       TyScope scope, TyScope position_scopetag);
 /* propagateInstruction(I1, I2, scope, propagateEquivalence) :
  *   if propagateEquivalence == false :
  *     Propagates I1 >= rhs(I1) from I1 to I2 if scope == Source, or
@@ -109,6 +115,13 @@ void generateHintForReplaceAllUsesWith(
     llvm::Instruction *source, llvm::Value *replaceTo,
     std::string ghost_var = "", std::shared_ptr<TyPosition> source_pos =
                                     std::shared_ptr<TyPosition>(nullptr));
+/* generateHintForReplaceAllUsesWithAtTgt(v1, v2) :
+ *   For each use U of v1, propagates hints at target to prove that
+ * replacing v1 with v2 in U is safe.
+ *   Invariant { v1 >=tgt v2 } must be given at definition of v1
+ */
+void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
+                                            llvm::Value *replaceTo);
 
 /* Hint generation functions for instcombine/instsimplify micro-optimizations
  * that appear multiple times
@@ -182,6 +195,13 @@ bool is_inverse_expression(Expression e1, Expression e2);
 
 void makeReachableBlockMap(llvm::BasicBlock* Src,
                            llvm::BasicBlock* Tgt);
+
+void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> lessdef_src,
+                                             std::shared_ptr<TyPropagateObject> lessdef_tgt,
+                                             llvm::Instruction* from,
+                                             llvm::Instruction* to,
+                                             std::vector<llvm::BasicBlock*> worklist,
+                                             llvm::BasicBlock* BB);
 
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst* SI,

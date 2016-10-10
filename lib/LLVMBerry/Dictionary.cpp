@@ -42,6 +42,18 @@ bool SimplifyInstArg::isActivated() const {
   return !aborted && activated;
 }
 
+SelectIcmpConstArg::SelectIcmpConstArg() {
+  this->activated = false;
+  this->isGtToLt = false;
+  this->isUnsigned = false;
+  this->selectCommutative = false;
+  this->Z = nullptr;
+  this->Y = nullptr;
+  this->X = nullptr;
+  this->C = nullptr;
+  this->Cprime = nullptr;
+}
+
 StripPointerCastsArg::StripPointerCastsArg() {
   strippedValues = TyStrippedValues(new TyStrippedValuesObj());
 }
