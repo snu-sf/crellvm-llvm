@@ -26,8 +26,10 @@ enum DictKeys {
   ArgForVisitMul,
   ArgForFoldSelectOpOp,
   ArgForLoadLoadStore,
+  ArgForSelectIcmpConst,
   ArgForSinkInst,
   ArgForVisitICmp,
+  ArgForDeadCodeElim,
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
@@ -228,12 +230,36 @@ public:
 };
 DEFINE_TRAITS(ArgForLoadLoadStore, LoadLoadStoreArg);
 
+// lib/Transform/InstCombine/InstCombineSelect.cpp : visitSelectInstWithICmp
+struct SelectIcmpConstArg {
+public:
+  SelectIcmpConstArg();
+  bool activated;
+  bool isGtToLt;
+  bool isUnsigned;
+  bool selectCommutative;
+  llvm::SelectInst *Z;
+  llvm::ICmpInst *Y;
+  llvm::Value *X;
+  llvm::ConstantInt *C, *Cprime;
+  std::shared_ptr<TyPosition> Y_org_pos;
+};
+
+DEFINE_TRAITS(ArgForSelectIcmpConst, SelectIcmpConstArg);
 // lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
 struct SinkInstArg {
 public:
   llvm::DominatorTree *sinkDT;
 };
 DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
+
+// lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
+struct DeadCodeElimArg {
+public:
+  std::vector<llvm::StructType *> namedts;
+  llvm::Module *M;
+};
+DEFINE_TRAITS(ArgForDeadCodeElim, DeadCodeElimArg);
 
 // lib/Transforms/Scalar/GVN.cpp : processInstruction, findLeader
 struct GVNReplaceArg {

@@ -597,17 +597,29 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         else // (Pred == ICmpInst::ICMP_ULT || Pred == ICmpInst::ICMP_SLT)
           AdjustedRHS = ConstantInt::get(CI->getContext(), CI->getValue() - 1);
 
+        llvmberry::ValidationUnit::Begin("select_icmp_unknown_const",
+                                         SI.getParent()->getParent());
+        llvmberry::ValidationUnit::GetInstance()->intrude(
+            [](llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+              auto ptr = data.create<llvmberry::ArgForSelectIcmpConst>();
+              ptr->activated = false;
+            });
         // X > C ? X : C+1  -->  X < C+1 ? C+1 : X
         // X < C ? X : C-1  -->  X > C-1 ? C-1 : X
         if ((CmpLHS == TrueVal && AdjustedRHS == FalseVal) ||
-            (CmpLHS == FalseVal && AdjustedRHS == TrueVal))
+            (CmpLHS == FalseVal && AdjustedRHS == TrueVal)) {
           ; // Nothing to do here. Values match without any sign/zero extension.
+          llvmberry::ValidationUnit::GetInstance()->intrude(
+              [](llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+                data.get<llvmberry::ArgForSelectIcmpConst>()->activated = true;
+              });
+        }
 
         // Types do not match. Instead of calculating this with mixed types
         // promote all to the larger type. This enables scalar evolution to
         // analyze this expression.
-        else if (CmpRHS->getType()->getScalarSizeInBits()
-                 < SelectTy->getBitWidth()) {
+        else if (CmpRHS->getType()->getScalarSizeInBits() <
+                 SelectTy->getBitWidth()) {
           Constant *sextRHS = ConstantExpr::getSExt(AdjustedRHS, SelectTy);
 
           // X = sext x; x >s c ? X : C+1 --> X = sext x; X <s C+1 ? C+1 : X
@@ -636,12 +648,50 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
                        zextRHS == TrueVal) {
               CmpLHS = FalseVal;
               AdjustedRHS = zextRHS;
-            } else
+            } else {
+              llvmberry::ValidationUnit::Abort();
               break;
-          } else
+            }
+          } else {
+            llvmberry::ValidationUnit::Abort();
             break;
-        } else
+          }
+        } else {
+          llvmberry::ValidationUnit::Abort();
           break;
+        }
+
+        llvmberry::ValidationUnit::GetInstance()->intrude(
+            [&ICI, &SI, &CI, &AdjustedRHS, &Pred](llvmberry::Dictionary &data,
+                                                  llvmberry::CoreHint &hints) {
+              auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
+              if (ptr->activated) {
+                //    <src>                   |    <tgt>
+                // Y = icmp sgt/ugt X, C      | Y = icmp slt/ult X, (C+1)
+                // Z = select Y, X, (C+1)     | Z = select Y, (C+1), X
+                //    <src>                   |    <tgt>
+                // Y = icmp slt/ult X, C      | Y = icmp sgt/ugt X, (C-1)
+                // Z = select Y, X, (C-1)     | Z = select Y, (C-1), X
+                ptr->Z = &SI;
+                ptr->Y = ICI;
+                ptr->X = ptr->Y->getOperand(0);
+                ptr->C = CI;
+                ptr->Cprime = dyn_cast<ConstantInt>(AdjustedRHS);
+                ptr->Y_org_pos = INSTPOS(SRC, ICI);
+                ptr->isGtToLt =
+                    Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_SGT;
+                ptr->isUnsigned =
+                    Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_ULT;
+                ptr->selectCommutative = SI.getOperand(1) != ICI->getOperand(0);
+                llvmberry::insertTgtNopAtSrcI(hints, ptr->Y);
+                llvmberry::propagateMaydiffGlobal(
+                    llvmberry::getVariable(*ptr->Y), llvmberry::Physical);
+                llvmberry::propagateInstruction(ptr->Y, ptr->Z,
+                                                llvmberry::Source);
+              } else {
+                llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+              }
+            });
 
         Pred = ICmpInst::getSwappedPredicate(Pred);
         CmpRHS = AdjustedRHS;
@@ -655,6 +705,61 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         // Move ICI instruction right before the select instruction. Otherwise
         // the sext/zext value may be defined after the ICI instruction uses it.
         ICI->moveBefore(&SI);
+
+        llvmberry::ValidationUnit::GetInstance()->intrude([](
+            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
+          if (ptr->activated) {
+            unsigned int bitsize = ptr->C->getType()->getIntegerBitWidth();
+            auto Z = ptr->Z;
+            auto C = ptr->C;
+            auto Cprime = ptr->Cprime;
+            auto Y = ptr->Y;
+            auto X = ptr->X;
+            bool select_commutative = ptr->selectCommutative;
+
+            llvmberry::insertSrcNopAtTgtI(hints, ptr->Y);
+            PROPAGATE(LESSDEF(RHS(llvmberry::getVariable(*Y), Physical,
+                                  llvmberry::Target),
+                              VAR(llvmberry::getVariable(*Y), Physical),
+                              llvmberry::Target),
+                      BOUNDS(INSTPOS(TGT, Y), INSTPOS(TGT, Z)));
+            std::function<std::shared_ptr<llvmberry::TyInfrule>(
+                std::shared_ptr<llvmberry::TyRegister>,
+                std::shared_ptr<llvmberry::TyValue>,
+                std::shared_ptr<llvmberry::TyValue>,
+                std::shared_ptr<llvmberry::TyConstInt>,
+                std::shared_ptr<llvmberry::TyConstInt>, bool,
+                std::shared_ptr<llvmberry::TySize>)> makeInfruleFunc = nullptr;
+            std::string optname = "";
+
+            if (ptr->isGtToLt) {
+              if (ptr->isUnsigned)
+                makeInfruleFunc = llvmberry::ConsSelectIcmpUgtConst::make;
+              else
+                makeInfruleFunc = llvmberry::ConsSelectIcmpSgtConst::make;
+              optname = "select_icmp_gt_const";
+            } else {
+              if (ptr->isUnsigned)
+                makeInfruleFunc = llvmberry::ConsSelectIcmpUltConst::make;
+              else
+                makeInfruleFunc = llvmberry::ConsSelectIcmpSltConst::make;
+              optname = "select_icmp_lt_const";
+            }
+            llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                optname);
+            INFRULE(
+                INSTPOS(SRC, Z),
+                makeInfruleFunc(REGISTER(llvmberry::getVariable(*Z), Physical),
+                                VAL(Y, Physical), VAL(X, Physical),
+                                llvmberry::TyConstInt::make(*C),
+                                llvmberry::TyConstInt::make(*Cprime),
+                                select_commutative, BITSIZE(bitsize)));
+          } else {
+            llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+          }
+        });
+        llvmberry::ValidationUnit::End();
 
         Changed = true;
         break;
@@ -698,11 +803,61 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
   if (CmpRHS != CmpLHS && isa<Constant>(CmpRHS)) {
     if (CmpLHS == TrueVal && Pred == ICmpInst::ICMP_EQ) {
       // Transform (X == C) ? X : Y -> (X == C) ? C : Y
+      llvmberry::ValidationUnit::Begin("select_icmp_eq",
+                                       SI.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude(
+          [&SI, &ICI, &CmpRHS, &CmpLHS, &FalseVal](llvmberry::Dictionary &data,
+                                                   llvmberry::CoreHint &hints) {
+            //    <src>           |    <tgt>
+            // Y = icmp eq, X, C  | Y = icmp eq, X, C
+            // Z = select Y, X, V | Z = select Y, C, V
+            if (CmpRHS->getType()->isVectorTy()) {
+              llvmberry::ValidationUnit::Abort();
+              return;
+            }
+            SelectInst *Z = &SI;
+            ICmpInst *Y = ICI;
+            Value *X = CmpLHS;
+            Value *V = FalseVal;
+            Constant *C = dyn_cast<Constant>(CmpRHS);
+            llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+            INFRULE(INSTPOS(SRC, Z),
+                    llvmberry::ConsSelectIcmpEq::make(
+                        VAL(Z, Physical), VAL(Y, Physical), VAL(X, Physical),
+                        VAL(V, Physical), llvmberry::TyConstant::make(*C),
+                        VALTYPE(C->getType())));
+          });
       SI.setOperand(1, CmpRHS);
+      llvmberry::ValidationUnit::End();
       Changed = true;
     } else if (CmpLHS == FalseVal && Pred == ICmpInst::ICMP_NE) {
       // Transform (X != C) ? Y : X -> (X != C) ? Y : C
+      llvmberry::ValidationUnit::Begin("select_icmp_ne",
+                                       SI.getParent()->getParent());
+      llvmberry::ValidationUnit::GetInstance()->intrude(
+          [&SI, &ICI, &CmpRHS, &CmpLHS, &TrueVal](llvmberry::Dictionary &data,
+                                                  llvmberry::CoreHint &hints) {
+            //     <src>          |      <tgt>
+            // Y = icmp ne, X, C  | Y = icmp ne, X, C
+            // Z = select Y, V, X | Z = select Y, V, C
+            if (CmpRHS->getType()->isVectorTy()) {
+              llvmberry::ValidationUnit::Abort();
+              return;
+            }
+            SelectInst *Z = &SI;
+            ICmpInst *Y = ICI;
+            Value *X = CmpLHS;
+            Value *V = TrueVal;
+            Constant *C = dyn_cast<Constant>(CmpRHS);
+            llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+            INFRULE(INSTPOS(SRC, Z),
+                    llvmberry::ConsSelectIcmpNe::make(
+                        VAL(Z, Physical), VAL(Y, Physical), VAL(X, Physical),
+                        VAL(V, Physical), llvmberry::TyConstant::make(*C),
+                        VALTYPE(C->getType())));
+          });
       SI.setOperand(2, CmpRHS);
+      llvmberry::ValidationUnit::End();
       Changed = true;
     }
   }
@@ -731,6 +886,8 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
       TrueWhenUnset = true;
     }
     if (IsBitTest) {
+      llvmberry::ValidationUnit::Begin("select_icmp_unknown_xor",
+                                       SI.getParent()->getParent());
       Value *V = nullptr;
       // (X & Y) == 0 ? X : X ^ Y  --> X & ~Y
       if (TrueWhenUnset && TrueVal == X &&
@@ -749,8 +906,199 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
                match(FalseVal, m_Xor(m_Specific(X), m_APInt(C))) && *Y == *C)
         V = Builder->CreateOr(X, *Y);
 
-      if (V)
+      if (V) {
+        llvmberry::ValidationUnit::GetInstance()->intrude([&SI, &ICI, &V, &Pred,
+                                                           &TrueVal, &FalseVal](
+            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          llvmberry::name_instructions(*SI.getParent()->getParent());
+          SelectInst *Z = &SI;
+          BinaryOperator *Zprime = dyn_cast<BinaryOperator>(V);
+          ICmpInst *V = ICI;
+          unsigned bitsize = Z->getType()->getIntegerBitWidth();
+
+          llvmberry::insertSrcNopAtTgtI(hints, Zprime);
+          llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Zprime),
+                                            llvmberry::Physical);
+          llvmberry::propagateInstruction(V, Z, llvmberry::Target);
+          llvmberry::propagateInstruction(Zprime, Z, llvmberry::Target);
+
+          if (Pred == ICmpInst::ICMP_EQ || Pred == ICmpInst::ICMP_NE) {
+            BinaryOperator *W = dyn_cast<BinaryOperator>(V->getOperand(0));
+            Value *X = W->getOperand(0);
+            ConstantInt *C = dyn_cast<ConstantInt>(W->getOperand(1));
+            ConstantInt *Cprime = dyn_cast<ConstantInt>(
+                ConstantInt::get(C->getType(), ~(C->getValue())));
+            BinaryOperator *U =
+                dyn_cast<BinaryOperator>(TrueVal == X ? FalseVal : TrueVal);
+
+            llvmberry::propagateInstruction(U, Z, llvmberry::Target);
+            llvmberry::propagateInstruction(W, Z, llvmberry::Target);
+
+            if (Pred == ICmpInst::ICMP_EQ) {
+              if (Z->getOperand(1) == X) {
+                llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                    "select_icmp_eq_xor1");
+                //    <src>           |     <tgt>
+                // W = X & C          | W = X & C
+                // V = icmp eq, W, 0  | V = icmp eq, W, 0
+                // U = X ^ C          | U = X ^ C
+                // <nop>              | Z' = X & ~C
+                // Z = select V, X, U | Z = select V, X, U
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z),
+                        llvmberry::ConsSelectIcmpEqXor1::make(
+                            VAL(Z, Physical), VAL(Zprime, Physical),
+                            VAL(V, Physical), VAL(X, Physical),
+                            VAL(U, Physical), VAL(W, Physical),
+                            llvmberry::TyConstInt::make(*C),
+                            llvmberry::TyConstInt::make(*Cprime),
+                            BITSIZE(bitsize)));
+              } else if (Z->getOperand(1) == U) {
+                llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                    "select_icmp_eq_xor2");
+                //     <src>          |     <tgt>
+                // W = X & C          | W = X & C
+                // V = icmp eq, W, 0  | V = icmp eq, W, 0
+                // U = X ^ C          | U = X ^ C
+                // <nop>              | Z' = X | C
+                // Z = select V, U, X | Z = select V, U, X
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z),
+                        llvmberry::ConsSelectIcmpEqXor2::make(
+                            VAL(Z, Physical), VAL(Zprime, Physical),
+                            VAL(V, Physical), VAL(X, Physical),
+                            VAL(U, Physical), VAL(W, Physical),
+                            llvmberry::TyConstInt::make(*C), BITSIZE(bitsize)));
+              } else {
+                assert(false && "Second operand of Z must be either X or U");
+              }
+            } else {
+              if (Z->getOperand(1) == U) {
+                llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                    "select_icmp_ne_xor1");
+                //     <src>          |     <tgt>
+                // W = X & C          | W = X & C
+                // V = icmp ne, W, 0  | V = icmp ne, W, 0
+                // U = X ^ C          | U = X ^ C
+                // <nop>              | Z' = X & ~C
+                // Z = select V, U, X | Z = select V, U, X
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z),
+                        llvmberry::ConsSelectIcmpNeXor1::make(
+                            VAL(Z, Physical), VAL(Zprime, Physical),
+                            VAL(V, Physical), VAL(X, Physical),
+                            VAL(U, Physical), VAL(W, Physical),
+                            llvmberry::TyConstInt::make(*C),
+                            llvmberry::TyConstInt::make(*Cprime),
+                            BITSIZE(bitsize)));
+              } else if (Z->getOperand(1) == X) {
+                llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                    "select_icmp_ne_xor2");
+                //     <src>          |     <tgt>
+                // W = X & C          | W = X & C
+                // V = icmp ne, W, 0  | V = icmp ne, W, 0
+                // U = X ^ C          | U = X ^ C
+                // <nop>              | Z' = X | C
+                // Z = select V, X, U | Z = select V, X, U
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z),
+                        llvmberry::ConsSelectIcmpNeXor2::make(
+                            VAL(Z, Physical), VAL(Zprime, Physical),
+                            VAL(V, Physical), VAL(X, Physical),
+                            VAL(U, Physical), VAL(W, Physical),
+                            llvmberry::TyConstInt::make(*C), BITSIZE(bitsize)));
+              } else {
+                assert(false && "Second operand of Z must be either X or U");
+              }
+            }
+          } else {
+            Value *X = Zprime->getOperand(0);
+            BinaryOperator *U =
+                dyn_cast<BinaryOperator>(TrueVal == X ? FalseVal : TrueVal);
+            ConstantInt *C = dyn_cast<ConstantInt>(U->getOperand(1));
+            ConstantInt *Cprime = dyn_cast<ConstantInt>(Zprime->getOperand(1));
+
+            llvmberry::propagateInstruction(U, Z, llvmberry::Target);
+
+            if (Pred == ICmpInst::ICMP_SLT) {
+              if (Z->getOperand(1) == U) {
+                llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                    "select_icmp_slt_xor1");
+                //    <src>           |    <tgt>
+                // U = X ^ C          | U = X ^ C
+                // V = icmp slt X, 0  | V = icmp slt X, 0
+                // <nop>              | Z' = X & ~C
+                // Z = select V, U, X | Z = select V, U, X
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z),
+                        llvmberry::ConsSelectIcmpSltXor1::make(
+                            VAL(Z, Physical), VAL(Zprime, Physical),
+                            VAL(V, Physical), VAL(X, Physical),
+                            VAL(U, Physical), llvmberry::TyConstInt::make(*C),
+                            llvmberry::TyConstInt::make(*Cprime),
+                            BITSIZE(bitsize)));
+              } else if (Z->getOperand(1) == X) {
+                llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                    "select_icmp_slt_xor2");
+                //    <src>           |    <tgt>
+                // U = X ^ C          | U = X ^ C
+                // V = icmp slt X, 0  | V = icmp slt X, 0
+                // <nop>              | Z' = X | C
+                // Z = select V, X, U | Z = select V, X, U
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z),
+                        llvmberry::ConsSelectIcmpSltXor2::make(
+                            VAL(Z, Physical), VAL(Zprime, Physical),
+                            VAL(V, Physical), VAL(X, Physical),
+                            VAL(U, Physical), llvmberry::TyConstInt::make(*C),
+                            BITSIZE(bitsize)));
+              } else {
+                assert(false && "Second operand of Z must be either X or U");
+              }
+            } else if (Pred == ICmpInst::ICMP_SGT) {
+              if (Z->getOperand(1) == X) {
+                llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                    "select_icmp_sgt_xor1");
+                //    <src>           |    <tgt>
+                // U = X ^ C          | U = X ^ C
+                // V = icmp sgt X, 0  | V = icmp sgt X, 0
+                // <nop>              | Z' = X & ~C
+                // Z = select V, X, U | Z = select V, X, U
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z),
+                        llvmberry::ConsSelectIcmpSgtXor1::make(
+                            VAL(Z, Physical), VAL(Zprime, Physical),
+                            VAL(V, Physical), VAL(X, Physical),
+                            VAL(U, Physical), llvmberry::TyConstInt::make(*C),
+                            llvmberry::TyConstInt::make(*Cprime),
+                            BITSIZE(bitsize)));
+              } else if (Z->getOperand(1) == U) {
+                llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
+                    "select_icmp_sgt_xor2");
+                //    <src>           |    <tgt>
+                // U = X ^ C          | U = X ^ C
+                // V = icmp sgt X, 0  | V = icmp sgt X, 0
+                // <nop>              | Z' = X | C
+                // Z = select V, U, X | Z = select V, U, X
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z),
+                        llvmberry::ConsSelectIcmpSgtXor2::make(
+                            VAL(Z, Physical), VAL(Zprime, Physical),
+                            VAL(V, Physical), VAL(X, Physical),
+                            VAL(U, Physical), llvmberry::TyConstInt::make(*C),
+                            BITSIZE(bitsize)));
+              } else {
+                assert(false && "Second operand of Z must be either X or U");
+              }
+            } else {
+              assert(false && "Unknown predicate");
+            }
+          }
+          llvmberry::generateHintForReplaceAllUsesWithAtTgt(Z, Zprime);
+        });
         return ReplaceInstUsesWith(SI, V);
+      }
+      llvmberry::ValidationUnit::Abort();
     }
   }
 

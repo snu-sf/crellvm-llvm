@@ -1225,12 +1225,10 @@ private:
 
 struct TyPropagateUnique {
 public:
-  //TyPropagateUnique(std::shared_ptr<TyRegister> _p, enum TyScope _scope);
   TyPropagateUnique(std::string _register_name, enum TyScope _scope);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
-  //std::shared_ptr<TyRegister> p;
   std::string register_name;
   enum TyScope scope;
 };
@@ -1294,7 +1292,6 @@ public:
   ConsUnique(std::shared_ptr<TyPropagateUnique> _propagate_unique);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  //static std::shared_ptr<TyPropagateObject> make(std::shared_ptr<TyRegister> _p,
   static std::shared_ptr<TyPropagateObject> make(std::string _register_name,
                                                  enum TyScope _scope);
 

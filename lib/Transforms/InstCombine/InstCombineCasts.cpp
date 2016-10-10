@@ -1121,11 +1121,12 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       llvmberry::name_instructions(*CI.getParent()->getParent());
       //        <src>        |       <tgt>
       // y = xor i1 x, 1     | y = xor i1 x, 1
-      // <nop>               | y' = zext i1 x to i32
-      // z = zext y to i32   | z = xor i32 y', 1
+      // <nop>               | y' = zext i1 x to sz
+      // z = zext y to sz   | z = xor i32 y', 1
       ZExtInst *Z = dyn_cast<ZExtInst>(&CI);
       BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(0));
       ZExtInst *Yprime = dyn_cast<ZExtInst>(New);
+      int sz = Yprime->getType()->getIntegerBitWidth();
       
       llvmberry::insertSrcNopAtTgtI(hints, Yprime);
       PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Yprime), llvmberry::Physical),
@@ -1134,7 +1135,8 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       llvmberry::propagateInstruction(Y, Z, TGT);
       llvmberry::propagateInstruction(Yprime, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsZextXor::make(
-          VAL(Z, Physical), VAL(Y, Physical), VAL(Yprime, Physical), VAL(X, Physical)));
+          VAL(Z, Physical), VAL(Y, Physical), VAL(Yprime, Physical), VAL(X, Physical),
+          BITSIZE(sz)));
     });
     return BinaryOperator::CreateXor(New, ConstantInt::get(CI.getType(), 1));
   }

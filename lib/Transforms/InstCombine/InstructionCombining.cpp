@@ -2804,6 +2804,9 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                                      SRC, *(BB->begin()->getParent()))));
               }
             }
+            if (isa<CallInst>(I)) {
+              hints.setReturnCodeToAdmitted();
+            }
         });
   I->moveBefore(InsertPos);
   ++NumSunkInst;
@@ -2823,7 +2826,24 @@ bool InstCombiner::run() {
       llvmberry::ValidationUnit::Begin("dead_code_elim",
                                        I->getParent()->getParent());
       llvmberry::generateHintForTrivialDCE(*I);
+      llvmberry::ValidationUnit::GetInstance()->intrude([&I](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        Module *Mod = I->getModule();
+        auto dce_arg = data.create<llvmberry::ArgForDeadCodeElim>();
+        dce_arg->namedts = Mod->getIdentifiedStructTypes();
+        dce_arg->M = Mod;
+      });
       EraseInstFromFunction(*I);
+      llvmberry::ValidationUnit::GetInstance()->intrude([](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        auto dce_arg = data.get<llvmberry::ArgForDeadCodeElim>();
+        Module *Mod = dce_arg->M;
+        std::vector<StructType *> &namedts_before = dce_arg->namedts;
+        auto namedts_after = Mod->getIdentifiedStructTypes();
+        if (namedts_before != namedts_after) {
+          hints.setReturnCodeToAdmitted();
+        }
+      });
       llvmberry::ValidationUnit::End();
       ++NumDeadInst;
       MadeIRChange = true;
@@ -2953,7 +2973,24 @@ bool InstCombiner::run() {
           llvmberry::ValidationUnit::Begin("dead_code_elim",
                            I->getParent()->getParent());
           llvmberry::generateHintForTrivialDCE(*I);
+          llvmberry::ValidationUnit::GetInstance()->intrude([&I](
+              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            Module *Mod = I->getModule();
+            auto dce_arg = data.create<llvmberry::ArgForDeadCodeElim>();
+            dce_arg->namedts = Mod->getIdentifiedStructTypes();
+            dce_arg->M = Mod;
+          });
           EraseInstFromFunction(*I);
+          llvmberry::ValidationUnit::GetInstance()->intrude([](
+              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            auto dce_arg = data.get<llvmberry::ArgForDeadCodeElim>();
+            Module *Mod = dce_arg->M;
+            std::vector<StructType *> &namedts_before = dce_arg->namedts;
+            auto namedts_after = Mod->getIdentifiedStructTypes();
+            if (namedts_before != namedts_after) {
+              hints.setReturnCodeToAdmitted();
+            }
+          });
           llvmberry::ValidationUnit::End();
         } else {
           Worklist.Add(I);
@@ -3006,7 +3043,24 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
         llvmberry::ValidationUnit::Begin("dead_code_elim",
                               Inst->getParent()->getParent());
         llvmberry::generateHintForTrivialDCE(*Inst);
+        llvmberry::ValidationUnit::GetInstance()->intrude([&Inst](
+            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          Module *Mod = Inst->getModule();
+          auto dce_arg = data.create<llvmberry::ArgForDeadCodeElim>();
+          dce_arg->namedts = Mod->getIdentifiedStructTypes();
+          dce_arg->M = Mod;
+        });
         Inst->eraseFromParent();
+        llvmberry::ValidationUnit::GetInstance()->intrude([](
+            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          auto dce_arg = data.get<llvmberry::ArgForDeadCodeElim>();
+          Module *Mod = dce_arg->M;
+          std::vector<StructType *> &namedts_before = dce_arg->namedts;
+          auto namedts_after = Mod->getIdentifiedStructTypes();
+          if (namedts_before != namedts_after) {
+            hints.setReturnCodeToAdmitted();
+          }
+        });
         llvmberry::ValidationUnit::End();
         continue;
       }
