@@ -900,9 +900,81 @@ void makeReachableBlockMap(llvm::BasicBlock* Src,
   });
 }
 
+void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> lessdef_src,
+                                             std::shared_ptr<TyPropagateObject> lessdef_tgt,
+                                             llvm::Instruction* from,
+                                             llvm::Instruction* to, 
+                                             std::vector<llvm::BasicBlock *> worklist,
+                                             llvm::BasicBlock* BB) {
+  ValidationUnit::GetInstance()->intrude([&lessdef_src, &lessdef_tgt, &from,
+                                          &to, &worklist, &BB](
+      Dictionary &data, CoreHint &hints) {
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    llvm::BasicBlock* fromBB = from->getParent();
+    llvm::BasicBlock* toBB = to->getParent();
+    std::string fromBBname = getBasicBlockIndex(fromBB);
+    std::string toBBname = getBasicBlockIndex(toBB);
+    std::string from_name = getVariable(*from);
+
+    if (fromBB == BB) {
+      PROPAGATE(lessdef_src,
+                BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
+                       TyPosition::make_end_of_block(SRC, *fromBB, termIndex[fromBBname])));
+      PROPAGATE(lessdef_tgt,
+                BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
+                       TyPosition::make_end_of_block(SRC, *fromBB, termIndex[fromBBname])));
+
+      // propagate from inst to end of block
+      //for (unsigned i = 0; i < worklist.size(); i++) {
+      while(!worklist.empty()) {
+        llvm::BasicBlock *BBtmp = *worklist.rbegin();
+        std::string BBtmpName = getBasicBlockIndex(BBtmp);
+        worklist.pop_back();
+       
+        if (fromBB == BBtmp)
+          continue;
+
+        if (toBB == BBtmp) {
+          std::cout << "blockpropagate 1" << std::endl;
+          PROPAGATE(lessdef_src,
+                    BOUNDS(TyPosition::make_start_of_block(SRC, toBBname),
+                           TyPosition::make(SRC, *to, instrIndex[to], "")));
+          PROPAGATE(lessdef_tgt,
+                    BOUNDS(TyPosition::make_start_of_block(SRC, toBBname),
+                           TyPosition::make(SRC, *to, instrIndex[to], "")));
+        } else { 
+          std::cout << "blockpropagate 2" << std::endl;
+          PROPAGATE(lessdef_src,
+                    BOUNDS(TyPosition::make_start_of_block(SRC, BBtmpName),
+                           TyPosition::make_end_of_block(SRC, *BBtmp, termIndex[BBtmpName])));
+          PROPAGATE(lessdef_tgt,
+                    BOUNDS(TyPosition::make_start_of_block(SRC, BBtmpName),
+                           TyPosition::make_end_of_block(SRC, *BBtmp, termIndex[BBtmpName])));
+        }
+      }
+
+      if (worklist.empty()) 
+        return;
+    }
+
+    // to block's propagate start to to Inst. 
+    
+    for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE;) {
+      llvm::BasicBlock* pred = *(BI++);
+      
+      if (std::find(worklist.begin(), worklist.end(), pred) != worklist.end())
+        continue;
+
+      worklist.push_back(pred);
+      generateHintForMem2RegPropagatePerBlock(lessdef_src, lessdef_tgt, from, to, worklist, pred);
+    }
+  });
+}
+
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
-                                          llvm::StoreInst *SI,
-                                          llvm::Instruction *next,
+                                          llvm::StoreInst* SI,
+                                          llvm::Instruction* next,
                                           int nextIndex) {
   if (Pred != NULL)
     llvm::dbgs() << "PropStore begin" <<  Pred->getName() << *SI << *next << "\n";
@@ -1731,19 +1803,29 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                               new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
                             VAR(Rstore, Ghost), SRC),
                     BOUNDS(TyPosition::make_start_of_block(
-                /* here */               SRC, getBasicBlockIndex(PHItmp->getParent())),
+                               SRC, getBasicBlockIndex(PHItmp->getParent())),
                            TyPosition::make_end_of_block(SRC, *Predtmp, termIndex[getBasicBlockIndex(Predtmp)])));
 
+                std::shared_ptr<TyPropagateLessdef> lessdef =
+                  TyPropagateLessdef::make(VAR(Rstore, Ghost),
+                                           VAR(Rphitmp, Physical),
+                                           TGT);
+
+                mem2regCmd[Rphitmp].lessdef.push_back(lessdef);
+
                 PROPAGATE(
-                    LESSDEF(VAR(Rstore, Ghost), VAR(Rphitmp, Physical), TGT),
+                    std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                     BOUNDS(TyPosition::make_start_of_block(
-                     /*here*/          SRC, getBasicBlockIndex(PHItmp->getParent())),
+                               SRC, getBasicBlockIndex(PHItmp->getParent())),
                            TyPosition::make_end_of_block(SRC, *Predtmp, termIndex[getBasicBlockIndex(Predtmp)])));
 
                 std::shared_ptr<TyTransitivityTgt> transitivitytgt
                   (new TyTransitivityTgt(VAR(Rstore, Ghost),
                                          VAR(Rphitmp, Previous),
                                          VAR(Rphi, Physical)));
+
+                mem2regCmd[Rphitmp].transTgt.push_back(transitivitytgt);
+                transTgt.push_back(transitivitytgt);
 
                 INFRULE(TyPosition::make(TGT, PHI->getParent()->getName(),
                                          Predtmp->getName()),

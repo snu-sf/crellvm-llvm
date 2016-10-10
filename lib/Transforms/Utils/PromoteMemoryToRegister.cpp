@@ -538,7 +538,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           (NULL, OnlyStore, LI, instrIndex[LI]);
       }
 
-      // now working : remove duplicate hint generation code
+      // remove duplicated targets
       std::vector<Instruction*> availInst;
       availInst.clear();
 
@@ -906,6 +906,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         std::string Rload = llvmberry::getVariable(*LI);
 
         // propagate undef from alloca to load
+        /*
         PROPAGATE(
             LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                       new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
@@ -913,13 +914,30 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                     SRC),
         BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
                llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+        */
 
+        std::shared_ptr<llvmberry::TyPropagateObject> lessdef_src =
+          LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+                  VAR(Ralloca, Ghost),
+                  SRC);
+        /*
         PROPAGATE(
             LESSDEF(VAR(Ralloca, Ghost),
                     EXPR(UndefVal, Physical),
                     TGT),
-        BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-               llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+            BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                   llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+        */
+
+        std::shared_ptr<llvmberry::TyPropagateObject> lessdef_tgt =
+          LESSDEF(VAR(Ralloca, Ghost),
+                  EXPR(UndefVal, Physical),
+                  TGT);
+
+        std::vector<llvm::BasicBlock*> worklist;
+        worklist.push_back(LI->getParent());
+        llvmberry::generateHintForMem2RegPropagatePerBlock(lessdef_src, lessdef_tgt, AI, LI, worklist, LI->getParent());
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
                 llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),

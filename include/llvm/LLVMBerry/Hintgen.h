@@ -196,6 +196,13 @@ bool is_inverse_expression(Expression e1, Expression e2);
 void makeReachableBlockMap(llvm::BasicBlock* Src,
                            llvm::BasicBlock* Tgt);
 
+void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> lessdef_src,
+                                             std::shared_ptr<TyPropagateObject> lessdef_tgt,
+                                             llvm::Instruction* from,
+                                             llvm::Instruction* to,
+                                             std::vector<llvm::BasicBlock*> worklist,
+                                             llvm::BasicBlock* BB);
+
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst* SI,
                                           llvm::Instruction* next,
