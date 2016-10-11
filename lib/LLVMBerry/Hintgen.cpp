@@ -917,6 +917,16 @@ void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> 
     std::string toBBname = getBasicBlockIndex(toBB);
     std::string from_name = getVariable(*from);
 
+    if (fromBB == toBB) {
+      PROPAGATE(lessdef_src,
+                BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
+                       TyPosition::make(SRC, *to, instrIndex[to], "")));
+      PROPAGATE(lessdef_tgt,
+                BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
+                       TyPosition::make(SRC, *to, instrIndex[to], "")));
+      return;
+    }
+
     if (fromBB == BB) {
       PROPAGATE(lessdef_src,
                 BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
@@ -1608,6 +1618,16 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                             TGT),
                     BOUNDS(TyPosition::make(SRC, *AI),
                            TyPosition::make(SRC, *LI)));
+            
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                    llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
+                                                    REGISTER(getVariable(*AI), Ghost)));
+
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                    llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
+                                                          new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                                                      EXPR(UndefVal, Physical),
+                                                      VAR(getVariable(*AI), Ghost)));
           } else {
             PROPAGATE(
                     LESSDEF(INSN(std::shared_ptr<TyInstruction>(
@@ -1914,6 +1934,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                 mem2regCmd[Rphitmp].transTgt.push_back(transitivitytgt);
                 transTgt.push_back(transitivitytgt);
 
+                llvm::dbgs() << "here? " << Rphitmp << " Rstore :" << Rstore << " Rphi : " << Rphi << "\n";
+
                 INFRULE(TyPosition::make(TGT, PHI->getParent()->getName(),
                                          Predtmp->getName()),
                         std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
@@ -1945,6 +1967,9 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                 INFRULE(TyPosition::make(TGT, PHI->getParent()->getName(),
                                          Predtmp->getName()),
                         std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
+               
+                if (SItmp->getOperand(0)->getName() != "")
+                  mem2regCmd[getVariable(*(SItmp->getOperand(0)))].transTgt.push_back(transitivitytgt);
 
                 if (storeItem[SItmp].op0 != "%") {
                   std::cout<<"transtgt check key: "+storeItem[SItmp].op0+", "+Rstore+", "+Rphi<<std::endl;
@@ -2018,6 +2043,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                               std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
                      
                       mem2regCmd[Rphi].transTgt.push_back(transitivitytgt);
+
+                      llvm::dbgs() << "here?2 " << Rphi << "\n";
                     }
                   }
                 } else if (llvm::isa<llvm::LoadInst>(use) &&

@@ -195,7 +195,8 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
     std::shared_ptr<TyExpr> keyExprGhost = ConsVar::make(key, Ghost);
-
+    std::shared_ptr<TyExpr> keyExprPrev = ConsVar::make(key, Previous);
+  
     std::vector<std::shared_ptr<TyTransitivityTgt>> &vec =
       mem2regCmd->find(key)->second.transTgt;
 
@@ -217,7 +218,13 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
           (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
         std::cout<<"check: "<<vec[i]->getExpr2()<<std::endl;
       }
+        if (equalsIfConsVar(vec[i]->getExpr2(), keyExprPrev)) {
+          if (phiKey != "")
+             newExpr = ConsVar::make(phiKey, Previous); 
 
+          vec[i]->updateExpr2(newExpr);
+
+      }
     }
   } else if (which == "TransitivityTgt_e3") {
     std::cout<<"transTgt3 replace:"+key<<std::endl;
