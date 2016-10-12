@@ -1547,6 +1547,7 @@ void PromoteMem2Reg::run() {
                         ([&PN, &V]
                                  (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           llvmberry::generateHintForMem2RegReplaceHint(V, PN);
+          dbgs() << "phi delete change phi : " << *PN << "  value : " << *V << "\n";
         });
 
         PN->replaceAllUsesWith(V);
