@@ -190,18 +190,20 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
   } else if (which == "TransitivityTgt_e2") {
     std::cout<<"transTgt2 replace:"+key<<std::endl;
     std::string phiKey = "";
-    if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
+    if (ConsVar *cv = dynamic_cast<ConsVar*>(newExpr.get()))
       phiKey = std::string(cv->getTyReg()->getName());
+    std::cout<<"check_replace_transtgt2: "<<key + "->" + phiKey <<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
     std::shared_ptr<TyExpr> keyExprGhost = ConsVar::make(key, Ghost);
+    std::shared_ptr<TyExpr> keyExprPrev = ConsVar::make(key, Previous);
 
     std::vector<std::shared_ptr<TyTransitivityTgt>> &vec =
       mem2regCmd->find(key)->second.transTgt;
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i]->getExpr2(), keyExpr)) {
-        std::cout<<"check: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
+        std::cout<<"check physical: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
         vec[i]->updateExpr2(newExpr);
 
         if (phiKey != "")
@@ -210,7 +212,10 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
       }
 
       if (equalsIfConsVar(vec[i]->getExpr2(), keyExprGhost)) {
-        std::cout<<"check: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
+        std::cout<<"check ghost: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
+        if (phiKey != "")
+          newExpr = ConsVar::make(phiKey, Ghost);
+
         vec[i]->updateExpr2(newExpr);
 
         if (phiKey != "")
@@ -218,6 +223,17 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
         std::cout<<"check: "<<vec[i]->getExpr2()<<std::endl;
       }
 
+      if (equalsIfConsVar(vec[i]->getExpr2(), keyExprPrev)) {
+        std::cout<<"check previous: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
+        if (phiKey != "")
+          newExpr = ConsVar::make(phiKey, Previous);
+          
+        vec[i]->updateExpr2(newExpr);
+
+        if (phiKey != "")
+          (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
+        std::cout<<"check: "<<vec[i]->getExpr2()<<std::endl;
+      }
     }
   } else if (which == "TransitivityTgt_e3") {
     std::cout<<"transTgt3 replace:"+key<<std::endl;
