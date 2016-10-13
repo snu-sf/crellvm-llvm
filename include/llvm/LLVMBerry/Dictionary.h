@@ -133,7 +133,7 @@ public:
 
   typedef std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                           llvm::BasicBlock*>,
-                                bool>> TyReachedEdgeTagObj;
+                                std::pair<bool, bool>>> TyReachedEdgeTagObj;
   typedef std::shared_ptr<TyReachedEdgeTagObj> TyReachedEdgeTag;
   TyReachedEdgeTag reachedEdgeTag;
 

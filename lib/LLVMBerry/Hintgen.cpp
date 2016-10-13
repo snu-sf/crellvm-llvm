@@ -1517,14 +1517,14 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
 void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                      std::vector<std::pair<llvm::BasicBlock*,
                                                            llvm::BasicBlock*>> VisitedBlock,
-                                     llvm::AllocaInst *AI) {
-  ValidationUnit::GetInstance()->intrude([&BB, &VisitedBlock, &AI]
+                                     llvm::AllocaInst *AI, bool ignore) {
+  ValidationUnit::GetInstance()->intrude([&BB, &VisitedBlock, &AI, &ignore]
       (Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
     auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
     auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
-
+    llvm::dbgs()<< " start phidelete for : " << BB->getName() << "\n";
     for(auto IN = BB->begin(), IE = BB->end(); IN != IE; ++IN) {
       llvm::Instruction *Inst = IN;
 
@@ -1533,17 +1533,28 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
           while (!VisitedBlock.empty()) {
             std::pair<std::pair<llvm::BasicBlock*,
                                 llvm::BasicBlock*>,
-                      bool> blockPairTag = std::make_pair(*VisitedBlock.rbegin(), false);
+                      std::pair<bool, bool>> blockPairTag1 = std::make_pair(*VisitedBlock.rbegin(), std::make_pair(false, false));
+            std::pair<std::pair<llvm::BasicBlock*,
+                                llvm::BasicBlock*>,
+                      std::pair<bool, bool>> blockPairTag2 = std::make_pair(*VisitedBlock.rbegin(), std::make_pair(false, true));
+
             llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
             llvm::Value *UndefVal = llvm::UndefValue::get(PN->getType());
 
-            if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
+            if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1) != reachedEdgeTag.end()) {
               std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                               llvm::BasicBlock*>,
-                                    bool>>::iterator it =
-              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag);
+                                    std::pair<bool, bool>>>::iterator it =
+              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
               int pos = std::distance(reachedEdgeTag.begin(), it);
-              reachedEdgeTag.at(pos).second = true;
+              reachedEdgeTag.at(pos).second.first = true;
+            } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2) != reachedEdgeTag.end()) {
+              std::vector<std::pair<std::pair<llvm::BasicBlock*,
+                                              llvm::BasicBlock*>,
+                                    std::pair<bool, bool>>>::iterator it =
+              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
+              int pos = std::distance(reachedEdgeTag.begin(), it);
+              reachedEdgeTag.at(pos).second.first = true;
             } else {
               assert("Cannot find edge damn");
             }
@@ -1648,16 +1659,29 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
             llvm::BasicBlock *current = (VisitedBlock.at(a)).first;
             std::pair<std::pair<llvm::BasicBlock*,
                                 llvm::BasicBlock*>,
-                      bool> blockPairTag = std::make_pair(VisitedBlock.at(a), false);
+                      std::pair<bool,bool>> blockPairTag1 = std::make_pair(VisitedBlock.at(a), std::make_pair(false, false));
+            std::pair<std::pair<llvm::BasicBlock*,
+                                llvm::BasicBlock*>,
+                      std::pair<bool,bool>> blockPairTag2 = std::make_pair(VisitedBlock.at(a), std::make_pair(false, true));
 
-            if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
+            if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1) != reachedEdgeTag.end()) {
               std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                               llvm::BasicBlock*>,
-                                    bool>>::iterator it =
-              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag);
+                                    std::pair<bool, bool>>>::iterator it =
+              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
 
               int pos = std::distance(reachedEdgeTag.begin(), it);
-              reachedEdgeTag.at(pos).second = true;
+              reachedEdgeTag.at(pos).second.first = true;
+              llvm::dbgs() << "tag true1 : " << current->getName() << " - " << (VisitedBlock.at(a)).second->getName() << "\n";
+            } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2) != reachedEdgeTag.end()) {
+              std::vector<std::pair<std::pair<llvm::BasicBlock*,
+                                              llvm::BasicBlock*>,
+                                    std::pair<bool, bool>>>::iterator it =
+              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2);
+
+              int pos = std::distance(reachedEdgeTag.begin(), it);
+              reachedEdgeTag.at(pos).second.first = true;
+              llvm::dbgs() << "tag true1 : " << current->getName() << " - " << (VisitedBlock.at(a)).second->getName() << "\n";
             }
 
             if (AI->getParent() != current) {
@@ -1700,7 +1724,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                                         EXPR(UndefVal, Physical),
                                                         VAR(getVariable(*AI), Ghost)));
             }
-
+            ignore = true;
             for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
               llvm::Use &U = *(UI++);
               llvm::Instruction *use =
@@ -1730,31 +1754,112 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
       std::pair<llvm::BasicBlock*, llvm::BasicBlock*> Bpair = std::make_pair(BB, succ);
       std::pair<std::pair<llvm::BasicBlock*,
                           llvm::BasicBlock*>,
-                bool> BpairFalse = std::make_pair(Bpair, false);
+                std::pair<bool, bool>> BpairFalse_False = std::make_pair(Bpair, std::make_pair(false, false));
       std::pair<std::pair<llvm::BasicBlock*,
                           llvm::BasicBlock*>,
-                bool> BpairTrue = std::make_pair(Bpair, true);
+                std::pair<bool, bool>> BpairFalse_True = std::make_pair(Bpair, std::make_pair(false, true));
+      std::pair<std::pair<llvm::BasicBlock*,
+                          llvm::BasicBlock*>,
+                std::pair<bool, bool>> BpairTrue_False = std::make_pair(Bpair, std::make_pair(true, false));
+      std::pair<std::pair<llvm::BasicBlock*,
+                          llvm::BasicBlock*>,
+                std::pair<bool, bool>> BpairTrue_True = std::make_pair(Bpair, std::make_pair(true, true));
 
-      llvm::dbgs() << "PHIdelete for start(" + std::to_string(i) + "): " + std::string(BB->getName()) + ", " + std::string(succ->getName()) + "\n"; 
+      if (ignore) {
+        if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse_True) != reachedEdgeTag.end()) {
+          continue;
+        } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue_False) != reachedEdgeTag.end() ||
+                    std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue_True) != reachedEdgeTag.end()) {
+          while (!VisitedBlock.empty()) {
+            llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
+            llvm::Value *UndefVal = llvm::UndefValue::get(AI->getType());
+            std::pair<std::pair<llvm::BasicBlock*,
+                              llvm::BasicBlock*>,
+                    std::pair<bool, bool>> blockPairTag = std::make_pair(*VisitedBlock.rbegin(), std::make_pair(false, true));
 
-      if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse) != reachedEdgeTag.end()) {
-        continue;
-      } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue) != reachedEdgeTag.end()) {
+          if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
+            std::vector<std::pair<std::pair<llvm::BasicBlock*,
+                                            llvm::BasicBlock*>,
+                                  std::pair<bool, bool>>>::iterator it =
+            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag);
+
+            int pos = std::distance(reachedEdgeTag.begin(), it);
+            reachedEdgeTag.at(pos).second.first = true;
+          }
+
+          VisitedBlock.pop_back();
+          llvm::dbgs() << "propagate this block when it meet previously propagate : " << current->getName() << "\n";
+
+          if (AI->getParent() != current) {
+            PROPAGATE(
+                    LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                  new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                            VAR(getVariable(*AI), Ghost),
+                            SRC),
+                    BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
+                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+
+            PROPAGATE(
+                    LESSDEF(VAR(getVariable(*AI), Ghost),
+                            EXPR(UndefVal, Physical),
+                            TGT),
+                    BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
+                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+          } else {
+            PROPAGATE(
+                    LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                  new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                            VAR(getVariable(*AI), Ghost),
+                            SRC),
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+
+            PROPAGATE(
+                    LESSDEF(VAR(getVariable(*AI), Ghost),
+                            EXPR(UndefVal, Physical),
+                            TGT),
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                    llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
+                                                    REGISTER(getVariable(*AI), Ghost)));
+
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                    llvmberry::ConsTransitivity::make(INSN(*AI),
+                                                      EXPR(UndefVal, Physical),
+                                                      VAR(getVariable(*AI), Ghost)));
+          }
+         }
+        } else /*if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse_False) != reachedEdgeTag.end())*/ { 
+          reachedEdgeTag.push_back(BpairFalse_True);
+          VisitedBlock.push_back(Bpair);
+          generateHintForMem2RegPHIdelete(succ, VisitedBlock, AI, ignore);
+          VisitedBlock.pop_back();
+          llvm::dbgs() << "PHIdelete for end(" + std::to_string(i) + "): " + std::string(BB->getName()) + ", " + std::string(succ->getName()) + "\n"; 
+          i++;
+        }
+      } else { 
+        if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse_False) != reachedEdgeTag.end() || 
+            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse_True) != reachedEdgeTag.end()) {
+          continue;
+        } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue_False) != reachedEdgeTag.end() || 
+                   std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue_True) != reachedEdgeTag.end()) {
         while (!VisitedBlock.empty()) {
           llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
           llvm::Value *UndefVal = llvm::UndefValue::get(AI->getType());
           std::pair<std::pair<llvm::BasicBlock*,
                               llvm::BasicBlock*>,
-                    bool> blockPairTag = std::make_pair(*VisitedBlock.rbegin(), false);
+                    std::pair<bool, bool>> blockPairTag = std::make_pair(*VisitedBlock.rbegin(), std::make_pair(false, false));
 
           if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
             std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                             llvm::BasicBlock*>,
-                                  bool>>::iterator it =
+                                  std::pair<bool, bool>>>::iterator it =
             std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag);
 
             int pos = std::distance(reachedEdgeTag.begin(), it);
-            reachedEdgeTag.at(pos).second = true;
+            reachedEdgeTag.at(pos).second.first = true;
           }
 
           VisitedBlock.pop_back();
@@ -1801,14 +1906,15 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
           }
         }
       } else {
-        reachedEdgeTag.push_back(BpairFalse);
+        reachedEdgeTag.push_back(BpairFalse_False);
         VisitedBlock.push_back(Bpair);
-        generateHintForMem2RegPHIdelete(succ, VisitedBlock, AI);
+        generateHintForMem2RegPHIdelete(succ, VisitedBlock, AI, ignore);
         VisitedBlock.pop_back();
         llvm::dbgs() << "PHIdelete for end(" + std::to_string(i) + "): " + std::string(BB->getName()) + ", " + std::string(succ->getName()) + "\n"; 
         i++;
       }
     }
+  }
   });
   llvm::dbgs()<< "PHIdelete end of function: " + std::string(BB->getName()) + "\n";
   return;
