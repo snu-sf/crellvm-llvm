@@ -1438,7 +1438,7 @@ void PromoteMem2Reg::run() {
       BasicBlock *start = F.begin();
       std::vector<std::pair<BasicBlock*, BasicBlock*>> VistedBlock;
 
-      llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI);
+      llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI, false);
       reachedEdgeTag.clear();
     });
   }

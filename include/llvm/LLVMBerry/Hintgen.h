@@ -226,7 +226,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
 
 void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB, 
                                      std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> VisitedBlock, 
-                                     llvm::AllocaInst* AI);
+                                     llvm::AllocaInst* AI, bool ignore);
 
 llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
                              llvm::Instruction* I, bool isInit,
