@@ -1207,7 +1207,9 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
 void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                                          llvm::PHINode* tmp,
                                          llvm::LoadInst* LI,
-                                         llvm::Instruction* use, int useIndex) {
+                                         llvm::BasicBlock* useBB,
+                                         int useIndex,
+                                         llvm::Instruction* use) {
   std::cout<<"PropLoad begin"<<std::endl;
   assert(I != NULL && "Input Instruction should not be NULL");
 
@@ -1743,7 +1745,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
                              use->getParent()) != isReachable[LI->getParent()].end())) {
-                generateHintForMem2RegPropagateLoad(AI, NULL, LI, use, useIndex);
+                //generateHintForMem2RegPropagateLoad(AI, NULL, LI, use, useIndex);
+                generateHintForMem2RegPropagateLoad(AI, NULL, LI, use->getParent(), useIndex, use);
               }
             }             
 
@@ -2363,9 +2366,8 @@ std::cout << "2nd elem4: " << storeItem[SItmp].op0 << std::endl;
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
                              use->getParent()) != isReachable[LI->getParent()].end())) {
-                generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, use, useIndex);
-                llvm::dbgs()<<"propagate load to use function : " << LI->getParent()->getParent()->getName() << " load : " << *LI << " use : " << *use << "\n";
-
+                //generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, use, useIndex);
+                generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, use->getParent(), useIndex, use);
               }
             }
           }

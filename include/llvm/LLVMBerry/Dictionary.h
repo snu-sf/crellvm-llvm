@@ -9,7 +9,7 @@
 #include "llvm/LLVMBerry/Infrules.h"
 
 #include <memory>
-#include <deque>
+#include <tuple>
 
 namespace llvmberry {
 
@@ -125,9 +125,18 @@ public:
   typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
   TyTermIndex termIndex;
 
-  typedef std::vector<llvm::BasicBlock*> TyReturnBlockObj;
-  typedef std::shared_ptr<TyReturnBlockObj> TyReturnBlock;
-  TyReturnBlock returnBlock;
+  struct UseTriple {
+    llvm::BasicBlock* BB;
+    int index;
+    llvm::Instruction* I;
+  };
+
+  typedef std::tuple<llvm::BasicBlock*, int, llvm::Instruction*> UseTupleType;
+
+  typedef std::map<llvm::Instruction*,
+                   std::vector<UseTupleType>> TyUsePileObj;
+  typedef std::shared_ptr<TyUsePileObj> TyUsePile;
+  TyUsePile usePile;
 
   typedef std::map<std::string,
                    std::vector<std::pair<llvm::BasicBlock*,
