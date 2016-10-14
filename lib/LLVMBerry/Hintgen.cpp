@@ -2352,6 +2352,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                              isReachable[LI->getParent()].end(),
                              use->getParent()) != isReachable[LI->getParent()].end())) {
                 generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, use, useIndex);
+                llvm::dbgs()<<"propagate load to use function : " << LI->getParent()->getParent()->getName() << " load : " << *LI << " use : " << *use << "\n";
+
               }
             }
           }

@@ -423,7 +423,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       }
     }
 
-    std::cout<<"SingleStore: "<<std::string(AI->getName())<<std::endl;
+    std::cout<< "Function : " << std::string(LI->getParent()->getParent()->getName()) << " SingleStore: "<<std::string(AI->getName())<<std::endl;
     // Otherwise, we *can* safely rewrite this load.
     Value *ReplVal = OnlyStore->getOperand(0);
 
@@ -885,6 +885,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
     unsigned LoadIdx = LBI.getInstructionIndex(LI);
 
+        std::cout<< "Function : " << std::string(LI->getParent()->getParent()->getName()) << " SingleBlock: "<<std::string(AI->getName())<<std::endl;
     // Find the nearest store that has a lower index than this load.
     StoresByIndexTy::iterator I =
         std::lower_bound(StoresByIndex.begin(), StoresByIndex.end(),
@@ -897,7 +898,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               ([&AI, &LI]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         Value* UndefVal = UndefValue::get(LI->getType());
-
         // prepare variables
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
         auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
