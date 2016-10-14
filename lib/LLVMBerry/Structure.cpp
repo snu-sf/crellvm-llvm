@@ -2,10 +2,12 @@
 #include <fstream>
 #include <string>
 #include <cassert>
+#include <iomanip>
 #include <cereal/archives/json.hpp>
 #include <cereal/types/vector.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
+#include <cfloat>
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
@@ -854,8 +856,12 @@ TyConstFloat::TyConstFloat(double _float_value, enum TyFloatType _float_type)
     : float_value(_float_value), float_type(_float_type) {}
 
 void TyConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(float_value),
-          cereal::make_nvp("float_type", toString(float_type)));
+  std::stringstream ss;
+  ss << std::setprecision(DECIMAL_DIG) // No digit loss
+     << float_value;
+  std::string res = ss.str();
+  archive(cereal::make_nvp("float_value", res));
+  archive(cereal::make_nvp("float_type", toString(float_type)));
 }
 
 std::shared_ptr<TyConstFloat> TyConstFloat::make(double _float_value,
