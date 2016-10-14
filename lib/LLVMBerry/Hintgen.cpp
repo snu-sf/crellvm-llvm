@@ -2036,7 +2036,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                   (new TyTransitivityTgt(VAR(Rstore, Ghost),
                                          VAR(Rphitmp, Previous),
                                          VAR(Rphi, Physical)));
-
+std::cout << "2nd elem1: " << Rphitmp << std::endl;
                 mem2regCmd[Rphitmp].transTgt.push_back(transitivitytgt);
                 transTgt.push_back(transitivitytgt);
 
@@ -2069,6 +2069,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                   (new TyTransitivityTgt(VAR(Rstore, Ghost),
                                          EXPR(SItmp->getOperand(0), Physical),
                                          VAR(Rphi, Physical)));
+std::cout << "2nd elem2: " << std::string(SItmp->getOperand(0)->getName()) << std::endl;
 
                 INFRULE(TyPosition::make(TGT, PHI->getParent()->getName(),
                                          Predtmp->getName()),
@@ -2080,6 +2081,10 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                 if (storeItem[SItmp].op0 != "%") {
                   std::cout<<"transtgt check key: "+storeItem[SItmp].op0+", "+Rstore+", "+Rphi<<std::endl;
                   transTgt.push_back(transitivitytgt);
+                }
+
+                if (SItmp->getOperand(0)->getName() != "") {
+                  mem2regCmd[getVariable(*SItmp->getOperand(0))].transTgt.push_back(transitivitytgt);
                 }
                 //check end
               }
@@ -2144,6 +2149,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                                VAR(Rphi, Previous),
                                                VAR(getVariable(*use), Physical)));
                      
+std::cout << "2nd elem3: " << Rphi << std::endl;
                       INFRULE(TyPosition::make(TGT, target->getName(),
                                                usePred->getName()),
                               std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
@@ -2304,6 +2310,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                 (new TyTransitivityTgt(VAR(Rstore, Ghost),
                                        storeItem[SItmp].expr,
                                        VAR(getVariable(*PHI), Physical)));
+
+std::cout << "2nd elem4: " << storeItem[SItmp].op0 << std::endl;
               mem2regCmd[getVariable(*PHI)].transTgt.push_back(transitivitytgt);
 
               INFRULE(TyPosition::make(TGT, LI->getParent()->getName(),
