@@ -9,7 +9,7 @@
 #include "llvm/LLVMBerry/Infrules.h"
 
 #include <memory>
-#include <deque>
+#include <tuple>
 
 namespace llvmberry {
 
@@ -109,7 +109,7 @@ DEFINE_TRAITS(ArgForFindAvailableLoadedValue, FindAvailableLoadedValueArg);
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Mem2RegArg
 struct Mem2RegArg {
 public:
-  typedef std::vector<llvm::AllocaInst *> TyAllocasObj;
+  typedef std::vector<llvm::AllocaInst*> TyAllocasObj;
   typedef std::shared_ptr<TyAllocasObj> TyAllocas;
   TyAllocas allocas;
 
@@ -117,13 +117,26 @@ public:
   typedef std::shared_ptr<TyDiffblocksObj> TyDiffblocks;
   TyDiffblocks diffBlocks;
 
-  typedef std::map<const llvm::Instruction *, unsigned> TyInstrIndexObj;
+  typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndexObj;
   typedef std::shared_ptr<TyInstrIndexObj> TyInstrIndex;
   TyInstrIndex instrIndex;
 
   typedef std::map<std::string, unsigned> TyTermIndexObj;
   typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
   TyTermIndex termIndex;
+
+  struct UseTriple {
+    llvm::BasicBlock* BB;
+    int index;
+    llvm::Instruction* I;
+  };
+
+  typedef std::tuple<llvm::BasicBlock*, int, llvm::Instruction*> UseTupleType;
+
+  typedef std::map<llvm::Instruction*,
+                   std::vector<UseTupleType>> TyUsePileObj;
+  typedef std::shared_ptr<TyUsePileObj> TyUsePile;
+  TyUsePile usePile;
 
   typedef std::map<std::string,
                    std::vector<std::pair<llvm::BasicBlock*,
