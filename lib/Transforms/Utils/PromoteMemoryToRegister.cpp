@@ -1199,7 +1199,6 @@ void PromoteMem2Reg::run() {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
     auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
     auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
-    auto &returnBlock = *(data.get<llvmberry::ArgForMem2Reg>()->returnBlock);
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
     auto &strVec = *(data.get<llvmberry::ArgForMem2Reg>()->strVec);
     auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
@@ -1209,9 +1208,6 @@ void PromoteMem2Reg::run() {
 
       std::string blockName = llvmberry::getBasicBlockIndex(BB);
       termIndex[blockName] = llvmberry::getTerminatorIndex(BB->getTerminator());
-
-      if (isa<ReturnInst>(BB->getTerminator()))
-        returnBlock.push_back(BB);
 
       strVec.clear();
       isReachable[BB].push_back(BB);

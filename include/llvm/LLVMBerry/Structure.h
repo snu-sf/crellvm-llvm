@@ -188,7 +188,9 @@ public:
   static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           const llvm::Instruction &I, int index,
                                           std::string _prev_block_name);
-
+  static  std::shared_ptr<TyPosition> make(enum TyScope _scope,
+                                           const llvm::BasicBlock &BB,
+                                           int index);
 private:
   enum TyScope scope;
   std::string block_name;

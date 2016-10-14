@@ -1216,6 +1216,10 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
+    auto &returnBlock = *(data.get<ArgForMem2Reg>()->returnBlock);
+    auto &allocas = *(data.get<ArgForMem2Reg>()->allocas);
+    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+
     std::string Rload = getVariable(*LI);
     if (llvm::isa<llvm::PHINode>(use)) {
       llvm::dbgs() << "LI : " << *LI << "\n";
@@ -1266,7 +1270,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
       } else {
         PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
                   BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                         TyPosition::make(SRC, *use, useIndex, "")));
+                         TyPosition::make(SRC, *BB, useIndex)));
       }
       blockPairVec.clear();
       llvm::PHINode* PHI = NULL; 
@@ -1298,7 +1302,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
           PROPAGATE(
               std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                     TyPosition::make(SRC, *use, useIndex, "")));
+                     TyPosition::make(SRC, *BB, useIndex)));
         }
         std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
                                                       VAR(Rload, Ghost),
@@ -1333,7 +1337,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
           PROPAGATE(
               std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                     TyPosition::make(SRC, *use, useIndex, "")));
+                     TyPosition::make(SRC, *BB, useIndex)));
         }
         std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
                                                       VAR(Rload, Ghost),
@@ -1378,7 +1382,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
       } else {
         PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
                   BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                         TyPosition::make(SRC, *use, useIndex, "")));
+                         TyPosition::make(SRC, *BB, useIndex)));
       }
       // now working:: not sure
         std::shared_ptr<TyPropagateLessdef> lessdef =
@@ -1406,7 +1410,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
           PROPAGATE(
               std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                     TyPosition::make(SRC, *use, useIndex, "")));
+                     TyPosition::make(SRC, *BB, useIndex)));
         }
 
         std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
