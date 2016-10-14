@@ -109,7 +109,7 @@ DEFINE_TRAITS(ArgForFindAvailableLoadedValue, FindAvailableLoadedValueArg);
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Mem2RegArg
 struct Mem2RegArg {
 public:
-  typedef std::vector<llvm::AllocaInst *> TyAllocasObj;
+  typedef std::vector<llvm::AllocaInst*> TyAllocasObj;
   typedef std::shared_ptr<TyAllocasObj> TyAllocas;
   TyAllocas allocas;
 
@@ -117,13 +117,17 @@ public:
   typedef std::shared_ptr<TyDiffblocksObj> TyDiffblocks;
   TyDiffblocks diffBlocks;
 
-  typedef std::map<const llvm::Instruction *, unsigned> TyInstrIndexObj;
+  typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndexObj;
   typedef std::shared_ptr<TyInstrIndexObj> TyInstrIndex;
   TyInstrIndex instrIndex;
 
   typedef std::map<std::string, unsigned> TyTermIndexObj;
   typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
   TyTermIndex termIndex;
+
+  typedef std::vector<llvm::BasicBlock*> TyReturnBlockObj;
+  typedef std::shared_ptr<TyReturnBlockObj> TyReturnBlock;
+  TyReturnBlock returnBlock;
 
   typedef std::map<std::string,
                    std::vector<std::pair<llvm::BasicBlock*,
@@ -177,6 +181,8 @@ public:
                    std::vector<llvm::BasicBlock*>> TyReachableObj;
   typedef std::shared_ptr<TyReachableObj> TyReachable;
   TyReachable isReachable;
+
+  
 
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);

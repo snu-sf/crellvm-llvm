@@ -73,7 +73,8 @@ VisitICmpArg::VisitICmpArg() {
 Mem2RegArg::Mem2RegArg()
     : allocas(new TyAllocasObj()), diffBlocks(new TyDiffblocksObj()),
       instrIndex(new TyInstrIndexObj()), termIndex(new TyTermIndexObj()),
-      reachedEdge(new TyReachedEdgeObj()), reachedEdgeTag(new TyReachedEdgeTagObj()),
+      returnBlock(new TyReturnBlockObj()), reachedEdge(new TyReachedEdgeObj()),
+      reachedEdgeTag(new TyReachedEdgeTagObj()),
       storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
       transTgt(new TyTransTgtObj()), strVec(new TyStrVecObj()),
       blockPairVec(new TyBlockPairVecObj()), isReachable(new TyReachableObj()) {}
