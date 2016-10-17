@@ -1273,6 +1273,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                   BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                          TyPosition::make(SRC, *useBB, useIndex)));
       }
+
       blockPairVec.clear();
       llvm::PHINode* PHI = NULL; 
       if (llvm::Instruction* Itmp = properPHI(LI->getParent(), Rstore, SI, true, false, data))
@@ -1286,6 +1287,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
              TGT);
 
         mem2regCmd[Rload].lessdef.push_back(lessdef);
+        
         if (llvm::isa<llvm::PHINode>(use)) {
           llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
           for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
@@ -1305,6 +1307,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
               BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                      TyPosition::make(SRC, *useBB, useIndex)));
         }
+
         std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
                                                       VAR(Rload, Ghost),
                                                       VAR(Rstore, Ghost),
