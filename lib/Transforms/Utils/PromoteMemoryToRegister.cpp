@@ -825,6 +825,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         // prepare variables
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
         auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
         auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
         std::string Ralloca = llvmberry::getVariable(*AI);
         std::string Rload = llvmberry::getVariable(*LI);
@@ -856,22 +857,32 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                                   VAR(Ralloca, Ghost)));
 
         // add hints per use of load
-        for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
-          Use &U = *(UI++);
-          Instruction *use = dyn_cast<Instruction>(U.getUser());
+        //for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
+        for (auto UI = usePile[LI].begin(), E = usePile[LI].end(); UI != E;) {
+          auto t = *(UI++);
+          BasicBlock* useBB = std::get<0>(t);
+          int useIndex =
+            llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
+                                         termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
+
+          //Use &U = *(UI++);
+          //Instruction *use = dyn_cast<Instruction>(U.getUser());
 
           // set index of use
-          int useIndex = 
-                llvmberry::getIndexofMem2Reg
-                  (use, instrIndex[use],
-                   termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
+          //int useIndex = 
+          //      llvmberry::getIndexofMem2Reg
+          //        (use, instrIndex[use],
+          //         termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
+
+          // now working : should we check if use is PHI?(161018)
 
           // propagate undef from load to use
           PROPAGATE(LESSDEF(VAR(Rload, Physical),
                             VAR(Rload, Ghost),
                             SRC),
                     BOUNDS(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                           llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+                           //llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+                           llvmberry::TyPosition::make(SRC, *useBB, useIndex)));
 
           std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef =
             llvmberry::TyPropagateLessdef::make
@@ -883,7 +894,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               std::shared_ptr<llvmberry::TyPropagateObject>
                 (new llvmberry::ConsLessdef(lessdef)),
               BOUNDS(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                     llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+                     //llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+                     llvmberry::TyPosition::make(SRC, *useBB, useIndex)));
 
           mem2regCmd[Rload].lessdef.push_back(lessdef);
 

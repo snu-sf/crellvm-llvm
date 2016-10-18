@@ -1948,6 +1948,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
     // prepare variables
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    auto &usePile = *(data.get<ArgForMem2Reg>()->usePile);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &transTgt = *(data.get<ArgForMem2Reg>()->transTgt);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
@@ -1997,7 +1998,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
             // <Condition 1>
             // check if one of incoming values of PHI is
             // stored value of current SI
-            if (/*Predtmp != PHI->getParent() && */PAM.count(PHI) &&
+            if (PAM.count(PHI) &&
                 // fragile: this condition relies on llvm naming convention of PHI
                 Rstore == Rphi.substr(0, Rphi.rfind("."))) {
 
@@ -2010,9 +2011,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
               // <Condition 2-1>
               // if there is no other PHI between SI and current PHI,
               // we can propagate store to current PHI
-              //if (PHItmp == NULL /*||
-              if (Itmp == NULL /*
-                  (PHItmp != NULL && (BBtmp == SItmp->getParent()))*/) {
+              if (Itmp == NULL) {
                 generateHintForMem2RegPropagateStore(Predtmp, SItmp, PHI, termIndex[getBasicBlockIndex(Predtmp)]);
               } else if (llvm::PHINode* PHItmp = llvm::dyn_cast<llvm::PHINode>(Itmp)) {
               // <Condition 2-2>
@@ -2227,67 +2226,7 @@ std::cout << "2nd elem3: " << Rphi << std::endl;
 
           if (PHI != NULL) {
             std::string Rphi = getVariable(*PHI);
-/*            
-            blockPairVec.clear();
-            llvm::PHINode* PHIbefore = NULL;
-            if (llvm::Instruction* Itmp = properPHI(LI->getParent(), Rstore, SItmp, false, false, data))
-              PHIbefore = llvm::dyn_cast<llvm::PHINode>(Itmp);
-            if (PHIbefore != NULL) {
-              llvm::BasicBlock* source = PHIbefore->getParent();
-              llvm::BasicBlock* target = PHI->getParent();
-            
-              if (source != target) {
-                for (auto UI2 = pred_begin(target), UE2 = pred_end(target); UI2 != UE2; UI2++) {
-                  llvm::BasicBlock* usePred = *UI2;
 
-                  if (std::find(isReachable[source].begin(),
-                                isReachable[source].end(),
-                                usePred) != isReachable[source].end()) {
-                    blockPairVec.clear();
-                    llvm::PHINode* PHItmp = NULL; 
-                      if (llvm::Instruction* Itmp = properPHI(usePred, Rstore, SItmp, true, true, data))
-                        PHItmp = llvm::dyn_cast<llvm::PHINode>(Itmp);
-
-                    if (PHItmp != NULL) {
-                      if (PHIbefore == PHItmp) {
-                        PROPAGATE(
-                            LESSDEF(INSN(std::shared_ptr<TyInstruction>(
-                                      new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
-                                    VAR(Rstore, Ghost), SRC),
-                            BOUNDS(TyPosition::make_start_of_block(
-                                       TGT, getBasicBlockIndex(source)),
-                                   TyPosition::make_end_of_block(TGT, *usePred)));
-
-                        std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
-                                                                      (VAR(Rstore,Ghost),
-                                                                       VAR(getVariable(*PHIbefore), Physical),
-                                                                       TGT);
-                        //mem2regCmd[Rphi].lessdef.push_back(lessdef);
-
-                        PROPAGATE(
-                            std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                            BOUNDS(TyPosition::make_start_of_block(
-                                       TGT, getBasicBlockIndex(source)),
-                                   TyPosition::make_end_of_block(TGT, *usePred)));
-
-                        
-                        std::shared_ptr<TyTransitivityTgt> transitivitytgt
-                          (new TyTransitivityTgt(VAR(Rstore, Ghost),
-                                                 VAR(getVariable(*PHIbefore), Previous),
-                                                 VAR(Rphi, Physical)));
-                       
-                        INFRULE(TyPosition::make(TGT, target->getName(),
-                                                 usePred->getName()),
-                                std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
-                       
-                        //mem2regCmd[Rphi].transTgt.push_back(transitivitytgt);
-                      }
-                    }
-                  }
-                }
-              }
-            }
-*/
             PROPAGATE(
                 LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                           new ConsLoadInst(TyLoadInst::makeAlignOne(SItmp)))),
@@ -2354,22 +2293,27 @@ std::cout << "2nd elem4: " << storeItem[SItmp].op0 << std::endl;
             }
 
             // add hints per every use of LI
-            for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
-              llvm::Use &U = *(UI++);
-              llvm::Instruction *use =
-                  llvm::dyn_cast<llvm::Instruction>(U.getUser());
+            //for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
+            for (auto UI = usePile[LI].begin(), E = usePile[LI].end(); UI != E;) {
+              auto t = *(UI++);
+              llvm::BasicBlock* useBB = std::get<0>(t);
+              int useIndex =
+                llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
+                                             termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
+              //llvm::Use &U = *(UI++);
+              //llvm::Instruction *use =
+              //    llvm::dyn_cast<llvm::Instruction>(U.getUser());
 
               // set index of use
-              int useIndex = getIndexofMem2Reg(
-                  use, instrIndex[use],
-                  termIndex[getBasicBlockIndex(use->getParent())]);
-              if ((LI->getParent() == use->getParent() &&
-                   instrIndex[LI] < instrIndex[use]) ||
+              //int useIndex = getIndexofMem2Reg(
+              //    use, instrIndex[use],
+              //    termIndex[getBasicBlockIndex(use->getParent())]);
+              if ((LI->getParent() == useBB &&
+                   instrIndex[LI] < std::get<1>(t)) ||
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
-                             use->getParent()) != isReachable[LI->getParent()].end())) {
-                //generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, use, useIndex);
-                generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, use->getParent(), useIndex, use);
+                             useBB) != isReachable[LI->getParent()].end())) {
+                generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, useBB, useIndex, std::get<2>(t));
               }
             }
           }
