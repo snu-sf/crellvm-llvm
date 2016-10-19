@@ -1125,7 +1125,7 @@ void PromoteMem2Reg::run() {
 
   std::vector<AllocaInst *> &allocs = Allocas;
   llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&allocs, &F]
+          ([&allocs, &F, this]
             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
     auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
@@ -1159,7 +1159,6 @@ void PromoteMem2Reg::run() {
       for (auto UI = AItmp->user_begin(), E = AItmp->user_end(); UI != E;) {
         Instruction *tmpInst = cast<Instruction>(*UI++);
         bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
-
         instrIndex[tmpInst] = llvmberry::getCommandIndex(*tmpInst);
 
         // save information of instruction's use
@@ -1168,9 +1167,45 @@ void PromoteMem2Reg::run() {
 
           if (Instruction* tmpUseinst = dyn_cast<Instruction>(U.getUser())) {
             instrIndex[tmpUseinst] = llvmberry::getCommandIndex(*tmpUseinst);
-            usePile[tmpInst].push_back(std::make_tuple(tmpUseinst->getParent(),
-                                                       instrIndex[tmpUseinst],
-                                                       tmpUseinst));
+
+            BasicBlock* useBB = tmpUseinst->getParent();
+            bool flag = false;
+            bool findReachable = false;
+
+            for (auto UI3 = usePile[tmpInst].begin(),
+                       E3 = usePile[tmpInst].end(); UI3 != E3;) {
+              auto t = *UI3;
+              Instruction* checkI = std::get<2>(t);
+              BasicBlock* checkBB = std::get<0>(t);
+              
+              if (useBB == checkBB) {
+                if (instrIndex[tmpUseinst] > std::get<1>(t)) {
+                  int pos = std::distance(usePile[tmpInst].begin(), UI3);
+
+                  usePile[tmpInst].erase(usePile[tmpInst].begin()+pos);
+                  flag = true;
+                  break;
+                }
+              }
+
+              if (!DT.dominates(useBB, checkBB)) {
+                flag = true;
+
+                if (DT.dominates(checkBB, useBB)) {
+                  int pos = std::distance(usePile[tmpInst].begin(), UI3);
+
+                  usePile[tmpInst].erase(usePile[tmpInst].begin()+pos);
+                }
+              } else {
+                findReachable = true;
+              }
+              UI3++;
+            }
+
+            if (!findReachable || flag)
+              usePile[tmpInst].push_back(std::make_tuple(tmpUseinst->getParent(),
+                                                         instrIndex[tmpUseinst],
+                                                         tmpUseinst));
           }
         }
 
