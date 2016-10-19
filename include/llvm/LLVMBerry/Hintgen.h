@@ -200,7 +200,7 @@ void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> 
                                              std::shared_ptr<TyPropagateObject> lessdef_tgt,
                                              llvm::Instruction* from,
                                              llvm::Instruction* to,
-                                             std::vector<llvm::BasicBlock*> worklist,
+                                             std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> worklist,
                                              llvm::BasicBlock* BB);
 
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,

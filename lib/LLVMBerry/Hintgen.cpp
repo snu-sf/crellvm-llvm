@@ -904,7 +904,7 @@ void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> 
                                              std::shared_ptr<TyPropagateObject> lessdef_tgt,
                                              llvm::Instruction* from,
                                              llvm::Instruction* to, 
-                                             std::vector<llvm::BasicBlock *> worklist,
+                                             std::vector<std::pair<llvm::BasicBlock *, llvm::BasicBlock *>> worklist,
                                              llvm::BasicBlock* BB) {
   ValidationUnit::GetInstance()->intrude([&lessdef_src, &lessdef_tgt, &from,
                                           &to, &worklist, &BB](
@@ -928,6 +928,8 @@ void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> 
     }
 
     if (fromBB == BB) {
+      std::cout << "blockpropagate 0 " << fromBBname << std::endl;
+
       PROPAGATE(lessdef_src,
                 BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
                        TyPosition::make_end_of_block(SRC, *fromBB, termIndex[fromBBname])));
@@ -938,15 +940,15 @@ void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> 
       // propagate from inst to end of block
       //for (unsigned i = 0; i < worklist.size(); i++) {
       while(!worklist.empty()) {
-        llvm::BasicBlock *BBtmp = *worklist.rbegin();
+        llvm::BasicBlock *BBtmp = (*worklist.rbegin()).second;
         std::string BBtmpName = getBasicBlockIndex(BBtmp);
         worklist.pop_back();
        
-        if (fromBB == BBtmp)
-          continue;
+        /*if (fromBB == BBtmp)
+          continue; */
 
         if (toBB == BBtmp) {
-          std::cout << "blockpropagate 1" << std::endl;
+          std::cout << "blockpropagate 1 " << toBBname << std::endl;
           PROPAGATE(lessdef_src,
                     BOUNDS(TyPosition::make_start_of_block(SRC, toBBname),
                            TyPosition::make(SRC, *to, instrIndex[to], "")));
@@ -954,7 +956,7 @@ void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> 
                     BOUNDS(TyPosition::make_start_of_block(SRC, toBBname),
                            TyPosition::make(SRC, *to, instrIndex[to], "")));
         } else { 
-          std::cout << "blockpropagate 2" << std::endl;
+          std::cout << "blockpropagate 2 " << BBtmpName << std::endl;
           PROPAGATE(lessdef_src,
                     BOUNDS(TyPosition::make_start_of_block(SRC, BBtmpName),
                            TyPosition::make_end_of_block(SRC, *BBtmp, termIndex[BBtmpName])));
@@ -972,11 +974,12 @@ void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> 
     
     for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE;) {
       llvm::BasicBlock* pred = *(BI++);
+      std::pair<llvm::BasicBlock *, llvm::BasicBlock *> pred_edge = std::make_pair(pred, BB);
       
-      if (std::find(worklist.begin(), worklist.end(), pred) != worklist.end())
+      if (std::find(worklist.begin(), worklist.end(), pred_edge) != worklist.end())
         continue;
 
-      worklist.push_back(pred);
+      worklist.push_back(pred_edge);
       generateHintForMem2RegPropagatePerBlock(lessdef_src, lessdef_tgt, from, to, worklist, pred);
     }
   });
@@ -1629,14 +1632,14 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                   new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                             VAR(getVariable(*AI), Ghost),
                             SRC),
-                    BOUNDS(TyPosition::make(SRC, *AI),
-                           TyPosition::make(SRC, *LI)));
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                           TyPosition::make(SRC, *LI, instrIndex[LI], "")));
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
                             EXPR(llvm::UndefValue::get(LI->getType()), Physical),
                             TGT),
-                    BOUNDS(TyPosition::make(SRC, *AI),
-                           TyPosition::make(SRC, *LI)));
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                           TyPosition::make(SRC, *LI, instrIndex[LI], "")));
             
             INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
                     llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
@@ -1654,13 +1657,13 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                             VAR(getVariable(*AI), Ghost),
                             SRC),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
-                           TyPosition::make(SRC, *LI)));
+                           TyPosition::make(SRC, *LI, instrIndex[LI], "")));
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
                             EXPR(UndefVal, Physical),
                             TGT),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
-                           TyPosition::make(SRC, *LI))); 
+                           TyPosition::make(SRC, *LI, instrIndex[LI], ""))); 
           }
 
           for (unsigned a = 0; a < VisitedBlock.size(); a++) {
@@ -1872,7 +1875,6 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
           }
 
           VisitedBlock.pop_back();
-          
           if (AI->getParent() != current) {
             PROPAGATE(
                     LESSDEF(INSN(std::shared_ptr<TyInstruction>(
@@ -1888,6 +1890,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                             TGT),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
                            TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+  llvm::dbgs() << "propagate this block when it meet previously propagate normal : " << current->getName() << "  " << *AI << "\n";        
+
           } else {
             PROPAGATE(
                     LESSDEF(INSN(std::shared_ptr<TyInstruction>(
@@ -1912,6 +1916,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                     llvmberry::ConsTransitivity::make(INSN(*AI),
                                                       EXPR(UndefVal, Physical),
                                                       VAR(getVariable(*AI), Ghost)));
+  llvm::dbgs() << "propagate this block when it meet previously propagate normal entry: " << current->getName() << "\n";        
+
           }
         }
       } else {
