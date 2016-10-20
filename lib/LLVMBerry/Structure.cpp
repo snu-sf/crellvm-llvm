@@ -227,6 +227,19 @@ std::string getVariable(const llvm::Value &value) {
   return val;
 }
 
+llvm::Instruction *getPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB) {
+  llvm::Instruction *result = I->clone();
+  for (unsigned i = 0, e = I->getNumOperands(); i != e; ++i) {
+    llvm::Value *Op = I->getOperand(i);
+    if (llvm::PHINode *OpPHI = llvm::dyn_cast<llvm::PHINode>(Op)) {
+      if (I->getParent() != OpPHI->getParent())
+        continue;
+      result->setOperand(i, OpPHI->getIncomingValueForBlock(PB));
+    }
+  }
+  return result;
+}
+
 std::string toString(llvmberry::TyFbop bop) {
   switch (bop) {
   case llvmberry::BopFadd:
