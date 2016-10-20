@@ -1009,8 +1009,6 @@ void generateHintForMem2RegPropagateLoad(llvm::StoreInst *SI,
   });
 }
 
-void generateHintForGVNPRE() {}
-
 int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex) {
   if (llvm::isa<llvm::TerminatorInst>(*instr))
     return termIndex;
