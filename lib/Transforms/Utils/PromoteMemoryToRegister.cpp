@@ -1178,7 +1178,9 @@ void PromoteMem2Reg::run() {
               BasicBlock* checkBB = std::get<0>(t);
               
               if (useBB == checkBB) {
-                if (instrIndex[tmpUseinst] > std::get<1>(t)) {
+                if ((!llvm::isa<llvm::PHINode>(tmpUseinst) &&
+                     (instrIndex[tmpUseinst] > std::get<1>(t))) ||
+                    llvm::isa<llvm::PHINode>(std::get<2>(t))) {
                   int pos = std::distance(usePile[tmpInst].begin(), UI3);
 
                   usePile[tmpInst].erase(usePile[tmpInst].begin()+pos);
