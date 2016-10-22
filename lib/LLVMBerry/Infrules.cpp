@@ -2572,6 +2572,25 @@ void ConsPtrtointBitcast::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(inttoptr_bitcast));
 }
 
+TyPtrtointInttoptr::TyPtrtointInttoptr(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty) : src(_src), mid(_mid), dst(_dst), srcty(_srcty), midty(_midty), dstty(_dstty){
+}
+void TyPtrtointInttoptr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(src), CEREAL_NVP(mid), CEREAL_NVP(dst), CEREAL_NVP(srcty), CEREAL_NVP(midty), CEREAL_NVP(dstty));
+}
+
+ConsPtrtointInttoptr::ConsPtrtointInttoptr(std::shared_ptr<TyPtrtointInttoptr> _ptrtoint_inttoptr) : ptrtoint_inttoptr(_ptrtoint_inttoptr){
+}
+std::shared_ptr<TyInfrule> ConsPtrtointInttoptr::make(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty){
+  std::shared_ptr<TyPtrtointInttoptr> _val(new TyPtrtointInttoptr(_src, _mid, _dst, _srcty, _midty, _dstty));
+  return std::shared_ptr<TyInfrule>(new ConsPtrtointInttoptr(_val));
+}
+void ConsPtrtointInttoptr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("PtrtointInttoptr");
+  archive(CEREAL_NVP(ptrtoint_inttoptr));
+}
+
 TyPtrtointLoad::TyPtrtointLoad(std::shared_ptr<TyValue> _ptr,
                                std::shared_ptr<TyValueType> _ptrty,
                                std::shared_ptr<TyValue> _v1,
@@ -4938,6 +4957,25 @@ void TySextBitcast::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(srcty));
   archive(CEREAL_NVP(midty));
   archive(CEREAL_NVP(dstty));
+}
+
+TySextTruncAshr::TySextTruncAshr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _v, std::shared_ptr<TySize> _s1, std::shared_ptr<TySize> _s2, std::shared_ptr<TyConstInt> _i3) : z(_z), x(_x), xprime(_xprime), v(_v), s1(_s1), s2(_s2), i3(_i3){
+}
+void TySextTruncAshr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(z), CEREAL_NVP(x), CEREAL_NVP(xprime), CEREAL_NVP(v), CEREAL_NVP(s1), CEREAL_NVP(s2), CEREAL_NVP(i3));
+}
+
+ConsSextTruncAshr::ConsSextTruncAshr(std::shared_ptr<TySextTruncAshr> _sext_trunc_ashr) : sext_trunc_ashr(_sext_trunc_ashr){
+}
+std::shared_ptr<TyInfrule> ConsSextTruncAshr::make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _v, std::shared_ptr<TySize> _s1, std::shared_ptr<TySize> _s2, std::shared_ptr<TyConstInt> _i3){
+  std::shared_ptr<TySextTruncAshr> _val(new TySextTruncAshr(_z, _x, _xprime, _v, _s1, _s2, _i3));
+  return std::shared_ptr<TyInfrule>(new ConsSextTruncAshr(_val));
+}
+void ConsSextTruncAshr::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("SextTruncAshr");
+  archive(CEREAL_NVP(sext_trunc_ashr));
 }
 
 TySextZext::TySextZext(std::shared_ptr<TyValue> _src,
