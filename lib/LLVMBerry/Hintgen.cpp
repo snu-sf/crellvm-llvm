@@ -1056,6 +1056,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
         data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, 
                                                   TyExpr::make(*(SI->getOperand(0)),
                                                                 Physical))) {
+      llvm::dbgs() << "no change SI inf :" << *SI << "\n";
       // stored value will not be changed in another iteration
       std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(storeItem[SI].expr,
                                                            REGISTER(Rstore, Ghost)));
@@ -1083,6 +1084,8 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
           position,
           std::shared_ptr<TyInfrule>(new ConsTransitivity(transitivity)));
     } else {
+
+       llvm::dbgs() << " may change SI inf :" << *SI << "\n";
       std::shared_ptr<TyPosition> position =
         TyPosition::make(SRC, *SI, instrIndex[SI], "");
 
@@ -1128,9 +1131,10 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
   auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
   auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
   llvm::BasicBlock *IB = I->getParent();
-
+  //checkSI = true;
   // return NULL if IB block is same as BB block 
-  if (BB == IB)
+  //if (!isInit && (BB == IB))
+   if (BB == IB)
     return NULL;
 
   // if isInit is true, check current BB
@@ -1162,7 +1166,10 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
       }
     }
   }
-
+  // return NULL if IB block is same as BB block 
+/*  if (BB == IB)
+    return NULL;
+*/
   for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE;) {
     llvm::BasicBlock* BBtmp = *(BI++);
 

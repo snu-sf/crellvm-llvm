@@ -829,6 +829,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
         std::string Ralloca = llvmberry::getVariable(*AI);
         std::string Rload = llvmberry::getVariable(*LI);
+    std::cout<< "Function : " << std::string(LI->getParent()->getParent()->getName()) << " SingleBlock UNDEF: "<<std::string(AI->getName())<<  std::endl;
 
         // propagate undef from alloca to load
         std::shared_ptr<llvmberry::TyPropagateObject> lessdef_src =
@@ -969,6 +970,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
         std::string Rload = llvmberry::getVariable(*LI);
+    std::cout<< "Function : " << std::string(LI->getParent()->getParent()->getName()) << " SingleBlock NORMAL: "<<std::string(AI->getName())<<std::endl;
 
         // Step1: propagate store instruction
         //        <src>           |     <tgt>
@@ -1794,11 +1796,12 @@ NextIteration:
             }
 
             if (AI != NULL) {
+              llvm::dbgs() << "PHI undef AI " << AI->getName() << "\n";
               for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
                 Instruction *User = cast<Instruction>(*UI++);
                 blockPairVec.clear();
                 if (LoadInst *LI = dyn_cast<LoadInst>(User)) {
-                  bool phi_exists = false;
+                 /* bool phi_exists = false;
                   if (llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(LI->getParent()->begin())) {
                     llvm::BasicBlock::iterator PNI = LI->getParent()->begin();
 
@@ -1810,26 +1813,36 @@ NextIteration:
                       PNI++;
                       PHI = llvm::dyn_cast<llvm::PHINode>(PNI);
                     }
-                  }
+                  } */
 
-                  if ((APN->getParent() == LI ->getParent() || DT.dominates(APN->getParent(), LI->getParent())) && !phi_exists) {
+                  if (APN->getParent() == LI ->getParent() || (DT.dominates(APN->getParent(), LI->getParent()) /*&& !phi_exists*/)) {
+                    llvm::dbgs() << "Is it in ? AI " << AI->getName() << " APN is " << *APN << " LI is " << *LI << "\n";
                     PHINode *check = NULL;
                     StoreInst *ST = NULL;
                     Instruction *tmp = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, true, data);
-
                     if (tmp != NULL) {
+                      llvm::dbgs() << "PHI undef tmp " << *tmp << "\n";
                       check = dyn_cast<PHINode>(tmp);
                       ST = dyn_cast<StoreInst>(tmp);
                     }
 
                     if (ST != NULL) {
                       if ((ST->getParent() == LI->getParent()) && (instrIndex[ST] > instrIndex[LI])) {
-                        Instruction *tmp1 = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, false, true, data);
+                        blockPairVec.clear();
+                        Instruction *tmp1 = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, false, true, data); //to check there are anything above this block
+                        blockPairVec.clear();
+                        Instruction *tmp2 = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, false, data); //to check there is phi in same block as LI 
                         PHINode *check1 = NULL;
+                        PHINode *check2 = NULL;
                         if (tmp1 != NULL) {
+                          llvm::dbgs() << "PHI undef tmp ST1 " << *tmp1 << "\n";
                           check1 = dyn_cast<PHINode>(tmp1);
                         }
-                        if (check1 == APN) {
+                        if (tmp2 != NULL) {
+                          llvm::dbgs() << "PHI undef tmp ST2 " << *tmp2 << "\n";
+                          check2 = dyn_cast<PHINode>(tmp2);
+                        }
+                        if (check2 == APN && check1 == APN) {
           dbgs() << "From APN to LI ST below LI : " << *LI << "  ST: " << *ST << "  APN block : "<< APN->getParent()->getName() << "\n";
                           PROPAGATE(
                             LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
