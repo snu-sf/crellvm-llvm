@@ -9,6 +9,7 @@
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/RuntimeOptions.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -36,6 +37,7 @@ std::string toString(llvmberry::CoreHint::RETURN_CODE return_code) {
   default:
     assert(false && "RETURN_CODE toString");
   }
+  return "";
 }
 
 std::string toString(llvmberry::TyScope scope) {
@@ -47,6 +49,7 @@ std::string toString(llvmberry::TyScope scope) {
   default:
     assert(false && "Scope toString");
   }
+  return "";
 }
 
 std::string toString(llvmberry::TyTag tag) {
@@ -60,6 +63,7 @@ std::string toString(llvmberry::TyTag tag) {
   default:
     assert(false && "Tag toString");
   }
+  return "";
 }
 
 unsigned int getRawInstrIndex(const llvm::Instruction &instr) {
@@ -159,7 +163,11 @@ static void PrintLLVMName(llvm::raw_ostream &OS, const llvm::Value *V) {
                 llvm::isa<llvm::GlobalValue>(V) ? GlobalPrefix : LocalPrefix);
 }
 
+
+
+
 namespace llvmberry {
+
 /// @return the index of the BasicBlock w.r.t. the parent function.
 std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
   if (!block || !(block->getParent())) {
@@ -255,6 +263,7 @@ std::string toString(llvmberry::TyFbop bop) {
   default:
     assert(false && "Fbop toString");
   }
+  return "";
 }
 
 std::string toString(llvmberry::TyBop bop) {
@@ -288,6 +297,7 @@ std::string toString(llvmberry::TyBop bop) {
   default:
     assert(false && "Bop toString");
   }
+  return "";
 }
 
 std::string toString(llvmberry::TyFloatType float_type) {
@@ -307,6 +317,7 @@ std::string toString(llvmberry::TyFloatType float_type) {
   default:
     assert(false && "FloatType toString");
   }
+  return "";
 }
 
 std::string toString(llvmberry::TyIcmpPred cond) {
@@ -334,6 +345,7 @@ std::string toString(llvmberry::TyIcmpPred cond) {
   default:
     assert(false && "Cond toString");
   }
+  return "";
 }
 
 std::string toString(llvmberry::TyFcmpPred fcond) {
@@ -374,6 +386,7 @@ std::string toString(llvmberry::TyFcmpPred fcond) {
     assert("llvmberry::toString(llvmberry::TyFCond fcond) : unknown fcond" &&
            false);
   }
+  return "";
 }
 
 llvmberry::TyFloatType getFloatType(llvm::Type *typ) {
@@ -926,6 +939,7 @@ std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value,
   } else {
     assert("Unknown value type" && false);
   }
+  return nullptr;
 }
 
 ConsConstInt::ConsConstInt(std::shared_ptr<TyConstInt> _const_int)
@@ -991,6 +1005,7 @@ TyConstantExpr::make(const llvm::ConstantExpr &ce) {
   rso.str();
   std::cerr << output << std::endl;
   assert("TyConstantExpr::make() : unsupported constant expression" && false);
+  return nullptr;
 }
 
 ConsConstExprGetElementPtr::ConsConstExprGetElementPtr(
@@ -1308,6 +1323,7 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
         new ConsConstDataVector(TyValueType::make(*elemty), elems));
   }
   assert("TyConstant::make() : unsupported value" && false);
+  return nullptr;
 }
 
 // size
@@ -2278,6 +2294,7 @@ std::shared_ptr<TyExpr> TyExpr::make(const std::shared_ptr<TyValue> vptr) {
   } else {
     assert("Unknown value type" && false);
   }
+  return nullptr;
 }
 
 std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value,
@@ -2716,9 +2733,7 @@ void CoreHint::setOptimizationName(const std::string &name) {
 }
 
 void intrude(std::function<void()> func) {
-  if (optPassWhiteListEnabled &&
-      std::find(optPassWhiteList.begin(), optPassWhiteList.end(),
-                ValidationUnit::GetCurrentPass()) == optPassWhiteList.end())
+  if (RuntimeOptions::IgnorePass(ValidationUnit::GetCurrentPass()))
     return;
   func();
 }

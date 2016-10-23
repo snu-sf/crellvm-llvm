@@ -53,7 +53,6 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include <algorithm>
 #include <memory>
-#include "llvm/LLVMBerry/ValidationUnit.h"
 using namespace llvm;
 using namespace opt_tool;
 
@@ -190,26 +189,6 @@ static cl::opt<bool> PreserveAssemblyUseListOrder(
     "preserve-ll-uselistorder",
     cl::desc("Preserve use-list order when writing LLVM assembly."),
     cl::init(false), cl::Hidden);
-
-////// LLVMBerry option
-static cl::opt<std::string>
-    LLVMBerryOutputDirectory("llvmberry-outputdir",
-                             cl::desc("Specify output directory of LLVMBerry"),
-                             cl::value_desc("dir"));
-
-static cl::opt<std::string>
-    LLVMBerryWhiteList("llvmberry-whitelist",
-       cl::desc("Enable hint generation for specific "
-                "optimizations only (separated by commas)"),
-       cl::value_desc("opt-names"),
-       cl::init("-"));
-
-static cl::opt<std::string>
-    LLVMBerryPassWhiteList("llvmberry-passwhitelist",
-       cl::desc("Enable hint generation for specific "
-                "passes only (separated by commas)"),
-       cl::value_desc("pass-names(instcombine, mem2reg, gvn, pre)"),
-       cl::init("-"));
 
 static inline void addPass(legacy::PassManagerBase &PM, Pass *P) {
   // Add the pass to the pass manager...
@@ -372,13 +351,6 @@ int main(int argc, char **argv) {
   // Strip debug info before running the verifier.
   if (StripDebug)
     StripDebugInfo(*M);
-
-  // LLVMBerry : set default output folder
-  llvmberry::defaultOutputDir = LLVMBerryOutputDirectory;
-  if (!(LLVMBerryWhiteList == "-"))
-    llvmberry::setWhiteList(LLVMBerryWhiteList);
-  if (!(LLVMBerryPassWhiteList == "-"))
-    llvmberry::setPassWhiteList(LLVMBerryPassWhiteList);
 
   // Immediately run the verifier to catch any problems before starting up the
   // pass pipelines.  Otherwise we can crash on broken code during
