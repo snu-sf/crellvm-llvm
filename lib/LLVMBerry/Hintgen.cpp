@@ -2202,7 +2202,7 @@ std::cout << "2nd elem3: " << Rphi << std::endl;
                        /*here*/          SRC, getBasicBlockIndex(PHI->getParent())),
                              TyPosition::make(SRC, *use, useIndex, "")));
                 } else {
-                  std::cout<<"use is not load or phi("+std::string(use->getOpcodeName())+")"<<std::endl;
+                  llvm::dbgs()<<"use is not load or phi("+std::string(use->getOpcodeName())+")"<<"\n";
                 }
               }
             }

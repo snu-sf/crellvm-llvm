@@ -779,7 +779,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 ///   for (...) { if (c) { A = undef; undef = B; } }
 ///
 /// ... so long as A is not used before undef is set.
-static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
+//static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
+static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                      LargeBlockInfo &LBI,
                                      AliasSetTracker *AST) {
   // The trickiest case to handle is when we have large blocks. Because of this,
@@ -818,8 +819,9 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                          less_first());
 
     if (I == StoresByIndex.begin()) {
+      if (StoresByIndex.empty())
       llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&AI, &LI]
+              ([&AI, &LI, &StoresByIndex]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         Value* UndefVal = UndefValue::get(LI->getType());
         // prepare variables
@@ -944,7 +946,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
           mem2regCmd[Rload].transTgt.push_back(transTgt);
         }
-
+        if (StoresByIndex.empty()) {
         // propagate maydiff
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
@@ -952,12 +954,15 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         hints.addNopPosition
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
-
+        }
         llvmberry::generateHintForMem2RegReplaceHint(UndefVal, LI);
       });
 
+      if (StoresByIndex.empty())
       // If there is no store before this load, the load takes the undef value.
       LI->replaceAllUsesWith(UndefValue::get(LI->getType()));
+      else
+        return false;
     }
     else {
       llvmberry::ValidationUnit::GetInstance()->intrude
@@ -1103,6 +1108,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   }
 
   ++NumLocalPromoted;
+  return true;
 }
 
 void PromoteMem2Reg::run() {
@@ -1345,8 +1351,10 @@ void PromoteMem2Reg::run() {
 
     // If the alloca is only read and written in one basic block, just perform a
     // linear sweep over the block to eliminate it.
-    if (Info.OnlyUsedInOneBlock) {
-      promoteSingleBlockAlloca(AI, Info, LBI, AST);
+    //if (Info.OnlyUsedInOneBlock) {
+    //  promoteSingleBlockAlloca(AI, Info, LBI, AST);
+    if (Info.OnlyUsedInOneBlock &&
+        promoteSingleBlockAlloca(AI, Info, LBI, AST)) {
         std::cout<<"singleblock success"<<std::endl;
 
       // The alloca has been processed, move on.
@@ -1815,7 +1823,10 @@ NextIteration:
                     }
                   } */
 
-                  if (APN->getParent() == LI ->getParent() || (DT.dominates(APN->getParent(), LI->getParent()) /*&& !phi_exists*/)) {
+                  if (APN->getParent() == LI ->getParent() ||
+                      (std::find(isReachable[APN->getParent()].begin(),
+                                 isReachable[APN->getParent()].end(),
+                                 LI->getParent()) != isReachable[APN->getParent()].end())) {
                     llvm::dbgs() << "Is it in ? AI " << AI->getName() << " APN is " << *APN << " LI is " << *LI << "\n";
                     PHINode *check = NULL;
                     StoreInst *ST = NULL;
@@ -1829,27 +1840,29 @@ NextIteration:
                     if (ST != NULL) {
                       if ((ST->getParent() == LI->getParent()) && (instrIndex[ST] > instrIndex[LI])) {
                         blockPairVec.clear();
-                        Instruction *tmp1 = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, false, true, data); //to check there are anything above this block
-                        blockPairVec.clear();
+                       // Instruction *tmp1 = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, false, true, data); //to check there are anything above this block
+                       // blockPairVec.clear();
                         Instruction *tmp2 = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, false, data); //to check there is phi in same block as LI 
                         PHINode *check1 = NULL;
                         PHINode *check2 = NULL;
-                        if (tmp1 != NULL) {
+                       /* if (tmp1 != NULL) {
                           llvm::dbgs() << "PHI undef tmp ST1 " << *tmp1 << "\n";
                           check1 = dyn_cast<PHINode>(tmp1);
                         }
+                        */
                         if (tmp2 != NULL) {
                           llvm::dbgs() << "PHI undef tmp ST2 " << *tmp2 << "\n";
                           check2 = dyn_cast<PHINode>(tmp2);
                         }
-                        if (check2 == APN && check1 == APN) {
+                        if ( check2 != NULL /*check2 == APN && check1 == APN*/) {
           dbgs() << "From APN to LI ST below LI : " << *LI << "  ST: " << *ST << "  APN block : "<< APN->getParent()->getName() << "\n";
+          std::string Rphi = llvmberry::getVariable(*check2);
                           PROPAGATE(
                             LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                                           new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
                                     VAR(llvmberry::getVariable(*AI), Ghost),
                                     SRC),
-                            BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
+                            BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(check2->getParent())),
                                   llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
 
                           std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
@@ -1857,7 +1870,7 @@ NextIteration:
                                                                                        VAR(Rphi, Physical), TGT);
 
                           PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
-                            BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
+                            BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(check2->getParent())),
                                    llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
 
                           mem2regCmd[Rphi].lessdef.push_back(lessdef); 
