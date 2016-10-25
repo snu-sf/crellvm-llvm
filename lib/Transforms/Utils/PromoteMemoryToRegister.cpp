@@ -779,8 +779,9 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 ///   for (...) { if (c) { A = undef; undef = B; } }
 ///
 /// ... so long as A is not used before undef is set.
-//static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
-static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
+//static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
+static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
+//static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                      LargeBlockInfo &LBI,
                                      AliasSetTracker *AST) {
   // The trickiest case to handle is when we have large blocks. Because of this,
@@ -819,7 +820,7 @@ static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                          less_first());
 
     if (I == StoresByIndex.begin()) {
-      if (StoresByIndex.empty())
+      //if (StoresByIndex.empty())
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&AI, &LI, &StoresByIndex]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
@@ -946,7 +947,7 @@ static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
           mem2regCmd[Rload].transTgt.push_back(transTgt);
         }
-        if (StoresByIndex.empty()) {
+        //if (StoresByIndex.empty()) {
         // propagate maydiff
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
@@ -954,15 +955,15 @@ static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         hints.addNopPosition
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
-        }
+        //}
         llvmberry::generateHintForMem2RegReplaceHint(UndefVal, LI);
       });
 
-      if (StoresByIndex.empty())
+      //if (StoresByIndex.empty())
       // If there is no store before this load, the load takes the undef value.
       LI->replaceAllUsesWith(UndefValue::get(LI->getType()));
-      else
-        return false;
+      //else
+      //  return false;
     }
     else {
       llvmberry::ValidationUnit::GetInstance()->intrude
@@ -1108,7 +1109,7 @@ static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   }
 
   ++NumLocalPromoted;
-  return true;
+  //return true;
 }
 
 void PromoteMem2Reg::run() {
@@ -1351,10 +1352,10 @@ void PromoteMem2Reg::run() {
 
     // If the alloca is only read and written in one basic block, just perform a
     // linear sweep over the block to eliminate it.
-    //if (Info.OnlyUsedInOneBlock) {
-    //  promoteSingleBlockAlloca(AI, Info, LBI, AST);
-    if (Info.OnlyUsedInOneBlock &&
-        promoteSingleBlockAlloca(AI, Info, LBI, AST)) {
+    if (Info.OnlyUsedInOneBlock) {
+      promoteSingleBlockAlloca(AI, Info, LBI, AST);
+    //if (Info.OnlyUsedInOneBlock &&
+    //    promoteSingleBlockAlloca(AI, Info, LBI, AST)) {
         std::cout<<"singleblock success"<<std::endl;
 
       // The alloca has been processed, move on.
