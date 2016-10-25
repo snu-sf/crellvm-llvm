@@ -2069,6 +2069,10 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         // Z = C2 -  Y | Z = (C2 - C1) - X
 
         BinaryOperator *Z = &I;
+        if (Z->getType()->isVectorTy()) {
+          llvmberry::ValidationUnit::Abort();
+          return;
+        }
         ConstantInt *C1 = dyn_cast<ConstantInt>(C2);
         ConstantInt *C2 = dyn_cast<ConstantInt>(C);
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(1));

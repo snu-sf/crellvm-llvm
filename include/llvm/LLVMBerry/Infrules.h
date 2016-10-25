@@ -803,6 +803,50 @@ private:
   std::shared_ptr<TyPointer> yprime;
 };
 
+struct TyDiffblockLoad {
+public:
+  TyDiffblockLoad(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _p,
+                  std::shared_ptr<TyValueType> _ty,
+                  std::shared_ptr<TySize> _align,
+                  std::shared_ptr<TyValue> _y,
+                  std::shared_ptr<TyValue> _a);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> p;
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TySize> align;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> a;
+};
+
+struct TyDiffblockGep {
+public:
+  TyDiffblockGep(std::shared_ptr<TyValue> _x,
+                 std::shared_ptr<TyExpr> _gepinst,
+                 std::shared_ptr<TyValue> _a);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyExpr> gepinst;
+  std::shared_ptr<TyValue> a;
+};
+
+struct TyDiffblockBitcast {
+public:
+  TyDiffblockBitcast(std::shared_ptr<TyValue> _x,
+                     std::shared_ptr<TyExpr> _bitcastinst,
+                     std::shared_ptr<TyValue> _a);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyExpr> bitcastinst;
+  std::shared_ptr<TyValue> a;
+};
+
 struct TyFaddCommutativeTgt {
 public:
   TyFaddCommutativeTgt(std::shared_ptr<TyRegister> _z,
@@ -1124,6 +1168,8 @@ public:
   TyLessthanUndefTgt(std::shared_ptr<TyValueType> _ty,
                      std::shared_ptr<TyValue> _v);
   void serialize(cereal::JSONOutputArchive &archive) const;
+
+  void updateRhs(std::shared_ptr<TyValue>);
 
 private:
   std::shared_ptr<TyValueType> ty;
@@ -3735,6 +3781,45 @@ public:
 
 private:
   std::shared_ptr<TyDiffblockNoalias> diffblock_noalias;
+};
+
+struct ConsDiffblockLoad : public TyInfrule {
+public:
+  ConsDiffblockLoad(std::shared_ptr<TyDiffblockLoad> _diffblock_load);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _p,
+                                         std::shared_ptr<TyValueType> _ty,
+                                         std::shared_ptr<TySize> _align,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TyValue> _a);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyDiffblockLoad> diffblock_load;
+};
+
+struct ConsDiffblockGep : public TyInfrule {
+public:
+  ConsDiffblockGep(std::shared_ptr<TyDiffblockGep> _diffblock_gep);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyExpr> _gepinst,
+                                         std::shared_ptr<TyValue> _a);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyDiffblockGep> diffblock_gep;
+};
+
+struct ConsDiffblockBitcast : public TyInfrule {
+public:
+  ConsDiffblockBitcast(std::shared_ptr<TyDiffblockBitcast> _diffblock_bitcast);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyExpr> _bitcastinst,
+                                         std::shared_ptr<TyValue> _a);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyDiffblockBitcast> diffblock_bitcast;
 };
 
 struct ConsFaddCommutativeTgt : public TyInfrule {

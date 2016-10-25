@@ -2,10 +2,12 @@
 #include <fstream>
 #include <string>
 #include <cassert>
+#include <iomanip>
 #include <cereal/archives/json.hpp>
 #include <cereal/types/vector.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
+#include <cfloat>
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
@@ -206,14 +208,14 @@ std::string getVariable(const llvm::Value &value) {
     return rso.str();
   }
 
-
   std::string val;
 
   if (llvm::isa<llvm::GlobalValue>(value)) {
     val = std::string("@");
   } else if (llvm::isa<llvm::Instruction>(value) ||
              llvm::isa<llvm::Argument>(value) ||
-             llvm::isa<llvm::ConstantExpr>(value)) {
+             llvm::isa<llvm::ConstantExpr>(value) ||
+             llvm::isa<llvm::UndefValue>(value)) {
     val = std::string("%");
   } else {
     assert("value must be a global value or an instruction" && false);
@@ -867,8 +869,12 @@ TyConstFloat::TyConstFloat(double _float_value, enum TyFloatType _float_type)
     : float_value(_float_value), float_type(_float_type) {}
 
 void TyConstFloat::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(float_value),
-          cereal::make_nvp("float_type", toString(float_type)));
+  std::stringstream ss;
+  ss << std::setprecision(DECIMAL_DIG) // No digit loss
+     << float_value;
+  std::string res = ss.str();
+  archive(cereal::make_nvp("float_value", res));
+  archive(cereal::make_nvp("float_type", toString(float_type)));
 }
 
 std::shared_ptr<TyConstFloat> TyConstFloat::make(double _float_value,
@@ -1275,9 +1281,15 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     else
       assert("Unknown floating point type" && false);
 
-    return std::shared_ptr<TyConstant>(
-        new ConsConstFloat(TyConstFloat::make(apf.convertToDouble(), fty)));
-
+    if (fty == llvmberry::DoubleType) {
+      return std::shared_ptr<TyConstant>(
+          new ConsConstFloat(TyConstFloat::make(apf.convertToDouble(), fty)));
+    } else if (fty == llvmberry::FloatType) {
+      return std::shared_ptr<TyConstant>(
+          new ConsConstFloat(TyConstFloat::make(apf.convertToFloat(), fty)));
+    } else {
+      return nullptr;
+    }
   } else if (const llvm::GlobalVariable *gv =
                  llvm::dyn_cast<llvm::GlobalVariable>(&value)) {
     return std::shared_ptr<TyConstant>(
@@ -1307,6 +1319,11 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     return std::shared_ptr<TyConstant>(
         new ConsConstDataVector(TyValueType::make(*elemty), elems));
   }
+  std::string output;
+  llvm::raw_string_ostream rso(output);
+  value.print(rso);
+  rso.str();
+  std::cerr << output << std::endl;
   assert("TyConstant::make() : unsupported value" && false);
 }
 
@@ -1598,6 +1615,12 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
   } else if (const llvm::SIToFPInst *si = llvm::dyn_cast<llvm::SIToFPInst>(&i)) {
     return std::shared_ptr<TyInstruction>(
         new ConsSitofpInst(TySitofpInst::make(*si)));
+  } else if (const llvm::InsertValueInst *ivi = llvm::dyn_cast<llvm::InsertValueInst>(&i)) {
+    return std::shared_ptr<TyInstruction>(
+        new ConsInsertValueInst(TyInsertValueInst::make(*ivi)));
+  } else if (const llvm::ExtractValueInst *evi = llvm::dyn_cast<llvm::ExtractValueInst>(&i)) {
+    return std::shared_ptr<TyInstruction>(
+        new ConsExtractValueInst(TyExtractValueInst::make(*evi)));
   } else {
     std::string output;
     llvm::raw_string_ostream rso(output);
@@ -1708,6 +1731,27 @@ std::shared_ptr<TyLoadInst> TyLoadInst::make(const llvm::StoreInst &si) {
                      1/*si.getAlignment()*/));
 }
 
+std::shared_ptr<TyLoadInst> TyLoadInst::makeAlignOne(llvm::Instruction *i) {
+  if (llvm::LoadInst* li = llvm::dyn_cast<llvm::LoadInst>(i)) {
+    return std::shared_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*li->getPointerOperand()->getType()),
+        TyValueType::make(*li->getType()), TyValue::make(*li->getPointerOperand()),
+        1));
+  } else if (llvm::StoreInst* si = llvm::dyn_cast<llvm::StoreInst>(i)) {
+    return std::shared_ptr<TyLoadInst>(
+        new TyLoadInst(TyValueType::make(*si->getOperand(1)->getType()),
+                       TyValueType::make(*si->getOperand(0)->getType()),
+                       TyValue::make(*si->getOperand(1)), 1));
+  } else if (llvm::AllocaInst* ai = llvm::dyn_cast<llvm::AllocaInst>(i)) {
+    return std::shared_ptr<TyLoadInst>(new TyLoadInst(
+        TyValueType::make(*ai->getType()),
+        TyValueType::make(*ai->getAllocatedType()), TyValue::make(*ai),
+        1));
+  } else {
+    assert("Instruction should be Load, Store, or Alloca" && false);
+  }
+}
+
 std::shared_ptr<TySelectInst>
 TySelectInst::make(const llvm::SelectInst &si) {
   return std::shared_ptr<TySelectInst>(new TySelectInst(
@@ -1764,6 +1808,33 @@ TyUitofpInst::make(const llvm::UIToFPInst &utfi) {
   return std::shared_ptr<TyUitofpInst>(new TyUitofpInst(
       TyValueType::make(*utfi.getSrcTy()), TyValue::make(*utfi.getOperand(0)),
       TyValueType::make(*utfi.getDestTy())));
+}
+
+std::shared_ptr<TyExtractValueInst>
+TyExtractValueInst::make(const llvm::ExtractValueInst &evi) {
+  std::vector<unsigned> indexes;
+  for (auto itr = evi.idx_begin(); itr != evi.idx_end(); itr++) {
+    indexes.push_back(*itr);
+  }
+  return std::shared_ptr<TyExtractValueInst>(new TyExtractValueInst(
+      TyValueType::make(*evi.getAggregateOperand()->getType()),
+      TyValue::make(*evi.getAggregateOperand()),
+      indexes,
+      TyValueType::make(*evi.getType())));
+}
+
+std::shared_ptr<TyInsertValueInst>
+TyInsertValueInst::make(const llvm::InsertValueInst &ivi) {
+  std::vector<unsigned> indexes;
+  for (auto itr = ivi.idx_begin(); itr != ivi.idx_end(); itr++) {
+    indexes.push_back(*itr);
+  }
+  return std::shared_ptr<TyInsertValueInst>(new TyInsertValueInst(
+      TyValueType::make(*ivi.getAggregateOperand()->getType()),
+      TyValue::make(*ivi.getAggregateOperand()),
+      TyValueType::make(*ivi.getInsertedValueOperand()->getType()),
+      TyValue::make(*ivi.getInsertedValueOperand()),
+      indexes));
 }
 
 // instruction constructor classes
@@ -2105,6 +2176,32 @@ void ConsUitofpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(uitofp_inst));
 }
 
+ConsInsertValueInst::ConsInsertValueInst(std::shared_ptr<TyInsertValueInst> _insert_value_inst) : insert_value_inst(_insert_value_inst){
+}
+std::shared_ptr<TyInstruction> ConsInsertValueInst::make(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::shared_ptr<TyValueType> _argty, std::shared_ptr<TyValue> _argv, std::vector<unsigned> _idx){
+  std::shared_ptr<TyInsertValueInst> _val(new TyInsertValueInst(_aggrty, _aggrv, _argty, _argv, _idx));
+  return std::shared_ptr<TyInstruction>(new ConsInsertValueInst(_val));
+}
+void ConsInsertValueInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("InsertValueInst");
+  archive(CEREAL_NVP(insert_value_inst));
+}
+
+ConsExtractValueInst::ConsExtractValueInst(std::shared_ptr<TyExtractValueInst> _extract_value_inst) : extract_value_inst(_extract_value_inst){
+}
+std::shared_ptr<TyInstruction> ConsExtractValueInst::make(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::vector<unsigned> _idx, std::shared_ptr<TyValueType> _retty){
+  std::shared_ptr<TyExtractValueInst> _val(new TyExtractValueInst(_aggrty, _aggrv, _idx, _retty));
+  return std::shared_ptr<TyInstruction>(new ConsExtractValueInst(_val));
+}
+void ConsExtractValueInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ExtractValueInst");
+  archive(CEREAL_NVP(extract_value_inst));
+}
+
 // instruction type classes
 
 TyBinaryOperator::TyBinaryOperator(TyBop _opcode,
@@ -2266,6 +2363,18 @@ void TyUitofpInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(fromty), CEREAL_NVP(v), CEREAL_NVP(toty));
 }
 
+TyInsertValueInst::TyInsertValueInst(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::shared_ptr<TyValueType> _argty, std::shared_ptr<TyValue> _argv, std::vector<unsigned> _idx) : aggrty(_aggrty), aggrv(_aggrv), argty(_argty), argv(_argv), idx(_idx){
+}
+void TyInsertValueInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(aggrty), CEREAL_NVP(aggrv), CEREAL_NVP(argty), CEREAL_NVP(argv), CEREAL_NVP(idx));
+}
+
+TyExtractValueInst::TyExtractValueInst(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::vector<unsigned> _idx, std::shared_ptr<TyValueType> _retty) : aggrty(_aggrty), aggrv(_aggrv), idx(_idx), retty(_retty){
+}
+void TyExtractValueInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(aggrty), CEREAL_NVP(aggrv), CEREAL_NVP(idx), CEREAL_NVP(retty));
+}
+
 // propagate expr
 // ConsVar or ConsConst
 
@@ -2286,7 +2395,7 @@ std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value,
 }
 
 ConsVar::ConsVar(std::shared_ptr<TyRegister> _register_name)
-    : register_name(std::move(_register_name)) {}
+    : register_name(_register_name) {}
 
 ConsVar::ConsVar(std::string _name, enum TyTag _tag)
     : register_name(new TyRegister(_name, _tag)) {}
@@ -2361,7 +2470,7 @@ std::shared_ptr<TyConstant> ConsConst::getTyConst() {
 }
 
 ConsInsn::ConsInsn(std::shared_ptr<TyInstruction> _instruction)
-    : instruction(std::move(_instruction)) {}
+    : instruction(_instruction) {}
 std::shared_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i) {
   return std::shared_ptr<TyExpr>(
       new ConsInsn(std::move(TyInstruction::make(i))));
@@ -2452,6 +2561,16 @@ TyPropagateDiffblock::make(std::shared_ptr<TyValue> _lhs,
       new TyPropagateDiffblock(_lhs, _rhs, _scope));
 }
 
+//TyPropagateUnique::TyPropagateUnique(std::shared_ptr<TyRegister> _p,
+TyPropagateUnique::TyPropagateUnique(std::string _register_name,
+                                     enum TyScope _scope)
+    : register_name(_register_name), scope(_scope) {}
+
+void TyPropagateUnique::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(register_name));
+  archive(cereal::make_nvp("scope", ::toString(scope)));
+}
+
 TyPropagatePrivate::TyPropagatePrivate(std::shared_ptr<TyRegister> _p,
                                        enum TyScope _scope)
     : p(std::move(_p)), scope(_scope) {}
@@ -2462,7 +2581,7 @@ void TyPropagatePrivate::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 ConsLessdef::ConsLessdef(std::shared_ptr<TyPropagateLessdef> _propagate_lessdef)
-    : propagate_lessdef(std::move(_propagate_lessdef)) {}
+    : propagate_lessdef(_propagate_lessdef) {}
 
 void ConsLessdef::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
@@ -2516,6 +2635,25 @@ void ConsDiffblock::serialize(cereal::JSONOutputArchive &archive) const {
 
   archive.saveValue("Diffblock");
   archive(CEREAL_NVP(propagate_diffblock));
+}
+
+ConsUnique::ConsUnique(std::shared_ptr<TyPropagateUnique> _propagate_unique)
+    : propagate_unique(std::move(_propagate_unique)) {}
+
+std::shared_ptr<TyPropagateObject>
+//ConsUnique::make(std::shared_ptr<TyRegister> _p, enum TyScope _scope) {
+ConsUnique::make(std::string _register_name, enum TyScope _scope) {
+  std::shared_ptr<TyPropagateUnique> _val(
+      new TyPropagateUnique(_register_name, _scope));
+
+  return std::shared_ptr<TyPropagateObject>(new ConsUnique(std::move(_val)));
+}
+
+void ConsUnique::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("Unique");
+  archive(CEREAL_NVP(propagate_unique));
 }
 
 ConsMaydiff::ConsMaydiff(std::shared_ptr<TyRegister> _register_name)
