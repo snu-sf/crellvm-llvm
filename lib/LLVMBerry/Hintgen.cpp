@@ -1111,7 +1111,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                                     VAR(storeItem[SI].op0, Ghost),
                                                     TyExpr::make(*(SI->getOperand(0)), Physical)));
 
-      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndex[SI], ""),
+      INFRULE(position,
               std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
 
       if (SI->getOperand(0)->getName() != "")
@@ -1122,19 +1122,18 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
   std::cout<<"PropStore end"<<std::endl;
 }
 
-//llvm::PHINode* properPHI(llvm::BasicBlock *BB, std::string Target,
 llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
-                         //llvm::StoreInst *SI, bool isInit,
-                         llvm::Instruction* I, bool isInit,
-                         bool checkSI, Dictionary data) {
+                             llvm::Instruction* I, bool isInit,
+                             bool checkSI, Dictionary data,
+                             bool isLoop) {
   llvm::dbgs() << "properPHI begin(" << BB->getParent()->getName() << "): " << BB->getName() << ", " << Target << ", " << I->getParent()->getName() << "(" << *I << ")" << "\n";
+  auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
   auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
   auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
   llvm::BasicBlock *IB = I->getParent();
-  //checkSI = true;
-  // return NULL if IB block is same as BB block 
-  //if (!isInit && (BB == IB))
-   if (BB == IB)
+
+  // return NULL if BB is loop
+   if (!llvm::isa<llvm::PHINode>(I) && (BB == IB))
     return NULL;
 
   // if isInit is true, check current BB
@@ -1144,7 +1143,9 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
 
       while (II != BB->end()) {
         if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(II++)) {
-          if (Target == getVariable(*SI->getOperand(1))) {
+          if ((Target == getVariable(*SI->getOperand(1)))/* &&
+              (!llvm::isa<llvm::PHINode>(I) &&
+               instrIndex[I] > instrIndex[SI])*/) {
             return SI;
           }
         }
@@ -1166,10 +1167,7 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
       }
     }
   }
-  // return NULL if IB block is same as BB block 
-/*  if (BB == IB)
-    return NULL;
-*/
+
   for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE;) {
     llvm::BasicBlock* BBtmp = *(BI++);
 
@@ -1207,7 +1205,7 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
       }
     }
 
-    llvm::Instruction* ret = properPHI(BBtmp, Target, I, false, checkSI, data);
+    llvm::Instruction* ret = properPHI(BBtmp, Target, I, false, checkSI, data, true);
     if (ret != NULL)
       return ret;
   }
@@ -2131,9 +2129,8 @@ std::cout << "2nd elem2: " << std::string(SItmp->getOperand(0)->getName()) << st
                     std::cout<<"isPred before("+std::string(target->getParent()->getName())+"): "+getBasicBlockIndex(source)+", "+getBasicBlockIndex(target)<<std::endl;
                     llvm::BasicBlock* usePred = *(UI2++);
                     blockPairVec.clear();
-
-                    // now working; 20160901
                     llvm::PHINode* PHItmp = NULL;
+
                     // check properPHI only if there is no incoming value from usePred in PHI
                     if (PHI->getBasicBlockIndex(usePred) != -1)
                       if (PHI->getIncomingValueForBlock(usePred) == NULL) {
@@ -2233,7 +2230,8 @@ std::cout << "2nd elem3: " << Rphi << std::endl;
           // prepare variables
           std::string Rload = getVariable(*LI);
           blockPairVec.clear();
-          llvm::PHINode* PHI = NULL; 
+          llvm::PHINode* PHI = NULL;
+
           if (llvm::Instruction* Itmp = properPHI(LI->getParent(), Rstore, SItmp, true, false, data))
             PHI = llvm::dyn_cast<llvm::PHINode>(Itmp);
 

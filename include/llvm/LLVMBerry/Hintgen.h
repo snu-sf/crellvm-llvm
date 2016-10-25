@@ -232,7 +232,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB,
 
 llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
                              llvm::Instruction* I, bool isInit,
-                             bool checkSI, Dictionary data);
+                             bool checkSI, Dictionary data,
+                             bool isLoop = false);
 
 int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
 
