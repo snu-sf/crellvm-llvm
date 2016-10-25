@@ -92,11 +92,14 @@ struct FindAvailableLoadedValueArg {
 public:
   typedef std::vector<std::pair<
       llvmberry::StripPointerCastsArg::TyStrippedValues,
-      std::pair<llvm::StoreInst *, std::string>>> TyOrthogonalStoresObj;
+      std::pair<llvm::Instruction *, std::string>>> TyOrthogonalInsnsObj;
+      // Note that there are two kinds of orthogonal instructions : 
+      // store, and 'call'.
+
   typedef llvmberry::StripPointerCastsArg::TyStrippedValuesObj TyPtrEqValuesObj;
-  typedef std::shared_ptr<TyOrthogonalStoresObj> TyOrthogonalStores;
+  typedef std::shared_ptr<TyOrthogonalInsnsObj> TyOrthogonalInsns;
   typedef std::shared_ptr<TyPtrEqValuesObj> TyPtrEqValues;
-  TyOrthogonalStores orthogonalStores;
+  TyOrthogonalInsns orthogonalInsns;
   TyPtrEqValues ptr1EquivalentValues;
   TyPtrEqValues ptr2EquivalentValues;
   bool isLoadStore;
@@ -249,7 +252,10 @@ DEFINE_TRAITS(ArgForSelectIcmpConst, SelectIcmpConstArg);
 // lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
 struct SinkInstArg {
 public:
+  SinkInstArg();
   llvm::DominatorTree *sinkDT;
+  bool propagatePrivate;
+  llvm::AllocaInst *privateAlloca;
 };
 DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
 
