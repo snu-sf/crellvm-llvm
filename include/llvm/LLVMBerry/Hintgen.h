@@ -204,6 +204,11 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
 int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
 
 bool hasBitcastOrGEP(llvm::AllocaInst* AI);
+
+int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
+
+void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
+                                TyScope scope);
 }
 
 #endif

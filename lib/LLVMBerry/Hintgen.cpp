@@ -2086,4 +2086,33 @@ bool hasBitcastOrGEP(llvm::AllocaInst* AI) {
   }
   return false;
 }
+
+void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
+                                TyScope scope) {
+  ValidationUnit::GetInstance()->intrude(
+      [&I, &PB, &scope](Dictionary &data, CoreHint &hints) {
+        for (unsigned i = 0, e = I->getNumOperands(); i != e; ++i) {
+          llvm::Value *Op = I->getOperand(i);
+          if (llvm::PHINode *OpPHI = llvm::dyn_cast<llvm::PHINode>(Op)) {
+            if (I->getParent() != OpPHI->getParent())
+              continue;
+            llvm::Value *OpPHIResolved = OpPHI->getIncomingValueForBlock(PB);
+            std::string OpPHI_id = getVariable(*OpPHI);
+            std::string OpPHIResolved_id = getVariable(*OpPHIResolved);
+            INFRULE(TyPosition::make(scope, getBasicBlockIndex(I->getParent()),
+                                     getBasicBlockIndex(PB)),
+                    ConsTransitivity::make(VAR(OpPHIResolved_id, Physical),
+                                           VAR(OpPHIResolved_id, Previous),
+                                           VAR(OpPHI_id, Physical)));
+
+            INFRULE(TyPosition::make(scope, getBasicBlockIndex(I->getParent()),
+                                     getBasicBlockIndex(PB)),
+                    ConsTransitivity::make(VAR(OpPHI_id, Physical),
+                                           VAR(OpPHIResolved_id, Previous),
+                                           VAR(OpPHIResolved_id, Physical)));
+          }
+        }
+      });
+}
+
 } // llvmberry

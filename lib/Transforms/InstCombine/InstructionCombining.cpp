@@ -1978,7 +1978,7 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
           }
           StoreInst *SI = dyn_cast<StoreInst>(&*Users[i]);
           llvmberry::insertTgtNopAtSrcI(hints, SI);
-          PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
+          PROPAGATE(ALLOCA(REGISTER(regname, Physical), SRC),
               BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
         }
         llvmberry::insertTgtNopAtSrcI(hints, &MI);
