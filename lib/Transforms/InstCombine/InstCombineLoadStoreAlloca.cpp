@@ -793,7 +793,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       auto falv_arg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
       auto lls_arg = data.create<llvmberry::ArgForLoadLoadStore>();
 
-      auto &orthogonalStores = falv_arg->orthogonalStores;
+      auto &orthogonalInsns = falv_arg->orthogonalInsns;
       auto &ptr1EquivalentValues = falv_arg->ptr1EquivalentValues;
       auto &ptr2EquivalentValues = falv_arg->ptr2EquivalentValues;
       Value *ptr1src = ptr1EquivalentValues->back();
@@ -1145,10 +1145,24 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                                    llvmberry::Target);
 
       // step 2. Show orthogonality
-      for (auto itr = orthogonalStores->begin(); itr != orthogonalStores->end(); itr++) {
+      for (auto itr = orthogonalInsns->begin(); itr != orthogonalInsns->end(); itr++) {
         llvmberry::StripPointerCastsArg::TyStrippedValues ptr3EquivalentValues = itr->first;
-        StoreInst *noalias_si = itr->second.first;
         std::string noalias_source = itr->second.second;
+
+        if(noalias_source == "aliasanalysis") {
+          // TODO:Currently we cannot prove noalias based on alias analysis..
+          llvmberry::ValidationUnit::GetInstance()->setDescription(
+              "This load-load/load-store optimization is done because alias an"
+              "alysis reported that two pointers are equivalent. However curre"
+              "ntly we cannot prove that two pointers are equivalent even if"
+              " alias analysis info is given.");
+          if (hints.getReturnCode() == llvmberry::CoreHint::ACTUAL) {
+            hints.setReturnCodeToAdmitted();
+            return;
+          }
+        }
+
+        StoreInst *noalias_si = dyn_cast<StoreInst>(itr->second.first);
         Value *ptr3src = ptr3EquivalentValues->back();
         Value *ptr3 = ptr3EquivalentValues->front();
 
@@ -1295,17 +1309,6 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             PROPAGATE(NOALIAS(POINTER(ptr1), POINTER(ptr3), llvmberry::Source),
               BOUNDS(INSTPOS(llvmberry::Source, diffblock_propagate_end),
                   INSTPOS(llvmberry::Source, noalias_si)));
-          }
-        } else if(noalias_source == "aliasanalysis") {
-          // TODO:Currently we cannot prove noalias based on alias analysis..
-          llvmberry::ValidationUnit::GetInstance()->setDescription(
-              "This load-load/load-store optimization is done because alias an"
-              "alysis reported that two pointers are equivalent. However curre"
-              "ntly we cannot prove that two pointers are equivalent even if"
-              " alias analysis info is given.");
-          if (hints.getReturnCode() == llvmberry::CoreHint::ACTUAL) {
-            hints.setReturnCodeToAdmitted();
-            return;
           }
         }
       }
