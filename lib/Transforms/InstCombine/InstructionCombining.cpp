@@ -2757,56 +2757,35 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
           auto si_arg = data.get<llvmberry::ArgForSinkInst>();
           DominatorTree *DT = si_arg->sinkDT;
           insertSrcNopAtTgtI(hints, InsertPos); // src nop
-             insertTgtNopAtSrcI(hints, I);         //tgt nop
-             std::string reg0_name = llvmberry::getVariable(*I);
+          insertTgtNopAtSrcI(hints, I);         //tgt nop
+          std::string reg0_name = llvmberry::getVariable(*I);
 
-             hints.addCommand(
-                 llvmberry::ConsPropagate::make // source propagate
-                 (llvmberry::ConsLessdef::make(
-                      llvmberry::ConsVar::make(reg0_name, llvmberry::Physical),
-                      llvmberry::ConsRhs::make(reg0_name, llvmberry::Physical,
-                                               llvmberry::Source),
-                      llvmberry::Source),
-                  llvmberry::ConsBounds::make(
-                      llvmberry::TyPosition::make(llvmberry::Source, *I),
-                      llvmberry::TyPosition::make(llvmberry::Target,
-                                                  *InsertPos))));
-	     //prev maydiff propagate global -> issue 86
-            hints.addCommand
-                    (llvmberry::ConsPropagate::make
-                             (llvmberry::ConsMaydiff::make
-                                      (reg0_name, llvmberry::Previous),
-                              llvmberry::ConsGlobal::make())
-                            );
+          PROPAGATE(LESSDEF(VAR(reg0_name, Physical),
+                   RHS(reg0_name, Physical, llvmberry::Source),
+                   SRC),
+              BOUNDS(INSTPOS(llvmberry::Source, I),
+                     INSTPOS(llvmberry::Target, InsertPos)));
+          //prev maydiff propagate global -> issue 86
+          PROPAGATE(MAYDIFF(reg0_name, llvmberry::Previous),
+                    llvmberry::ConsGlobal::make());
+          PROPAGATE(MAYDIFF(reg0_name, llvmberry::Physical),
+                    BOUNDS(INSTPOS(llvmberry::Source, I),
+                           INSTPOS(llvmberry::Target, InsertPos)));
 
-            hints.addCommand
-                    (llvmberry::ConsPropagate::make //maydiff propagate
-                             (llvmberry::ConsMaydiff::make
-                                      (reg0_name, llvmberry::Physical),
-                              llvmberry::ConsBounds::make
-                                      (llvmberry::TyPosition::make
-                                       (llvmberry::Source, *I), 
-                                       llvmberry::TyPosition::make
-                                       (llvmberry::Target, *InsertPos))
-                             ));
-
-            // traversal dominator tree
-            for (auto node = GraphTraits<DominatorTree *>::nodes_begin(DT);
-                 node != GraphTraits<DominatorTree *>::nodes_end(DT); ++node) {
-              BasicBlock *BB = node->getBlock();
-              if ((DestBlock->getName() != BB->getName()) &&
-                  isPotentiallyReachable(I->getParent(), BB) &&
-                  !DT->dominates(DestBlock, BB)) {
-                PROPAGATE(MAYDIFF(reg0_name, llvmberry::Physical),
-                          BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                                     SRC, (BB->getName())),
-                                 llvmberry::TyPosition::make_end_of_block(
-                                     SRC, *(BB->begin()->getParent()))));
-              }
+          // traversal dominator tree
+          for (auto node = GraphTraits<DominatorTree *>::nodes_begin(DT);
+               node != GraphTraits<DominatorTree *>::nodes_end(DT); ++node) {
+            BasicBlock *BB = node->getBlock();
+            if ((DestBlock->getName() != BB->getName()) &&
+                isPotentiallyReachable(I->getParent(), BB) &&
+                !DT->dominates(DestBlock, BB)) {
+              PROPAGATE(MAYDIFF(reg0_name, llvmberry::Physical),
+                        BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                                   SRC, (BB->getName())),
+                               llvmberry::TyPosition::make_end_of_block(
+                                   SRC, *(BB->begin()->getParent()))));
             }
-            if (isa<CallInst>(I)) {
-              hints.setReturnCodeToAdmitted();
-            }
+          }
         });
   I->moveBefore(InsertPos);
   ++NumSunkInst;

@@ -1108,6 +1108,20 @@ private:
   std::shared_ptr<TyValueType> dstty;
 };
 
+struct TyPtrtointInttoptr{
+public : 
+  TyPtrtointInttoptr(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> src;
+  std::shared_ptr<TyValue> mid;
+  std::shared_ptr<TyValue> dst;
+  std::shared_ptr<TyValueType> srcty;
+  std::shared_ptr<TyValueType> midty;
+  std::shared_ptr<TyValueType> dstty;
+};
+
 struct TyPtrtointLoad {
 public:
   TyPtrtointLoad(std::shared_ptr<TyValue> _ptr,
@@ -2454,6 +2468,21 @@ private:
   std::shared_ptr<TyValueType> srcty;
   std::shared_ptr<TyValueType> midty;
   std::shared_ptr<TyValueType> dstty;
+};
+
+struct TySextTruncAshr{
+public : 
+  TySextTruncAshr(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _v, std::shared_ptr<TySize> _s1, std::shared_ptr<TySize> _s2, std::shared_ptr<TyConstInt> _i3);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> xprime;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TySize> s1;
+  std::shared_ptr<TySize> s2;
+  std::shared_ptr<TyConstInt> i3;
 };
 
 struct TySextZext {
@@ -4014,6 +4043,16 @@ private:
   std::shared_ptr<TyPtrtointBitcast> inttoptr_bitcast;
 };
 
+struct ConsPtrtointInttoptr : public TyInfrule{
+public : 
+  ConsPtrtointInttoptr(std::shared_ptr<TyPtrtointInttoptr> _ptrtoint_inttoptr);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid, std::shared_ptr<TyValue> _dst, std::shared_ptr<TyValueType> _srcty, std::shared_ptr<TyValueType> _midty, std::shared_ptr<TyValueType> _dstty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyPtrtointInttoptr> ptrtoint_inttoptr;
+};
+
 struct ConsPtrtointLoad : public TyInfrule {
 public:
   ConsPtrtointLoad(std::shared_ptr<TyPtrtointLoad> _ptrtoint_load);
@@ -4596,6 +4635,16 @@ public:
 
 private:
   std::shared_ptr<TySextSext> sext_sext;
+};
+
+struct ConsSextTruncAshr : public TyInfrule{
+public : 
+  ConsSextTruncAshr(std::shared_ptr<TySextTruncAshr> _sext_trunc_ashr);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _xprime, std::shared_ptr<TyValue> _v, std::shared_ptr<TySize> _s1, std::shared_ptr<TySize> _s2, std::shared_ptr<TyConstInt> _i3);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TySextTruncAshr> sext_trunc_ashr;
 };
 
 struct ConsShiftUndef1 : public TyInfrule {

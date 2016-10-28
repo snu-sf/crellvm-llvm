@@ -98,6 +98,7 @@ class CoreHint;
 
 std::string getBasicBlockIndex(const llvm::BasicBlock *block);
 std::string getVariable(const llvm::Value &value);
+llvm::Instruction *getPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB);
 int getCommandIndex(const llvm::Value &value);
 int getTerminatorIndex(const llvm::TerminatorInst *instr);
 bool name_instructions(llvm::Function &F);
@@ -881,6 +882,33 @@ private :
   std::shared_ptr<TyValueType> toty;
 };
 
+struct TyInsertValueInst{
+public : 
+  TyInsertValueInst(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::shared_ptr<TyValueType> _argty, std::shared_ptr<TyValue> _argv, std::vector<unsigned> _idx);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyInsertValueInst> make(const llvm::InsertValueInst &ivi);
+
+private : 
+  std::shared_ptr<TyValueType> aggrty;
+  std::shared_ptr<TyValue> aggrv;
+  std::shared_ptr<TyValueType> argty;
+  std::shared_ptr<TyValue> argv;
+  std::vector<unsigned> idx;
+};
+
+struct TyExtractValueInst{
+public : 
+  TyExtractValueInst(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::vector<unsigned> _idx, std::shared_ptr<TyValueType> _retty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+  static std::shared_ptr<TyExtractValueInst> make(const llvm::ExtractValueInst &evi);
+
+private : 
+  std::shared_ptr<TyValueType> aggrty;
+  std::shared_ptr<TyValue> aggrv;
+  std::vector<unsigned> idx;
+  std::shared_ptr<TyValueType> retty;
+};
+
 struct ConsBinaryOp : public TyInstruction {
 public:
   ConsBinaryOp(std::shared_ptr<TyBinaryOperator> _binary_operator);
@@ -1091,6 +1119,26 @@ public :
 
 private : 
   std::shared_ptr<TyUitofpInst> uitofp_inst;
+};
+
+struct ConsExtractValueInst : public TyInstruction{
+public : 
+  ConsExtractValueInst(std::shared_ptr<TyExtractValueInst> _extract_value_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::vector<unsigned> _idx, std::shared_ptr<TyValueType> _retty);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyExtractValueInst> extract_value_inst;
+};
+
+struct ConsInsertValueInst : public TyInstruction{
+public : 
+  ConsInsertValueInst(std::shared_ptr<TyInsertValueInst> _insert_value_inst);
+  static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::shared_ptr<TyValueType> _argty, std::shared_ptr<TyValue> _argv, std::vector<unsigned> _idx);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyInsertValueInst> insert_value_inst;
 };
 
 

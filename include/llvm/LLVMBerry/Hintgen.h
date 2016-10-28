@@ -28,7 +28,8 @@
   llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
-// LESSDEF, NOALIAS, PRIVATE, MAYDIFF make TyPropagateObject instance
+// LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
+// TyPropagateObject instance
 #define LESSDEF(left, right, SCOPE)                                            \
   llvmberry::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE)                                             \
@@ -164,35 +165,6 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
     false_encoding;
 
-/* Generating symbolic expressions from instructions
- * for GVN
- */
-
-struct Expression {
-  uint32_t opcode;
-  llvm::Type *type;
-  llvm::SmallVector<uint32_t, 4> varargs;
-
-  Expression(uint32_t o = ~2U) : opcode(o) {}
-
-  bool operator==(const Expression &other) const {
-    if (opcode != other.opcode)
-      return false;
-    if (opcode == ~0U || opcode == ~1U)
-      return true;
-    if (type != other.type)
-      return false;
-    if (varargs != other.varargs)
-      return false;
-    return true;
-  }
-};
-
-Expression create_expression(llvm::Instruction *I, bool &swapped,
-                             llvm::SmallVector<uint32_t, 4> va);
-
-bool is_inverse_expression(Expression e1, Expression e2);
-
 void makeReachableBlockMap(llvm::BasicBlock* Src,
                            llvm::BasicBlock* Tgt);
 
@@ -238,6 +210,11 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
 int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
 
 bool hasBitcastOrGEP(llvm::AllocaInst* AI);
+
+int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
+
+void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
+                                TyScope scope);
 }
 
 #endif

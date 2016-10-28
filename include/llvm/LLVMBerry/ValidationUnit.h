@@ -63,15 +63,6 @@ private:
   static PASS _CurrentPass;
 };
 
-extern std::string defaultOutputDir;
-extern std::vector<std::string> optWhiteList;
-extern bool optWhiteListEnabled;
-extern std::vector<ValidationUnit::PASS> optPassWhiteList;
-extern bool optPassWhiteListEnabled;
-
-void setWhiteList(const std::string &str);
-void setPassWhiteList(const std::string &str);
-
 } // llvmberry
 
 #endif

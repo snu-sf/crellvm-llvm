@@ -1122,6 +1122,8 @@ void PromoteMem2Reg::run() {
   LargeBlockInfo LBI;
   IDFCalculator IDF(DT);
 
+  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
+  
   llvmberry::name_instructions(F);
   llvmberry::ValidationUnit::Begin("mem2reg", &F);
   llvmberry::ValidationUnit::GetInstance()->intrude
@@ -1428,6 +1430,8 @@ void PromoteMem2Reg::run() {
   if (Allocas.empty()) {
     llvmberry::ValidationUnit::End();
 
+    llvmberry::ValidationUnit::EndPass();
+
     return; // All of the allocas must have been trivial!
   }
 
@@ -1639,6 +1643,7 @@ void PromoteMem2Reg::run() {
 
   NewPhiNodes.clear();
   llvmberry::ValidationUnit::End();
+  llvmberry::ValidationUnit::EndPass();
 }
 
 /// \brief Determine which blocks the value is live in.
