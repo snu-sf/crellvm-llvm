@@ -1938,6 +1938,10 @@ void ConsLoadInst::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(load_inst));
 }
 
+std::shared_ptr<TyLoadInst> ConsLoadInst::getTyLoadInst() {
+  return load_inst;
+}
+
 ConsBitCastInst::ConsBitCastInst(std::shared_ptr<TyBitCastInst> _bit_cast_inst)
     : bit_cast_inst(std::move(_bit_cast_inst)) {}
 std::shared_ptr<TyInstruction>
@@ -2212,6 +2216,10 @@ void TyLoadInst::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(valtype));
   archive(CEREAL_NVP(ptrvalue));
   archive(CEREAL_NVP(align));
+}
+
+std::shared_ptr<TyValue> TyLoadInst::getPtrValue() {
+  return ptrvalue;
 }
 
 TySelectInst::TySelectInst(std::shared_ptr<TyValue> _cond, std::shared_ptr<TyValueType> _valty, std::shared_ptr<TyValue> _trueval, std::shared_ptr<TyValue> _falseval) : cond(_cond), valty(_valty), trueval(_trueval), falseval(_falseval){
