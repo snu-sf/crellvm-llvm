@@ -380,6 +380,8 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
         } else if (llvm::isa<IntToPtrInst>(mid)) {
           if (llvm::isa<BitCastInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsBitcastInttoptr::make;
+          else if (llvm::isa<PtrToIntInst>(dst))
+            makeInfruleFunc = llvmberry::ConsPtrtointInttoptr::make;
             
         } else if (llvm::isa<PtrToIntInst>(mid)) {
           if (llvm::isa<BitCastInst>(dst))
@@ -1356,9 +1358,37 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
       uint32_t SrcBitSize = SrcTy->getScalarSizeInBits();
       uint32_t DestBitSize = DestTy->getScalarSizeInBits();
 
+      llvmberry::ValidationUnit::Begin("sext_trunc_ashr", CI.getParent()->getParent());
+
       // We need to emit a shl + ashr to do the sign extend.
       Value *ShAmt = ConstantInt::get(DestTy, DestBitSize-SrcBitSize);
       Value *Res = Builder->CreateShl(TI->getOperand(0), ShAmt, "sext");
+
+      llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &TI, &Res, SrcBitSize, 
+        DestBitSize, &ShAmt] 
+        (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        //   <src>              |    <tgt>
+        // X = trunc t1 v to t2 | X = trunc t1 v to t2
+        // <nop>                | X' = shl v (sizeof(t1) - sizeof(t2))
+        // Z = sext t2 X to t1  | Z = ashr v (sizeof(t1) - sizeof(t2))
+        TruncInst *X = TI;
+        Value *V = X->getOperand(0);
+        SExtInst *Z = &CI;
+        BinaryOperator *Xprime = dyn_cast<BinaryOperator>(Res);
+        uint32_t s1 = DestBitSize;
+        uint32_t s2 = SrcBitSize;
+        ConstantInt *i3 = dyn_cast<ConstantInt>(ShAmt);
+
+        llvmberry::insertSrcNopAtTgtI(hints, Xprime);
+        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Xprime), 
+            llvmberry::Physical);
+        llvmberry::propagateInstruction(X, Z, llvmberry::Target);
+        llvmberry::propagateInstruction(Xprime, Z, llvmberry::Target);
+        INFRULE(INSTPOS(TGT, Z), llvmberry::ConsSextTruncAshr::make(
+            VAL(Z, Physical), VAL(X, Physical), VAL(Xprime, Physical),
+            VAL(V, Physical), BITSIZE(s1), BITSIZE(s2), 
+            llvmberry::TyConstInt::make(*i3)));
+      });
       return BinaryOperator::CreateAShr(Res, ShAmt);
     }
 

@@ -8,58 +8,59 @@
 #include <string>
 #include <algorithm>
 #include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/RuntimeOptions.h"
 
-namespace {
+////// LLVMBerry option
+llvm::cl::opt<std::string>
+    LLVMBerryOutputDirectory("llvmberry-outputdir",
+       llvm::cl::desc("Specify output directory of LLVMBerry"),
+       llvm::cl::value_desc("dir"));
 
-static std::string makeFullFilename(std::string org_filename,
-                                    std::string extension) {
-  if (llvmberry::defaultOutputDir.empty())
-    return org_filename + extension;
-  else {
-    if (org_filename.rfind("/") == std::string::npos)
-      return llvmberry::defaultOutputDir + "/" + org_filename + extension;
-    else
-      return llvmberry::defaultOutputDir + "/" +
-             org_filename.substr(org_filename.rfind("/")) + extension;
-  }
-}
+static llvm::cl::opt<std::string>
+    LLVMBerryWhiteList("llvmberry-whitelist",
+       llvm::cl::desc("Enable hint generation for specific "
+                "optimizations only"),
+       llvm::cl::value_desc("opt-names(use commas)"),
+       llvm::cl::init("-"));
 
-} // anonymous
+static llvm::cl::opt<std::string>
+    LLVMBerryPassWhiteList("llvmberry-passwhitelist",
+       llvm::cl::desc("Enable hint generation for specific "
+                "passes only (instcombine|mem2reg|gvn|pre)"),
+       llvm::cl::value_desc("pass-names(use commas)"),
+       llvm::cl::init("-"));
+
+static llvm::cl::opt<bool>
+    LLVMBerryCompactJson("llvmberry-compactjson",
+        llvm::cl::desc("Use compact json for hint"));
+
+static llvm::cl::opt<bool>
+    LLVMBerryNoCommit("llvmberry-nocommit",
+        llvm::cl::desc("Use compact json for hint"));
+
 
 namespace llvmberry {
 
-std::string defaultOutputDir = "";
-std::vector<std::string> optWhiteList;
-bool optWhiteListEnabled = false;
-std::vector<ValidationUnit::PASS> optPassWhiteList;
-bool optPassWhiteListEnabled = false;
+std::string RuntimeOptions::_DefaultOutputDir;
+std::vector<std::string> RuntimeOptions::_OptWhiteList;
+bool RuntimeOptions::_OptWhiteListEnabled = false;
+std::vector<ValidationUnit::PASS> RuntimeOptions::_OptPassWhiteList;
+bool RuntimeOptions::_OptPassWhiteListEnabled = false;
+bool RuntimeOptions::_CompactJson = false;
+bool RuntimeOptions::_NoCommit = false;
 
-void setWhiteList(const std::string &str) {
-  std::stringstream ss(str);
-  std::string optname;
-  while (std::getline(ss, optname, ',')) {
-    optWhiteList.push_back(optname);
-  }
-  optWhiteListEnabled = true;
-}
-
-void setPassWhiteList(const std::string &str) {
-  std::stringstream ss(str);
-  std::string optname;
-  while (std::getline(ss, optname, ',')) {
-    std::transform(optname.begin(), optname.end(), optname.begin(), ::tolower);
-    if (optname == "gvn")
-      optPassWhiteList.push_back(ValidationUnit::GVN);
-    else if (optname == "mem2reg")
-      optPassWhiteList.push_back(ValidationUnit::MEM2REG);
-    else if (optname == "pre")
-      optPassWhiteList.push_back(ValidationUnit::PRE);
-    else if (optname == "instcombine")
-      optPassWhiteList.push_back(ValidationUnit::INSTCOMBINE);
+std::string makeFullFilename(std::string org_filename,
+                                    std::string extension) {
+  std::string defaultOutputDir = RuntimeOptions::GetDefaultOutputDir();
+  if (defaultOutputDir.empty())
+    return org_filename + extension;
+  else {
+    if (org_filename.rfind("/") == std::string::npos)
+      return defaultOutputDir + "/" + org_filename + extension;
     else
-      assert(false && "Invalid pass white list");
+      return defaultOutputDir + "/" +
+             org_filename.substr(org_filename.rfind("/")) + extension;
   }
-  optPassWhiteListEnabled = true;
 }
 
 void writeModuleToBuffer(const llvm::Module &module, std::string *buffer) {
@@ -88,13 +89,9 @@ void writeModuleToFile(const llvm::Module &module,
 ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
     : _filename(), _optname(optname), _srcfile_buffer(nullptr), _func(func),
       _corehint(), _data(), isAborted(false) {
-  if (optWhiteListEnabled && 
-      std::find(optWhiteList.begin(), optWhiteList.end(), optname) == 
-        optWhiteList.end()) {
-    this->isAborted = true;
-  } else if (optPassWhiteListEnabled &&
-      std::find(optPassWhiteList.begin(), optPassWhiteList.end(), _CurrentPass) 
-        == optPassWhiteList.end()) {
+  if (RuntimeOptions::IgnoreOpt(optname))
+     this->isAborted = true;
+  else if (RuntimeOptions::IgnorePass(_CurrentPass)) {
     this->isAborted = true;
   } else {
     this->begin();
@@ -171,7 +168,10 @@ void ValidationUnit::begin() {
 
 void ValidationUnit::commit() {
   assert(!isAborted);
-
+  
+  if (RuntimeOptions::NoCommit())
+    return;
+  
   // print src
   std::ofstream src_ofs(makeFullFilename(_filename, ".src.bc"), std::ios::out);
   src_ofs << *_srcfile_buffer;
@@ -200,7 +200,11 @@ void ValidationUnit::commit() {
 
   // print corehints
   std::ofstream ofs(makeFullFilename(_filename, ".hint.json"));
-  cereal::JSONOutputArchive oarchive(ofs);
+  cereal::JSONOutputArchive::Options jsonoption = 
+      RuntimeOptions::UseCompactJson() ?
+        cereal::JSONOutputArchive::Options::NoIndent() : 
+        cereal::JSONOutputArchive::Options::Default();
+  cereal::JSONOutputArchive oarchive(ofs, jsonoption);
   _corehint.serialize(oarchive);
   ofs << std::endl;
   if (ofs.fail() || ofs.bad()) {
@@ -227,6 +231,15 @@ void ValidationUnit::StartPass(PASS pass) {
   assert(_CurrentPass == NOTHING);
   _CurrentPass = pass;
   PassDictionary::Create();
+
+  // JYLEE : I put this code here because I could't find where to place this
+  // kind of 'global LLVMBerry-beginning' code. each of `opt` and `clang` has
+  // own main(), and it is too burdensome to place this RuntimeOptions::Init in
+  // both main() functions considering that we're maintaining only llvm repo,
+  // not clang repo..
+  RuntimeOptions::Init(LLVMBerryOutputDirectory, LLVMBerryWhiteList,
+                            LLVMBerryPassWhiteList, LLVMBerryCompactJson,
+                            LLVMBerryNoCommit);
 }
 
 ValidationUnit::PASS ValidationUnit::GetCurrentPass() {

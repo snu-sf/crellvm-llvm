@@ -1084,7 +1084,6 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
           position,
           std::shared_ptr<TyInfrule>(new ConsTransitivity(transitivity)));
     } else {
-
        llvm::dbgs() << " may change SI inf :" << *SI << "\n";
       std::shared_ptr<TyPosition> position =
         TyPosition::make(SRC, *SI, instrIndex[SI], "");
@@ -1457,6 +1456,8 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
         (mem2regCmd.find(ReplName) == mem2regCmd.end()))
       return;
 
+  std::cout<<"ReplaceHint start("<<std::string(ReplInst->getParent()->getParent()->getName())<<"): "<<ReplName<<", "<<std::string(ReplVal->getName())<<std::endl;
+
     data.get<ArgForMem2Reg>()->replaceCmdRhs("Lessdef", ReplName,
                                     TyExpr::make(*ReplVal, Physical));
 
@@ -1485,13 +1486,13 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
                           std::shared_ptr<TyTransitivity>>> tmp;
 
     for (size_t i = 0; i < vec.size(); i++) {
-      if(data.get<ArgForMem2Reg>()->equalsIfConsVar(vec[i].second->getExpr2(), 
+      if (data.get<ArgForMem2Reg>()->equalsIfConsVar(vec[i].second->getExpr2(), 
                                                     keyExpr)) {
-        if (ConsInsn *cv1 = dynamic_cast<ConsInsn *>(vec[i].second->getExpr1().get())) {
-        if (ConsVar *cv2 = dynamic_cast<ConsVar *>(vec[i].second->getExpr2().get())) {
-        if (ConsVar *cv3 = dynamic_cast<ConsVar *>(vec[i].second->getExpr3().get())) {
+        if (ConsInsn* ci = dynamic_cast<ConsInsn*>(vec[i].second->getExpr1().get())) {
+        if (ConsVar* cv2 = dynamic_cast<ConsVar*>(vec[i].second->getExpr2().get())) {
+        if (ConsVar* cv3 = dynamic_cast<ConsVar*>(vec[i].second->getExpr3().get())) {
           std::shared_ptr<TyTransitivity> transitivity
-            (new TyTransitivity(std::shared_ptr<TyExpr>(new ConsInsn(cv1->getTyInsn())),
+            (new TyTransitivity(std::shared_ptr<TyExpr>(new ConsInsn(ci->getTyInsn())),
                                 std::shared_ptr<TyExpr>(new ConsVar(cv2->getTyReg())),
                                 std::shared_ptr<TyExpr>(new ConsVar(cv3->getTyReg()))));
 
@@ -1507,9 +1508,13 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
 
           INFRULE(vec[i].first,
                   std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
-          
-          data.get<ArgForMem2Reg>()->replaceCmdRhs("Transitivity_e3", ReplName,
-                                                   vec[i].second->getExpr3());
+         
+          if (ConsLoadInst* cli = dynamic_cast<ConsLoadInst*>(ci->getTyInsn().get())) {
+          if (ConsId* cid = dynamic_cast<ConsId*>(cli->getTyLoadInst().get()->getPtrValue().get())) {
+          if (cv3->getTyReg() == cid->reg) {
+            data.get<ArgForMem2Reg>()->replaceCmdRhs("Transitivity_e3", ReplName,
+                                                     vec[i].second->getExpr3());
+          }}}
         }}}
       }
     }
@@ -2382,4 +2387,33 @@ bool hasBitcastOrGEP(llvm::AllocaInst* AI) {
   }
   return false;
 }
-} // llvmberry:
+
+void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
+                                TyScope scope) {
+  ValidationUnit::GetInstance()->intrude(
+      [&I, &PB, &scope](Dictionary &data, CoreHint &hints) {
+        for (unsigned i = 0, e = I->getNumOperands(); i != e; ++i) {
+          llvm::Value *Op = I->getOperand(i);
+          if (llvm::PHINode *OpPHI = llvm::dyn_cast<llvm::PHINode>(Op)) {
+            if (I->getParent() != OpPHI->getParent())
+              continue;
+            llvm::Value *OpPHIResolved = OpPHI->getIncomingValueForBlock(PB);
+            std::string OpPHI_id = getVariable(*OpPHI);
+            std::string OpPHIResolved_id = getVariable(*OpPHIResolved);
+            INFRULE(TyPosition::make(scope, getBasicBlockIndex(I->getParent()),
+                                     getBasicBlockIndex(PB)),
+                    ConsTransitivity::make(VAR(OpPHIResolved_id, Physical),
+                                           VAR(OpPHIResolved_id, Previous),
+                                           VAR(OpPHI_id, Physical)));
+
+            INFRULE(TyPosition::make(scope, getBasicBlockIndex(I->getParent()),
+                                     getBasicBlockIndex(PB)),
+                    ConsTransitivity::make(VAR(OpPHI_id, Physical),
+                                           VAR(OpPHIResolved_id, Previous),
+                                           VAR(OpPHIResolved_id, Physical)));
+          }
+        }
+      });
+}
+
+} // llvmberry
