@@ -76,11 +76,21 @@ bool llvm::isAllocaPromotable(const AllocaInst *AI) {
       if (II->getIntrinsicID() != Intrinsic::lifetime_start &&
           II->getIntrinsicID() != Intrinsic::lifetime_end)
         return false;
+
+      //llvmberry::ValidationUnit::GetInstance()->intrude([]
+      //    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      //  hints.setReturnCodeToAdmitted();
+      //});
     } else if (const BitCastInst *BCI = dyn_cast<BitCastInst>(U)) {
       if (BCI->getType() != Type::getInt8PtrTy(U->getContext(), AS)) {
         return false; }
       if (!onlyUsedByLifetimeMarkers(BCI)) {
         return false;}
+
+      //llvmberry::ValidationUnit::GetInstance()->intrude([]
+      //    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      //  hints.setReturnCodeToAdmitted();
+      //});
     } else if (const GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(U)) {
       if (GEPI->getType() != Type::getInt8PtrTy(U->getContext(), AS))
         return false;
@@ -88,6 +98,11 @@ bool llvm::isAllocaPromotable(const AllocaInst *AI) {
         return false;
       if (!onlyUsedByLifetimeMarkers(GEPI))
         return false;
+
+      //llvmberry::ValidationUnit::GetInstance()->intrude([]
+      //    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      //  hints.setReturnCodeToAdmitted();
+      //});
     } else {
       return false;
     }
@@ -324,7 +339,7 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
       for (auto UUI = I->user_begin(), UUE = I->user_end(); UUI != UUE;) {
         Instruction *Inst = cast<Instruction>(*UUI);
         ++UUI;
-        
+       /* 
         llvmberry::ValidationUnit::GetInstance()->intrude
                 ([&Inst]
                   (llvmberry::Dictionary &data, 
@@ -343,7 +358,7 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
             (llvmberry::TyPosition::make
               (llvmberry::Target, *Inst, instrIndex[Inst]-1, ""));
         });
-
+*/
         Inst->eraseFromParent();
       }
     }
@@ -352,6 +367,7 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
             ([&I]
               (llvmberry::Dictionary &data, 
                llvmberry::CoreHint &hints) {
+              /*
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
       std::string RI = llvmberry::getVariable(*I);
 
@@ -365,6 +381,9 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
       hints.addNopPosition
         (llvmberry::TyPosition::make
           (llvmberry::Target, *I, instrIndex[I]-1, ""));
+          */
+      
+      hints.setReturnCodeToAdmitted();
     });
 
     I->eraseFromParent();
@@ -779,7 +798,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 ///   for (...) { if (c) { A = undef; undef = B; } }
 ///
 /// ... so long as A is not used before undef is set.
-//static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 //static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                      LargeBlockInfo &LBI,
@@ -1144,6 +1162,9 @@ void PromoteMem2Reg::run() {
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
     auto &strVec = *(data.get<llvmberry::ArgForMem2Reg>()->strVec);
     auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
+    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
+
+    namedts = F.getParent()->getIdentifiedStructTypes();
 
     for (auto BS = F.begin(), BE = F.end(); BS != BE;) {
       BasicBlock *BB = BS++;
@@ -1641,6 +1662,40 @@ void PromoteMem2Reg::run() {
       }
     }
   }
+
+  llvmberry::ValidationUnit::GetInstance()->intrude
+          ([&F]
+             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
+    auto namedts2 = F.getParent()->getIdentifiedStructTypes();
+    int cmp = 0, cnt = 0;
+
+    for (auto I = namedts.begin(), U = namedts.end(); I != U; I++) {
+      auto I2 = namedts2.begin()+cnt;
+
+      if (I2 == namedts2.end())
+        break;
+
+      if (*I != *I2) {
+        cmp++;
+
+        if (*(I+1) == *I2)
+          cnt--;
+        else if (*I == *(I2+1))
+          cnt++;
+      }
+
+      cnt++;
+      //for (auto I2 = namedts2.begin(), U2 = namedts2.end(); I2 != U2; I2++) {
+      //  if (*I != *I2)
+      //    cmp++;
+      //}
+    }
+
+    //if (namedts != F.getParent()->getIdentifiedStructTypes())
+    if (cmp > 2)
+      hints.setReturnCodeToAdmitted();
+  });
 
   NewPhiNodes.clear();
   llvmberry::ValidationUnit::End();

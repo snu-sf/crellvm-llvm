@@ -192,7 +192,7 @@ public:
   typedef std::shared_ptr<TyReachableObj> TyReachable;
   TyReachable isReachable;
 
-  
+  std::vector<llvm::StructType*> namedts;
 
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
