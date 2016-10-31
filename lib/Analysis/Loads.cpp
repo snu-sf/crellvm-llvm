@@ -320,11 +320,11 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       if ((isa<AllocaInst>(StrippedPtr) || isa<GlobalVariable>(StrippedPtr)) &&
           (isa<AllocaInst>(StorePtr) || isa<GlobalVariable>(StorePtr)) &&
           StrippedPtr != StorePtr){
-        if(llvmberry_isActive){ 
+        if(llvmberry_isActive){
           llvmberry::ValidationUnit::GetInstance()->intrude([SI](
               llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
             auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-            falvarg->orthogonalStores->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "alloca_or_global")));
+            falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "alloca_or_global")));
           });
         }
         continue;
@@ -335,11 +335,11 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       if (AA &&
           (AA->getModRefInfo(SI, StrippedPtr, AccessSize) &
            AliasAnalysis::Mod) == 0){
-        if(llvmberry_isActive){ 
+        if(llvmberry_isActive){
           llvmberry::ValidationUnit::GetInstance()->intrude([SI](
               llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
             auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-            falvarg->orthogonalStores->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "aliasanalysis")));
+            falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "aliasanalysis")));
           });
         }
         continue;
@@ -356,12 +356,32 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       // ignore it.
       if (AA &&
           (AA->getModRefInfo(Inst, StrippedPtr, AccessSize) &
-           AliasAnalysis::Mod) == 0)
+           AliasAnalysis::Mod) == 0) {
+        if(llvmberry_isActive){
+          llvmberry::ValidationUnit::GetInstance()->intrude([Inst](
+              llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+            auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+            falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(Inst, "aliasanalysis")));
+          });
+        }
         continue;
+      }
 
       // May modify the pointer, bail out.
       ++ScanFrom;
       return nullptr;
+    }
+
+    if(llvmberry_isActive){
+      llvmberry::ValidationUnit::GetInstance()->intrude([Inst](
+          llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+        auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+        if (isa<CallInst>(Inst)) {
+          // Yes, readonly / readnone calls must be considered as well.
+          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
+              std::make_pair(Inst, "aliasanalysis")));
+        }
+      });
     }
   }
 

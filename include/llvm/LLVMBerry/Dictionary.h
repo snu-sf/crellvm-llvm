@@ -255,8 +255,6 @@ struct SinkInstArg {
 public:
   SinkInstArg();
   llvm::DominatorTree *sinkDT;
-  bool propagatePrivate;
-  llvm::AllocaInst *privateAlloca;
 };
 DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
 

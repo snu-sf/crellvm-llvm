@@ -2750,51 +2750,7 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
           (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         Instruction *BI = Scan;
         if (isa<CallInst>(BI)) {
-          Value *pointerOperand = nullptr;
-          if (LoadInst *LI = dyn_cast<LoadInst>(I))
-            pointerOperand = LI->getPointerOperand();
-
-          if (pointerOperand) {
-            // How to prove this sink optimization is correct even
-            // if it passes CallInst?
-            // One heuristic : if we can say that its pointer operand is 
-            // private alloca..
-            auto si_arg = data.get<llvmberry::ArgForSinkInst>();
-            bool doesPrivateSolveThisCase = false;
-            if (AllocaInst *AI = dyn_cast<AllocaInst>(pointerOperand)) {
-              // If AI's users are all loads or stores..
-              bool allLoadsOrStore = true;
-              for (auto itr = AI->user_begin(); itr != AI->user_end(); itr++) {
-                Value *V = *itr;
-                // Heuristic : If all uses are load/store, then we can say that
-                // the pointer is private.
-                if (!isa<LoadInst>(V) && !isa<StoreInst>(V)) {
-                  allLoadsOrStore = false;
-                  break;
-                }
-              }
-              if(allLoadsOrStore) {
-                doesPrivateSolveThisCase = true;
-                si_arg->propagatePrivate = true;
-                si_arg->privateAlloca = AI;
-                // To generate PRIVATE.
-                // alloca      -
-                //   -      alloca
-                /*
-                insertSrcNopAtTgtI(hints, AI); // src nop
-                BasicBlock::iterator Scan = I;
-                Scan++;
-                insertTgtNopAtSrcI(hints, Scan); //tgt nop
-                */
-                insertTgtNopAtSrcI(hints, AI);
-                BasicBlock::iterator Scan = I;
-                Scan++;
-                insertSrcNopAtTgtI(hints, Scan); // src nop
-              }
-            }
-            if (!doesPrivateSolveThisCase)
-              hints.setReturnCodeToAdmitted();
-          }
+          hints.setReturnCodeToAdmitted();
         }
       });
     }
@@ -2817,16 +2773,6 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
                    SRC),
               BOUNDS(INSTPOS(llvmberry::Source, I),
                      INSTPOS(llvmberry::Target, InsertPos)));
-          if (si_arg->propagatePrivate) {
-            AllocaInst *AI = si_arg->privateAlloca;
-            auto aireg = REGISTER(llvmberry::getVariable(*AI), Physical);
-            PROPAGATE(PRIVATE(aireg, SRC),
-              BOUNDS(INSTPOS(llvmberry::Source, AI),
-                     INSTPOS(llvmberry::Target, InsertPos)));
-            PROPAGATE(PRIVATE(aireg, TGT),
-              BOUNDS(INSTPOS(llvmberry::Target, AI),
-                     INSTPOS(llvmberry::Target, InsertPos)));
-          }
           //prev maydiff propagate global -> issue 86
           PROPAGATE(MAYDIFF(reg0_name, llvmberry::Previous),
                     llvmberry::ConsGlobal::make());
