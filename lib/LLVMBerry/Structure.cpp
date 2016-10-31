@@ -11,6 +11,7 @@
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/RuntimeOptions.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -164,7 +165,11 @@ static void PrintLLVMName(llvm::raw_ostream &OS, const llvm::Value *V) {
                 llvm::isa<llvm::GlobalValue>(V) ? GlobalPrefix : LocalPrefix);
 }
 
+
+
+
 namespace llvmberry {
+
 /// @return the index of the BasicBlock w.r.t. the parent function.
 std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
   if (!block || !(block->getParent())) {
@@ -2400,6 +2405,7 @@ std::shared_ptr<TyExpr> TyExpr::make(const std::shared_ptr<TyValue> vptr) {
     assert("Unknown value type" && false);
     return nullptr;
   }
+  return nullptr;
 }
 
 std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value,
@@ -2867,9 +2873,7 @@ void CoreHint::setOptimizationName(const std::string &name) {
 }
 
 void intrude(std::function<void()> func) {
-  if (optPassWhiteListEnabled &&
-      std::find(optPassWhiteList.begin(), optPassWhiteList.end(),
-                ValidationUnit::GetCurrentPass()) == optPassWhiteList.end())
+  if (RuntimeOptions::IgnorePass(ValidationUnit::GetCurrentPass()))
     return;
   func();
 }

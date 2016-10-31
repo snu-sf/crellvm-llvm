@@ -60,8 +60,6 @@ INITIALIZE_PASS_END(PromotePass, "mem2reg", "Promote Memory to Register",
                 false, false)
 
 bool PromotePass::runOnFunction(Function &F) {
-  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
-
   std::vector<AllocaInst*> Allocas;
 
   BasicBlock &BB = F.getEntryBlock();  // Get the entry node for the function
@@ -89,7 +87,6 @@ bool PromotePass::runOnFunction(Function &F) {
     Changed = true;
   }
 
-  llvmberry::ValidationUnit::EndPass();
   return Changed;
 }
 
