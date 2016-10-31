@@ -1216,18 +1216,42 @@ void PromoteMem2Reg::run() {
                   int pos = std::distance(usePile[tmpInst].begin(), UI3);
 
                   usePile[tmpInst].erase(usePile[tmpInst].begin()+pos);
+  dbgs() << "usepile tmpinst " << *tmpInst << " erasing tmpuseinst check1 " << pos << "\n";             
+          
                   flag = true;
                   break;
                 }
               }
+              if ((std::find(isReachable[useBB].begin(), isReachable[useBB].end(), checkBB) != 
+                    isReachable[useBB].end()) && 
+                  (std::find(isReachable[checkBB].begin(), isReachable[checkBB].end(), useBB) !=
+                  isReachable[checkBB].end())) {
+                  flag = true;
+              }
+
 
               if (!DT.dominates(useBB, checkBB)) {
                 flag = true;
 
                 if (DT.dominates(checkBB, useBB)) {
+                  
+              if ((std::find(isReachable[useBB].begin(), isReachable[useBB].end(), checkBB) == 
+                    isReachable[useBB].end()) ||
+                  (std::find(isReachable[checkBB].begin(), isReachable[checkBB].end(), useBB) ==
+                  isReachable[checkBB].end())) {
+                    int pos = std::distance(usePile[tmpInst].begin(), UI3);
+
+                  usePile[tmpInst].erase(usePile[tmpInst].begin()+pos);
+  dbgs() << "usepile tmpinst " << *tmpInst << " erasing tmpuseinst check2 " << pos << "\n";             
+          
+
+              }
+                 /* 
                   int pos = std::distance(usePile[tmpInst].begin(), UI3);
 
                   usePile[tmpInst].erase(usePile[tmpInst].begin()+pos);
+  dbgs() << "usepile tmpinst " << *tmpInst << " erasing tmpuseinst check2 " << pos << "\n";             
+          */
                 }
               } else {
                 findReachable = true;
@@ -1235,10 +1259,12 @@ void PromoteMem2Reg::run() {
               UI3++;
             }
 
-            if (!findReachable || flag)
+            if (!findReachable || flag) {
+  dbgs() << "usepile tmpinst " << *tmpInst << " BB of tmpInst " << tmpInst->getParent()->getName() << " pushing tmpuseinst " << *tmpUseinst << " in " << tmpUseinst->getParent()->getName() << "\n";             
               usePile[tmpInst].push_back(std::make_tuple(tmpUseinst->getParent(),
                                                          instrIndex[tmpUseinst],
                                                          tmpUseinst));
+            }
           }
         }
 
