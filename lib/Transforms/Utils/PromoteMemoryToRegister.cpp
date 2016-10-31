@@ -1477,7 +1477,6 @@ void PromoteMem2Reg::run() {
 
   if (Allocas.empty()) {
     llvmberry::ValidationUnit::End();
-
     llvmberry::ValidationUnit::EndPass();
 
     return; // All of the allocas must have been trivial!
@@ -1694,32 +1693,8 @@ void PromoteMem2Reg::run() {
              (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
     auto namedts2 = F.getParent()->getIdentifiedStructTypes();
-    int cmp = 0, cnt = 0;
 
-    for (auto I = namedts.begin(), U = namedts.end(); I != U; I++) {
-      auto I2 = namedts2.begin()+cnt;
-
-      if (I2 == namedts2.end())
-        break;
-
-      if (*I != *I2) {
-        cmp++;
-
-        if (*(I+1) == *I2)
-          cnt--;
-        else if (*I == *(I2+1))
-          cnt++;
-      }
-
-      cnt++;
-      //for (auto I2 = namedts2.begin(), U2 = namedts2.end(); I2 != U2; I2++) {
-      //  if (*I != *I2)
-      //    cmp++;
-      //}
-    }
-
-    //if (namedts != F.getParent()->getIdentifiedStructTypes())
-    if (cmp > 2)
+    if (namedts != F.getParent()->getIdentifiedStructTypes())
       hints.setReturnCodeToAdmitted();
   });
 
