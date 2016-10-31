@@ -1748,6 +1748,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
             }
 
             ignore = true;
+          }
 
             // add hints per every use of LI
             for (auto UI = usePile[LI].begin(), E = usePile[LI].end(); UI != E;) {
@@ -1766,27 +1767,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                 generateHintForMem2RegPropagateLoad(AI, NULL, LI, useBB, useIndex, std::get<2>(t));
               }
             }
-/*
-            for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
-              llvm::Use &U = *(UI++);
-              llvm::Instruction *use =
-                  llvm::dyn_cast<llvm::Instruction>(U.getUser());
 
-              // set index of use
-              int useIndex = getIndexofMem2Reg(
-                  use, instrIndex[use],
-                  termIndex[getBasicBlockIndex(use->getParent())]);
-              if ((LI->getParent() == use->getParent() &&
-                   instrIndex[LI] < instrIndex[use]) ||
-                  (std::find(isReachable[LI->getParent()].begin(),
-                             isReachable[LI->getParent()].end(),
-                             use->getParent()) != isReachable[LI->getParent()].end())) {
-                //generateHintForMem2RegPropagateLoad(AI, NULL, LI, use, useIndex);
-                generateHintForMem2RegPropagateLoad(AI, NULL, LI, use->getParent(), useIndex, use);
-              }
-            }
-*/            
-          }
         }
       }
     }
