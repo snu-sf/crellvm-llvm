@@ -170,7 +170,7 @@ struct AllocaInfo {
   }
 };
 
-// Data package used by RenamePass()
+// Data package used by RenamePasa()
 class RenamePassData {
 public:
   typedef std::vector<Value *> ValVector;
@@ -1206,7 +1206,7 @@ void PromoteMem2Reg::run() {
             for (auto UI3 = usePile[tmpInst].begin(),
                        E3 = usePile[tmpInst].end(); UI3 != E3;) {
               auto t = *UI3;
-              Instruction* checkI = std::get<2>(t);
+              //Instruction* checkI = std::get<2>(t);
               BasicBlock* checkBB = std::get<0>(t);
               
               if (useBB == checkBB) {
@@ -1844,141 +1844,16 @@ NextIteration:
                    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
-          auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
-          auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-          auto &termIndex =  *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
-          auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
-          auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
-          auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
-          auto &blockPairVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockPairVec);
           Value* UndefVal = UndefValue::get(APN->getType());
 
           if (IncomingVals[AllocaNo] == UndefVal) {
             // alloca's use search
             // among them load which is dominated by bb.
             // then propagate phi to load
-            AllocaInst* AI = NULL;
-
-            for (auto i = allocas.begin(); i != allocas.end(); ++i) {
-              AllocaInst* AItmp = *i;
-              if(AItmp->getName() == APN->getName().substr(0, APN->getName().rfind(".")))
-                AI = AItmp;
+            
+            llvmberry::generateHintForMem2RegPhiUndef(APN, Pred);
             }
 
-            if (AI != NULL) {
-              llvm::dbgs() << "PHI undef AI " << AI->getName() << "\n";
-              for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
-                Instruction *User = cast<Instruction>(*UI++);
-
-                if (LoadInst *LI = dyn_cast<LoadInst>(User)) {
-                  if (APN->getParent() == LI ->getParent() ||
-                      (std::find(isReachable[APN->getParent()].begin(),
-                                 isReachable[APN->getParent()].end(),
-                                 LI->getParent()) != isReachable[APN->getParent()].end())) {
-                    llvm::dbgs() << "Is it in ? AI " << AI->getName() << " APN is " << *APN << " LI is " << *LI << "\n";
-                    PHINode *check = NULL;
-                    StoreInst *ST = NULL;
-                    blockPairVec.clear();
-                    Instruction *tmp = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, true, data);
-
-                    if (tmp != NULL) {
-                      llvm::dbgs() << "PHI undef tmp " << *tmp << "\n";
-                      check = dyn_cast<PHINode>(tmp);
-                      ST = dyn_cast<StoreInst>(tmp);
-                    }
-
-                    if (ST != NULL) {
-                      if ((ST->getParent() == LI->getParent()) && (instrIndex[ST] > instrIndex[LI])) {
-                        blockPairVec.clear();
-                        Instruction *tmpI = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, false, data); //to check there is phi in same block as LI 
-                        PHINode *checkPHI = NULL;
-
-                        if (tmpI != NULL) {
-                          llvm::dbgs() << "PHI undef tmp ST2 " << *tmpI << "\n";
-                          checkPHI = dyn_cast<PHINode>(tmpI);
-                        }
-
-                        if (checkPHI != NULL) {
-          dbgs() << "From APN to LI ST below LI : " << *LI << "  ST: " << *ST << "  APN block : "<< APN->getParent()->getName() << "\n";
-                          std::string Rphi = llvmberry::getVariable(*checkPHI);
-
-                          PROPAGATE(
-                            LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                          new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                                    VAR(llvmberry::getVariable(*AI), Ghost),
-                                    SRC),
-                            BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(checkPHI->getParent())),
-                                  llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
-
-                          std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
-                                                                                      (VAR(llvmberry::getVariable(*AI), Ghost),
-                                                                                       VAR(Rphi, Physical), TGT);
-
-                          PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
-                            BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(checkPHI->getParent())),
-                                   llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
-
-                          mem2regCmd[Rphi].lessdef.push_back(lessdef); 
-                        }
-                      }
-                    }
-
-                    if (check == APN) {
-dbgs() << "From APN to LI nothing between LI: " << *LI << "  phi is : " << *tmp << "  APN block: " << APN->getParent()->getName() << "\n";
-                      PROPAGATE(
-                          LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                            VAR(llvmberry::getVariable(*AI), Ghost),
-                            SRC),
-                          BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
-                             llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
-
-                      std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
-                        (VAR(llvmberry::getVariable(*AI), Ghost),
-                        VAR(Rphi, Physical), TGT);
-
-                      PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
-                          BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
-                            llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
-                      mem2regCmd[Rphi].lessdef.push_back(lessdef);
-                    } else if (check != NULL) {
-                      std::string Rphi = llvmberry::getVariable(*check);
-
-                      PROPAGATE(
-                              LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                              new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                                      VAR(llvmberry::getVariable(*AI), Ghost),
-                                      SRC),
-                              BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(
-                                             check->getParent())),
-                                     llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
-
-                      std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
-                              (VAR(llvmberry::getVariable(*AI), Ghost),
-                               VAR(Rphi, Physical), TGT);
-
-                      PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
-                                BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(
-                                               check->getParent())),
-                                       llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
-                      mem2regCmd[Rphi].lessdef.push_back(lessdef);
-                    }
-                  }
-
-                  for (auto UI2 = usePile[LI].begin(), E2 = usePile[LI].end(); UI2 != E2;) {
-                    auto t = *(UI2++);
-
-                    int useIndex =
-                      llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
-                                                   termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
-
-                    llvmberry::generateHintForMem2RegPropagateLoad(AI, APN, LI, std::get<0>(t), 
-                                                                   useIndex, std::get<2>(t));
-                  }
-                }/*this is for LI*/ 
-              } 
-            }
-          }
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);

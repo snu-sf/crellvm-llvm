@@ -1126,7 +1126,7 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
                              bool checkSI, Dictionary data,
                              bool isLoop) {
   llvm::dbgs() << "properPHI begin(" << BB->getParent()->getName() << "): " << BB->getName() << ", " << Target << ", " << I->getParent()->getName() << "(" << *I << ")" << "\n";
-  auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+  //auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
   auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
   auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
   llvm::BasicBlock *IB = I->getParent();
@@ -1225,8 +1225,8 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
-    auto &allocas = *(data.get<ArgForMem2Reg>()->allocas);
-    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    //auto &allocas = *(data.get<ArgForMem2Reg>()->allocas);
+    //auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
 
     std::string Rload = getVariable(*LI);
     if (llvm::isa<llvm::PHINode>(use)) {
@@ -1535,6 +1535,139 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
   std::cout<<"ReplaceHint end"<<std::endl;
 }
 
+void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instruction *Inst) {
+
+  ValidationUnit::GetInstance()->intrude([&BB, &AI, &Inst]
+                                                 (Dictionary &data, CoreHint &hints) {
+    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    //auto &usePile = *(data.get<ArgForMem2Reg>()->usePile);
+    auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
+    //auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
+    
+    for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE; ++BI) {
+      llvm::BasicBlock *pred = *BI;
+      llvm::dbgs() << "pred : " << pred->getName() << " BB : " << BB->getName() << "\n";
+      llvm::Value *UndefVal = llvm::UndefValue::get(Inst->getType());
+
+      std::pair<llvm::BasicBlock *, llvm::BasicBlock *> edge = std::make_pair(pred, BB);
+
+      std::pair<std::pair<llvm::BasicBlock *, llvm::BasicBlock *>,
+             llvmberry::Mem2RegArg::Tr_Type> blockPairTag1 = std::make_pair(edge, llvmberry::Mem2RegArg::False);
+      std::pair<std::pair<llvm::BasicBlock *, llvm::BasicBlock *>,
+              llvmberry::Mem2RegArg::Tr_Type> blockPairTag2 = std::make_pair(edge, llvmberry::Mem2RegArg::LoadStart);
+
+      if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1) != reachedEdgeTag.end()) {
+        llvm::dbgs() << "reachededge propagating  Inst : " << *Inst << " block : " << pred->getName() << "\n";
+        std::vector<std::pair<std::pair<llvm::BasicBlock*,llvm::BasicBlock*>,
+                llvmberry::Mem2RegArg::Tr_Type>>::iterator it =
+                std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
+        int pos = std::distance(reachedEdgeTag.begin(), it);
+        reachedEdgeTag.at(pos).second = llvmberry::Mem2RegArg::True;
+        llvm::dbgs() << "pred propagate false  " << pred->getName() << "\n";
+
+           //propagate pred block
+        if (AI->getParent() != pred) {
+          PROPAGATE(
+                  LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                  new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                          VAR(getVariable(*AI), Ghost),
+                          SRC),
+                  BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(pred)),
+                         TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+
+
+          PROPAGATE(
+                  LESSDEF(VAR(getVariable(*AI), Ghost),
+                          EXPR(UndefVal, Physical),
+                          TGT),
+                  BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(pred)),
+                         TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+        } else {
+          PROPAGATE(
+                  LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                  new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                          VAR(getVariable(*AI), Ghost),
+                          SRC),
+                  BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                         TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+
+          PROPAGATE(
+                  LESSDEF(VAR(getVariable(*AI), Ghost),
+                          EXPR(UndefVal, Physical),
+                          TGT),
+                  BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                         TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+
+          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                  llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
+                                                  REGISTER(getVariable(*AI), Ghost)));
+
+          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                  llvmberry::ConsTransitivity::make(INSN(*AI),
+                                                    EXPR(UndefVal, Physical),
+                                                    VAR(getVariable(*AI), Ghost)));
+        }
+            checkTag_propagate(pred, AI, Inst);
+      }
+      if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2) != reachedEdgeTag.end()) {
+      llvm::dbgs() << "reachededge propagating  Inst : " << *Inst << " block : " << pred->getName() << "\n";
+        std::vector<std::pair<std::pair<llvm::BasicBlock*,llvm::BasicBlock*>,
+                llvmberry::Mem2RegArg::Tr_Type>>::iterator it =
+                std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2);
+        int pos = std::distance(reachedEdgeTag.begin(), it);
+        reachedEdgeTag.at(pos).second = llvmberry::Mem2RegArg::True;
+       //propagate pred block
+      llvm::dbgs() << "pred propagate load  " << pred->getName() << "\n";
+
+      if (AI->getParent() != pred) {
+        PROPAGATE(
+                LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                        VAR(getVariable(*AI), Ghost),
+                        SRC),
+                BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(pred)),
+                       TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+
+
+        PROPAGATE(
+                LESSDEF(VAR(getVariable(*AI), Ghost),
+                        EXPR(UndefVal, Physical),
+                        TGT),
+                BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(pred)),
+                       TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+      } else {
+        PROPAGATE(
+                LESSDEF(INSN(std::shared_ptr<TyInstruction>(
+                                new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
+                        VAR(getVariable(*AI), Ghost),
+                        SRC),
+                BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                       TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+
+        PROPAGATE(
+                LESSDEF(VAR(getVariable(*AI), Ghost),
+                        EXPR(UndefVal, Physical),
+                        TGT),
+                BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                       TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+
+        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
+                                                REGISTER(getVariable(*AI), Ghost)));
+
+        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                llvmberry::ConsTransitivity::make(INSN(*AI),
+                                                  EXPR(UndefVal, Physical),
+                                                  VAR(getVariable(*AI), Ghost)));
+      }
+            checkTag_propagate(pred, AI, Inst);
+    }
+  }
+  });
+}
+
+
 void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                      std::vector<std::pair<llvm::BasicBlock*,
                                                            llvm::BasicBlock*>> VisitedBlock,
@@ -1552,85 +1685,16 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
 
       if (llvm::PHINode* PN = llvm::dyn_cast<llvm::PHINode>(Inst)) {
         if (AI->getName() == PN->getName().substr(0, PN->getName().rfind("."))) {
-          while (!VisitedBlock.empty()) {
-            std::pair<std::pair<llvm::BasicBlock*,
-                                llvm::BasicBlock*>,
-                      std::pair<bool, bool>> blockPairTag1 = std::make_pair(*VisitedBlock.rbegin(), std::make_pair(false, false));
-            std::pair<std::pair<llvm::BasicBlock*,
-                                llvm::BasicBlock*>,
-                      std::pair<bool, bool>> blockPairTag2 = std::make_pair(*VisitedBlock.rbegin(), std::make_pair(false, true));
+          llvm::dbgs()<< "PHI checktag start " << *PN << "\n";
 
-            llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
-            llvm::Value *UndefVal = llvm::UndefValue::get(PN->getType());
-
-            if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1) != reachedEdgeTag.end()) {
-              std::vector<std::pair<std::pair<llvm::BasicBlock*,
-                                              llvm::BasicBlock*>,
-                                    std::pair<bool, bool>>>::iterator it =
-              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
-              int pos = std::distance(reachedEdgeTag.begin(), it);
-              reachedEdgeTag.at(pos).second.first = true;
-            } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2) != reachedEdgeTag.end()) {
-              std::vector<std::pair<std::pair<llvm::BasicBlock*,
-                                              llvm::BasicBlock*>,
-                                    std::pair<bool, bool>>>::iterator it =
-              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
-              int pos = std::distance(reachedEdgeTag.begin(), it);
-              reachedEdgeTag.at(pos).second.first = true;
-            } else {
-              assert("Cannot find edge damn");
-            }
-
-            VisitedBlock.pop_back();
-
-            if (AI->getParent() != current) {
-              PROPAGATE(
-                      LESSDEF(INSN(std::shared_ptr<TyInstruction>(
-                                    new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
-                              VAR(getVariable(*AI), Ghost),
-                              SRC),
-                      BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                             TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
-
-
-              PROPAGATE(
-                      LESSDEF(VAR(getVariable(*AI), Ghost),
-                              EXPR(UndefVal, Physical),
-                              TGT),
-                      BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                             TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
-            } else {
-              PROPAGATE(
-                      LESSDEF(INSN(std::shared_ptr<TyInstruction>(
-                                    new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
-                              VAR(getVariable(*AI), Ghost),
-                              SRC),
-                      BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                             TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
-
-              PROPAGATE(
-                      LESSDEF(VAR(getVariable(*AI), Ghost),
-                              EXPR(UndefVal, Physical),
-                              TGT),
-                      BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                             TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
-
-              INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                      llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
-                                                      REGISTER(getVariable(*AI), Ghost)));
-
-              INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                      llvmberry::ConsTransitivity::make(INSN(*AI),
-                                                        EXPR(UndefVal, Physical),
-                                                        VAR(getVariable(*AI), Ghost)));
-            }
-          }
+          checkTag_propagate(BB, AI, PN); 
           llvm::dbgs()<< "PHIdelete case PHI: " + std::string(BB->getName()) + "\n";
           return;  
         }
       } else if(llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(Inst)){
         if(SI->getOperand(1)->getName() == AI->getName()) {
-          llvm::dbgs()<< "PHIdelete case SI: " + std::string(BB->getName()) + "\n";
+        llvm::dbgs()<< "store inst return \n";
+llvm::dbgs()<< "PHIdelete case SI: " + std::string(BB->getName()) + "\n";
           return;
         }
       } else if(llvm::LoadInst *LI = llvm::dyn_cast<llvm::LoadInst>(Inst)) {
@@ -1676,79 +1740,11 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
                            TyPosition::make(SRC, *LI, instrIndex[LI], ""))); 
           }
+          llvm::dbgs()<< "Load checktag start " << *LI << "\n";
 
-          for (unsigned a = 0; a < VisitedBlock.size(); a++) {
-            llvm::BasicBlock *current = (VisitedBlock.at(a)).first;
-            std::pair<std::pair<llvm::BasicBlock*,
-                                llvm::BasicBlock*>,
-                      std::pair<bool,bool>> blockPairTag1 = std::make_pair(VisitedBlock.at(a), std::make_pair(false, false));
-            std::pair<std::pair<llvm::BasicBlock*,
-                                llvm::BasicBlock*>,
-                      std::pair<bool,bool>> blockPairTag2 = std::make_pair(VisitedBlock.at(a), std::make_pair(false, true));
-
-            if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1) != reachedEdgeTag.end()) {
-              std::vector<std::pair<std::pair<llvm::BasicBlock*,
-                                              llvm::BasicBlock*>,
-                                    std::pair<bool, bool>>>::iterator it =
-              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
-
-              int pos = std::distance(reachedEdgeTag.begin(), it);
-              reachedEdgeTag.at(pos).second.first = true;
-              llvm::dbgs() << "tag true1 : " << current->getName() << " - " << (VisitedBlock.at(a)).second->getName() << "\n";
-            } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2) != reachedEdgeTag.end()) {
-              std::vector<std::pair<std::pair<llvm::BasicBlock*,
-                                              llvm::BasicBlock*>,
-                                    std::pair<bool, bool>>>::iterator it =
-              std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2);
-
-              int pos = std::distance(reachedEdgeTag.begin(), it);
-              reachedEdgeTag.at(pos).second.first = true;
-              llvm::dbgs() << "tag true1 : " << current->getName() << " - " << (VisitedBlock.at(a)).second->getName() << "\n";
-            }
-
-            if (AI->getParent() != current) {
-              PROPAGATE(
-                      LESSDEF(INSN(std::shared_ptr<TyInstruction>(
-                                    new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
-                              VAR(getVariable(*AI), Ghost),
-                              SRC),
-                        BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                             TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
-                PROPAGATE(
-                        LESSDEF(VAR(getVariable(*AI), Ghost),
-                                EXPR(UndefVal, Physical),
-                                TGT),
-                        BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                               TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
-            } else {
-              PROPAGATE(
-                      LESSDEF(INSN(std::shared_ptr<TyInstruction>(
-                                    new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
-                              VAR(getVariable(*AI), Ghost),
-                              SRC),
-                      BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                             TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
-
-              PROPAGATE(
-                      LESSDEF(VAR(getVariable(*AI), Ghost),
-                              EXPR(UndefVal, Physical),
-                              TGT),
-                      BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                             TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
-
-              INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                      llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
-                                                      REGISTER(getVariable(*AI), Ghost)));
-
-              INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                      llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
-                                                            new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
-                                                        EXPR(UndefVal, Physical),
-                                                        VAR(getVariable(*AI), Ghost)));
-            }
+            checkTag_propagate(BB, AI, LI);
 
             ignore = true;
-          }
 
             // add hints per every use of LI
             for (auto UI = usePile[LI].begin(), E = usePile[LI].end(); UI != E;) {
@@ -1771,46 +1767,61 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
         }
       }
     }
-
+      
     int i = 0;
     for (auto BI = succ_begin(BB), BE = succ_end(BB); BI != BE; ++BI) {
+
       llvm::BasicBlock* succ = *BI;
+
+      llvm::dbgs() << "reachededge " << BB->getName() << " -> " << succ->getName() << "\n"; 
+
       std::pair<llvm::BasicBlock*, llvm::BasicBlock*> Bpair = std::make_pair(BB, succ);
       std::pair<std::pair<llvm::BasicBlock*,
                           llvm::BasicBlock*>,
-                std::pair<bool, bool>> BpairFalse_False = std::make_pair(Bpair, std::make_pair(false, false));
+                llvmberry::Mem2RegArg::Tr_Type> BpairFalse = std::make_pair(Bpair, llvmberry::Mem2RegArg::False);
+        std::pair<std::pair<llvm::BasicBlock*,
+                          llvm::BasicBlock*>,
+                llvmberry::Mem2RegArg::Tr_Type> BpairTrue = std::make_pair(Bpair, llvmberry::Mem2RegArg::True);
       std::pair<std::pair<llvm::BasicBlock*,
                           llvm::BasicBlock*>,
-                std::pair<bool, bool>> BpairFalse_True = std::make_pair(Bpair, std::make_pair(false, true));
-      std::pair<std::pair<llvm::BasicBlock*,
-                          llvm::BasicBlock*>,
-                std::pair<bool, bool>> BpairTrue_False = std::make_pair(Bpair, std::make_pair(true, false));
-      std::pair<std::pair<llvm::BasicBlock*,
-                          llvm::BasicBlock*>,
-                std::pair<bool, bool>> BpairTrue_True = std::make_pair(Bpair, std::make_pair(true, true));
+                llvmberry::Mem2RegArg::Tr_Type> BpairLoad = std::make_pair(Bpair, llvmberry::Mem2RegArg::LoadStart);
 
       if (ignore) {
-        if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse_True) != reachedEdgeTag.end()) {
+        if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairLoad) != reachedEdgeTag.end()) {
+          
+          llvm::dbgs() << "reachededge continue load " << BB->getName() << " -> " << succ->getName() << "\n"; 
+
           continue;
-        } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue_False) != reachedEdgeTag.end() ||
-                    std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue_True) != reachedEdgeTag.end()) {
+        } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue) != reachedEdgeTag.end()) { 
           while (!VisitedBlock.empty()) {
             llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
             llvm::Value *UndefVal = llvm::UndefValue::get(AI->getType());
             std::pair<std::pair<llvm::BasicBlock*,
                               llvm::BasicBlock*>,
-                    std::pair<bool, bool>> blockPairTag = std::make_pair(*VisitedBlock.rbegin(), std::make_pair(false, true));
-
-          if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
+                    llvmberry::Mem2RegArg::Tr_Type> blockPairTag1 = std::make_pair(*VisitedBlock.rbegin(), llvmberry::Mem2RegArg::LoadStart);
+            std::pair<std::pair<llvm::BasicBlock*,
+                              llvm::BasicBlock*>,
+                    llvmberry::Mem2RegArg::Tr_Type> blockPairTag2 = std::make_pair(*VisitedBlock.rbegin(), llvmberry::Mem2RegArg::False);
+           
+          if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1) != reachedEdgeTag.end()) {
             std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                             llvm::BasicBlock*>,
-                                  std::pair<bool, bool>>>::iterator it =
-            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag);
+                                  llvmberry::Mem2RegArg::Tr_Type>>::iterator it =
+            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
 
             int pos = std::distance(reachedEdgeTag.begin(), it);
-            reachedEdgeTag.at(pos).second.first = true;
-          }
+            reachedEdgeTag.at(pos).second = llvmberry::Mem2RegArg::True;
+              llvm::dbgs() << "reachededge tag is true now5 " << AI->getName () << "     " << current->getName() << "   " << (*VisitedBlock.rbegin()).second->getName() << "\n"; 
+          } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2) != reachedEdgeTag.end()) {
+            std::vector<std::pair<std::pair<llvm::BasicBlock*,
+                                            llvm::BasicBlock*>,
+                                  llvmberry::Mem2RegArg::Tr_Type>>::iterator it =
+            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag2);
 
+            int pos = std::distance(reachedEdgeTag.begin(), it);
+            reachedEdgeTag.at(pos).second = llvmberry::Mem2RegArg::True;
+              llvm::dbgs() << "reachededge tag is true now5 " << AI->getName () << "     " << current->getName() << "   " << (*VisitedBlock.rbegin()).second->getName() << "\n"; 
+          }
           VisitedBlock.pop_back();
           llvm::dbgs() << "propagate this block when it meet previously propagate : " << current->getName() << "\n";
 
@@ -1854,38 +1865,50 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                                       EXPR(UndefVal, Physical),
                                                       VAR(getVariable(*AI), Ghost)));
           }
-         }
-        } else /*if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse_False) != reachedEdgeTag.end())*/ { 
-          reachedEdgeTag.push_back(BpairFalse_True);
+         } 
+          return ;
+        } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse) != reachedEdgeTag.end() ) {
+
+            std::vector<std::pair<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>,
+                                  llvmberry::Mem2RegArg::Tr_Type>>::iterator it =
+            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse);
+            int pos = std::distance(reachedEdgeTag.begin(), it);
+            reachedEdgeTag.at(pos).second = llvmberry::Mem2RegArg::True;
+          } else { 
+          reachedEdgeTag.push_back(BpairLoad);
           VisitedBlock.push_back(Bpair);
+    llvm::dbgs() << "reachededge tag false load push  " << AI->getName () << "   push  " << BB->getName() << "   " << succ->getName() << "\n"; 
+          
           generateHintForMem2RegPHIdelete(succ, VisitedBlock, AI, ignore);
           VisitedBlock.pop_back();
           llvm::dbgs() << "PHIdelete for end(" + std::to_string(i) + "): " + std::string(BB->getName()) + ", " + std::string(succ->getName()) + "\n"; 
           i++;
         }
       } else { 
-        if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse_False) != reachedEdgeTag.end() || 
-            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse_True) != reachedEdgeTag.end()) {
+        if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairFalse) != reachedEdgeTag.end() || 
+            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairLoad) != reachedEdgeTag.end()) {
+          llvm::dbgs() << "reachededge continue 2 " << BB->getName() << " -> " << succ->getName() << "\n"; 
+
           continue;
-        } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue_False) != reachedEdgeTag.end() || 
-                   std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue_True) != reachedEdgeTag.end()) {
+        } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue) != reachedEdgeTag.end()) { 
         while (!VisitedBlock.empty()) {
           llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
           llvm::Value *UndefVal = llvm::UndefValue::get(AI->getType());
-          std::pair<std::pair<llvm::BasicBlock*,
+           std::pair<std::pair<llvm::BasicBlock*,
                               llvm::BasicBlock*>,
-                    std::pair<bool, bool>> blockPairTag = std::make_pair(*VisitedBlock.rbegin(), std::make_pair(false, false));
-
-          if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag) != reachedEdgeTag.end()) {
+                    llvmberry::Mem2RegArg::Tr_Type> blockPairTag1 = std::make_pair(*VisitedBlock.rbegin(), llvmberry::Mem2RegArg::False);
+         
+           if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1) != reachedEdgeTag.end()) {
             std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                             llvm::BasicBlock*>,
-                                  std::pair<bool, bool>>>::iterator it =
-            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag);
+                                  llvmberry::Mem2RegArg::Tr_Type>>::iterator it =
+            std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), blockPairTag1);
 
             int pos = std::distance(reachedEdgeTag.begin(), it);
-            reachedEdgeTag.at(pos).second.first = true;
+            reachedEdgeTag.at(pos).second = llvmberry::Mem2RegArg::True;
+    llvm::dbgs() << "reachededge tag is true now6 "  << AI->getName () << "     " << current->getName() << "   " << (*VisitedBlock.rbegin()).second->getName() << "\n"; 
+          
           }
-
           VisitedBlock.pop_back();
           if (AI->getParent() != current) {
             PROPAGATE(
@@ -1932,9 +1955,11 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
 
           }
         }
-      } else {
-        reachedEdgeTag.push_back(BpairFalse_False);
+      }  else {
+        reachedEdgeTag.push_back(BpairFalse);
         VisitedBlock.push_back(Bpair);
+   llvm::dbgs() << "reachededge tag  none " << AI->getName () << "   push  " << BB->getName() << "   " << succ->getName() << "\n"; 
+
         generateHintForMem2RegPHIdelete(succ, VisitedBlock, AI, ignore);
         VisitedBlock.pop_back();
         llvm::dbgs() << "PHIdelete for end(" + std::to_string(i) + "): " + std::string(BB->getName()) + ", " + std::string(succ->getName()) + "\n"; 
@@ -1946,6 +1971,153 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
   llvm::dbgs()<< "PHIdelete end of function: " + std::string(BB->getName()) + "\n";
   return;
 }
+
+void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) {
+  llvmberry::ValidationUnit::GetInstance()->intrude
+          ([&APN, &Pred]
+                   (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            std::string Rphi = llvmberry::getVariable(*APN);
+            std::string prev = llvmberry::getBasicBlockIndex(Pred);
+            auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
+            auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+            auto &termIndex =  *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+            auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
+            auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
+            auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
+            auto &blockPairVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockPairVec);
+            //llvm::Value* UndefVal = llvm::UndefValue::get(APN->getType());
+            llvm::AllocaInst* AI = NULL;
+
+  for (auto i = allocas.begin(); i != allocas.end(); ++i) {
+    llvm::AllocaInst* AItmp = *i;
+    if(AItmp->getName() == APN->getName().substr(0, APN->getName().rfind(".")))
+      AI = AItmp;
+  }
+
+  if (AI != NULL) {
+    llvm::dbgs() << "PHI undef AI " << AI->getName() << "\n";
+    for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
+      llvm::Instruction *User = llvm::dyn_cast<llvm::Instruction>(*UI++);
+
+      if (llvm::LoadInst *LI = llvm::cast<llvm::LoadInst>(User)) {
+        if (APN->getParent() == LI ->getParent() ||
+            (std::find(isReachable[APN->getParent()].begin(),
+                       isReachable[APN->getParent()].end(),
+                       LI->getParent()) != isReachable[APN->getParent()].end())) {
+          llvm::dbgs() << "Is it in ? AI " << AI->getName() << " APN is " << *APN << " LI is " << *LI << "\n";
+          llvm::PHINode *check = NULL;
+          llvm::StoreInst *ST = NULL;
+          blockPairVec.clear();
+          llvm::Instruction *tmp = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, true, data);
+
+          if (tmp != NULL) {
+            llvm::dbgs() << "PHI undef tmp " << *tmp << "\n";
+            check = llvm::dyn_cast<llvm::PHINode>(tmp);
+            ST = llvm::dyn_cast<llvm::StoreInst>(tmp);
+          }
+
+          if (ST != NULL) {
+            if ((ST->getParent() == LI->getParent()) && (instrIndex[ST] > instrIndex[LI])) {
+              blockPairVec.clear();
+              llvm::Instruction *tmpI = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, false, data); //to check there is phi in same block as LI
+              llvm::PHINode *checkPHI = NULL;
+
+              if (tmpI != NULL) {
+                llvm::dbgs() << "PHI undef tmp ST2 " << *tmpI << "\n";
+                checkPHI = llvm::dyn_cast<llvm::PHINode>(tmpI);
+              }
+
+              if (checkPHI != NULL) {
+                llvm::dbgs() << "From APN to LI ST below LI : " << *LI << "  ST: " << *ST << "  APN block : "<< APN->getParent()->getName() << "\n";
+                std::string Rphi = llvmberry::getVariable(*checkPHI);
+
+                PROPAGATE(
+                        LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                        new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+                                VAR(llvmberry::getVariable(*AI), Ghost),
+                                SRC),
+                        BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(checkPHI->getParent())),
+                               llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+
+                std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
+                        (VAR(llvmberry::getVariable(*AI), Ghost),
+                         VAR(Rphi, Physical), TGT);
+
+                PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
+                          BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(checkPHI->getParent())),
+                                 llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+
+                mem2regCmd[Rphi].lessdef.push_back(lessdef);
+              }
+            }
+          }
+
+          if (check == APN) {
+            llvm::dbgs() << "From APN to LI nothing between LI: " << *LI << "  phi is : " << *tmp << "  APN block: " << APN->getParent()->getName() << "\n";
+            PROPAGATE(
+                    LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+                            VAR(llvmberry::getVariable(*AI), Ghost),
+                            SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
+                           llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+
+            std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
+                    (VAR(llvmberry::getVariable(*AI), Ghost),
+                     VAR(Rphi, Physical), TGT);
+
+            PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
+                      BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
+                             llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+            mem2regCmd[Rphi].lessdef.push_back(lessdef);
+          } else if (check != NULL) {
+            std::string Rphi = llvmberry::getVariable(*check);
+
+            PROPAGATE(
+                    LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+                            VAR(llvmberry::getVariable(*AI), Ghost),
+                            SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(
+                                   check->getParent())),
+                           llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+
+            std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
+                    (VAR(llvmberry::getVariable(*AI), Ghost),
+                     VAR(Rphi, Physical), TGT);
+
+            PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
+                      BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(
+                                     check->getParent())),
+                             llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+            mem2regCmd[Rphi].lessdef.push_back(lessdef);
+          }
+        }
+
+        for (auto UI2 = usePile[LI].begin(), E2 = usePile[LI].end(); UI2 != E2;) {
+          auto t = *(UI2++);
+
+          int useIndex =
+                  llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
+                                               termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
+
+          llvmberry::generateHintForMem2RegPropagateLoad(AI, APN, LI, std::get<0>(t),
+                                                         useIndex, std::get<2>(t));
+        }
+      }/*this is for LI*/
+    }
+  }
+
+});
+
+}
+
+
+
+
+
+
+
 
 void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                llvm::AllocaInst *AI, llvm::StoreInst *SI,

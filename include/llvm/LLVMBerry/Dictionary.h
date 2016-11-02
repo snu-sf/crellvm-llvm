@@ -145,9 +145,11 @@ public:
   typedef std::shared_ptr<TyReachedEdgeObj> TyReachedEdge;
   TyReachedEdge reachedEdge;  
 
+  enum Tr_Type { False = 0, True, LoadStart };
+
   typedef std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                           llvm::BasicBlock*>,
-                                std::pair<bool, bool>>> TyReachedEdgeTagObj;
+                                Tr_Type>> TyReachedEdgeTagObj;
   typedef std::shared_ptr<TyReachedEdgeTagObj> TyReachedEdgeTag;
   TyReachedEdgeTag reachedEdgeTag;
 
@@ -205,7 +207,7 @@ public:
                             std::shared_ptr<TyValue> newVal);
   void replaceLessthanUndefTgt(std::string key,
                             std::shared_ptr<TyValue> newVal);
-
+  
   Mem2RegArg();
 };
 DEFINE_TRAITS(ArgForMem2Reg, Mem2RegArg);

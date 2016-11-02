@@ -215,6 +215,7 @@ int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
 
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
+void generateHintForMem2RegPhiUndef(llvm::PHINode *APN, llvm::BasicBlock *Pred);
 }
 
 #endif
