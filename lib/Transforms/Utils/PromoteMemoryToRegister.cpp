@@ -339,26 +339,6 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
       for (auto UUI = I->user_begin(), UUE = I->user_end(); UUI != UUE;) {
         Instruction *Inst = cast<Instruction>(*UUI);
         ++UUI;
-       /* 
-        llvmberry::ValidationUnit::GetInstance()->intrude
-                ([&Inst]
-                  (llvmberry::Dictionary &data, 
-                   llvmberry::CoreHint &hints) {
-          auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-          std::string RInst = llvmberry::getVariable(*Inst);
-
-          if (RInst != "") {
-            // propagate maydiff
-            llvmberry::propagateMaydiffGlobal(RInst, llvmberry::Physical);
-            llvmberry::propagateMaydiffGlobal(RInst, llvmberry::Previous);
-          }
-
-          // add nop
-          hints.addNopPosition
-            (llvmberry::TyPosition::make
-              (llvmberry::Target, *Inst, instrIndex[Inst]-1, ""));
-        });
-*/
         Inst->eraseFromParent();
       }
     }
@@ -367,22 +347,7 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
             ([&I]
               (llvmberry::Dictionary &data, 
                llvmberry::CoreHint &hints) {
-              /*
-      auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-      std::string RI = llvmberry::getVariable(*I);
-
-      if (RI != "") {
-        // propagate maydiff
-        llvmberry::propagateMaydiffGlobal(RI, llvmberry::Physical);
-        llvmberry::propagateMaydiffGlobal(RI, llvmberry::Previous);
-      }
-
-      // add nop
-      hints.addNopPosition
-        (llvmberry::TyPosition::make
-          (llvmberry::Target, *I, instrIndex[I]-1, ""));
-          */
-      
+      dbgs() << "Admit removelifetime \n";      
       hints.setReturnCodeToAdmitted();
     });
 
@@ -1694,8 +1659,9 @@ void PromoteMem2Reg::run() {
     auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
     auto namedts2 = F.getParent()->getIdentifiedStructTypes();
 
-    if (namedts != F.getParent()->getIdentifiedStructTypes())
+    if (namedts != F.getParent()->getIdentifiedStructTypes()) {
       hints.setReturnCodeToAdmitted();
+    }
   });
 
   NewPhiNodes.clear();
