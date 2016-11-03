@@ -27,7 +27,6 @@ enum DictKeys {
   ArgForFoldSelectOpOp,
   ArgForLoadLoadStore,
   ArgForSelectIcmpConst,
-  ArgForSinkInst,
   ArgForVisitICmp,
   ArgForDeadCodeElim,
   // Mem2Reg
@@ -264,12 +263,6 @@ public:
 };
 
 DEFINE_TRAITS(ArgForSelectIcmpConst, SelectIcmpConstArg);
-// lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
-struct SinkInstArg {
-public:
-  llvm::DominatorTree *sinkDT;
-};
-DEFINE_TRAITS(ArgForSinkInst, SinkInstArg);
 
 // lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
 struct DeadCodeElimArg {
