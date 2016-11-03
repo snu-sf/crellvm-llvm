@@ -4413,11 +4413,9 @@ bool SROA::promoteAllocas(Function &F) {
   NumPromoted += PromotableAllocas.size();
 
   if (DT && !ForceSSAUpdater) {
-    //llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
     DEBUG(dbgs() << "Promoting allocas with mem2reg...\n");
     PromoteMemToReg(PromotableAllocas, *DT, nullptr, AC);
     PromotableAllocas.clear();
-    //llvmberry::ValidationUnit::EndPass();
     return true;
   }
 

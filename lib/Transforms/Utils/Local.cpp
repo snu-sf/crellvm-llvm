@@ -993,7 +993,7 @@ bool llvm::ConvertDebugDeclareToDebugValue(DbgDeclareInst *DDI,
 
   if (llvmberry::ValidationUnit::Exists()) {
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&SI]
+            ([]
               (llvmberry::Dictionary &data, 
                llvmberry::CoreHint &hints) {
       llvm::dbgs()<< "Admit ConvertDebugDeclareToDebugValue\n";
@@ -1028,15 +1028,16 @@ bool llvm::ConvertDebugDeclareToDebugValue(DbgDeclareInst *DDI,
   auto *DIExpr = DDI->getExpression();
   assert(DIVar && "Missing variable");
   
-   if (llvmberry::ValidationUnit::Exists()) {
+  if (llvmberry::ValidationUnit::Exists()) {
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&LI]
-              (llvmberry::Dictionary &data, 
-               llvmberry::CoreHint &hints) {
+           ([]
+             (llvmberry::Dictionary &data, 
+              llvmberry::CoreHint &hints) {
       llvm::dbgs()<< "Admit ConvertDebugDeclareToDebugValue\n";        
       hints.setReturnCodeToAdmitted();
     });
-   }
+  }
+
   if (LdStHasDebugValue(DIVar, LI))
     return true;
 
