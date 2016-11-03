@@ -3749,11 +3749,9 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
 
   CurInst->replaceAllUsesWith(Phi);
 
-  //llvmberry::ValidationUnit::End();
   llvmberry::intrude([] {
-      llvmberry::ValidationUnit::End();
-      });
-
+    llvmberry::ValidationUnit::End();
+  });
 
   if (Phi->getType()->getScalarType()->isPointerTy()) {
     // Because we have added a PHI-use of the pointer value, it has now
