@@ -1654,6 +1654,12 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
     if (!hintgen) {
       hints.appendToDescription("GVN repl_inv: hintgen_same_vn failed.");
     }
+
+    // We admit redundant readonly call cases.
+    if ((I->getOpcode() == Instruction::Call) &&
+        (I_repl->getOpcode() == Instruction::Call)) {
+      hints.setReturnCodeToAdmitted();
+    }
     // assert(hintgen && "GVN make_repl_inv: same_vn failed!");
 
     // // Propagate [ exp(I_repl) >= id(I_repl) ] until I.
