@@ -9,7 +9,7 @@
 #include "llvm/LLVMBerry/Infrules.h"
 
 #include <memory>
-#include <deque>
+#include <tuple>
 
 namespace llvmberry {
 
@@ -110,7 +110,7 @@ DEFINE_TRAITS(ArgForFindAvailableLoadedValue, FindAvailableLoadedValueArg);
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Mem2RegArg
 struct Mem2RegArg {
 public:
-  typedef std::vector<llvm::AllocaInst *> TyAllocasObj;
+  typedef std::vector<llvm::AllocaInst*> TyAllocasObj;
   typedef std::shared_ptr<TyAllocasObj> TyAllocas;
   TyAllocas allocas;
 
@@ -118,7 +118,7 @@ public:
   typedef std::shared_ptr<TyDiffblocksObj> TyDiffblocks;
   TyDiffblocks diffBlocks;
 
-  typedef std::map<const llvm::Instruction *, unsigned> TyInstrIndexObj;
+  typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndexObj;
   typedef std::shared_ptr<TyInstrIndexObj> TyInstrIndex;
   TyInstrIndex instrIndex;
 
@@ -126,15 +126,30 @@ public:
   typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
   TyTermIndex termIndex;
 
+  struct UseTriple {
+    llvm::BasicBlock* BB;
+    int index;
+    llvm::Instruction* I;
+  };
+
+  typedef std::tuple<llvm::BasicBlock*, int, llvm::Instruction*> UseTupleType;
+
+  typedef std::map<llvm::Instruction*,
+                   std::vector<UseTupleType>> TyUsePileObj;
+  typedef std::shared_ptr<TyUsePileObj> TyUsePile;
+  TyUsePile usePile;
+
   typedef std::map<std::string,
                    std::vector<std::pair<llvm::BasicBlock*,
                                          llvm::BasicBlock*>>> TyReachedEdgeObj;
   typedef std::shared_ptr<TyReachedEdgeObj> TyReachedEdge;
   TyReachedEdge reachedEdge;  
 
+  enum Tr_Type { False = 0, True, LoadStart };
+
   typedef std::vector<std::pair<std::pair<llvm::BasicBlock*,
                                           llvm::BasicBlock*>,
-                                bool>> TyReachedEdgeTagObj;
+                                Tr_Type>> TyReachedEdgeTagObj;
   typedef std::shared_ptr<TyReachedEdgeTagObj> TyReachedEdgeTag;
   TyReachedEdgeTag reachedEdgeTag;
 
@@ -179,6 +194,8 @@ public:
   typedef std::shared_ptr<TyReachableObj> TyReachable;
   TyReachable isReachable;
 
+  std::vector<llvm::StructType*> namedts;
+
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
   static bool isUndef(std::shared_ptr<TyExpr> e);
@@ -190,7 +207,7 @@ public:
                             std::shared_ptr<TyValue> newVal);
   void replaceLessthanUndefTgt(std::string key,
                             std::shared_ptr<TyValue> newVal);
-
+  
   Mem2RegArg();
 };
 DEFINE_TRAITS(ArgForMem2Reg, Mem2RegArg);

@@ -783,6 +783,29 @@ std::shared_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
   return std::shared_ptr<TyPosition>(
       new TyPosition(_scope, _block_name, std::move(_instr_index)));
 }
+std::shared_ptr<TyPosition> TyPosition::make(enum TyScope _scope,
+                                             const llvm::BasicBlock &BB,
+                                             int index) {
+
+  std::string _block_name = getBasicBlockIndex(&BB);
+  std::string _register_name = "";
+
+  std::shared_ptr<TyInstrIndex> _instr_index;
+   if (index < 0) {
+    // if index is less than 0, it means start of block
+    return TyPosition::make_start_of_block(_scope, _block_name);
+  } else {
+    std::shared_ptr<TyPositionCommand> _pos_cmd(
+            new TyPositionCommand(index, _register_name));
+    std::shared_ptr<TyInstrIndex> _cmd(new ConsCommand(std::move(_pos_cmd)));
+
+    _instr_index = std::move(_cmd);
+  }
+
+  return std::shared_ptr<TyPosition>(
+          new TyPosition(_scope, _block_name, std::move(_instr_index)));
+}
+
 
 std::shared_ptr<TyPosition>
 TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB) {
@@ -1983,6 +2006,10 @@ void ConsLoadInst::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(load_inst));
 }
 
+std::shared_ptr<TyLoadInst> ConsLoadInst::getTyLoadInst() {
+  return load_inst;
+}
+
 ConsBitCastInst::ConsBitCastInst(std::shared_ptr<TyBitCastInst> _bit_cast_inst)
     : bit_cast_inst(std::move(_bit_cast_inst)) {}
 std::shared_ptr<TyInstruction>
@@ -2285,6 +2312,10 @@ void TyLoadInst::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(align));
 }
 
+std::shared_ptr<TyValue> TyLoadInst::getPtrValue() {
+  return ptrvalue;
+}
+
 TySelectInst::TySelectInst(std::shared_ptr<TyValue> _cond, std::shared_ptr<TyValueType> _valty, std::shared_ptr<TyValue> _trueval, std::shared_ptr<TyValue> _falseval) : cond(_cond), valty(_valty), trueval(_trueval), falseval(_falseval){
 }
 void TySelectInst::serialize(cereal::JSONOutputArchive& archive) const{
@@ -2578,7 +2609,6 @@ TyPropagateDiffblock::make(std::shared_ptr<TyValue> _lhs,
       new TyPropagateDiffblock(_lhs, _rhs, _scope));
 }
 
-//TyPropagateUnique::TyPropagateUnique(std::shared_ptr<TyRegister> _p,
 TyPropagateUnique::TyPropagateUnique(std::string _register_name,
                                      enum TyScope _scope)
     : register_name(_register_name), scope(_scope) {}
@@ -2658,7 +2688,6 @@ ConsUnique::ConsUnique(std::shared_ptr<TyPropagateUnique> _propagate_unique)
     : propagate_unique(std::move(_propagate_unique)) {}
 
 std::shared_ptr<TyPropagateObject>
-//ConsUnique::make(std::shared_ptr<TyRegister> _p, enum TyScope _scope) {
 ConsUnique::make(std::string _register_name, enum TyScope _scope) {
   std::shared_ptr<TyPropagateUnique> _val(
       new TyPropagateUnique(_register_name, _scope));
