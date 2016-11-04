@@ -157,7 +157,8 @@ void ValidationUnit::begin() {
   // print src
   llvmberry::name_instructions(*_func);
   _srcfile_buffer = new std::string();
-  writeModuleToBuffer(*module, _srcfile_buffer);
+  if (!RuntimeOptions::NoCommit())
+    writeModuleToBuffer(*module, _srcfile_buffer);
   // writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc.org"));
 
   // set corehints
