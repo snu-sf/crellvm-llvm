@@ -63,13 +63,15 @@ std::string makeFullFilename(std::string org_filename,
   }
 }
 
-void writeModuleToBuffer(const llvm::Module &module, std::string *buffer) {
+void writeModuleToBuffer(const llvm::Module &module, std::string *buffer,
+    llvm::Function *F) {
   llvm::raw_string_ostream strstream(*buffer);
-  WriteBitcodeToFile(&module, strstream);
+  WriteBitcodeToFile(&module, strstream, false, F);
 }
 
 void writeModuleToFile(const llvm::Module &module,
-                       const std::string &filename) {
+                       const std::string &filename,
+                       llvm::Function *F) {
   std::error_code errorInfo;
   llvm::StringRef filename_stref = filename.c_str();
 
@@ -80,7 +82,7 @@ void writeModuleToFile(const llvm::Module &module,
     exit(1);
   }
 
-  WriteBitcodeToFile(&module, outputFile->os());
+  WriteBitcodeToFile(&module, outputFile->os(), false, F);
   outputFile->keep();
 }
 
@@ -158,7 +160,7 @@ void ValidationUnit::begin() {
   llvmberry::name_instructions(*_func);
   _srcfile_buffer = new std::string();
   if (!RuntimeOptions::NoCommit())
-    writeModuleToBuffer(*module, _srcfile_buffer);
+    writeModuleToBuffer(*module, _srcfile_buffer, _func);
   // writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc.org"));
 
   // set corehints
@@ -188,7 +190,7 @@ void ValidationUnit::commit() {
   llvmberry::name_instructions(*_func);
   const llvm::Module *module = _func->getParent();
   std::string tgt_ss;
-  writeModuleToBuffer(*module, &tgt_ss);
+  writeModuleToBuffer(*module, &tgt_ss, _func);
   std::ofstream tgt_ofs(makeFullFilename(_filename, ".tgt.bc"));
   tgt_ofs << tgt_ss;
   tgt_ofs.close();
