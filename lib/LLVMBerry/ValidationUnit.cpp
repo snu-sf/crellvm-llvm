@@ -63,13 +63,15 @@ std::string makeFullFilename(std::string org_filename,
   }
 }
 
-void writeModuleToBuffer(const llvm::Module &module, std::string *buffer) {
+void writeModuleToBuffer(const llvm::Module &module, std::string *buffer,
+    llvm::Function *F) {
   llvm::raw_string_ostream strstream(*buffer);
-  WriteBitcodeToFile(&module, strstream);
+  WriteBitcodeToFile(&module, strstream, false, F);
 }
 
 void writeModuleToFile(const llvm::Module &module,
-                       const std::string &filename) {
+                       const std::string &filename,
+                       llvm::Function *F) {
   std::error_code errorInfo;
   llvm::StringRef filename_stref = filename.c_str();
 
@@ -80,13 +82,13 @@ void writeModuleToFile(const llvm::Module &module,
     exit(1);
   }
 
-  WriteBitcodeToFile(&module, outputFile->os());
+  WriteBitcodeToFile(&module, outputFile->os(), false, F);
   outputFile->keep();
 }
 
 // class ValidationUnit
 // constructor
-ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
+ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func, bool rneame)
     : _filename(), _optname(optname), _srcfile_buffer(nullptr), _func(func),
       _corehint(), _data(), isAborted(false) {
   if (RuntimeOptions::IgnoreOpt(optname))
@@ -94,7 +96,7 @@ ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
   else if (RuntimeOptions::IgnorePass(_CurrentPass)) {
     this->isAborted = true;
   } else {
-    this->begin();
+    this->begin(rename);
   }
 }
 
@@ -140,7 +142,7 @@ void ValidationUnit::intrude(
 }
 
 // private functions
-void ValidationUnit::begin() {
+void ValidationUnit::begin(bool rename) {
   assert(!isAborted);
 
   // get module & module name
@@ -155,10 +157,11 @@ void ValidationUnit::begin() {
   _filename = ss.str();
 
   // print src
-  llvmberry::name_instructions(*_func);
+  if (rename)
+    llvmberry::name_instructions(*_func);
   _srcfile_buffer = new std::string();
   if (!RuntimeOptions::NoCommit())
-    writeModuleToBuffer(*module, _srcfile_buffer);
+    writeModuleToBuffer(*module, _srcfile_buffer, _func);
   // writeModuleToFile(*module, makeFullFilename(_filename, ".src.bc.org"));
 
   // set corehints
@@ -188,7 +191,7 @@ void ValidationUnit::commit() {
   llvmberry::name_instructions(*_func);
   const llvm::Module *module = _func->getParent();
   std::string tgt_ss;
-  writeModuleToBuffer(*module, &tgt_ss);
+  writeModuleToBuffer(*module, &tgt_ss, _func);
   std::ofstream tgt_ofs(makeFullFilename(_filename, ".tgt.bc"));
   tgt_ofs << tgt_ss;
   tgt_ofs.close();
@@ -259,10 +262,10 @@ bool ValidationUnit::Exists() {
     return false;
 }
 
-void ValidationUnit::Begin(const std::string &optname, llvm::Function *func) {
+void ValidationUnit::Begin(const std::string &optname, llvm::Function *func, bool rename) {
   assert(!Exists() && "ValidationUnit already exists");
   assert(func && "Function cannot be null");
-  _Instance = new ValidationUnit(optname, func);
+  _Instance = new ValidationUnit(optname, func, rename);
 }
 
 bool ValidationUnit::BeginIfNotExists(const std::string &optname,

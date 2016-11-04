@@ -30,9 +30,9 @@ public:
   void intrude(std::function<void(Dictionary &, CoreHint &)> func);
 
 private:
-  ValidationUnit(const std::string &optname, llvm::Function *func);
+  ValidationUnit(const std::string &optname, llvm::Function *func, bool rename=true);
   ~ValidationUnit();
-  void begin();
+  void begin(bool rename=true);
   void commit();
   void abort();
 
@@ -49,7 +49,7 @@ public:
   static void StartPass(PASS pass);
   static PASS GetCurrentPass();
   static void EndPass();
-  static void Begin(const std::string &optname, llvm::Function *func);
+  static void Begin(const std::string &optname, llvm::Function *func, bool rename=true);
   static bool BeginIfNotExists(const std::string &optname,
                                llvm::Function *func);
   static void End();

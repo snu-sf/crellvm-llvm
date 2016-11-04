@@ -618,6 +618,17 @@ bool name_instructions(llvm::Function &F) {
   return true;
 }
 
+bool name_instruction(llvm::Instruction &I) {
+  llvm::BasicBlock *BB = I.getParent();
+  if (!BB->hasName())
+    BB->setName("bb");
+
+  if (!I.hasName() && !I.getType()->isVoidTy())
+    I.setName("tmp");
+
+  return true;
+}
+
 int getCommandIndex(const llvm::Value &V) {
   if (!llvm::isa<llvm::Instruction>(V))
     return -1; // not an instruction
