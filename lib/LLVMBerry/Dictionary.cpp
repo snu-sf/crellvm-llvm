@@ -100,13 +100,10 @@ bool Mem2RegArg::isUndef(std::shared_ptr<TyExpr> e) {
 
 void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
                                std::shared_ptr<TyExpr> newExpr) {
-  std::cout<<"replaceCmdRhsbegin: "+which+", "+key<<std::endl;
   if (mem2regCmd->find(key) == mem2regCmd->end())
     return;
 
-  std::cout<<"replaceCmdRhsstart: "+which+", "+key<<std::endl;
   if (which == "Lessdef") {
-    std::cout<<"lessdef replace:"+key<<std::endl;
 
     std::shared_ptr<TyExpr> keyRhs = ConsVar::make(key, Physical);
     std::shared_ptr<TyExpr> keyLhs = ConsVar::make(key, Ghost);
@@ -120,28 +117,19 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i]->getRhs(), keyRhs)) {
-        std::cout<<"checkrhs: "<<vec[i]->getRhs()<<", "<<newExpr<<std::endl;
         vec[i]->updateRhs(newExpr);
 
         if (phiKey != "")
           (*mem2regCmd.get())[phiKey].lessdef.push_back(vec[i]);
-
-        std::cout<<"check: "<<vec[i]->getRhs()<<std::endl;
       }
       
       if (equalsIfConsVar(vec[i]->getLhs(), keyLhs)) {
-        std::cout<<"checklhs: "<<vec[i]->getLhs()<<", "<<newExpr<<std::endl;
-
         if (isUndef(vec[i]->getRhs())) {
-          std::cout<<"undefreplace check"<<std::endl;
           vec[i]->updateRhs(newExpr);
         }
-
-        std::cout<<"check: "<<vec[i]->getLhs()<<std::endl;
       }
     }
   } else if (which == "Transitivity_e1") {
-    std::cout<<"trans1 replace:"+key<<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
@@ -151,13 +139,10 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i].second->getExpr2(), keyExpr)) {
-        std::cout<<"check: "<<vec[i].second->getExpr1()<<", "<<newExpr<<std::endl;
         vec[i].second->updateExpr1(newExpr);
-        std::cout<<"check: "<<vec[i].second->getExpr1()<<std::endl;
       }
     }
   } else if (which == "Transitivity_e2") {
-    std::cout<<"trans2 replace:"+key<<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
@@ -167,13 +152,10 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i].second->getExpr2(), keyExpr)) {
-        std::cout<<"check: "<<vec[i].second->getExpr2()<<", "<<newExpr<<std::endl;
         vec[i].second->updateExpr2(newExpr);
-        std::cout<<"check: "<<vec[i].second->getExpr2()<<std::endl;
       }
     }
   } else if (which == "Transitivity_e3") {
-    std::cout<<"trans3 replace:"+key<<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
@@ -183,17 +165,13 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i].second->getExpr2(), keyExpr)) {
-        std::cout<<"check: "<<vec[i].second->getExpr3()<<", "<<newExpr<<std::endl;
         vec[i].second->updateExpr3(newExpr);
-        std::cout<<"check: "<<vec[i].second->getExpr3()<<std::endl;
       }
     }
   } else if (which == "TransitivityTgt_e2") {
-    std::cout<<"transTgt2 replace:"+key<<std::endl;
     std::string phiKey = "";
     if (ConsVar *cv = dynamic_cast<ConsVar*>(newExpr.get()))
       phiKey = std::string(cv->getTyReg()->getName());
-    std::cout<<"check_replace_transtgt2: "<<key + "->" + phiKey <<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
     std::shared_ptr<TyExpr> keyExprGhost = ConsVar::make(key, Ghost);
@@ -203,16 +181,13 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i]->getExpr2(), keyExpr)) {
-        std::cout<<"check physical: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
         vec[i]->updateExpr2(newExpr);
 
         if (phiKey != "")
           (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
-        std::cout<<"check: "<<vec[i]->getExpr2()<<std::endl;
       }
 
       if (equalsIfConsVar(vec[i]->getExpr2(), keyExprGhost)) {
-        std::cout<<"check ghost: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
         if (phiKey != "")
           newExpr = ConsVar::make(phiKey, Ghost);
 
@@ -220,11 +195,9 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
         if (phiKey != "")
           (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
-        std::cout<<"check: "<<vec[i]->getExpr2()<<std::endl;
       }
 
       if (equalsIfConsVar(vec[i]->getExpr2(), keyExprPrev)) {
-        std::cout<<"check previous: "<<vec[i]->getExpr2()<<", "<<newExpr<<std::endl;
         if (phiKey != "")
           newExpr = ConsVar::make(phiKey, Previous);
           
@@ -232,15 +205,12 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
         if (phiKey != "")
           (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
-        std::cout<<"check: "<<vec[i]->getExpr2()<<std::endl;
       }
     }
   } else if (which == "TransitivityTgt_e3") {
-    std::cout<<"transTgt3 replace:"+key<<std::endl;
     std::string phiKey = "";
     if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
       phiKey = std::string(cv->getTyReg()->getName());
-    std::cout<<"check_replace_transtgt3: "<<key + "->" + phiKey <<std::endl;
 
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
 
@@ -249,33 +219,26 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i]->getExpr3(), keyExpr)) {
-        std::cout<<"check: "<<vec[i]->getExpr3()<<", "<<newExpr<<std::endl;
         vec[i]->updateExpr3(newExpr);
 
         if (phiKey != "")
           (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
-        std::cout<<"check: "<<vec[i]->getExpr3()<<std::endl;
       }
     }
   } else if (which == "IntroGhost") {
-    std::cout<<"ghost replace:"+key<<std::endl;
-
     std::shared_ptr<TyExpr> keyExpr = ConsVar::make(key, Physical);
     std::vector<std::shared_ptr<TyIntroGhost>> &vec =
       mem2regCmd->find(key)->second.ghost;
 
     for(size_t i = 0; i < vec.size(); i++) {
       if (equalsIfConsVar(vec[i]->getExpr(), keyExpr)) {
-        std::cout<<"check: "<<vec[i]->getExpr()<<", "<<newExpr<<std::endl;
         vec[i]->updateExpr(newExpr);
-        std::cout<<"check: "<<vec[i]->getExpr()<<std::endl;
       }
     }
   }
 }
 
 void Mem2RegArg::replaceTransTgtPrev() {
-  std::cout<<"TransTgtPrev"<<std::endl;
   std::vector<std::shared_ptr<TyTransitivityTgt>> &vec = *transTgt.get();
 
   for(size_t i = 0; i < vec.size(); i++) {
@@ -286,7 +249,6 @@ void Mem2RegArg::replaceTransTgtPrev() {
                                                           Previous)))));
     }
   }
-  std::cout<<"TransTgtPrevEnd"<<std::endl;
 }
 
 void Mem2RegArg::replaceLessthanUndef(std::string key,
@@ -294,14 +256,12 @@ void Mem2RegArg::replaceLessthanUndef(std::string key,
   if (mem2regCmd->find(key) == mem2regCmd->end())
     return;
 
-  std::cout<<"LessthanUndef"<<std::endl;
   std::vector<std::shared_ptr<TyLessthanUndef>> &vec =
       mem2regCmd->find(key)->second.lessUndef;
 
   for(size_t i = 0; i < vec.size(); i++) {
     vec[i]->updateRhs(newVal);
   }
-  std::cout<<"LessthanUndefEnd"<<std::endl;
 }
 
 void Mem2RegArg::replaceLessthanUndefTgt(std::string key,
@@ -309,14 +269,12 @@ void Mem2RegArg::replaceLessthanUndefTgt(std::string key,
   if (mem2regCmd->find(key) == mem2regCmd->end())
     return;
 
-  std::cout<<"LessthanUndefTgt"<<std::endl;
   std::vector<std::shared_ptr<TyLessthanUndefTgt>> &vec =
           mem2regCmd->find(key)->second.lessUndefTgt;
 
   for(size_t i = 0; i < vec.size(); i++) {
     vec[i]->updateRhs(newVal);
   }
-  std::cout<<"LessthanUndefEndTgt"<<std::endl;
 }
 
 // PassDictionary
