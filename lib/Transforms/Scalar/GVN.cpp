@@ -744,8 +744,6 @@ namespace {
 namespace {
 class PREAnalysisResult {
 public:
-  std::vector<std::vector<int>> notSameIdx; // predMap idx -> operand idx
-  bool isSameForAll;
   bool PrevPRENotEnough;
   std::vector<std::pair<PHINode *, int>> PrevPRE;
   bool isFromNonLocalLoad;
@@ -761,36 +759,8 @@ public:
     for (auto PI = pred_begin(PNBlock), PE = pred_end(PNBlock); PI != PE; ++PI)
       numPredBlocks++;
 
-    notSameIdx.resize(numPredBlocks);
-    isSameForAll = true;
     for (auto OI = CurInst->op_begin(); OI != CurInst->op_end(); ++OI)
       op_CurInst.push_back(OI->get());
-
-    for (unsigned i = 0, e = numPredBlocks; i != e; ++i) {
-      BasicBlock *PB = PN->getIncomingBlock(i);
-      Value *V = PN->getIncomingValue(i);
-      if (Instruction *VI = dyn_cast<Instruction>(V)) {
-        std::vector<Value *> op_VI;
-        for (auto OI = VI->op_begin(); OI != VI->op_end(); ++OI)
-          op_VI.push_back(OI->get());
-
-        bool isSame = true;
-        if (op_CurInst.size() != op_VI.size()) {
-          dbgs() << "CurInst :" << *CurInst << "\n";
-          dbgs() << "VI :" << *VI << "\n";
-          assert(isa<PHINode>(VI));
-        }
-        for (int j = 0; j < op_CurInst.size(); j++) {
-          bool tmp = (op_CurInst[j] == op_VI[j]);
-          if (!tmp)
-            notSameIdx[i].push_back(j);
-          isSame &= tmp;
-        }
-        isSameForAll &= isSame;
-      } else
-        isSameForAll = false;
-      // TODO care notSameIdx??
-    }
 
     for (Instruction &I : *PNBlock)
       if (PHINode *PI = dyn_cast<PHINode>(&I)) {
@@ -865,7 +835,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   std::string Phi_id = llvmberry::getVariable(*Phi);
   PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
 
-  if (PREAR->isSameForAll) {
+  if (PREAR->PrevPRE.size() == 0) {
     llvmberry::ValidationUnit::GetInstance()->intrude(
         [&CurInst, &Phi, &PhiBlock, &CurInst_id,
          &Phi_id](llvmberry::ValidationUnit::Dictionary &data,
@@ -971,11 +941,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       dbgs() << "Phi : " << *Phi << "\n";
       // if is same for all, it does not involve previous PRE and just works
       // it is treated below
-      for (int i = 0; i < PREAR->notSameIdx.size(); i++)
-        for (int j = 0; j < PREAR->notSameIdx[i].size(); j++)
-          hints.appendToDescription("notSameIdx " + std::to_string(i) + ": " +
-                                    std::to_string(j));
-
       if (PREAR->PrevPRENotEnough) {
         hints.appendToDescription("PrevPRENotEnough");
         hints.setReturnCodeToFail();
@@ -3668,7 +3633,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   llvmberry::intrude([&CurInst, &Phi]() {
     PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
     llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
-    if (PREAR->isSameForAll)
+    if (PREAR->PrevPRE.size() == 0)
       llvmberry::ValidationUnit::Begin("GVN_PRE",
                                        CurInst->getParent()->getParent());
     else
