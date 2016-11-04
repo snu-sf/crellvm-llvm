@@ -836,10 +836,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
 
   if (PREAR->PrevPRE.size() == 0) {
-    llvmberry::ValidationUnit::GetInstance()->intrude(
-        [&CurInst, &Phi, &PhiBlock, &CurInst_id,
-         &Phi_id](llvmberry::ValidationUnit::Dictionary &data,
-                  llvmberry::CoreHint &hints) {
+    llvmberry::ValidationUnit::GetInstance()
+        ->intrude([&CurInst, &Phi, &PhiBlock, &CurInst_id, &Phi_id](
+              llvmberry::ValidationUnit::Dictionary &data,
+              llvmberry::CoreHint &hints) {
           if (isa<CallInst>(CurInst)) {
             hints.appendToDescription("CurInstIsCall");
             hints.setReturnCodeToAdmitted();
@@ -897,7 +897,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
                 if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
                   hints.appendToDescription("gep removal - bug");
-                  hints.setReturnCodeToFail();
+                  hints.setReturnCodeToAdmitted();
+                  // hints.setReturnCodeToFail();
                   return;
                 }
                 if (CurInstGEP->isInBounds() && !VIGEP->isInBounds())
@@ -921,7 +922,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                           INSN(*CurInst), INSN(*VI), VAR(Phi_id, Physical)));
             }
           }
-        });
+          });
   } else {
     llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi,
                                                        &CurInst_id, &PhiBlock,
