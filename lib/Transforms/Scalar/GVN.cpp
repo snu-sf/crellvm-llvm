@@ -865,33 +865,44 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                       ((*VI).getName()).str());
 
             if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
-              // // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
-              // // start_of_block(VPHI)
-              // generateHintForPRE(CurInstInPB, VPHI);
+              Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
+              // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
+              // start_of_block(VPHI)
+              generateHintForPRE(CurInstInPB, VPHI);
 
-              // // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
-              // PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical),
-              // SRC),
-              //           BOUNDS(llvmberry::TyPosition::make_start_of_block(
-              //                      llvmberry::Source,
-              // llvmberry::getBasicBlockIndex(
-              //                                             VPHI->getParent())),
-              //                  llvmberry::TyPosition::make(SRC,
-              // PhiBlock->getName(),
-              //                                              PB->getName())));
-
-              // Propagate [ INSN(CurInst) >= VAR(VI) ]
+              // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
               PROPAGATE(
-                  LESSDEF(INSN(*CurInst), VAR(VI_id, Physical), SRC),
+                  LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
                   BOUNDS(llvmberry::TyPosition::make_start_of_block(
                              llvmberry::Source,
                              llvmberry::getBasicBlockIndex(VPHI->getParent())),
                          llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                                      PB->getName())));
 
-              // Somehow get [ INSN(CurInst) >= Var(VI) ] in
-              // start_of_block(VPHI)
-              generateHintForPRE(CurInst, VPHI);
+              // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
+              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                  PB->getName()),
+                      llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
+                                                        VAR(VI_id, Previous),
+                                                        VAR(Phi_id, Physical)));
+
+              // Transitivity [ INSN(CurInstInPB) >= Var(VI) >= Var(Phi) ]
+              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                  PB->getName()),
+                      llvmberry::ConsTransitivity::make(INSN(*CurInstInPB),
+                                                        VAR(VI_id, Physical),
+                                                        VAR(Phi_id, Physical)));
+
+              llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
+
+              // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi) ]
+              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                  PB->getName()),
+                      llvmberry::ConsTransitivity::make(INSN(*CurInst),
+                                                        INSN(*CurInstInPB),
+                                                        VAR(Phi_id, Physical)));
+
+              delete CurInstInPB;
             } else {
               propagateInstrUntilBlockEnd(hints, VI, PB);
 
