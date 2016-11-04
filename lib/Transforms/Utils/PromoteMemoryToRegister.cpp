@@ -1025,7 +1025,7 @@ void PromoteMem2Reg::run() {
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
   
-  llvmberry::name_instructions(F);
+  //llvmberry::name_instructions(F);
   llvmberry::ValidationUnit::Begin("mem2reg", &F);
   llvmberry::ValidationUnit::GetInstance()->intrude
           ([]
