@@ -763,19 +763,15 @@ public:
 
     notSameIdx.resize(numPredBlocks);
     isSameForAll = true;
-    for (Instruction::op_iterator OI = CurInst->op_begin(),
-                                  OE = CurInst->op_end();
-         OI != OE; ++OI) {
+    for (auto OI = CurInst->op_begin(); OI != CurInst->op_end(); ++OI)
       op_CurInst.push_back(OI->get());
-    }
 
     for (unsigned i = 0, e = numPredBlocks; i != e; ++i) {
       BasicBlock *PB = PN->getIncomingBlock(i);
       Value *V = PN->getIncomingValue(i);
       if (Instruction *VI = dyn_cast<Instruction>(V)) {
         std::vector<Value *> op_VI;
-        for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
-             OI != OE; ++OI)
+        for (auto OI = VI->op_begin(); OI != VI->op_end(); ++OI)
           op_VI.push_back(OI->get());
 
         bool isSame = true;
@@ -790,9 +786,6 @@ public:
             notSameIdx[i].push_back(j);
           isSame &= tmp;
         }
-        // hints.appendToDescription("VI: " + (*VI).getName().str());
-        // hints.appendToDescription("RHS of CurInst and VI is same: " +
-        //                           std::to_string(isSame));
         isSameForAll &= isSame;
       } else
         isSameForAll = false;
@@ -817,8 +810,7 @@ public:
 
             // It finds the first j that matches
             // VI may have same operand, such as VI = a + a, so there can be
-            // many
-            // j
+            // many j
             // Anyhow, propagating only once && substituting only once may
             // sufficient
             for (int j = 0; j < VI->getNumOperands(); j++) {
@@ -830,17 +822,8 @@ public:
                   idx = j;
                 else if (idx == j) {
                 } else {
-                  // this may occur because of 1+x <=> x+1
-                  // hints.appendToDescription("idx : " + std::to_string(idx) +
-                  //                           " | j : " + std::to_string(j));
                   assert(false);
                 }
-                // hints.appendToDescription(
-                //     "PI: " + (*PI).getName().str() + " | VI: " +
-                //     (*VI).getName().str() + " | OI: " +
-                //     (*dyn_cast<Instruction>(VI->getOperand(j)))
-                //         .getName()
-                //         .str());
               }
             }
           }
@@ -850,9 +833,6 @@ public:
           if (hit == numPredBlocks) {
             PrevPRE.push_back(std::make_pair(PI, idx));
           } else {
-            // hints.appendToDescription("hit : " + std::to_string(hit) +
-            //                           " | predMap.size() : " +
-            //                           std::to_string(predMap.size()));
             PrevPRENotEnough = true;
           }
         }
