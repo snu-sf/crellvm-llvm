@@ -257,6 +257,11 @@ static uint64_t getAttrKindEncoding(Attribute::AttrKind Kind) {
   llvm_unreachable("Trying to encode unknown attribute");
 }
 
+inline static bool AssumeAsDeclaration(const Function *F, const Function *AllowedFunc) {
+  //return true;
+  return F->isDeclaration() || (AllowedFunc != nullptr && F != AllowedFunc);
+}
+
 static void WriteAttributeGroupTable(const ValueEnumerator &VE,
                                      BitstreamWriter &Stream) {
   const std::vector<AttributeSet> &AttrGrps = VE.getAttributeGroups();
@@ -576,7 +581,7 @@ static void writeComdats(const ValueEnumerator &VE, BitstreamWriter &Stream) {
 // Emit top-level description of module, including target triple, inline asm,
 // descriptors for global variables, and function prototype info.
 static void WriteModuleInfo(const Module *M, const ValueEnumerator &VE,
-                            BitstreamWriter &Stream) {
+                            BitstreamWriter &Stream, Function *AllowedFunc) {
   // Emit various pieces of data attached to a module.
   if (!M->getTargetTriple().empty())
     WriteStringRecord(bitc::MODULE_CODE_TRIPLE, M->getTargetTriple(),
@@ -700,7 +705,8 @@ static void WriteModuleInfo(const Module *M, const ValueEnumerator &VE,
     //             dllstorageclass, comdat, prefixdata, personalityfn]
     Vals.push_back(VE.getTypeID(F.getFunctionType()));
     Vals.push_back(F.getCallingConv());
-    Vals.push_back(F.isDeclaration());
+    //Vals.push_back(F.isDeclaration());
+    Vals.push_back(AssumeAsDeclaration(&F, AllowedFunc));
     Vals.push_back(getEncodedLinkage(F));
     Vals.push_back(VE.getAttributeID(F.getAttributes()));
     Vals.push_back(Log2_32(F.getAlignment())+1);
@@ -2350,7 +2356,8 @@ static void WriteBlockInfo(const ValueEnumerator &VE, BitstreamWriter &Stream) {
 
 /// WriteModule - Emit the specified module to the bitstream.
 static void WriteModule(const Module *M, BitstreamWriter &Stream,
-                        bool ShouldPreserveUseListOrder) {
+                        bool ShouldPreserveUseListOrder,
+                        Function *AllowedFunc = nullptr) {
   Stream.EnterSubblock(bitc::MODULE_BLOCK_ID, 3);
 
   SmallVector<unsigned, 1> Vals;
@@ -2377,7 +2384,7 @@ static void WriteModule(const Module *M, BitstreamWriter &Stream,
 
   // Emit top-level description of module, including target triple, inline asm,
   // descriptors for global variables, and function prototype info.
-  WriteModuleInfo(M, VE, Stream);
+  WriteModuleInfo(M, VE, Stream, AllowedFunc);
 
   // Emit constants.
   WriteModuleConstants(VE, Stream);
@@ -2397,7 +2404,8 @@ static void WriteModule(const Module *M, BitstreamWriter &Stream,
 
   // Emit function bodies.
   for (Module::const_iterator F = M->begin(), E = M->end(); F != E; ++F)
-    if (!F->isDeclaration())
+    //if (!F->isDeclaration())
+    if (!AssumeAsDeclaration(F, AllowedFunc))
       WriteFunction(*F, VE, Stream);
 
   Stream.ExitBlock();
@@ -2476,7 +2484,8 @@ static void EmitDarwinBCHeaderAndTrailer(SmallVectorImpl<char> &Buffer,
 /// WriteBitcodeToFile - Write the specified module to the specified output
 /// stream.
 void llvm::WriteBitcodeToFile(const Module *M, raw_ostream &Out,
-                              bool ShouldPreserveUseListOrder) {
+                              bool ShouldPreserveUseListOrder,
+                              Function *AllowedFunc) {
   SmallVector<char, 0> Buffer;
   Buffer.reserve(256*1024);
 
@@ -2499,7 +2508,7 @@ void llvm::WriteBitcodeToFile(const Module *M, raw_ostream &Out,
     Stream.Emit(0xD, 4);
 
     // Emit the module.
-    WriteModule(M, Stream, ShouldPreserveUseListOrder);
+    WriteModule(M, Stream, ShouldPreserveUseListOrder, AllowedFunc);
   }
 
   if (TT.isOSDarwin())
