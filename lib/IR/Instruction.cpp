@@ -62,6 +62,9 @@ Module *Instruction::getModule() {
   return getParent()->getModule();
 }
 
+void Instruction::setName(const Twine &Name) {
+  this->Value::setName(Name);
+}
 
 void Instruction::removeFromParent() {
   getParent()->getInstList().remove(this);

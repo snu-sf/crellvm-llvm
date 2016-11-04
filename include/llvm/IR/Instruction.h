@@ -104,6 +104,8 @@ public:
   /// MovePos.
   void moveBefore(Instruction *MovePos);
 
+  void setName(const Twine &Name);
+
   //===--------------------------------------------------------------------===//
   // Subclass classification.
   //===--------------------------------------------------------------------===//
