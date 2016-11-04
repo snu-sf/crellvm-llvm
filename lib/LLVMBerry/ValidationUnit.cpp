@@ -88,7 +88,7 @@ void writeModuleToFile(const llvm::Module &module,
 
 // class ValidationUnit
 // constructor
-ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
+ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func, bool rneame)
     : _filename(), _optname(optname), _srcfile_buffer(nullptr), _func(func),
       _corehint(), _data(), isAborted(false) {
   if (RuntimeOptions::IgnoreOpt(optname))
@@ -96,7 +96,7 @@ ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func)
   else if (RuntimeOptions::IgnorePass(_CurrentPass)) {
     this->isAborted = true;
   } else {
-    this->begin();
+    this->begin(rename);
   }
 }
 
@@ -142,7 +142,7 @@ void ValidationUnit::intrude(
 }
 
 // private functions
-void ValidationUnit::begin() {
+void ValidationUnit::begin(bool rename) {
   assert(!isAborted);
 
   // get module & module name
@@ -157,7 +157,8 @@ void ValidationUnit::begin() {
   _filename = ss.str();
 
   // print src
-  llvmberry::name_instructions(*_func);
+  if (rename)
+    llvmberry::name_instructions(*_func);
   _srcfile_buffer = new std::string();
   if (!RuntimeOptions::NoCommit())
     writeModuleToBuffer(*module, _srcfile_buffer, _func);
@@ -261,10 +262,10 @@ bool ValidationUnit::Exists() {
     return false;
 }
 
-void ValidationUnit::Begin(const std::string &optname, llvm::Function *func) {
+void ValidationUnit::Begin(const std::string &optname, llvm::Function *func, bool rename) {
   assert(!Exists() && "ValidationUnit already exists");
   assert(func && "Function cannot be null");
-  _Instance = new ValidationUnit(optname, func);
+  _Instance = new ValidationUnit(optname, func, rename);
 }
 
 bool ValidationUnit::BeginIfNotExists(const std::string &optname,

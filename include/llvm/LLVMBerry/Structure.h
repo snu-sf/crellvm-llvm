@@ -102,6 +102,7 @@ llvm::Instruction *getPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB);
 int getCommandIndex(const llvm::Value &value);
 int getTerminatorIndex(const llvm::TerminatorInst *instr);
 bool name_instructions(llvm::Function &F);
+bool name_instruction(llvm::Instruction &I);
 
 std::string toString(llvmberry::TyBop bop);
 std::string toString(llvmberry::TyFbop bop);

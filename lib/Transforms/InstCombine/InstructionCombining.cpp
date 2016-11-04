@@ -2762,9 +2762,11 @@ bool InstCombiner::run() {
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
-      llvmberry::name_instructions(*(I->getParent()->getParent()));
+      //llvmberry::name_instructions(*(I->getParent()->getParent()));
+      llvmberry::name_instruction(*I);
       llvmberry::ValidationUnit::Begin("dead_code_elim",
-                                       I->getParent()->getParent());
+                                       I->getParent()->getParent(),
+                                       false);
       llvmberry::generateHintForTrivialDCE(*I);
       llvmberry::ValidationUnit::GetInstance()->intrude([&I](
           llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
@@ -2897,9 +2899,10 @@ bool InstCombiner::run() {
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
-          llvmberry::name_instructions(*(I->getParent()->getParent()));
+          //llvmberry::name_instructions(*(I->getParent()->getParent()));
+          llvmberry::name_instruction(*I);
           llvmberry::ValidationUnit::Begin("dead_code_elim",
-                           I->getParent()->getParent());
+                           I->getParent()->getParent(), false);
           llvmberry::generateHintForTrivialDCE(*I);
           llvmberry::ValidationUnit::GetInstance()->intrude([&I](
               llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
@@ -2967,9 +2970,10 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (isInstructionTriviallyDead(Inst, TLI)) {
         ++NumDeadInst;
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
-        llvmberry::name_instructions(*(Inst->getParent()->getParent()));
+        //llvmberry::name_instructions(*(Inst->getParent()->getParent()));
+        llvmberry::name_instruction(*Inst);
         llvmberry::ValidationUnit::Begin("dead_code_elim",
-                              Inst->getParent()->getParent());
+                              Inst->getParent()->getParent(), false);
         llvmberry::generateHintForTrivialDCE(*Inst);
         llvmberry::ValidationUnit::GetInstance()->intrude([&Inst](
             llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
