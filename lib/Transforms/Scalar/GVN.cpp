@@ -948,11 +948,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
           }
           });
   } else {
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi,
-                                                       &CurInst_id, &PhiBlock,
-                                                       &Phi_id, &PREAR](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
+    llvmberry::ValidationUnit::GetInstance()
+        ->intrude([&CurInst, &Phi, &CurInst_id, &PhiBlock, &Phi_id, &PREAR](
+              llvmberry::ValidationUnit::Dictionary &data,
+              llvmberry::CoreHint &hints) {
       if (isa<CallInst>(CurInst)) {
         hints.appendToDescription("CurInstIsCall");
         hints.setReturnCodeToAdmitted();
@@ -1000,17 +999,20 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
-          // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
-          // start_of_block(VPHI)
-          generateHintForPRE(CurInstInPB, VPHI);
+          assert(false);
+          // // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
+          // // start_of_block(VPHI)
+          // generateHintForPRE(CurInstInPB, VPHI);
 
-          // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
-          PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                               llvmberry::Source, llvmberry::getBasicBlockIndex(
-                                                      VPHI->getParent())),
-                           llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                       PB->getName())));
+          // // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
+          // PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
+          //           BOUNDS(llvmberry::TyPosition::make_start_of_block(
+          //                      llvmberry::Source,
+          // llvmberry::getBasicBlockIndex(
+          //                                             VPHI->getParent())),
+          //                  llvmberry::TyPosition::make(SRC,
+          // PhiBlock->getName(),
+          //                                              PB->getName())));
         }
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VI)
         else {
@@ -1103,7 +1105,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       }
 
       return;
-    });
+          });
   }
 }
 }
