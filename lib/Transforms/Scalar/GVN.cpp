@@ -813,10 +813,8 @@ public:
 bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
                                  BasicBlock *PB) {
   std::string Inst_id = llvmberry::getVariable(*Inst);
-  if (isa<PHINode>(Inst)) {
-    hints.appendToDescription("[A]Problem : " + ((*Inst).getName()).str());
-    return false;
-  }
+  if (isa<PHINode>(Inst))
+    assert(false);
   PROPAGATE(LESSDEF(RHS(Inst_id, Physical, SRC), VAR(Inst_id, Physical), SRC),
             BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
@@ -861,65 +859,91 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             assert(isa<Instruction>(V) &&
                    "Value not an instruction: not yet handled.");
             Instruction *VI = dyn_cast<Instruction>(V);
-            if (!propagateInstrUntilBlockEnd(hints, VI, PB)) {
-              hints.appendToDescription("propagateInstrUntilBlockEnd");
-              hints.setReturnCodeToFail();
-              return;
-            }
-
             std::string VI_id = llvmberry::getVariable(*VI);
             hints.appendToDescription("VI_id is: " + VI_id);
             hints.appendToDescription("VI's getName is: " +
                                       ((*VI).getName()).str());
 
-            // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-            // Currently, assume Rhs(VI) = Rhs(CurInst)
-            // TODO: difference btw BB->getName() and
-            // llvmberry::getBasicBlockIndex?
-            INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                PB->getName()),
-                    llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-                                                      VAR(VI_id, Previous),
-                                                      VAR(Phi_id, Physical)));
+            if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
+              // // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
+              // // start_of_block(VPHI)
+              // generateHintForPRE(CurInstInPB, VPHI);
 
-            // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
-            // Currently, assume Rhs(VI) = Rhs(CurInst)
-            // TODO: difference btw BB->getName() and
-            // llvmberry::getBasicBlockIndex?
-            INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                PB->getName()),
-                    llvmberry::ConsTransitivity::make(RHS(VI_id, Physical, SRC),
-                                                      VAR(VI_id, Physical),
-                                                      VAR(Phi_id, Physical)));
+              // // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
+              // PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical),
+              // SRC),
+              //           BOUNDS(llvmberry::TyPosition::make_start_of_block(
+              //                      llvmberry::Source,
+              // llvmberry::getBasicBlockIndex(
+              //                                             VPHI->getParent())),
+              //                  llvmberry::TyPosition::make(SRC,
+              // PhiBlock->getName(),
+              //                                              PB->getName())));
 
-            bool inboundsRemovalOccured = false;
-            if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
-              if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
-                if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
-                  hints.appendToDescription("gep removal - bug");
-                  hints.setReturnCodeToAdmitted();
-                  // hints.setReturnCodeToFail();
-                  return;
-                }
-                if (CurInstGEP->isInBounds() && !VIGEP->isInBounds())
-                  inboundsRemovalOccured = true;
-              } else
-                assert(false && "This cannot occur");
-            }
+              // Propagate [ INSN(CurInst) >= VAR(VI) ]
+              PROPAGATE(
+                  LESSDEF(INSN(*CurInst), VAR(VI_id, Physical), SRC),
+                  BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                             llvmberry::Source,
+                             llvmberry::getBasicBlockIndex(VPHI->getParent())),
+                         llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                     PB->getName())));
 
-            if (inboundsRemovalOccured) {
-              // CurInst has inbounds
-              // This VI does not have inbounds
+              // Somehow get [ INSN(CurInst) >= Var(VI) ] in
+              // start_of_block(VPHI)
+              generateHintForPRE(CurInst, VPHI);
+            } else {
+              propagateInstrUntilBlockEnd(hints, VI, PB);
 
-              // GEP Inbounds Remove [ INSN(CurInst) >= INSN(VI) ]
-              INFRULE(llvmberry::TyPosition::make(
-                          SRC, Phi->getParent()->getName(), PB->getName()),
-                      llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
-              // Transitivity [ INSN(CurInst) >= INSN(VI) >= Var(Phi) ]
-              INFRULE(llvmberry::TyPosition::make(
-                          SRC, Phi->getParent()->getName(), PB->getName()),
+              // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
+              // Currently, assume Rhs(VI) = Rhs(CurInst)
+              // TODO: difference btw BB->getName() and
+              // llvmberry::getBasicBlockIndex?
+              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                  PB->getName()),
+                      llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
+                                                        VAR(VI_id, Previous),
+                                                        VAR(Phi_id, Physical)));
+
+              // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
+              // Currently, assume Rhs(VI) = Rhs(CurInst)
+              // TODO: difference btw BB->getName() and
+              // llvmberry::getBasicBlockIndex?
+              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                  PB->getName()),
                       llvmberry::ConsTransitivity::make(
-                          INSN(*CurInst), INSN(*VI), VAR(Phi_id, Physical)));
+                          RHS(VI_id, Physical, SRC), VAR(VI_id, Physical),
+                          VAR(Phi_id, Physical)));
+
+              bool inboundsRemovalOccured = false;
+              if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
+                if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
+                  if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
+                    hints.appendToDescription("gep removal - bug");
+                    hints.setReturnCodeToAdmitted();
+                    // hints.setReturnCodeToFail();
+                    return;
+                  }
+                  if (CurInstGEP->isInBounds() && !VIGEP->isInBounds())
+                    inboundsRemovalOccured = true;
+                } else
+                  assert(false && "This cannot occur");
+              }
+
+              if (inboundsRemovalOccured) {
+                // CurInst has inbounds
+                // This VI does not have inbounds
+
+                // GEP Inbounds Remove [ INSN(CurInst) >= INSN(VI) ]
+                INFRULE(llvmberry::TyPosition::make(
+                            SRC, Phi->getParent()->getName(), PB->getName()),
+                        llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
+                // Transitivity [ INSN(CurInst) >= INSN(VI) >= Var(Phi) ]
+                INFRULE(llvmberry::TyPosition::make(
+                            SRC, Phi->getParent()->getName(), PB->getName()),
+                        llvmberry::ConsTransitivity::make(
+                            INSN(*CurInst), INSN(*VI), VAR(Phi_id, Physical)));
+              }
             }
           }
           });
