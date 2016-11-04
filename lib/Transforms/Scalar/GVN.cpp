@@ -749,12 +749,14 @@ public:
   bool PrevPRENotEnough;
   std::vector<std::pair<PHINode *, int>> PrevPRE;
   bool isFromNonLocalLoad;
+  bool hasPhiInPB;
 
   PREAnalysisResult(Instruction *CurInst, PHINode *PN) {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     isFromNonLocalLoad =
         pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad;
     PrevPRENotEnough = false;
+    hasPhiInPB = false;
     std::vector<Value *> op_CurInst;
     unsigned numPredBlocks = 0;
     BasicBlock *PNBlock = PN->getParent();
@@ -801,6 +803,7 @@ public:
 
     for (Instruction &I : *PNBlock)
       if (PHINode *PI = dyn_cast<PHINode>(&I)) {
+        hasPhiInPB = true;
         int hit = 0;
         int idx = -1;
         for (unsigned i = 0, e = numPredBlocks; i != e; ++i) {
@@ -885,7 +888,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   std::string Phi_id = llvmberry::getVariable(*Phi);
   PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
 
-  if (PREAR->isSameForAll) {
+  if (!PREAR->hasPhiInPB) {
     llvmberry::ValidationUnit::GetInstance()->intrude(
         [&CurInst, &Phi, &PhiBlock, &CurInst_id,
          &Phi_id](llvmberry::ValidationUnit::Dictionary &data,
