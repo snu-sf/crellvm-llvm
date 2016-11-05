@@ -973,6 +973,19 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
               delete CurInstInPB;
             } else {
+              // If repl is not an instruction, then it's always from
+              // propagateEquality.
+              const BasicBlock *BBSucc =
+                  llvmberry::PassDictionary::GetInstance()
+                      .get<llvmberry::ArgForGVNPRE>()
+                      ->prevLeaderBBs[PB];
+              assert(BBSucc && "Expect BBSucc to exist");
+              const BasicBlock *BBPred = BBSucc->getSinglePredecessor();
+              assert(BBPred &&
+                     "Expect it to be introduced from propagateEquality, and "
+                     "it checks "
+                     "RootDominatesEnd, meaning it has single predecessor");
+
               hints.appendToDescription("V Is Not Instruction");
               hints.setReturnCodeToFail();
             }
@@ -3607,6 +3620,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   BasicBlock *CurrentBlock = CurInst->getParent();
   predMap.clear();
 
+  llvmberry::intrude([]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs.clear();
+  });
   for (pred_iterator PI = pred_begin(CurrentBlock), PE = pred_end(CurrentBlock);
        PI != PE; ++PI) {
     BasicBlock *P = *PI;
@@ -3621,11 +3638,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       break;
     }
 
-    llvmberry::intrude([]() {
-      llvmberry::PassDictionary &pdata =
-          llvmberry::PassDictionary::GetInstance();
-      pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs.clear();
-    });
     Value *predV = findLeader(P, ValNo);
     if (!predV) {
       predMap.push_back(std::make_pair(static_cast<Value *>(nullptr), P));
