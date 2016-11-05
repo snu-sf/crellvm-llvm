@@ -2743,17 +2743,9 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
   // the end of block that could change the value.
   if (I->mayReadFromMemory()) {
     for (BasicBlock::iterator Scan = I, E = I->getParent()->end();
-         Scan != E; ++Scan) {
+         Scan != E; ++Scan)
       if (Scan->mayWriteToMemory())
         return false;
-      llvmberry::ValidationUnit::GetInstance()->intrude([Scan, I]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        Instruction *BI = Scan;
-        if (isa<CallInst>(BI)) {
-          hints.setReturnCodeToAdmitted();
-        }
-      });
-    }
   }
 
   BasicBlock::iterator InsertPos = DestBlock->getFirstInsertionPt();
