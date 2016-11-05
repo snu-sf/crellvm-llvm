@@ -939,9 +939,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                   INFRULE(PBPhiPos,
                           llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
                   // Transitivity [ INSN(CurInst) >= INSN(VI) >= Var(Phi) ]
-                  INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
-                                        INSN(*CurInst), INSN(*VI),
-                                        VAR(Phi_id, Physical)));
+                  INFRULE(PBPhiPos,
+                          llvmberry::ConsTransitivity::make(
+                              INSN(*CurInst), INSN(*VI), VAR(VI_id, Physical)));
                 }
               }
 
