@@ -851,6 +851,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             BasicBlock *PB = *PI;
             Value *V = Phi->getIncomingValueForBlock(PB);
 
+            auto PBPhiPos = llvmberry::TyPosition::make(
+                SRC, PhiBlock->getName(), PB->getName());
+
             hints.setDescription(
                 (hints.getDescription() + "\nV is: " + (*V).getName()).str());
             hints.appendToDescription("CurInst is: " +
@@ -877,8 +880,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                     BOUNDS(llvmberry::TyPosition::make_start_of_block(
                                llvmberry::Source, llvmberry::getBasicBlockIndex(
                                                       VPHI->getParent())),
-                           llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                       PB->getName())));
+                           PBPhiPos));
               }
               // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
               // VPHI)
@@ -886,9 +888,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                 // Propagate [ RHS(VI) >= VAR(VI) ]
                 PROPAGATE(LESSDEF(RHS(VI_id, Physical, SRC),
                                   VAR(VI_id, Physical), SRC),
-                          BOUNDS(INSTPOS(SRC, VI),
-                                 llvmberry::TyPosition::make_end_of_block(
-                                     llvmberry::Source, *PB)));
+                          BOUNDS(INSTPOS(SRC, VI), PBPhiPos));
 
                 // Somehow get [ INSN(CurInstInPB) >= Var(VI) ]
                 // Expect INSN(CurInstInPB) is already Var(VI)
@@ -901,8 +901,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                 // Currently, assume Rhs(VI) = Rhs(CurInst)
                 // TODO: difference btw BB->getName() and
                 // llvmberry::getBasicBlockIndex?
-                INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                    PB->getName()),
+                INFRULE(PBPhiPos,
                         llvmberry::ConsTransitivity::make(
                             VAR(VI_id, Physical), VAR(VI_id, Previous),
                             VAR(Phi_id, Physical)));
@@ -911,8 +910,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                 // Currently, assume Rhs(VI) = Rhs(CurInst)
                 // TODO: difference btw BB->getName() and
                 // llvmberry::getBasicBlockIndex?
-                INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                    PB->getName()),
+                INFRULE(PBPhiPos,
                         llvmberry::ConsTransitivity::make(
                             RHS(VI_id, Physical, SRC), VAR(VI_id, Physical),
                             VAR(Phi_id, Physical)));
@@ -937,43 +935,34 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                   // This VI does not have inbounds
 
                   // GEP Inbounds Remove [ INSN(CurInst) >= INSN(VI) ]
-                  INFRULE(llvmberry::TyPosition::make(
-                              SRC, Phi->getParent()->getName(), PB->getName()),
+                  INFRULE(PBPhiPos,
                           llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
                   // Transitivity [ INSN(CurInst) >= INSN(VI) >= Var(Phi) ]
-                  INFRULE(
-                      llvmberry::TyPosition::make(
-                          SRC, Phi->getParent()->getName(), PB->getName()),
-                      llvmberry::ConsTransitivity::make(
-                          INSN(*CurInst), INSN(*VI), VAR(Phi_id, Physical)));
+                  INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                                        INSN(*CurInst), INSN(*VI),
+                                        VAR(Phi_id, Physical)));
                 }
                 }
               }
 
               // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                  PB->getName()),
-                      llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-                                                        VAR(VI_id, Previous),
-                                                        VAR(Phi_id, Physical)));
+              INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                                    VAR(VI_id, Physical), VAR(VI_id, Previous),
+                                    VAR(Phi_id, Physical)));
 
               // Transitivity [ INSN(CurInstInPB) >= Var(VI) >= Var(Phi) ]
-              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                  PB->getName()),
-                      llvmberry::ConsTransitivity::make(INSN(*CurInstInPB),
-                                                        VAR(VI_id, Physical),
-                                                        VAR(Phi_id, Physical)));
+              INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                                    INSN(*CurInstInPB), VAR(VI_id, Physical),
+                                    VAR(Phi_id, Physical)));
 
               // Transitivity [ INSN(CurInst) <=> INSN(CurInstInPB) ]
               llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
 
               // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi)
               // ]
-              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                  PB->getName()),
-                      llvmberry::ConsTransitivity::make(INSN(*CurInst),
-                                                        INSN(*CurInstInPB),
-                                                        VAR(Phi_id, Physical)));
+              INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                                    INSN(*CurInst), INSN(*CurInstInPB),
+                                    VAR(Phi_id, Physical)));
 
               delete CurInstInPB;
             } else {
