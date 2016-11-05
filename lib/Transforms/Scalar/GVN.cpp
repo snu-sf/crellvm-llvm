@@ -968,7 +968,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               delete CurInstInPB;
             } else {
               hints.appendToDescription("V Is Not Instruction");
-              hints.setReturnCodeToAdmitted();
+              hints.setReturnCodeToFail();
             }
           }
           });
