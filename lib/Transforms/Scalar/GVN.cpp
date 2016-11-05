@@ -773,10 +773,10 @@ public:
 
           // it may be constant int... ?!
           if (Instruction *VI = dyn_cast<Instruction>(V)) {
-            if (isa<PHINode>(VI)) {
-              hit++;
-              continue;
-            }
+            // if (isa<PHINode>(VI)) {
+            //   hit++;
+            //   continue;
+            // }
 
             // It finds the first j that matches
             // VI may have same operand, such as VI = a + a, so there can be
@@ -792,7 +792,7 @@ public:
                   idx = j;
                 else if (idx == j) {
                 } else {
-                  assert(false);
+                  assert("idx is not equal to j" && false);
                 }
               }
             }
@@ -814,7 +814,7 @@ bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
                                  BasicBlock *PB) {
   std::string Inst_id = llvmberry::getVariable(*Inst);
   if (isa<PHINode>(Inst))
-    assert(false);
+    assert("Phi should not occur here" && false);
   PROPAGATE(LESSDEF(RHS(Inst_id, Physical, SRC), VAR(Inst_id, Physical), SRC),
             BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
@@ -856,105 +856,110 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             hints.appendToDescription("CurInst is: " +
                                       ((*CurInst).getName()).str());
 
-            assert(isa<Instruction>(V) &&
-                   "Value not an instruction: not yet handled.");
-            Instruction *VI = dyn_cast<Instruction>(V);
-            std::string VI_id = llvmberry::getVariable(*VI);
-            hints.appendToDescription("VI_id is: " + VI_id);
-            hints.appendToDescription("VI's getName is: " +
-                                      ((*VI).getName()).str());
+            if (Instruction *VI = dyn_cast<Instruction>(V)) {
+              std::string VI_id = llvmberry::getVariable(*VI);
+              hints.appendToDescription("VI_id is: " + VI_id);
+              hints.appendToDescription("VI's getName is: " +
+                                        ((*VI).getName()).str());
 
-            if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
-              Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
-              // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
-              // start_of_block(VPHI)
-              generateHintForPRE(CurInstInPB, VPHI);
+              if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
+                Instruction *CurInstInPB =
+                    llvmberry::getPHIResolved(CurInst, PB);
+                // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
+                // start_of_block(VPHI)
+                generateHintForPRE(CurInstInPB, VPHI);
 
-              // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
-              PROPAGATE(
-                  LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
-                  BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                             llvmberry::Source,
-                             llvmberry::getBasicBlockIndex(VPHI->getParent())),
-                         llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                     PB->getName())));
+                // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
+                PROPAGATE(
+                    LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                               llvmberry::Source, llvmberry::getBasicBlockIndex(
+                                                      VPHI->getParent())),
+                           llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                       PB->getName())));
 
-              // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                  PB->getName()),
-                      llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-                                                        VAR(VI_id, Previous),
-                                                        VAR(Phi_id, Physical)));
-
-              // Transitivity [ INSN(CurInstInPB) >= Var(VI) >= Var(Phi) ]
-              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                  PB->getName()),
-                      llvmberry::ConsTransitivity::make(INSN(*CurInstInPB),
-                                                        VAR(VI_id, Physical),
-                                                        VAR(Phi_id, Physical)));
-
-              llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
-
-              // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi) ]
-              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                  PB->getName()),
-                      llvmberry::ConsTransitivity::make(INSN(*CurInst),
-                                                        INSN(*CurInstInPB),
-                                                        VAR(Phi_id, Physical)));
-
-              delete CurInstInPB;
-            } else {
-              propagateInstrUntilBlockEnd(hints, VI, PB);
-
-              // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-              // Currently, assume Rhs(VI) = Rhs(CurInst)
-              // TODO: difference btw BB->getName() and
-              // llvmberry::getBasicBlockIndex?
-              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                  PB->getName()),
-                      llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-                                                        VAR(VI_id, Previous),
-                                                        VAR(Phi_id, Physical)));
-
-              // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
-              // Currently, assume Rhs(VI) = Rhs(CurInst)
-              // TODO: difference btw BB->getName() and
-              // llvmberry::getBasicBlockIndex?
-              INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                  PB->getName()),
-                      llvmberry::ConsTransitivity::make(
-                          RHS(VI_id, Physical, SRC), VAR(VI_id, Physical),
-                          VAR(Phi_id, Physical)));
-
-              bool inboundsRemovalOccured = false;
-              if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
-                if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
-                  if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
-                    hints.appendToDescription("gep removal - bug");
-                    hints.setReturnCodeToAdmitted();
-                    // hints.setReturnCodeToFail();
-                    return;
-                  }
-                  if (CurInstGEP->isInBounds() && !VIGEP->isInBounds())
-                    inboundsRemovalOccured = true;
-                } else
-                  assert(false && "This cannot occur");
-              }
-
-              if (inboundsRemovalOccured) {
-                // CurInst has inbounds
-                // This VI does not have inbounds
-
-                // GEP Inbounds Remove [ INSN(CurInst) >= INSN(VI) ]
-                INFRULE(llvmberry::TyPosition::make(
-                            SRC, Phi->getParent()->getName(), PB->getName()),
-                        llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
-                // Transitivity [ INSN(CurInst) >= INSN(VI) >= Var(Phi) ]
-                INFRULE(llvmberry::TyPosition::make(
-                            SRC, Phi->getParent()->getName(), PB->getName()),
+                // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
+                INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                    PB->getName()),
                         llvmberry::ConsTransitivity::make(
-                            INSN(*CurInst), INSN(*VI), VAR(Phi_id, Physical)));
+                            VAR(VI_id, Physical), VAR(VI_id, Previous),
+                            VAR(Phi_id, Physical)));
+
+                // Transitivity [ INSN(CurInstInPB) >= Var(VI) >= Var(Phi) ]
+                INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                    PB->getName()),
+                        llvmberry::ConsTransitivity::make(
+                            INSN(*CurInstInPB), VAR(VI_id, Physical),
+                            VAR(Phi_id, Physical)));
+
+                llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
+
+                // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi)
+                // ]
+                INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                    PB->getName()),
+                        llvmberry::ConsTransitivity::make(
+                            INSN(*CurInst), INSN(*CurInstInPB),
+                            VAR(Phi_id, Physical)));
+
+                delete CurInstInPB;
+              } else {
+                propagateInstrUntilBlockEnd(hints, VI, PB);
+
+                // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
+                // Currently, assume Rhs(VI) = Rhs(CurInst)
+                // TODO: difference btw BB->getName() and
+                // llvmberry::getBasicBlockIndex?
+                INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                    PB->getName()),
+                        llvmberry::ConsTransitivity::make(
+                            VAR(VI_id, Physical), VAR(VI_id, Previous),
+                            VAR(Phi_id, Physical)));
+
+                // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
+                // Currently, assume Rhs(VI) = Rhs(CurInst)
+                // TODO: difference btw BB->getName() and
+                // llvmberry::getBasicBlockIndex?
+                INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                    PB->getName()),
+                        llvmberry::ConsTransitivity::make(
+                            RHS(VI_id, Physical, SRC), VAR(VI_id, Physical),
+                            VAR(Phi_id, Physical)));
+
+                bool inboundsRemovalOccured = false;
+                if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
+                  if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
+                    if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
+                      hints.appendToDescription("gep removal - bug");
+                      hints.setReturnCodeToAdmitted();
+                      // hints.setReturnCodeToFail();
+                      return;
+                    }
+                    if (CurInstGEP->isInBounds() && !VIGEP->isInBounds())
+                      inboundsRemovalOccured = true;
+                  } else
+                    assert(false && "This cannot occur");
+                }
+
+                if (inboundsRemovalOccured) {
+                  // CurInst has inbounds
+                  // This VI does not have inbounds
+
+                  // GEP Inbounds Remove [ INSN(CurInst) >= INSN(VI) ]
+                  INFRULE(llvmberry::TyPosition::make(
+                              SRC, Phi->getParent()->getName(), PB->getName()),
+                          llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
+                  // Transitivity [ INSN(CurInst) >= INSN(VI) >= Var(Phi) ]
+                  INFRULE(
+                      llvmberry::TyPosition::make(
+                          SRC, Phi->getParent()->getName(), PB->getName()),
+                      llvmberry::ConsTransitivity::make(
+                          INSN(*CurInst), INSN(*VI), VAR(Phi_id, Physical)));
+                }
               }
+            } else {
+              hints.appendToDescription("V Is Not Instruction");
+              hints.setReturnCodeToAdmitted();
             }
           }
           });
@@ -1010,7 +1015,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
-          assert(false);
+          assert("VPHI case should not occur" && false);
           // // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
           // // start_of_block(VPHI)
           // generateHintForPRE(CurInstInPB, VPHI);
