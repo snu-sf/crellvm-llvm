@@ -232,8 +232,17 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
     // We must ignore debug info directives when counting (otherwise they
     // would affect codegen).
     Instruction *Inst = --ScanFrom;
-    if (isa<DbgInfoIntrinsic>(Inst))
+    if (isa<DbgInfoIntrinsic>(Inst)) {
+      if(llvmberry_isActive){
+        llvmberry::ValidationUnit::GetInstance()->intrude([Inst](
+            llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
+              std::make_pair(Inst, "intrinsics")));
+        });
+      }
       continue;
+    }
 
     // Restore ScanFrom to expected value in case next test succeeds
     ScanFrom++;
@@ -379,7 +388,7 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
         if (isa<CallInst>(Inst)) {
           // Yes, readonly / readnone calls must be considered as well.
           falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
-              std::make_pair(Inst, "aliasanalysis")));
+              std::make_pair(Inst, "readonlycall")));
         }
       });
     }

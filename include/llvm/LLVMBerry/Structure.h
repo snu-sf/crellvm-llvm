@@ -102,6 +102,7 @@ llvm::Instruction *getPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB);
 int getCommandIndex(const llvm::Value &value);
 int getTerminatorIndex(const llvm::TerminatorInst *instr);
 bool name_instructions(llvm::Function &F);
+bool name_instruction(llvm::Instruction &I);
 
 std::string toString(llvmberry::TyBop bop);
 std::string toString(llvmberry::TyFbop bop);
@@ -134,6 +135,12 @@ public:
   TyPositionCommand(int _index, std::string _register_name);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
+public:
+  int getIndex() const
+  { return index; }
+  const std::string getRegisterName() const
+  { return register_name; }
+
 private:
   int index;
   std::string register_name;
@@ -160,6 +167,8 @@ public:
 
   /* static std::shared_ptr<TyPosition> make(const llvm::Instruction &I, */
   /*                                         enum TyScope _scope); */
+  std::shared_ptr<TyPositionCommand> getPositionCommand() const
+  { return position_command; }
 
 private:
   std::shared_ptr<TyPositionCommand> position_command;
@@ -189,6 +198,13 @@ public:
   static std::shared_ptr<TyPosition> make(enum TyScope _scope,
                                           const llvm::Instruction &I, int index,
                                           std::string _prev_block_name);
+public:
+  enum TyScope getScope() const
+  { return scope; }
+  const std::string &getBlockName() const
+  { return block_name; }
+  std::shared_ptr<TyInstrIndex> getInstrIndex() const
+  { return instr_index; }
 
 private:
   enum TyScope scope;
@@ -622,6 +638,7 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyPointer> make(const llvm::Value &v);
+  static std::shared_ptr<TyPointer> makeWithElementType(const llvm::Value &v);
 
 private:
   std::shared_ptr<TyValue> v;

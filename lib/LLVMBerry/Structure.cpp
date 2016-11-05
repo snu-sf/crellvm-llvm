@@ -618,6 +618,15 @@ bool name_instructions(llvm::Function &F) {
   return true;
 }
 
+bool name_instruction(llvm::Instruction &I) {
+  if (!I.hasName() && !I.getType()->isVoidTy())
+    I.setName("tmp");
+  if (!I.getParent()->hasName())
+    I.getParent()->setName("bb");
+
+  return true;
+}
+
 int getCommandIndex(const llvm::Value &V) {
   if (!llvm::isa<llvm::Instruction>(V))
     return -1; // not an instruction
@@ -1377,6 +1386,14 @@ std::shared_ptr<TyPointer> TyPointer::make(const llvm::Value &v) {
   return std::shared_ptr<TyPointer>(
       new TyPointer(TyValue::make(v), TyValueType::make(*ty)));
 }
+
+std::shared_ptr<TyPointer> TyPointer::makeWithElementType(const llvm::Value &v) {
+  llvm::PointerType *ty = llvm::dyn_cast<llvm::PointerType>(v.getType());
+  assert(ty && "ty must be a pointer type.");
+  return std::shared_ptr<TyPointer>(
+      new TyPointer(TyValue::make(v), TyValueType::make(*(ty->getElementType()))));
+}
+
 
 // valuetype
 
