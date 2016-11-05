@@ -914,6 +914,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                         llvmberry::ConsTransitivity::make(
                             RHS(VI_id, Physical, SRC), VAR(VI_id, Physical),
                             VAR(Phi_id, Physical)));
+                }
 
                 bool inboundsRemovalOccured = false;
                 if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
@@ -941,7 +942,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                   INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
                                         INSN(*CurInst), INSN(*VI),
                                         VAR(Phi_id, Physical)));
-                }
                 }
               }
 
