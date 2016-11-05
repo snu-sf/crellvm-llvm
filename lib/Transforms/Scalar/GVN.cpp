@@ -1230,9 +1230,25 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
 
   if (I1->getOpcode() != I2->getOpcode()) {
     if (isa<PHINode>(I1) || isa<PHINode>(I2)) {
-      hints.appendToDescription("GVN hintgen_same_vn: PRE & GVN combined case - not handled yet.");
-      // Return true since we should do this later, but now validation will fail
-      // since we don't generate hint here.
+      if (PHINode *phi_I2 = dyn_cast<PHINode>(I2)) {
+        generateHintForPRE(I1, phi_I2);
+        PROPAGATE(
+            LESSDEF(RHS(id_I1, Physical, SRC), VAR(id_I2, Physical), SRC),
+            BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                       SRC, llvmberry::getBasicBlockIndex(phi_I2->getParent())),
+                   INSTPOS(SRC, POS)));
+        if (I1 != POS)
+          PROPAGATE(LESSDEF(VAR(id_I1, Physical), RHS(id_I1, Physical, SRC), SRC),
+                    BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
+
+        INFRULE(INSTPOS(SRC, POS),
+              llvmberry::ConsTransitivity::make(VAR(id_I1, Physical),
+                                                RHS(id_I1, Physical, SRC),
+                                                VAR(id_I2, Physical)));
+      }
+
+      hints.appendToDescription("GVN hintgen_same_vn: PRE & GVN combined case.");
+
       return true;
     }
     assert(
@@ -1653,6 +1669,12 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
     bool hintgen = hintgen_same_vn(hints, VN, I, I_repl, true, I);
     if (!hintgen) {
       hints.appendToDescription("GVN repl_inv: hintgen_same_vn failed.");
+    }
+
+    // We admit redundant readonly call cases.
+    if ((I->getOpcode() == Instruction::Call) &&
+        (I_repl->getOpcode() == Instruction::Call)) {
+      hints.setReturnCodeToAdmitted();
     }
     // assert(hintgen && "GVN make_repl_inv: same_vn failed!");
 
