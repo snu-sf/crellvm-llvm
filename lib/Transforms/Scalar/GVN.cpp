@@ -890,15 +890,15 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                   VAR(VI_id, Physical), SRC),
                           BOUNDS(INSTPOS(SRC, VI), PBPhiPos));
 
-                // Somehow get [ INSN(CurInstInPB) >= Var(VI) ]
-                // Expect INSN(CurInstInPB) is already Var(VI)
+                // Somehow get [ INSN(CurInstInPBInPB) >= Var(VI) ]
+                // Expect INSN(CurInstInPBInPB) is already Var(VI)
 
                 if (false) {
                   // Propagate [ RHS(VI) <=> VAR(VI) ]
                 propagateInstrUntilBlockEnd(hints, VI, PB);
 
                 // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-                // Currently, assume Rhs(VI) = Rhs(CurInst)
+                // Currently, assume Rhs(VI) = Rhs(CurInstInPB)
                 // TODO: difference btw BB->getName() and
                 // llvmberry::getBasicBlockIndex?
                 INFRULE(PBPhiPos,
@@ -907,7 +907,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                             VAR(Phi_id, Physical)));
 
                 // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
-                // Currently, assume Rhs(VI) = Rhs(CurInst)
+                // Currently, assume Rhs(VI) = Rhs(CurInstInPB)
                 // TODO: difference btw BB->getName() and
                 // llvmberry::getBasicBlockIndex?
                 INFRULE(PBPhiPos,
@@ -917,31 +917,32 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                 }
 
                 bool inboundsRemovalOccured = false;
-                if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
+                if (auto *CurInstInPBGEP =
+                        dyn_cast<GetElementPtrInst>(CurInstInPB)) {
                   if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
-                    if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
+                    if (!CurInstInPBGEP->isInBounds() && VIGEP->isInBounds()) {
                       hints.appendToDescription("gep removal - bug");
                       hints.setReturnCodeToAdmitted();
                       // hints.setReturnCodeToFail();
                       return;
                     }
-                    if (CurInstGEP->isInBounds() && !VIGEP->isInBounds())
+                    if (CurInstInPBGEP->isInBounds() && !VIGEP->isInBounds())
                       inboundsRemovalOccured = true;
                   } else
                     assert(false && "This cannot occur");
                 }
 
                 if (inboundsRemovalOccured) {
-                  // CurInst has inbounds
+                  // CurInstInPB has inbounds
                   // This VI does not have inbounds
 
-                  // GEP Inbounds Remove [ INSN(CurInst) >= INSN(VI) ]
+                  // GEP Inbounds Remove [ INSN(CurInstInPB) >= INSN(VI) ]
                   INFRULE(PBPhiPos,
                           llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
-                  // Transitivity [ INSN(CurInst) >= INSN(VI) >= Var(Phi) ]
-                  INFRULE(PBPhiPos,
-                          llvmberry::ConsTransitivity::make(
-                              INSN(*CurInst), INSN(*VI), VAR(VI_id, Physical)));
+                  // Transitivity [ INSN(CurInstInPB) >= INSN(VI) >= Var(Phi) ]
+                  INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                                        INSN(*CurInstInPB), INSN(*VI),
+                                        VAR(VI_id, Physical)));
                 }
               }
 
