@@ -835,13 +835,19 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
   if (PREAR->PrevPRE.size() == 0) {
     llvmberry::ValidationUnit::GetInstance()
-        ->intrude([&CurInst, &Phi, &PhiBlock, &CurInst_id, &Phi_id](
+        ->intrude([&CurInst, &Phi, &PhiBlock, &CurInst_id, &Phi_id, &PREAR](
               llvmberry::ValidationUnit::Dictionary &data,
               llvmberry::CoreHint &hints) {
           if (isa<CallInst>(CurInst)) {
             hints.appendToDescription("CurInstIsCall");
             hints.setReturnCodeToAdmitted();
           }
+
+          if (PREAR->isFromNonLocalLoad) {
+            hints.appendToDescription("isFromNonLocalLoad");
+            hints.setReturnCodeToAdmitted();
+          }
+
           // For each pred block, propagate the chain of involved values until
           // the
           // end
