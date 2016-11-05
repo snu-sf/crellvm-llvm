@@ -59,7 +59,7 @@ StripPointerCastsArg::StripPointerCastsArg() {
 }
 
 FindAvailableLoadedValueArg::FindAvailableLoadedValueArg() {
-  orthogonalStores = TyOrthogonalStores(new TyOrthogonalStoresObj());
+  orthogonalInsns = TyOrthogonalInsns(new TyOrthogonalInsnsObj());
   ptr1EquivalentValues = TyPtrEqValues(new TyPtrEqValuesObj());
   ptr2EquivalentValues = TyPtrEqValues(new TyPtrEqValuesObj());
   isLoadStore = false;

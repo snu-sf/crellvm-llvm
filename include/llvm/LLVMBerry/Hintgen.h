@@ -17,6 +17,7 @@
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
 #define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
+#define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
 #define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
 #define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
 #define PROPAGATE(what, where)                                                 \
