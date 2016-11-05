@@ -3080,9 +3080,10 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
     // llvmberry::ValidationUnit::GetInstance()->intrude(
     //     [&Vals](llvmberry::Dictionary &data, llvmberry::CoreHint &hints)
     //     { data.get<llvmberry::ArgForGVNReplace>()->BB = Vals.BB; });
-    llvmberry::intrude([&Vals]() {
+    llvmberry::intrude([&Vals, &BB]() {
       llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
       pdata.get<llvmberry::ArgForGVNReplace>()->BB = Vals.BB;
+      pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs[BB] = Vals.BB;
     });
     if (isa<Constant>(Val)) return Val;
   }
@@ -3091,17 +3092,19 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
   while (Next) {
     if (DT->dominates(Next->BB, BB)) {
       if (isa<Constant>(Next->Val)) {
-        llvmberry::intrude([&Next]() {
+        llvmberry::intrude([&Next, &BB]() {
           llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
           pdata.get<llvmberry::ArgForGVNReplace>()->BB = Next->BB;
+          pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs[BB] = Next->BB;
         });
         return Next->Val;
       }
       if (!Val) {
         Val = Next->Val;
-        llvmberry::intrude([&Next]() {
+        llvmberry::intrude([&Next, &BB]() {
           llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
           pdata.get<llvmberry::ArgForGVNReplace>()->BB = Next->BB;
+          pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs[BB] = Next->BB;
         });
       }
     }
@@ -3618,6 +3621,11 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       break;
     }
 
+    llvmberry::intrude([]() {
+      llvmberry::PassDictionary &pdata =
+          llvmberry::PassDictionary::GetInstance();
+      pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs.clear();
+    });
     Value *predV = findLeader(P, ValNo);
     if (!predV) {
       predMap.push_back(std::make_pair(static_cast<Value *>(nullptr), P));

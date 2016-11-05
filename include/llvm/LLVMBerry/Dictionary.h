@@ -286,6 +286,7 @@ DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
 // processNonLocalLoad
 struct GVNPREArg {
   bool isFromNonLocalLoad;
+  std::map<const llvm::BasicBlock *, const llvm::BasicBlock *> prevLeaderBBs;
 };
 DEFINE_TRAITS(ArgForGVNPRE, GVNPREArg);
 
