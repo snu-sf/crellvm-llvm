@@ -166,12 +166,15 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
     false_encoding;
 
-void generateHintForMem2RegPropagateNoalias(llvm::AllocaInst *AI,
-                                            llvm::Instruction *useInst,
-                                            int useIndex);
-
 void makeReachableBlockMap(llvm::BasicBlock* Src,
                            llvm::BasicBlock* Tgt);
+
+void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> lessdef_src,
+                                             std::shared_ptr<TyPropagateObject> lessdef_tgt,
+                                             llvm::Instruction* from,
+                                             llvm::Instruction* to,
+                                             std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> worklist,
+                                             llvm::BasicBlock* BB);
 
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst* SI,
@@ -181,7 +184,9 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
 void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                                          llvm::PHINode* tmp,
                                          llvm::LoadInst* LI,
-                                         llvm::Instruction *use, int useIndex);
+                                         llvm::BasicBlock* useBB,
+                                         int useIndex,
+                                         llvm::Instruction *use);
 
 void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal,
                                        llvm::Instruction* I);
@@ -196,11 +201,12 @@ void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
 
 void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB, 
                                      std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> VisitedBlock, 
-                                     llvm::AllocaInst* AI);
+                                     llvm::AllocaInst* AI, bool ignore);
 
 llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
                              llvm::Instruction* I, bool isInit,
-                             bool checkSI, Dictionary data);
+                             bool checkSI, Dictionary data,
+                             bool isLoop = false);
 
 int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
 
@@ -210,6 +216,7 @@ int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
 
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
+void generateHintForMem2RegPhiUndef(llvm::PHINode *APN, llvm::BasicBlock *Pred);
 }
 
 #endif

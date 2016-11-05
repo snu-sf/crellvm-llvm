@@ -2756,48 +2756,9 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
     }
   }
 
-
   BasicBlock::iterator InsertPos = DestBlock->getFirstInsertionPt();
-
-  llvmberry::ValidationUnit::GetInstance()
-      ->intrude([&I, &InsertPos, &DestBlock](llvmberry::Dictionary &data,
-                                             llvmberry::CoreHint &hints) {
-          auto si_arg = data.get<llvmberry::ArgForSinkInst>();
-          DominatorTree *DT = si_arg->sinkDT;
-          insertSrcNopAtTgtI(hints, InsertPos); // src nop
-          insertTgtNopAtSrcI(hints, I);         //tgt nop
-          std::string reg0_name = llvmberry::getVariable(*I);
-
-          PROPAGATE(LESSDEF(VAR(reg0_name, Physical),
-                   RHS(reg0_name, Physical, llvmberry::Source),
-                   SRC),
-              BOUNDS(INSTPOS(llvmberry::Source, I),
-                     INSTPOS(llvmberry::Target, InsertPos)));
-          //prev maydiff propagate global -> issue 86
-          PROPAGATE(MAYDIFF(reg0_name, llvmberry::Previous),
-                    llvmberry::ConsGlobal::make());
-          PROPAGATE(MAYDIFF(reg0_name, llvmberry::Physical),
-                    BOUNDS(INSTPOS(llvmberry::Source, I),
-                           INSTPOS(llvmberry::Target, InsertPos)));
-
-          // traversal dominator tree
-          for (auto node = GraphTraits<DominatorTree *>::nodes_begin(DT);
-               node != GraphTraits<DominatorTree *>::nodes_end(DT); ++node) {
-            BasicBlock *BB = node->getBlock();
-            if ((DestBlock->getName() != BB->getName()) &&
-                isPotentiallyReachable(I->getParent(), BB) &&
-                !DT->dominates(DestBlock, BB)) {
-              PROPAGATE(MAYDIFF(reg0_name, llvmberry::Physical),
-                        BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                                   SRC, (BB->getName())),
-                               llvmberry::TyPosition::make_end_of_block(
-                                   SRC, *(BB->begin()->getParent()))));
-            }
-          }
-        });
   I->moveBefore(InsertPos);
   ++NumSunkInst;
-  llvmberry::ValidationUnit::End();
   return true;
 }
 
@@ -2809,28 +2770,13 @@ bool InstCombiner::run() {
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
-      llvmberry::name_instructions(*(I->getParent()->getParent()));
+      //llvmberry::name_instructions(*(I->getParent()->getParent()));
+      llvmberry::name_instruction(*I);
       llvmberry::ValidationUnit::Begin("dead_code_elim",
-                                       I->getParent()->getParent());
+                                       I->getParent()->getParent(),
+                                       false);
       llvmberry::generateHintForTrivialDCE(*I);
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        Module *Mod = I->getModule();
-        auto dce_arg = data.create<llvmberry::ArgForDeadCodeElim>();
-        dce_arg->namedts = Mod->getIdentifiedStructTypes();
-        dce_arg->M = Mod;
-      });
       EraseInstFromFunction(*I);
-      llvmberry::ValidationUnit::GetInstance()->intrude([](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        auto dce_arg = data.get<llvmberry::ArgForDeadCodeElim>();
-        Module *Mod = dce_arg->M;
-        std::vector<StructType *> &namedts_before = dce_arg->namedts;
-        auto namedts_after = Mod->getIdentifiedStructTypes();
-        if (namedts_before != namedts_after) {
-          hints.setReturnCodeToAdmitted();
-        }
-      });
       llvmberry::ValidationUnit::End();
       ++NumDeadInst;
       MadeIRChange = true;
@@ -2877,18 +2823,8 @@ bool InstCombiner::run() {
         // only has us as a predecessors (we'd have to split the critical edge
         // otherwise), we can keep going.
         if (UserIsSuccessor && UserParent->getSinglePredecessor()) {
-          llvmberry::ValidationUnit::Begin("sink_inst",
-                                           I->getParent()->getParent());
-
-          llvmberry::ValidationUnit::GetInstance()->intrude([this](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-            DominatorTree *DT = this->getDominatorTree();
-            auto si_arg = data.create<llvmberry::ArgForSinkInst>();
-            si_arg->sinkDT = DT;
-          });
           // Okay, the CFG is simple enough, try to sink this instruction.
           if (TryToSinkInstruction(I, UserParent)) {
-            
             MadeIRChange = true;
             // We'll add uses of the sunk instruction below, but since sinking
             // can expose opportunities for it's *operands* add them to the
@@ -2896,8 +2832,6 @@ bool InstCombiner::run() {
             for (Use &U : I->operands())
               if (Instruction *OpI = dyn_cast<Instruction>(U.get()))
                 Worklist.Add(OpI);
-          } else {
-            llvmberry::ValidationUnit::Abort();
           }
         }
       }
@@ -2956,28 +2890,12 @@ bool InstCombiner::run() {
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
-          llvmberry::name_instructions(*(I->getParent()->getParent()));
+          //llvmberry::name_instructions(*(I->getParent()->getParent()));
+          llvmberry::name_instruction(*I);
           llvmberry::ValidationUnit::Begin("dead_code_elim",
-                           I->getParent()->getParent());
+                           I->getParent()->getParent(), false);
           llvmberry::generateHintForTrivialDCE(*I);
-          llvmberry::ValidationUnit::GetInstance()->intrude([&I](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-            Module *Mod = I->getModule();
-            auto dce_arg = data.create<llvmberry::ArgForDeadCodeElim>();
-            dce_arg->namedts = Mod->getIdentifiedStructTypes();
-            dce_arg->M = Mod;
-          });
           EraseInstFromFunction(*I);
-          llvmberry::ValidationUnit::GetInstance()->intrude([](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-            auto dce_arg = data.get<llvmberry::ArgForDeadCodeElim>();
-            Module *Mod = dce_arg->M;
-            std::vector<StructType *> &namedts_before = dce_arg->namedts;
-            auto namedts_after = Mod->getIdentifiedStructTypes();
-            if (namedts_before != namedts_after) {
-              hints.setReturnCodeToAdmitted();
-            }
-          });
           llvmberry::ValidationUnit::End();
         } else {
           Worklist.Add(I);
@@ -3026,28 +2944,12 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (isInstructionTriviallyDead(Inst, TLI)) {
         ++NumDeadInst;
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
-        llvmberry::name_instructions(*(Inst->getParent()->getParent()));
+        //llvmberry::name_instructions(*(Inst->getParent()->getParent()));
+        llvmberry::name_instruction(*Inst);
         llvmberry::ValidationUnit::Begin("dead_code_elim",
-                              Inst->getParent()->getParent());
+                              Inst->getParent()->getParent(), false);
         llvmberry::generateHintForTrivialDCE(*Inst);
-        llvmberry::ValidationUnit::GetInstance()->intrude([&Inst](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-          Module *Mod = Inst->getModule();
-          auto dce_arg = data.create<llvmberry::ArgForDeadCodeElim>();
-          dce_arg->namedts = Mod->getIdentifiedStructTypes();
-          dce_arg->M = Mod;
-        });
         Inst->eraseFromParent();
-        llvmberry::ValidationUnit::GetInstance()->intrude([](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-          auto dce_arg = data.get<llvmberry::ArgForDeadCodeElim>();
-          Module *Mod = dce_arg->M;
-          std::vector<StructType *> &namedts_before = dce_arg->namedts;
-          auto namedts_after = Mod->getIdentifiedStructTypes();
-          if (namedts_before != namedts_after) {
-            hints.setReturnCodeToAdmitted();
-          }
-        });
         llvmberry::ValidationUnit::End();
         continue;
       }

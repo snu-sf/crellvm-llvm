@@ -155,7 +155,7 @@ struct AllocaInfo {
   }
 };
 
-// Data package used by RenamePass()
+// Data package used by RenamePasa()
 class RenamePassData {
 public:
   typedef std::vector<Value *> ValVector;
@@ -324,26 +324,6 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
       for (auto UUI = I->user_begin(), UUE = I->user_end(); UUI != UUE;) {
         Instruction *Inst = cast<Instruction>(*UUI);
         ++UUI;
-        
-        llvmberry::ValidationUnit::GetInstance()->intrude
-                ([&Inst]
-                  (llvmberry::Dictionary &data, 
-                   llvmberry::CoreHint &hints) {
-          auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-          std::string RInst = llvmberry::getVariable(*Inst);
-
-          if (RInst != "") {
-            // propagate maydiff
-            llvmberry::propagateMaydiffGlobal(RInst, llvmberry::Physical);
-            llvmberry::propagateMaydiffGlobal(RInst, llvmberry::Previous);
-          }
-
-          // add nop
-          hints.addNopPosition
-            (llvmberry::TyPosition::make
-              (llvmberry::Target, *Inst, instrIndex[Inst]-1, ""));
-        });
-
         Inst->eraseFromParent();
       }
     }
@@ -352,19 +332,8 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
             ([&I]
               (llvmberry::Dictionary &data, 
                llvmberry::CoreHint &hints) {
-      auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-      std::string RI = llvmberry::getVariable(*I);
-
-      if (RI != "") {
-        // propagate maydiff
-        llvmberry::propagateMaydiffGlobal(RI, llvmberry::Physical);
-        llvmberry::propagateMaydiffGlobal(RI, llvmberry::Previous);
-      }
-
-      // add nop
-      hints.addNopPosition
-        (llvmberry::TyPosition::make
-          (llvmberry::Target, *I, instrIndex[I]-1, ""));
+      dbgs() << "Admit removelifetime\n";      
+      hints.setReturnCodeToAdmitted();
     });
 
     I->eraseFromParent();
@@ -423,7 +392,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       }
     }
 
-    std::cout<<"SingleStore: "<<std::string(AI->getName())<<std::endl;
     // Otherwise, we *can* safely rewrite this load.
     Value *ReplVal = OnlyStore->getOperand(0);
 
@@ -441,6 +409,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       // prepare variables
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
       auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+      auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
       auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
       std::string Ralloca = llvmberry::getVariable(*AI);
@@ -520,8 +489,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       if ((LI->getParent() == OnlyStore->getParent() && 
            instrIndex[OnlyStore] < instrIndex[LI]) ||
           (LI->getParent() != OnlyStore->getParent() &&
-           //(DT.dominates(OnlyStore->getParent(), LI->getParent()) ||
-            //isPotentiallyReachable(OnlyStore->getParent(), LI->getParent())))) {
            (std::find(isReachable[OnlyStore->getParent()].begin(),
                       isReachable[OnlyStore->getParent()].end(),
                       LI->getParent()) != isReachable[OnlyStore->getParent()].end()))) {
@@ -538,18 +505,65 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           (NULL, OnlyStore, LI, instrIndex[LI]);
       }
 
-      // add hints per every use of LI
+      // remove duplicated targets
+      std::vector<Instruction*> availInst;
+      availInst.clear();
+
       for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
         Use &U = *(UI++);
-        Instruction *use = dyn_cast<Instruction>(U.getUser());
+        Instruction* use = dyn_cast<Instruction>(U.getUser());
+        BasicBlock* useBB = use->getParent();
+        bool flag = false;
+        bool findReachable = false;
 
+        for (auto UI2 = availInst.begin(),
+                   E2 = availInst.end(); UI2 != E2;) {
+          Instruction* checkI = *UI2;
+          BasicBlock* checkBB = checkI->getParent();
+          std::vector<BasicBlock*>::iterator it =
+            std::find(isReachable[useBB].begin(),
+                      isReachable[useBB].end(),
+                      checkBB);
+
+          if (useBB == checkBB) {
+            if (instrIndex[use] > instrIndex[checkI]) {
+              int pos = std::distance(availInst.begin(), UI2);
+
+              availInst.erase(availInst.begin()+pos);
+              flag = true;
+              break;
+            }
+          }
+
+          if (!DT.dominates(useBB, checkBB)) {
+            flag = true;
+
+            if (DT.dominates(checkBB, useBB)) {
+              int pos = std::distance(availInst.begin(), UI2);
+
+              availInst.erase(availInst.begin()+pos);
+            }
+          } else {
+            findReachable = true;
+          }
+
+          UI2++;
+        }
+
+        if (!findReachable || flag)
+          availInst.push_back(use);
+      }
+
+      // add hints per every use of LI
+      for (auto UI = usePile[LI].begin(), E = usePile[LI].end(); UI != E;) {
+        auto t = *(UI++);
         // set index of use
-        int useIndex = 
-              llvmberry::getIndexofMem2Reg
-                (use, instrIndex[use],
-                 termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
-        dbgs()<< "lets see what is LI for this use " << *LI << "   " << "\n";
-        dbgs()<< "lets check useIndex  " << *use << " instrIndex is   " << instrIndex[use] << "\n"; 
+        int useIndex =
+          llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
+                                       termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
+        Instruction* use = std::get<2>(t);
+        BasicBlock* useBB = std::get<0>(t);
+
         // - store and loads are in the same block
         //   and store exists before loads
         // - store and loads are not in the same block
@@ -557,8 +571,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         if ((LI->getParent() == OnlyStore->getParent() && 
              instrIndex[OnlyStore] < instrIndex[LI]) ||
             (LI->getParent() != OnlyStore->getParent() &&
-             //(DT.dominates(OnlyStore->getParent(), LI->getParent()) ||
-              //isPotentiallyReachable(OnlyStore->getParent(), LI->getParent())))) {
              (std::find(isReachable[OnlyStore->getParent()].begin(),
                         isReachable[OnlyStore->getParent()].end(),
                         LI->getParent()) != isReachable[OnlyStore->getParent()].end()))) {
@@ -569,14 +581,14 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           // %c = add i32 %a, %b   | %c = add i32 1, 1
           // ret i32 %c            | ret i32 %c
           llvmberry::generateHintForMem2RegPropagateLoad
-            (OnlyStore, NULL, LI, use, useIndex);
+            (OnlyStore, NULL, LI, useBB, useIndex, use);
         } else {
           // propagate undef from load to use
           PROPAGATE(LESSDEF(VAR(Rload, Physical),
                             VAR(Rload, Ghost),
                             SRC),
                     BOUNDS(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                           llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+                           llvmberry::TyPosition::make(SRC, *useBB, useIndex)));
 
           std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef =
             llvmberry::TyPropagateLessdef::make
@@ -588,7 +600,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
               std::shared_ptr<llvmberry::TyPropagateObject>
                 (new llvmberry::ConsLessdef(lessdef)),
               BOUNDS(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                     llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+                     llvmberry::TyPosition::make(SRC, *useBB, useIndex)));
 
           mem2regCmd[Rload].lessdef.push_back(lessdef);
 
@@ -718,6 +730,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 ///
 /// ... so long as A is not used before undef is set.
 static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
+//static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                      LargeBlockInfo &LBI,
                                      AliasSetTracker *AST) {
   // The trickiest case to handle is when we have large blocks. Because of this,
@@ -732,73 +745,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   for (User *U : AI->users())
     if (StoreInst *SI = dyn_cast<StoreInst>(U)) {
       StoresByIndex.push_back(std::make_pair(LBI.getInstructionIndex(SI), SI));
-/*
-      llvmberry::ValidationUnit::GetInstance()->intrude
-         ([&AI, &SI]
-           (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        //        <src>           |     <tgt>
-        // %x = alloca i32        | nop
-        // store i32 1, %x        | nop
-        // %a = load i32 %x       | nop
-        // call void @bar(i32 %a) | call void @bar(i32 1)
-        // store i32 2, %x        | nop
-        // %b = load i32 %x       | nop
-        // call void @bar(i32 %b) | call void @bar(i32 2)
-        // store i32 3, %x        | nop
-        // %c = load i32 %x       | nop
-        // ret i32 %c             | ret i32 3
-
-        // prepare variables
-        auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-        auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
-        std::string Ralloca = llvmberry::getVariable(*AI);
-        std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
-
-        // find next store, and final use of alloca
-        llvm::Instruction* next;
-        llvm::Instruction* use = SI; 
-
-        bool checkNext = false;
-        for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
-          Instruction *tmpInst = cast<Instruction>(*UI++);
-
-          if (isa<StoreInst>(tmpInst) && 
-              (instrIndex[tmpInst]>instrIndex[SI] ||      // for initial next
-               (instrIndex[tmpInst]>instrIndex[SI] && 
-                instrIndex[next]>instrIndex[tmpInst]))) {
-            checkNext = true;
-            next = tmpInst;
-          } else if (instrIndex[use] < instrIndex[tmpInst])
-            use = tmpInst;
-        }
-        if (!checkNext) next = use;
-
-        // set index of next store
-        int nextIndex = 
-              llvmberry::getIndexofMem2Reg
-                (next, instrIndex[next],
-                 termIndex[llvmberry::getBasicBlockIndex(next->getParent())]);
-
-        // skip if there is no use of SI
-        if ((instrIndex[SI] != instrIndex[use]) ||
-            (SI->getParent() != use->getParent())) {
-          // Step1: propagate store instruction
-          //        <src>           |     <tgt>
-          // %x = alloca i32        | nop
-          // store i32 1, %x        | nop
-          // %a = load i32 %x       | %a = load i32 1
-          // call void @bar(i32 %a) | call void @bar(i32 %a)
-          // store i32 2, %x        | nop
-          // %b = load i32 %x       | %b = load i32 2
-          // call void @bar(i32 %b) | call void @bar(i32 %b)
-          // store i32 3, %x        | nop
-          // %c = load i32 %x       | %c = load i32 3
-          // ret i32 %c             | ret i32 %c
-          llvmberry::generateHintForMem2RegPropagateStore
-            (NULL, SI, next, nextIndex);
-        }
-      });
-*/      
     }
 
   // Sort the stores by their index, making it efficient to do a lookup with a
@@ -823,32 +769,31 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
     if (I == StoresByIndex.begin()) {
       llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&AI, &LI]
+              ([&AI, &LI, &StoresByIndex]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         Value* UndefVal = UndefValue::get(LI->getType());
-
         // prepare variables
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
         auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
         auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
         std::string Ralloca = llvmberry::getVariable(*AI);
         std::string Rload = llvmberry::getVariable(*LI);
 
         // propagate undef from alloca to load
-        PROPAGATE(
-            LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                    VAR(Ralloca, Ghost),
-                    SRC),
-        BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-               llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+        std::shared_ptr<llvmberry::TyPropagateObject> lessdef_src =
+          LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+                  VAR(Ralloca, Ghost),
+                  SRC);
 
-        PROPAGATE(
-            LESSDEF(VAR(Ralloca, Ghost),
-                    EXPR(UndefVal, Physical),
-                    TGT),
-        BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-               llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+        std::shared_ptr<llvmberry::TyPropagateObject> lessdef_tgt =
+          LESSDEF(VAR(Ralloca, Ghost),
+                  EXPR(UndefVal, Physical),
+                  TGT);
+
+        std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> worklist;
+        llvmberry::generateHintForMem2RegPropagatePerBlock(lessdef_src, lessdef_tgt, AI, LI, worklist, LI->getParent());
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
                 llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
@@ -861,22 +806,20 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                                   VAR(Ralloca, Ghost)));
 
         // add hints per use of load
-        for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
-          Use &U = *(UI++);
-          Instruction *use = dyn_cast<Instruction>(U.getUser());
-
+        for (auto UI = usePile[LI].begin(), E = usePile[LI].end(); UI != E;) {
+          auto t = *(UI++);
+          BasicBlock* useBB = std::get<0>(t);
           // set index of use
-          int useIndex = 
-                llvmberry::getIndexofMem2Reg
-                  (use, instrIndex[use],
-                   termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
+          int useIndex =
+            llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
+                                         termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
 
           // propagate undef from load to use
           PROPAGATE(LESSDEF(VAR(Rload, Physical),
                             VAR(Rload, Ghost),
                             SRC),
                     BOUNDS(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                           llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+                           llvmberry::TyPosition::make(SRC, *useBB, useIndex)));
 
           std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef =
             llvmberry::TyPropagateLessdef::make
@@ -888,7 +831,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               std::shared_ptr<llvmberry::TyPropagateObject>
                 (new llvmberry::ConsLessdef(lessdef)),
               BOUNDS(llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                     llvmberry::TyPosition::make(SRC, *use, useIndex, "")));
+                     llvmberry::TyPosition::make(SRC, *useBB, useIndex)));
 
           mem2regCmd[Rload].lessdef.push_back(lessdef);
 
@@ -924,8 +867,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                   std::shared_ptr<llvmberry::TyInfrule>
                     (new llvmberry::ConsLessthanUndefTgt(lessthanundef_tgt)));
           
-          //mem2regCmd[Rload].lessUndeftgt.push_back(lessthanundef_tgt);
-
           std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
             (new llvmberry::TyTransitivityTgt(VAR(Rload, Ghost),
                                               EXPR(UndefVal, Physical),
@@ -938,14 +879,12 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
           mem2regCmd[Rload].transTgt.push_back(transTgt);
         }
 
-        // propagate maydiff
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
 
         hints.addNopPosition
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
-
         llvmberry::generateHintForMem2RegReplaceHint(UndefVal, LI);
       });
 
@@ -960,6 +899,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         StoreInst* SI = std::prev(I)->second;
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
         auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
         std::string Rload = llvmberry::getVariable(*LI);
 
@@ -979,26 +919,14 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
           (NULL, SI, LI, instrIndex[LI]);
 
         // add hints per use of load
-        for (auto UI = LI->use_begin(), E = LI->use_end(); UI != E;) {
-          Use &U = *(UI++);
-          Instruction *use = dyn_cast<Instruction>(U.getUser());
+        for (auto UI = usePile[LI].begin(), E = usePile[LI].end(); UI != E;) {
+          auto t = *(UI++);
+          int useIndex =
+            llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
+                                         termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
 
-          // set index of use
-          int useIndex = 
-                llvmberry::getIndexofMem2Reg
-                  (use, instrIndex[use],
-                   termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
-
-          // Step2: propagate load instruction
-          //        <src>           |     <tgt>
-          // %a = load i32 1        | nop
-          // call void @bar(i32 %a) | call void @bar(i32 1)
-          // %b = load i32 2        | nop
-          // call void @bar(i32 %b) | call void @bar(i32 2)
-          // %c = load i32 3        | nop
-          // ret i32 %c             | ret i32 3
-          llvmberry::generateHintForMem2RegPropagateLoad
-            (SI, NULL, LI, use, useIndex);
+          llvmberry::generateHintForMem2RegPropagateLoad(SI, NULL, LI, std::get<0>(t), 
+                                                         useIndex, std::get<2>(t));
         }
 
         // propagate maydiff
@@ -1097,7 +1025,7 @@ void PromoteMem2Reg::run() {
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
   
-  llvmberry::name_instructions(F);
+  //llvmberry::name_instructions(F);
   llvmberry::ValidationUnit::Begin("mem2reg", &F);
   llvmberry::ValidationUnit::GetInstance()->intrude
           ([]
@@ -1105,16 +1033,19 @@ void PromoteMem2Reg::run() {
       data.create<llvmberry::ArgForMem2Reg>();
   });
 
-  std::vector<AllocaInst *> &allocs = Allocas;
   llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&allocs, &F]
+          ([&F, this]
             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
     auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
     auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+    auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
     auto &strVec = *(data.get<llvmberry::ArgForMem2Reg>()->strVec);
     auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
+    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
+
+    namedts = F.getParent()->getIdentifiedStructTypes();
 
     for (auto BS = F.begin(), BE = F.end(); BS != BE;) {
       BasicBlock *BB = BS++;
@@ -1124,31 +1055,124 @@ void PromoteMem2Reg::run() {
 
       strVec.clear();
       isReachable[BB].push_back(BB);
-      llvmberry::makeReachableBlockMap(BB, BB); 
+      llvmberry::makeReachableBlockMap(BB, BB);
+
+      for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
+        AllocaInst *AItmp = Allocas[tmpNum];
+        BasicBlock* AIB = AItmp->getParent();
+        std::string Ralloca = llvmberry::getVariable(*AItmp);
+        std::string AIBname = llvmberry::getBasicBlockIndex(AIB);
+
+        allocas.push_back(AItmp);
+        instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
+
+        // TODO: if we can validate "call -> nop" we need this condition
+        //if (!llvmberry::hasBitcastOrGEP(AI)) { 
+        if (BB == AIB) {
+          PROPAGATE(UNIQUE(Ralloca,
+                           SRC),
+                    BOUNDS(llvmberry::TyPosition::make
+                            (SRC, *AItmp, instrIndex[AItmp], ""),
+                           llvmberry::TyPosition::make_end_of_block
+                            (SRC, *AIB, termIndex[AIBname])));
+
+          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
+                            SRC),
+                    BOUNDS(llvmberry::TyPosition::make
+                            (SRC, *AItmp, instrIndex[AItmp], ""),
+                           llvmberry::TyPosition::make_end_of_block
+                            (SRC, *AIB, termIndex[AIBname])));
+        } else {
+          PROPAGATE(UNIQUE(Ralloca,
+                           SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block
+                            (SRC, blockName),
+                           llvmberry::TyPosition::make_end_of_block
+                            (SRC, *BB, termIndex[blockName])));
+
+          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
+                            SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block
+                            (SRC, blockName),
+                           llvmberry::TyPosition::make_end_of_block
+                            (SRC, *BB, termIndex[blockName])));
+        }
+        //}
+      }
     }
 
     // initialize dictionary datum
     // memorize indices of alloca, store, load, and terminator instructions
-    for (unsigned tmpNum = 0; tmpNum != allocs.size(); ++tmpNum) {
-      AllocaInst *AItmp = allocs[tmpNum];
-      std::string bname = llvmberry::getBasicBlockIndex(AItmp->getParent());
-      
-      allocas.push_back(AItmp);
-      instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
+    for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
+      AllocaInst *AItmp = Allocas[tmpNum];
 
       // initialize information of each alloca's store and alloca
       for (auto UI = AItmp->user_begin(), E = AItmp->user_end(); UI != E;) {
         Instruction *tmpInst = cast<Instruction>(*UI++);
-        bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
-
+        //bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
         instrIndex[tmpInst] = llvmberry::getCommandIndex(*tmpInst);
 
         // save information of instruction's use
         for (auto UI2 = tmpInst->use_begin(), E2 = tmpInst->use_end(); UI2 != E2;) {
           Use &U = *(UI2++);
 
-          if (Instruction* tmpUseinst = dyn_cast<Instruction>(U.getUser()))
+          if (Instruction* tmpUseinst = dyn_cast<Instruction>(U.getUser())) {
             instrIndex[tmpUseinst] = llvmberry::getCommandIndex(*tmpUseinst);
+
+            BasicBlock* useBB = tmpUseinst->getParent();
+            bool flag = false;
+            bool findReachable = false;
+
+            for (auto UI3 = usePile[tmpInst].begin(),
+                       E3 = usePile[tmpInst].end(); UI3 != E3;) {
+              auto t = *UI3;
+              BasicBlock* checkBB = std::get<0>(t);
+              
+              if (useBB == checkBB) {
+                if ((!llvm::isa<llvm::PHINode>(tmpUseinst) &&
+                     (instrIndex[tmpUseinst] > std::get<1>(t))) ||
+                    llvm::isa<llvm::PHINode>(std::get<2>(t))) {
+                  int pos = std::distance(usePile[tmpInst].begin(), UI3);
+
+                  usePile[tmpInst].erase(usePile[tmpInst].begin()+pos);
+                  flag = true;
+                  break;
+                }
+              }
+
+              if ((std::find(isReachable[useBB].begin(), isReachable[useBB].end(), checkBB) != 
+                   isReachable[useBB].end()) && 
+                  (std::find(isReachable[checkBB].begin(), isReachable[checkBB].end(), useBB) !=
+                   isReachable[checkBB].end())) {
+                  flag = true;
+              }
+
+
+              if (!DT.dominates(useBB, checkBB)) {
+                flag = true;
+
+                if (DT.dominates(checkBB, useBB)) {
+                  if ((std::find(isReachable[useBB].begin(), isReachable[useBB].end(), checkBB) == 
+                       isReachable[useBB].end()) ||
+                      (std::find(isReachable[checkBB].begin(), isReachable[checkBB].end(), useBB) ==
+                       isReachable[checkBB].end())) {
+                    int pos = std::distance(usePile[tmpInst].begin(), UI3);
+
+                    usePile[tmpInst].erase(usePile[tmpInst].begin()+pos);
+                  }
+                }
+              } else {
+                findReachable = true;
+              }
+              UI3++;
+            }
+
+            if (!findReachable || flag) {
+              usePile[tmpInst].push_back(std::make_tuple(tmpUseinst->getParent(),
+                                                         instrIndex[tmpUseinst],
+                                                         tmpUseinst));
+            }
+          }
         }
 
         // ignore if user of alloca is not load or store
@@ -1176,57 +1200,6 @@ void PromoteMem2Reg::run() {
     assert(isAllocaPromotable(AI) && "Cannot promote non-promotable alloca!");
     assert(AI->getParent()->getParent() == &F &&
            "All allocas should be in the same function, which is same as DF!");
-
-    llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&F, &AI]
-              (llvmberry::Dictionary &data, 
-               llvmberry::CoreHint &hints) {
-      auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-      auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
-      BasicBlock* AIB = AI->getParent();
-      std::string Ralloca = llvmberry::getVariable(*AI);
-      std::string AIBname = llvmberry::getBasicBlockIndex(AIB);
-
-      if (!llvmberry::hasBitcastOrGEP(AI)) {
-        std::cout<< "im not bitcast or gep!!!: " << std::string(F.getName()) + ", " + std::string(AI->getName()) << std::endl;
-        PROPAGATE(UNIQUE(Ralloca,
-                         SRC),
-                  BOUNDS(llvmberry::TyPosition::make
-                          (SRC, *AI, instrIndex[AI], ""),
-                         llvmberry::TyPosition::make_end_of_block
-                          (SRC, *AIB, termIndex[AIBname])));
-
-        PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
-                          SRC),
-                  BOUNDS(llvmberry::TyPosition::make
-                          (SRC, *AI, instrIndex[AI], ""),
-                         llvmberry::TyPosition::make_end_of_block
-                          (SRC, *AIB, termIndex[AIBname])));
-
-        for (auto BS = F.begin(), BE = F.end(); BS != BE;) {
-          BasicBlock *BB = BS++;
-
-          if (BB == AIB)
-            continue;
-
-          std::string bName = llvmberry::getBasicBlockIndex(BB);
-
-          PROPAGATE(UNIQUE(Ralloca,
-                           SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block
-                            (SRC, bName),
-                           llvmberry::TyPosition::make_end_of_block
-                            (SRC, *BB, termIndex[bName])));
-
-          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
-                            SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block
-                            (SRC, bName),
-                           llvmberry::TyPosition::make_end_of_block
-                            (SRC, *BB, termIndex[bName])));
-        }
-      }
-    });
 
     removeLifetimeIntrinsicUsers(AI);
 
@@ -1274,7 +1247,6 @@ void PromoteMem2Reg::run() {
     // it that are directly dominated by the definition with the value stored.
     if (Info.DefiningBlocks.size() == 1) {
       if (rewriteSingleStoreAlloca(AI, Info, LBI, DT, AST)) {
-        std::cout<<"singlestore success"<<std::endl;
         // The alloca has been processed, move on.
         RemoveFromAllocasList(AllocaNum);
         ++NumSingleStore;
@@ -1286,8 +1258,6 @@ void PromoteMem2Reg::run() {
     // linear sweep over the block to eliminate it.
     if (Info.OnlyUsedInOneBlock) {
       promoteSingleBlockAlloca(AI, Info, LBI, AST);
-        std::cout<<"singleblock success"<<std::endl;
-
       // The alloca has been processed, move on.
       RemoveFromAllocasList(AllocaNum);
       continue;
@@ -1351,14 +1321,13 @@ void PromoteMem2Reg::run() {
       BasicBlock *start = F.begin();
       std::vector<std::pair<BasicBlock*, BasicBlock*>> VistedBlock;
 
-      llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI);
+      llvmberry::generateHintForMem2RegPHIdelete(start, VistedBlock, AI, false);
       reachedEdgeTag.clear();
     });
   }
 
   if (Allocas.empty()) {
     llvmberry::ValidationUnit::End();
-
     llvmberry::ValidationUnit::EndPass();
 
     return; // All of the allocas must have been trivial!
@@ -1380,7 +1349,6 @@ void PromoteMem2Reg::run() {
   std::vector<RenamePassData> RenamePassWorkList;
   RenamePassWorkList.emplace_back(F.begin(), nullptr, std::move(Values));
   do {
-    std::cout << "----------check iteration-----------" << std::endl;
     RenamePassData RPD;
     RPD.swap(RenamePassWorkList.back());
     RenamePassWorkList.pop_back();
@@ -1569,6 +1537,17 @@ void PromoteMem2Reg::run() {
     }
   }
 
+  llvmberry::ValidationUnit::GetInstance()->intrude
+          ([&F]
+             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
+    auto namedts2 = F.getParent()->getIdentifiedStructTypes();
+
+    if (namedts != F.getParent()->getIdentifiedStructTypes()) {
+      hints.setReturnCodeToAdmitted();
+    }
+  });
+
   NewPhiNodes.clear();
   llvmberry::ValidationUnit::End();
   llvmberry::ValidationUnit::EndPass();
@@ -1715,86 +1694,15 @@ NextIteration:
                    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
-          auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
-          auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-          auto &termIndex =  *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
-          auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
-          auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
-          auto &blockPairVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockPairVec);
           Value* UndefVal = UndefValue::get(APN->getType());
 
           if (IncomingVals[AllocaNo] == UndefVal) {
             // alloca's use search
             // among them load which is dominated by bb.
             // then propagate phi to load
-            AllocaInst* AI = NULL;
-
-            for (auto i = allocas.begin(); i != allocas.end(); ++i) {
-              AllocaInst* AItmp = *i;
-              if(AItmp->getName() == APN->getName().substr(0, APN->getName().rfind(".")))
-                AI = AItmp;
+            
+            llvmberry::generateHintForMem2RegPhiUndef(APN, Pred);
             }
-
-            if (AI != NULL) {
-              for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
-                Instruction *User = cast<Instruction>(*UI++);
-
-                if (LoadInst *LI = dyn_cast<LoadInst>(User)) {
-                  blockPairVec.clear();
-                  PHINode *check = NULL;
-                  Instruction *tmp = properPHI(LI->getParent(),
-                                               llvmberry::getVariable(*AI),
-                                               APN, true, false, data);
-
-                  if (tmp != NULL)
-                    check = dyn_cast<PHINode>(tmp);
-
-                  if (APN->getParent() == LI->getParent() ||
-                      (DT.dominates(APN->getParent(), LI->getParent()) &&
-                       (check == APN || check == NULL))) {
-                    PROPAGATE(
-                            LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                                    VAR(llvmberry::getVariable(*AI), Ghost),
-                                    SRC),
-                            BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
-                                   llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
-
-                    std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
-                          (VAR(llvmberry::getVariable(*AI), Ghost),
-                           VAR(Rphi, Physical), TGT);
-
-                    PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
-                            BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
-                                   llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
-
-                    mem2regCmd[Rphi].lessdef.push_back(lessdef);
-                  }
-
-                  // add hints per every use of LI
-                  for (auto UI2 = LI->use_begin(), E2 = LI->use_end(); UI2 != E2;) {
-                    llvm::Use &U = *(UI2++);
-                    llvm::Instruction *use =
-                           llvm::dyn_cast<llvm::Instruction>(U.getUser());
-
-                    // set index of use
-                    int useIndex = llvmberry::getIndexofMem2Reg(
-                           use, instrIndex[use],
-                           termIndex[llvmberry::getBasicBlockIndex(use->getParent())]);
-
-                    if ((LI->getParent() == use->getParent() &&
-                         instrIndex[LI] < instrIndex[use]) ||
-                        //(isPotentiallyReachable(LI->getParent(), use->getParent()))) {
-                        (std::find(isReachable[LI->getParent()].begin(),
-                                   isReachable[LI->getParent()].end(),
-                                   use->getParent()) != isReachable[LI->getParent()].end())) {
-                      llvmberry::generateHintForMem2RegPropagateLoad(AI, APN, LI, use, useIndex);
-                    }
-                  }
-                }
-              }
-            }
-          }
 
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
@@ -1820,12 +1728,10 @@ NextIteration:
   if (!Visited.insert(BB).second)
     return;
 
-std::cout << "checkBB: " << llvmberry::getBasicBlockIndex(BB)<<std::endl;
   for (BasicBlock::iterator II = BB->begin(); !isa<TerminatorInst>(II);) {
     Instruction *I = II++; // get the instruction, increment iterator
 
     if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
-std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberry::getVariable(*LI)<<std::endl;
       AllocaInst *Src = dyn_cast<AllocaInst>(LI->getPointerOperand());
       if (!Src)
         continue;
@@ -1849,8 +1755,6 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
         // propagate maydiff
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
-
-      dbgs() << "replace Hint " << V->getName() << " LI is " << *LI << "\n" ;
 
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
       });
@@ -1917,7 +1821,6 @@ std::cout << "originload: " << llvmberry::getBasicBlockIndex(BB) <<" "<<llvmberr
   BB = *I;
   ++I;
 
-  std::cout << "block change : " << llvmberry::getBasicBlockIndex(Pred) << "->" << llvmberry::getBasicBlockIndex(BB)<<std::endl;
   for (; I != E; ++I)
     if (VisitedSuccs.insert(*I).second)
       Worklist.emplace_back(*I, Pred, IncomingVals);

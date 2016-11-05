@@ -206,6 +206,10 @@ public:
   std::shared_ptr<TyInstrIndex> getInstrIndex() const
   { return instr_index; }
 
+  static  std::shared_ptr<TyPosition> make(enum TyScope _scope,
+                                           const llvm::BasicBlock &BB,
+                                           int index);
+
 private:
   enum TyScope scope;
   std::string block_name;
@@ -729,6 +733,7 @@ public:
   static std::shared_ptr<TyLoadInst> make(const llvm::StoreInst &si);
   static std::shared_ptr<TyLoadInst> makeAlignOne(llvm::Instruction *i);
 
+  std::shared_ptr<TyValue> getPtrValue();
 private:
   std::shared_ptr<TyValueType> pointertype;
   std::shared_ptr<TyValueType> valtype;
@@ -985,6 +990,7 @@ public:
   static std::shared_ptr<TyInstruction> make(const llvm::LoadInst &li);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
+  std::shared_ptr<TyLoadInst> getTyLoadInst();
 private:
   std::shared_ptr<TyLoadInst> load_inst;
 };

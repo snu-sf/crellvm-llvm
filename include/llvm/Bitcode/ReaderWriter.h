@@ -67,7 +67,8 @@ namespace llvm {
   /// Value in \c M.  These will be reconstructed exactly when \a M is
   /// deserialized.
   void WriteBitcodeToFile(const Module *M, raw_ostream &Out,
-                          bool ShouldPreserveUseListOrder = false);
+                          bool ShouldPreserveUseListOrder = false,
+                          Function *AllowedFunc = nullptr);
 
   /// isBitcodeWrapper - Return true if the given bytes are the magic bytes
   /// for an LLVM IR bitcode wrapper.
