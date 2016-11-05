@@ -892,6 +892,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                             INSN(*CurInstInPB), VAR(VI_id, Physical),
                             VAR(Phi_id, Physical)));
 
+                // Transitivity [ INSN(CurInst) <=> INSN(CurInstInPB) ]
                 llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
 
                 // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi)
