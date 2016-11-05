@@ -1043,9 +1043,9 @@ void PromoteMem2Reg::run() {
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
     auto &strVec = *(data.get<llvmberry::ArgForMem2Reg>()->strVec);
     auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
-    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
+    //auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
 
-    namedts = F.getParent()->getIdentifiedStructTypes();
+    //namedts = F.getParent()->getIdentifiedStructTypes();
 
     for (auto BS = F.begin(), BE = F.end(); BS != BE;) {
       BasicBlock *BB = BS++;
@@ -1537,7 +1537,7 @@ void PromoteMem2Reg::run() {
     }
   }
 
-  llvmberry::ValidationUnit::GetInstance()->intrude
+/*  llvmberry::ValidationUnit::GetInstance()->intrude
           ([&F]
              (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
@@ -1547,7 +1547,7 @@ void PromoteMem2Reg::run() {
       hints.setReturnCodeToAdmitted();
     }
   });
-
+*/
   NewPhiNodes.clear();
   llvmberry::ValidationUnit::End();
   llvmberry::ValidationUnit::EndPass();
@@ -1690,13 +1690,13 @@ NextIteration:
           APN->addIncoming(IncomingVals[AllocaNo], Pred);
 
         llvmberry::ValidationUnit::GetInstance()->intrude
-                ([&APN, &Pred, &AllocaNo, &IncomingVals, this]
+                ([&APN, &Pred, &AllocaNo, &IncomingVals]
                    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
           Value* UndefVal = UndefValue::get(APN->getType());
 
-          if (IncomingVals[AllocaNo] == UndefVal) {
+          if (IncomingVals[AllocaNo] == UndefVal && APN != NULL) {
             // alloca's use search
             // among them load which is dominated by bb.
             // then propagate phi to load

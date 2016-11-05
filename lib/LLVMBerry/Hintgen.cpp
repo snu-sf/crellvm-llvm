@@ -1905,7 +1905,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
     for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
       llvm::Instruction *User = llvm::dyn_cast<llvm::Instruction>(*UI++);
 
-      if (llvm::LoadInst *LI = llvm::cast<llvm::LoadInst>(User)) {
+      if (llvm::LoadInst *LI = llvm::dyn_cast<llvm::LoadInst>(User)) {
         if (APN->getParent() == LI ->getParent() ||
             (std::find(isReachable[APN->getParent()].begin(),
                        isReachable[APN->getParent()].end(),
