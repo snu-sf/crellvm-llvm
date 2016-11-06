@@ -1025,7 +1025,6 @@ void PromoteMem2Reg::run() {
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
   
-  //llvmberry::name_instructions(F);
   llvmberry::ValidationUnit::Begin("mem2reg", &F);
   llvmberry::ValidationUnit::GetInstance()->intrude
           ([]
@@ -1766,9 +1765,8 @@ NextIteration:
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> > succs;
         llvmberry::generateHintForMem2RegPHI
-          (BB, Pred, Dest, SI, II, PAM, AL, succs, true);
+          (BB, Pred, Dest, SI, II, PAM, AL, true);
       });
 
       // what value were we writing?

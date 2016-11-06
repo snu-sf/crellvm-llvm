@@ -1329,6 +1329,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
       INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
               ConsTransitivity::make(VAR(Rload, Physical), VAR(Ralloca, Ghost),
                                      VAR(Rload, Ghost)));
+
       if (llvm::isa<llvm::PHINode>(use)) {
         llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
         for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
@@ -1346,44 +1347,44 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                   BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                          TyPosition::make(SRC, *useBB, useIndex)));
       }
-      // now working:: not sure
-        std::shared_ptr<TyPropagateLessdef> lessdef =
-          TyPropagateLessdef::make
-            (VAR(Rload, Ghost),
-             VAR(Rload, Physical),
-             TGT);
 
-        mem2regCmd[Rload].lessdef.push_back(lessdef);
+      std::shared_ptr<TyPropagateLessdef> lessdef =
+        TyPropagateLessdef::make
+          (VAR(Rload, Ghost),
+           VAR(Rload, Physical),
+           TGT);
 
-        if (llvm::isa<llvm::PHINode>(use)) {
-          llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
-          for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
-            llvm::Value *iPI =
-                llvm::dyn_cast<llvm::Value>(use_aux->getIncomingValue(i));
-            if (LI == iPI) {
-              std::string prev = use_aux->getIncomingBlock(i)->getName();
-              PROPAGATE(
-                  std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                  BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                         TyPosition::make(SRC, *use, useIndex, prev)));
-            }
+      mem2regCmd[Rload].lessdef.push_back(lessdef);
+
+      if (llvm::isa<llvm::PHINode>(use)) {
+        llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
+        for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
+          llvm::Value *iPI =
+              llvm::dyn_cast<llvm::Value>(use_aux->getIncomingValue(i));
+          if (LI == iPI) {
+            std::string prev = use_aux->getIncomingBlock(i)->getName();
+            PROPAGATE(
+                std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+                BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                       TyPosition::make(SRC, *use, useIndex, prev)));
           }
-        } else {
-          PROPAGATE(
-              std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-              BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                     TyPosition::make(SRC, *useBB, useIndex)));
         }
+      } else {
+        PROPAGATE(
+            std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+            BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                   TyPosition::make(SRC, *useBB, useIndex)));
+      }
 
-        std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
-                                                      VAR(Rload, Ghost),
-                                                      VAR(Ralloca, Ghost),
-                                                      VAR(Rload, Physical)));
+      std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
+                                                    VAR(Rload, Ghost),
+                                                    VAR(Ralloca, Ghost),
+                                                    VAR(Rload, Physical)));
 
-        INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
-                std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
+      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+              std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
 
-        mem2regCmd[Rload].transTgt.push_back(transTgt);
+      mem2regCmd[Rload].transTgt.push_back(transTgt);
     }
   });
 }
@@ -1891,17 +1892,20 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
     auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
     auto &blockPairVec = *(data.get<llvmberry::ArgForMem2Reg>()->blockPairVec);
     llvm::AllocaInst* AI = NULL;
-    std::string Rphi = llvmberry::getVariable(*APN);
-    std::string prev = llvmberry::getBasicBlockIndex(Pred);
+    std::string Rphi = getVariable(*APN);
+    std::string AIname = Rphi.substr(0, Rphi.rfind("."));
+    std::string prev = getBasicBlockIndex(Pred);
 
-    for (auto i = allocas.begin(); i != allocas.end(); ++i) {
-      llvm::AllocaInst* AItmp = *i;
-
-      if (AItmp->getName() == APN->getName().substr(0, APN->getName().rfind(".")))
+    for (auto i = allocas.begin(); i != allocas.end();) {
+      llvm::AllocaInst* AItmp = *(i++);
+    
+      if (getVariable(*AItmp) == AIname)
         AI = AItmp;
     }
 
     if (AI != NULL) {
+      std::string Ralloca = getVariable(*AI);
+
       for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
         llvm::Instruction *User = llvm::dyn_cast<llvm::Instruction>(*UI++);
 
@@ -1913,7 +1917,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
             llvm::PHINode *check = NULL;
             llvm::StoreInst *ST = NULL;
             blockPairVec.clear();
-            llvm::Instruction *tmp = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, true, data);
+            llvm::Instruction *tmp = properPHI(LI->getParent(), Ralloca, APN, true, true, data);
 
             if (tmp != NULL) {
               check = llvm::dyn_cast<llvm::PHINode>(tmp);
@@ -1923,7 +1927,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
             if (ST != NULL) {
               if ((ST->getParent() == LI->getParent()) && (instrIndex[ST] > instrIndex[LI])) {
                 blockPairVec.clear();
-                llvm::Instruction *tmpI = properPHI(LI->getParent(), llvmberry::getVariable(*AI), APN, true, false, data); //to check there is phi in same block as LI
+                llvm::Instruction *tmpI = properPHI(LI->getParent(), Ralloca, APN, true, false, data); //to check there is phi in same block as LI
                 llvm::PHINode *checkPHI = NULL;
 
                 if (tmpI != NULL) {
@@ -1936,13 +1940,13 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
                   PROPAGATE(
                           LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                                           new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                                  VAR(llvmberry::getVariable(*AI), Ghost),
+                                  VAR(Ralloca, Ghost),
                                   SRC),
                           BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(checkPHI->getParent())),
                                  llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
 
                   std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
-                          (VAR(llvmberry::getVariable(*AI), Ghost),
+                          (VAR(Ralloca, Ghost),
                            VAR(Rphi, Physical), TGT);
 
                   PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
@@ -1958,13 +1962,13 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
               PROPAGATE(
                       LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                                       new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                              VAR(llvmberry::getVariable(*AI), Ghost),
+                              VAR(Ralloca, Ghost),
                               SRC),
                       BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
                              llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
 
               std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
-                      (VAR(llvmberry::getVariable(*AI), Ghost),
+                      (VAR(Ralloca, Ghost),
                        VAR(Rphi, Physical), TGT);
 
               PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
@@ -1977,14 +1981,14 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
               PROPAGATE(
                       LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                                       new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                              VAR(llvmberry::getVariable(*AI), Ghost),
+                              VAR(Ralloca, Ghost),
                               SRC),
                       BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(
                                      check->getParent())),
                              llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
 
               std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
-                      (VAR(llvmberry::getVariable(*AI), Ghost),
+                      (VAR(Ralloca, Ghost),
                        VAR(Rphi, Physical), TGT);
 
               PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
@@ -2016,10 +2020,9 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                llvm::BasicBlock::iterator II,
                                llvm::DenseMap<llvm::PHINode *, unsigned> PAM,
                                llvm::DenseMap<llvm::AllocaInst *, unsigned> AL,
-                               std::vector<std::pair<llvm::BasicBlock *, llvm::BasicBlock *> > succs,
                                bool isSameBB) {
   ValidationUnit::GetInstance()->intrude([&BB, &Pred, &AI, &SI, &II, &PAM, &AL,
-                                          &succs, &isSameBB](Dictionary &data,
+                                          &isSameBB](Dictionary &data,
                                                      CoreHint &hints) {
     if (BB == NULL || AI == NULL || SI == NULL)
       return;
@@ -2051,9 +2054,6 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
         Predtmp = BB;
         BBtmp = *BI++;
         IItmp = BBtmp->begin();
-
-        bname = getBasicBlockIndex(SItmp->getParent());
-        Rstore = getVariable(*SItmp->getOperand(1));
 
         // do not check same block again
         // now working
@@ -2397,7 +2397,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
         BI--;
         if (BI != BE && !newStore) {
           generateHintForMem2RegPHI(BBtmp, Predtmp, AItmp, SItmp, IItmp,
-                                    PAM, AL, succs, true);
+                                    PAM, AL, true);
         }
         BI++;
       }
