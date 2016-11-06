@@ -1676,13 +1676,13 @@ NextIteration:
           APN->addIncoming(IncomingVals[AllocaNo], Pred);
 
         llvmberry::ValidationUnit::GetInstance()->intrude
-                ([&APN, &Pred, &AllocaNo, &IncomingVals, this]
+                ([&APN, &Pred, &AllocaNo, &IncomingVals]
                    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
           Value* UndefVal = UndefValue::get(APN->getType());
 
-          if (IncomingVals[AllocaNo] == UndefVal) {
+          if (IncomingVals[AllocaNo] == UndefVal && APN != NULL) {
             // alloca's use search
             // among them load which is dominated by bb.
             // then propagate phi to load
