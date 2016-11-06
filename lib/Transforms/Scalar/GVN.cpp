@@ -3775,7 +3775,6 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   });
 
   CurInst->replaceAllUsesWith(Phi);
-
   llvmberry::intrude([] {
     llvmberry::ValidationUnit::End();
   });
