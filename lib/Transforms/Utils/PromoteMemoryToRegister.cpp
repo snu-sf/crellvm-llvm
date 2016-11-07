@@ -1025,7 +1025,6 @@ void PromoteMem2Reg::run() {
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
   
-  //llvmberry::name_instructions(F);
   llvmberry::ValidationUnit::Begin("mem2reg", &F);
   llvmberry::ValidationUnit::GetInstance()->intrude
           ([]
@@ -1043,9 +1042,6 @@ void PromoteMem2Reg::run() {
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
     auto &strVec = *(data.get<llvmberry::ArgForMem2Reg>()->strVec);
     auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
-    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
-
-    namedts = F.getParent()->getIdentifiedStructTypes();
 
     for (auto BS = F.begin(), BE = F.end(); BS != BE;) {
       BasicBlock *BB = BS++;
@@ -1537,17 +1533,6 @@ void PromoteMem2Reg::run() {
     }
   }
 
-  llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&F]
-             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
-    auto namedts2 = F.getParent()->getIdentifiedStructTypes();
-
-    if (namedts != F.getParent()->getIdentifiedStructTypes()) {
-      hints.setReturnCodeToAdmitted();
-    }
-  });
-
   NewPhiNodes.clear();
   llvmberry::ValidationUnit::End();
   llvmberry::ValidationUnit::EndPass();
@@ -1690,19 +1675,19 @@ NextIteration:
           APN->addIncoming(IncomingVals[AllocaNo], Pred);
 
         llvmberry::ValidationUnit::GetInstance()->intrude
-                ([&APN, &Pred, &AllocaNo, &IncomingVals, this]
+                ([&APN, &Pred, &AllocaNo, &IncomingVals]
                    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
           Value* UndefVal = UndefValue::get(APN->getType());
 
-          if (IncomingVals[AllocaNo] == UndefVal) {
+          if (IncomingVals[AllocaNo] == UndefVal && APN != NULL) {
             // alloca's use search
             // among them load which is dominated by bb.
             // then propagate phi to load
             
             llvmberry::generateHintForMem2RegPhiUndef(APN, Pred);
-            }
+          }
 
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
@@ -1780,9 +1765,8 @@ NextIteration:
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> > succs;
         llvmberry::generateHintForMem2RegPHI
-          (BB, Pred, Dest, SI, II, PAM, AL, succs, true);
+          (BB, Pred, Dest, SI, II, PAM, AL, true);
       });
 
       // what value were we writing?
