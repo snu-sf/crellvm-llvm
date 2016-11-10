@@ -792,8 +792,12 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                   EXPR(UndefVal, Physical),
                   TGT);
 
-        std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> worklist;
-        llvmberry::generateHintForMem2RegPropagatePerBlock(lessdef_src, lessdef_tgt, AI, LI, worklist, LI->getParent());
+        PROPAGATE(lessdef_src,
+                  BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                         llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+        PROPAGATE(lessdef_tgt,
+                  BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                         llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
                 llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
