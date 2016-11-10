@@ -169,13 +169,6 @@ extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
 void makeReachableBlockMap(llvm::BasicBlock* Src,
                            llvm::BasicBlock* Tgt);
 
-void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> lessdef_src,
-                                             std::shared_ptr<TyPropagateObject> lessdef_tgt,
-                                             llvm::Instruction* from,
-                                             llvm::Instruction* to,
-                                             std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> worklist,
-                                             llvm::BasicBlock* BB);
-
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst* SI,
                                           llvm::Instruction* next,
