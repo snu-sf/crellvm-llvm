@@ -824,10 +824,11 @@ bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
   return true;
 }
 
-// Somehow create CurInst >= VConst in pos(BBPred->BBSucc)
+// Somehow create VAR(CurInst) >= EXPR(VConst) in pos(BBPred->BBSucc)
+// Not INSN(CurInst), 75.alias.o.find_base_value.1 -> CurInst is Phi
 void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
                            const BasicBlock *BBPred, Instruction *CurInst,
-                           ConstantInt *VConst) {
+                           Constant *VConst) {
   auto BBPredSuccPos =
       llvmberry::TyPosition::make(SRC, BBSucc->getName(), BBPred->getName());
 
@@ -873,7 +874,9 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
   hints.appendToDescription("condI: " + ((*condI).getName()).str());
   hints.appendToDescription("CurInst: " + ((*CurInst).getName()).str());
   if (condI == CurInst) {
-    assert(VConst->getUniqueInteger() == CI_cond->getUniqueInteger());
+    // both are also constant int
+    assert(dyn_cast<ConstantInt>(VConst)->getUniqueInteger() ==
+           dyn_cast<ConstantInt>(CI_cond)->getUniqueInteger());
     // CurInst != Phi, so condI != Phi
 
     // No VI_id
@@ -1046,18 +1049,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             } else
               assert(false && "One constant, one Inst expceted.");
 
-            // assert(isa<Constant>(CurInst->getOperand(i)));
-            // auto CurOpConst = dyn_cast<ConstantInt>(CurInst->getOperand(i));
-            // auto CurOpConstObj = llvmberry::TyExpr::make(*CurOpConst);
-            // assert(isa<Instruction>(VI->getOperand(i)));
-            // auto VOpInst = dyn_cast<Instruction>(VI->getOperand(i));
-
-            // assert(isa<Constant>(V));
-            // auto VConst = dyn_cast<ConstantInt>(V);
-            // auto VConstObj = llvmberry::TyExpr::make(*VConst);
-            // // If repl is not an instruction, then it's always from
-            // // propagateEquality.
-
+            auto OpConstObj = llvmberry::TyExpr::make(*OpConst);
             const BasicBlock *BBSucc = llvmberry::PassDictionary::GetInstance()
                                            .get<llvmberry::ArgForGVNPRE>()
                                            ->prevLeaderBBs[PB];
@@ -1068,13 +1060,12 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                    "it checks "
                    "RootDominatesEnd, meaning it has single predecessor");
 
-            // generateHintForPropEq(hints, BBSucc, BBPred, CurInst, VConst);
-            // auto BBPredSuccPos = llvmberry::TyPosition::make(SRC,
-            // BBSucc->getName(),
-            //                                                  BBPred->getName());
+            generateHintForPropEq(hints, BBSucc, BBPred, OpInst, OpConst);
+            auto BBPredSuccPos = llvmberry::TyPosition::make(
+                SRC, BBSucc->getName(), BBPred->getName());
 
-            // PROPAGATE(LESSDEF(INSN(*CurInst), VConstObj, SRC),
-            //           BOUNDS(BBPredSuccPos, PBPhiPos));
+            PROPAGATE(LESSDEF(INSN(*OpInst), OpConstObj, SRC),
+                      BOUNDS(BBPredSuccPos, PBPhiPos));
 
             // // Transitivity [ INSN(CurInst) >= CI_cond >= Var(Phi) ]
             // INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make
