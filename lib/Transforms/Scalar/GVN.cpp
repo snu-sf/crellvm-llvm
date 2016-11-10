@@ -824,6 +824,70 @@ bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
   return true;
 }
 
+void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
+                           const BasicBlock *BBPred, Instruction *CurInst) {
+  auto BBPredSuccPos =
+      llvmberry::TyPosition::make(SRC, BBSucc->getName(), BBPred->getName());
+
+  TerminatorInst *TI = const_cast<TerminatorInst *>(BBPred->getTerminator());
+
+  // from here
+
+  Instruction *condI = nullptr;
+  ConstantInt *CI_cond = nullptr;
+
+  if (BranchInst *BI = llvm::dyn_cast<llvm::BranchInst>(TI)) {
+    condI = llvm::dyn_cast<Instruction>(BI->getCondition());
+
+    if (BI->getSuccessor(0) == BBSucc) {
+      CI_cond = ConstantInt::getTrue(BBSucc->getContext());
+    } else if (BI->getSuccessor(1) == BBSucc) {
+      CI_cond = ConstantInt::getFalse(BBSucc->getContext());
+    } else
+      assert(false &&
+             "GVN make_repl_inv: Leader_bb not successor of leader_bb_pred");
+  } else if (SwitchInst *SI = llvm::dyn_cast<llvm::SwitchInst>(TI)) {
+    condI = llvm::dyn_cast<Instruction>(SI->getCondition());
+
+    // Set to null when case for BBSucc is not found, not unique, or
+    // default.
+    // Find case from dest.
+    // We cannot use SwitchInst::findCaseDest since BBSucc is const.
+    for (SwitchInst::CaseIt i = SI->case_begin(), e = SI->case_end(); i != e;
+         ++i)
+      if (i.getCaseSuccessor() == BBSucc)
+        CI_cond = i.getCaseValue();
+  } else
+    assert(false && "GVN make_repl_inv: Unexpected terminator.");
+
+  assert(condI && "GVN make_repl_inv: Branch case with non-instr cond!");
+  assert(CI_cond && "GVN make_repl_inv: Branch condition constant not found!");
+
+  std::string condI_id = llvmberry::getVariable(*condI);
+
+  // No VI_id
+  // WTS (final goal of this block): INSN(CurInst) >= Var(Phi)
+
+  // VConst <=> Var(Phi)
+  // WTS: INSN(CurInst) >= VConst
+
+  // condI == other VI
+  // CI_cond == 13
+
+  if (isa<PHINode>(condI))
+    assert(false && "This might.. not occur, propagateEquality occurrs in "
+                    "GVN, and numbering Phi only occurs in PRE");
+  // For the same reason, curInstInPB might not needed.
+  // Extending it won't be very hard.
+
+  auto CI_cond_obj = llvmberry::TyExpr::make(*CI_cond);
+  // llvmberry::ConsConstInt(llvmberry::TyConstInt::make(*CI_cond));
+  // Transitivity [ INSN(CurInst) >= INSN(condI) >= CI_cond ]
+  INFRULE(BBPredSuccPos,
+          llvmberry::ConsTransitivity::make(
+              INSN(*CurInst), VAR(condI_id, Physical), CI_cond_obj));
+}
+
 // [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi->getParent())
 void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   // dbgs() << "CurInst : " << *CurInst << "\n";
@@ -971,9 +1035,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
     } else {
       assert(isa<Constant>(V));
       auto VConst = dyn_cast<ConstantInt>(V);
-
+      auto VConstObj = llvmberry::TyExpr::make(*VConst);
       // If repl is not an instruction, then it's always from
       // propagateEquality.
+
       const BasicBlock *BBSucc = llvmberry::PassDictionary::GetInstance()
                                      .get<llvmberry::ArgForGVNPRE>()
                                      ->prevLeaderBBs[PB];
@@ -983,77 +1048,16 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                        "it checks "
                        "RootDominatesEnd, meaning it has single predecessor");
 
-      TerminatorInst *TI =
-          const_cast<TerminatorInst *>(BBPred->getTerminator());
-
-      // from here
-
-      Instruction *condI = nullptr;
-      ConstantInt *CI_cond = nullptr;
-
-      if (BranchInst *BI = llvm::dyn_cast<llvm::BranchInst>(TI)) {
-        condI = llvm::dyn_cast<Instruction>(BI->getCondition());
-
-        if (BI->getSuccessor(0) == BBSucc) {
-          CI_cond = ConstantInt::getTrue(BBSucc->getContext());
-        } else if (BI->getSuccessor(1) == BBSucc) {
-          CI_cond = ConstantInt::getFalse(BBSucc->getContext());
-        } else
-          assert(
-              false &&
-              "GVN make_repl_inv: Leader_bb not successor of leader_bb_pred");
-      } else if (SwitchInst *SI = llvm::dyn_cast<llvm::SwitchInst>(TI)) {
-        condI = llvm::dyn_cast<Instruction>(SI->getCondition());
-
-        // Set to null when case for BBSucc is not found, not unique, or
-        // default.
-        // Find case from dest.
-        // We cannot use SwitchInst::findCaseDest since BBSucc is const.
-        for (SwitchInst::CaseIt i = SI->case_begin(), e = SI->case_end();
-             i != e; ++i)
-          if (i.getCaseSuccessor() == BBSucc)
-            CI_cond = i.getCaseValue();
-      } else
-        assert(false && "GVN make_repl_inv: Unexpected terminator.");
-
-      assert(condI && "GVN make_repl_inv: Branch case with non-instr cond!");
-      assert(CI_cond &&
-             "GVN make_repl_inv: Branch condition constant not found!");
-
-      std::string condI_id = llvmberry::getVariable(*condI);
-
-      // No VI_id
-      // WTS (final goal of this block): INSN(CurInst) >= Var(Phi)
-
-      // VConst <=> Var(Phi)
-      // WTS: INSN(CurInst) >= VConst
-
-      // condI == other VI
-      // CI_cond == 13
-
-      if (isa<PHINode>(condI))
-        assert(false && "This might.. not occur, propagateEquality occurrs in "
-                        "GVN, and numbering Phi only occurs in PRE");
-      // For the same reason, curInstInPB might not needed.
-      // Extending it won't be very hard.
-
+      generateHintForPropEq(hints, BBSucc, BBPred, CurInst);
       auto BBPredSuccPos = llvmberry::TyPosition::make(SRC, BBSucc->getName(),
                                                        BBPred->getName());
 
-      auto CI_cond_obj = llvmberry::TyExpr::make(*CI_cond);
-      // llvmberry::ConsConstInt(llvmberry::TyConstInt::make(*CI_cond));
-      // Transitivity [ INSN(CurInst) >= INSN(condI) >= CI_cond ]
-      INFRULE(BBPredSuccPos,
-              llvmberry::ConsTransitivity::make(
-                  INSN(*CurInst), VAR(condI_id, Physical), CI_cond_obj));
-
-      PROPAGATE(LESSDEF(INSN(*CurInst), CI_cond_obj, SRC),
+      PROPAGATE(LESSDEF(INSN(*CurInst), VConstObj, SRC),
                 BOUNDS(BBPredSuccPos, PBPhiPos));
 
       // Transitivity [ INSN(CurInst) >= CI_cond >= Var(Phi) ]
-      INFRULE(PBPhiPos,
-              llvmberry::ConsTransitivity::make(INSN(*CurInst), CI_cond_obj,
-                                                VAR(Phi_id, Physical)));
+      INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                            INSN(*CurInst), VConstObj, VAR(Phi_id, Physical)));
 
       // Inbounds removal may not occur, because V is const...
     }
