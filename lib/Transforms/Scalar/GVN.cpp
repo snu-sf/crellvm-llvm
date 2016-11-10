@@ -833,6 +833,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   std::string Phi_id = llvmberry::getVariable(*Phi);
   PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
 
+  dbgs() << "Start Generating Hint For " << *CurInst << " and " << *Phi << "\n";
   if (PREAR->PrevPRE.size() == 0) {
     llvmberry::ValidationUnit::GetInstance()
         ->intrude([&CurInst, &Phi, &PhiBlock, &CurInst_id, &Phi_id, &PREAR](
@@ -841,11 +842,13 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   if (isa<CallInst>(CurInst)) {
     hints.appendToDescription("CurInstIsCall");
     hints.setReturnCodeToAdmitted();
+    return;
   }
 
   if (PREAR->isFromNonLocalLoad) {
     hints.appendToDescription("isFromNonLocalLoad");
     hints.setReturnCodeToAdmitted();
+    return;
   }
 
   // For each pred block, propagate the chain of involved values until
@@ -922,6 +925,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             if (!CurInstInPBGEP->isInBounds() && VIGEP->isInBounds()) {
               hints.appendToDescription("gep removal - bug");
               hints.setReturnCodeToAdmitted();
+              delete CurInstInPB;
               // hints.setReturnCodeToFail();
               return;
             }
@@ -1063,11 +1067,13 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       if (isa<CallInst>(CurInst)) {
         hints.appendToDescription("CurInstIsCall");
         hints.setReturnCodeToAdmitted();
+        return;
       }
 
       if (PREAR->isFromNonLocalLoad) {
         hints.appendToDescription("isFromNonLocalLoad");
         hints.setReturnCodeToAdmitted();
+        return;
       }
       dbgs() << "CurInst : " << *CurInst << "\n";
       dbgs() << "Phi : " << *Phi << "\n";
@@ -1215,6 +1221,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       return;
           });
   }
+  dbgs() << "Done Generating Hint For " << *CurInst << " and " << *Phi << "\n";
 }
 }
 
