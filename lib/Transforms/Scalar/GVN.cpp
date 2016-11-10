@@ -1021,6 +1021,69 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
       // VPHI)
       else {
+        for (int i = 0; i < CurInst->getNumOperands(); i++) {
+          if (CurInst->getOperand(i) != VI->getOperand(i)) {
+            dbgs() << "----------------------CurInst and VI "
+                      "differs----------------------\n";
+            dbgs() << "CurInst : " << *CurInst << "\n";
+            dbgs() << "VI : " << *VI << "\n";
+            // just to get BB from dictionary. we may able to store it as a map
+            // or something but it would be wasteful
+
+            Constant *OpConst;
+            Instruction *OpInst;
+            // Both are constant -> must be already same
+            // Both are instruction -> may not occur, expects it to be
+            // propagated from propagateEquality
+            if (isa<Constant>(CurInst->getOperand(i))) {
+              OpConst = dyn_cast<Constant>(CurInst->getOperand(i));
+              OpInst = dyn_cast<Instruction>(VI->getOperand(i));
+              assert(OpInst && "One constant, one Inst expceted.");
+            } else if (isa<Constant>(VI->getOperand(i))) {
+              OpConst = dyn_cast<Constant>(VI->getOperand(i));
+              OpInst = dyn_cast<Instruction>(CurInst->getOperand(i));
+              assert(OpInst && "One constant, one Inst expceted.");
+            } else
+              assert(false && "One constant, one Inst expceted.");
+
+            // assert(isa<Constant>(CurInst->getOperand(i)));
+            // auto CurOpConst = dyn_cast<ConstantInt>(CurInst->getOperand(i));
+            // auto CurOpConstObj = llvmberry::TyExpr::make(*CurOpConst);
+            // assert(isa<Instruction>(VI->getOperand(i)));
+            // auto VOpInst = dyn_cast<Instruction>(VI->getOperand(i));
+
+            // assert(isa<Constant>(V));
+            // auto VConst = dyn_cast<ConstantInt>(V);
+            // auto VConstObj = llvmberry::TyExpr::make(*VConst);
+            // // If repl is not an instruction, then it's always from
+            // // propagateEquality.
+
+            const BasicBlock *BBSucc = llvmberry::PassDictionary::GetInstance()
+                                           .get<llvmberry::ArgForGVNPRE>()
+                                           ->prevLeaderBBs[PB];
+            assert(BBSucc && "Expect BBSucc to exist");
+            const BasicBlock *BBPred = BBSucc->getSinglePredecessor();
+            assert(BBPred &&
+                   "Expect it to be introduced from propagateEquality, and "
+                   "it checks "
+                   "RootDominatesEnd, meaning it has single predecessor");
+
+            // generateHintForPropEq(hints, BBSucc, BBPred, CurInst, VConst);
+            // auto BBPredSuccPos = llvmberry::TyPosition::make(SRC,
+            // BBSucc->getName(),
+            //                                                  BBPred->getName());
+
+            // PROPAGATE(LESSDEF(INSN(*CurInst), VConstObj, SRC),
+            //           BOUNDS(BBPredSuccPos, PBPhiPos));
+
+            // // Transitivity [ INSN(CurInst) >= CI_cond >= Var(Phi) ]
+            // INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make
+            //         (INSN(*CurInst), VConstObj, VAR(Phi_id, Physical)));
+
+            // // Inbounds removal may not occur, because V is const...
+          }
+        }
+
         // Propagate [ RHS(VI) >= VAR(VI) ]
         PROPAGATE(LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
                   BOUNDS(INSTPOS(SRC, VI), PBPhiPos));
