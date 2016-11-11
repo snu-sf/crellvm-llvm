@@ -1093,6 +1093,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                    "it checks "
                    "RootDominatesEnd, meaning it has single predecessor");
 
+            // Somehow create VAR(OpInst) >= EXPR(OpConst) in
+            // pos(BBPred->BBSucc)
             generateHintForPropEq(hints, BBSucc, BBPred, OpInst, OpConst);
             auto BBPredSuccPos = llvmberry::TyPosition::make(
                 SRC, BBSucc->getName(), BBPred->getName());
@@ -1119,29 +1121,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         PROPAGATE(LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
                   BOUNDS(INSTPOS(SRC, VI), PBPhiPos));
 
-        // Somehow get [ INSN(CurInstInPBInPB) >= Var(VI) ]
-        // Expect INSN(CurInstInPBInPB) is already Var(VI)
-
-        if (false) {
-          // Propagate [ RHS(VI) <=> VAR(VI) ]
-          propagateInstrUntilBlockEnd(hints, VI, PB);
-
-          // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-          // Currently, assume Rhs(VI) = Rhs(CurInstInPB)
-          // TODO: difference btw BB->getName() and
-          // llvmberry::getBasicBlockIndex?
-          INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
-                                VAR(VI_id, Physical), VAR(VI_id, Previous),
-                                VAR(Phi_id, Physical)));
-
-          // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
-          // Currently, assume Rhs(VI) = Rhs(CurInstInPB)
-          // TODO: difference btw BB->getName() and
-          // llvmberry::getBasicBlockIndex?
-          INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
-                                RHS(VI_id, Physical, SRC), VAR(VI_id, Physical),
-                                VAR(Phi_id, Physical)));
-        }
+        // Somehow get [ INSN(CurInstInPB) >= Var(VI) ]
+        // Expect INSN(CurInstInPB) is already Var(VI)
 
         bool inboundsRemovalOccured = false;
         if (auto *CurInstInPBGEP = dyn_cast<GetElementPtrInst>(CurInstInPB)) {
@@ -1185,8 +1166,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       // Transitivity [ INSN(CurInst) <=> INSN(CurInstInPB) ]
       llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
 
-      // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi)
-      // ]
+      // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi) ]
       INFRULE(PBPhiPos,
               llvmberry::ConsTransitivity::make(
                   INSN(*CurInst), INSN(*CurInstInPB), VAR(Phi_id, Physical)));
