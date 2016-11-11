@@ -1056,9 +1056,11 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       else {
         int diffs = 0;
         // Assume diffs <= 1 for now
+        // Below hint relies on [ INSN(CurInstInPB) >= Var(VI) ]
+        // It should generate hint for that
         for (int i = 0; i < CurInstInPB->getNumOperands(); i++) {
-          diffs++;
           if (CurInstInPB->getOperand(i) != VI->getOperand(i)) {
+            diffs++;
             dbgs() << "----------------------CurInstInPB and VI "
                       "differs----------------------\n";
             dbgs() << "CurInstInPB : " << *CurInstInPB << "\n";
@@ -1095,6 +1097,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
             // Somehow create VAR(OpInst) >= EXPR(OpConst) in
             // pos(BBPred->BBSucc)
+            // TODO might need both direction?
             generateHintForPropEq(hints, BBSucc, BBPred, OpInst, OpConst);
             auto BBPredSuccPos = llvmberry::TyPosition::make(
                 SRC, BBSucc->getName(), BBPred->getName());
@@ -1103,17 +1106,25 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             PROPAGATE(LESSDEF(VAR(OpInst_id, Physical), OpConstObj, SRC),
                       BOUNDS(BBPredSuccPos, PBPhiPos));
 
+            std::string CurInstInPBOp_id =
+                llvmberry::getVariable(*CurInstInPB->getOperand(i));
+            // Substitute [ INSN(CurInstInPB) >= INSN(VI) ]
+            // CurInstInPB[CurInstOp := VIOp] = VI
+            INFRULE(PBPhiPos,
+                    llvmberry::ConsSubstitute::make(
+                        REGISTER(CurInstInPBOp_id, Physical),
+                        VAL(VI->getOperand(i), Physical), INSN(*CurInstInPB)));
+
             // Transitivity [ INSN(CurInstInPB) >= INSN(VI) >= Var(VI) ]
             INFRULE(PBPhiPos,
                     llvmberry::ConsTransitivity::make(
                         INSN(*CurInstInPB), INSN(*VI), VAR(VI_id, Physical)));
-
-            // // Inbounds removal may not occur, because V is const...
           }
         }
         if (diffs > 1) {
           hints.appendToDescription("Diffs > 1");
           hints.setReturnCodeToFail();
+          delete CurInstInPB;
           return;
         }
 
