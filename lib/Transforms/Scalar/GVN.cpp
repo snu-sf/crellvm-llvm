@@ -744,8 +744,6 @@ namespace {
 namespace {
 class PREAnalysisResult {
 public:
-  std::vector<std::vector<int>> notSameIdx; // predMap idx -> operand idx
-  bool isSameForAll;
   bool PrevPRENotEnough;
   std::vector<std::pair<PHINode *, int>> PrevPRE;
   bool isFromNonLocalLoad;
@@ -753,7 +751,7 @@ public:
   PREAnalysisResult(Instruction *CurInst, PHINode *PN) {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     isFromNonLocalLoad =
-        pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad;
+        pdata.get<llvmberry::ArgForGVNPRE>()->isFromNonLocalLoad;
     PrevPRENotEnough = false;
     std::vector<Value *> op_CurInst;
     unsigned numPredBlocks = 0;
@@ -761,43 +759,8 @@ public:
     for (auto PI = pred_begin(PNBlock), PE = pred_end(PNBlock); PI != PE; ++PI)
       numPredBlocks++;
 
-    notSameIdx.resize(numPredBlocks);
-    isSameForAll = true;
-    for (Instruction::op_iterator OI = CurInst->op_begin(),
-                                  OE = CurInst->op_end();
-         OI != OE; ++OI) {
+    for (auto OI = CurInst->op_begin(); OI != CurInst->op_end(); ++OI)
       op_CurInst.push_back(OI->get());
-    }
-
-    for (unsigned i = 0, e = numPredBlocks; i != e; ++i) {
-      BasicBlock *PB = PN->getIncomingBlock(i);
-      Value *V = PN->getIncomingValue(i);
-      if (Instruction *VI = dyn_cast<Instruction>(V)) {
-        std::vector<Value *> op_VI;
-        for (Instruction::op_iterator OI = VI->op_begin(), OE = VI->op_end();
-             OI != OE; ++OI)
-          op_VI.push_back(OI->get());
-
-        bool isSame = true;
-        if (op_CurInst.size() != op_VI.size()) {
-          dbgs() << "CurInst :" << *CurInst << "\n";
-          dbgs() << "VI :" << *VI << "\n";
-          assert(isa<PHINode>(VI));
-        }
-        for (int j = 0; j < op_CurInst.size(); j++) {
-          bool tmp = (op_CurInst[j] == op_VI[j]);
-          if (!tmp)
-            notSameIdx[i].push_back(j);
-          isSame &= tmp;
-        }
-        // hints.appendToDescription("VI: " + (*VI).getName().str());
-        // hints.appendToDescription("RHS of CurInst and VI is same: " +
-        //                           std::to_string(isSame));
-        isSameForAll &= isSame;
-      } else
-        isSameForAll = false;
-      // TODO care notSameIdx??
-    }
 
     for (Instruction &I : *PNBlock)
       if (PHINode *PI = dyn_cast<PHINode>(&I)) {
@@ -810,15 +773,14 @@ public:
 
           // it may be constant int... ?!
           if (Instruction *VI = dyn_cast<Instruction>(V)) {
-            if (isa<PHINode>(VI)) {
-              hit++;
-              continue;
-            }
+            // if (isa<PHINode>(VI)) {
+            //   hit++;
+            //   continue;
+            // }
 
             // It finds the first j that matches
             // VI may have same operand, such as VI = a + a, so there can be
-            // many
-            // j
+            // many j
             // Anyhow, propagating only once && substituting only once may
             // sufficient
             for (int j = 0; j < VI->getNumOperands(); j++) {
@@ -830,17 +792,8 @@ public:
                   idx = j;
                 else if (idx == j) {
                 } else {
-                  // this may occur because of 1+x <=> x+1
-                  // hints.appendToDescription("idx : " + std::to_string(idx) +
-                  //                           " | j : " + std::to_string(j));
-                  assert(false);
+                  assert("idx is not equal to j" && false);
                 }
-                // hints.appendToDescription(
-                //     "PI: " + (*PI).getName().str() + " | VI: " +
-                //     (*VI).getName().str() + " | OI: " +
-                //     (*dyn_cast<Instruction>(VI->getOperand(j)))
-                //         .getName()
-                //         .str());
               }
             }
           }
@@ -850,9 +803,6 @@ public:
           if (hit == numPredBlocks) {
             PrevPRE.push_back(std::make_pair(PI, idx));
           } else {
-            // hints.appendToDescription("hit : " + std::to_string(hit) +
-            //                           " | predMap.size() : " +
-            //                           std::to_string(predMap.size()));
             PrevPRENotEnough = true;
           }
         }
@@ -863,10 +813,8 @@ public:
 bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
                                  BasicBlock *PB) {
   std::string Inst_id = llvmberry::getVariable(*Inst);
-  if (isa<PHINode>(Inst)) {
-    hints.appendToDescription("[A]Problem : " + ((*Inst).getName()).str());
-    return false;
-  }
+  if (isa<PHINode>(Inst))
+    assert("Phi should not occur here" && false);
   PROPAGATE(LESSDEF(RHS(Inst_id, Physical, SRC), VAR(Inst_id, Physical), SRC),
             BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
@@ -874,6 +822,169 @@ bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
             BOUNDS(INSTPOS(SRC, Inst), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
   return true;
+}
+
+bool hasSameRHS(Instruction *X, Instruction *Y) {
+  if (X->getType() != Y->getType())
+    return false;
+  if (X->getOpcode() != Y->getOpcode())
+    return false;
+  if (X->getNumOperands() != Y->getNumOperands())
+    return false;
+  for (int i = 0; i < X->getNumOperands(); i++)
+    if (X->getOperand(i) != Y->getOperand(i))
+      return false;
+  return true;
+}
+// Somehow create VAR(XInst) >= EXPR(YConst) in pos(BBPred->BBSucc)
+// Not INSN(XInst), 75.alias.o.find_base_value.1 -> XInst is Phi
+void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
+                           const BasicBlock *BBPred, Instruction *XInst,
+                           Constant *YConst) {
+  std::string XInst_id = llvmberry::getVariable(*XInst);
+  auto BBPredSuccPos =
+      llvmberry::TyPosition::make(SRC, BBSucc->getName(), BBPred->getName());
+
+  TerminatorInst *TI = const_cast<TerminatorInst *>(BBPred->getTerminator());
+
+  // from here
+
+  Instruction *condI = nullptr;
+  ConstantInt *CI_cond = nullptr;
+
+  if (BranchInst *BI = llvm::dyn_cast<llvm::BranchInst>(TI)) {
+    condI = llvm::dyn_cast<Instruction>(BI->getCondition());
+
+    if (BI->getSuccessor(0) == BBSucc) {
+      CI_cond = ConstantInt::getTrue(BBSucc->getContext());
+    } else if (BI->getSuccessor(1) == BBSucc) {
+      CI_cond = ConstantInt::getFalse(BBSucc->getContext());
+    } else
+      assert(false &&
+             "GVN make_repl_inv: Leader_bb not successor of leader_bb_pred");
+  } else if (SwitchInst *SI = llvm::dyn_cast<llvm::SwitchInst>(TI)) {
+    condI = llvm::dyn_cast<Instruction>(SI->getCondition());
+
+    // Set to null when case for BBSucc is not found, not unique, or
+    // default.
+    // Find case from dest.
+    // We cannot use SwitchInst::findCaseDest since BBSucc is const.
+    for (SwitchInst::CaseIt i = SI->case_begin(), e = SI->case_end(); i != e;
+         ++i)
+      if (i.getCaseSuccessor() == BBSucc)
+        CI_cond = i.getCaseValue();
+  } else
+    assert(false && "GVN make_repl_inv: Unexpected terminator.");
+
+  assert(condI && "GVN make_repl_inv: Branch case with non-instr cond!");
+  assert(CI_cond && "GVN make_repl_inv: Branch condition constant not found!");
+
+  std::string condI_id = llvmberry::getVariable(*condI);
+  if (isa<PHINode>(condI))
+    assert(false && "This might.. not occur, propagateEquality occurrs in "
+                    "GVN, and numbering Phi only occurs in PRE");
+
+  hints.appendToDescription("condI: " + ((*condI).getName()).str());
+  hints.appendToDescription("XInst: " + ((*XInst).getName()).str());
+  dbgs() << "condI: " << *condI << "\n";
+  dbgs() << "XInst: " << *XInst << "\n";
+  dbgs() << "CI_cond: " << *CI_cond << "\n";
+  if (hasSameRHS(XInst, condI)) {
+    // both are also constant int
+    assert(dyn_cast<ConstantInt>(YConst)->getUniqueInteger() ==
+           dyn_cast<ConstantInt>(CI_cond)->getUniqueInteger());
+    // XInst != Phi, so condI != Phi
+
+    // No VI_id
+    // WTS (final goal of this block): Var(XInst) >= Var(Phi)
+
+    // YConst <=> Var(Phi)
+    // WTS: Var(XInst) >= YConst
+
+    // condI == XInst
+    // CI_cond == 13
+
+    // For the same reason, curInstInPB might not needed.
+    // Extending it won't be very hard.
+
+    auto CI_cond_obj = llvmberry::TyExpr::make(*CI_cond);
+    // llvmberry::ConsConstInt(llvmberry::TyConstInt::make(*CI_cond));
+    // Transitivity [ INSN(XInst) >= INSN(condI) >= CI_cond ]
+    INFRULE(BBPredSuccPos,
+            llvmberry::ConsTransitivity::make(
+                INSN(*XInst), VAR(condI_id, Physical), CI_cond_obj));
+
+    // Transitivity [ Var(XInst) >= INSN(XInst) >= CI_cond ]
+    INFRULE(BBPredSuccPos,
+            llvmberry::ConsTransitivity::make(VAR(XInst_id, Physical),
+                                              INSN(*XInst), CI_cond_obj));
+
+  } else {
+    if (condI->getOpcode() == Instruction::And) {
+      assert(CI_cond == ConstantInt::getTrue(BBSucc->getContext()));
+      assert("And case not yet covered" && false);
+    } else if (condI->getOpcode() == Instruction::Or) {
+      assert(CI_cond == ConstantInt::getFalse(BBSucc->getContext()));
+      assert("Or case not yet covered" && false);
+    } else if (ICmpInst *condIC = dyn_cast<ICmpInst>(condI)) {
+      if (condIC->getPredicate() == CmpInst::ICMP_EQ) {
+        assert(CI_cond == ConstantInt::getTrue(BBSucc->getContext()));
+
+        // INSN(condIC->getOperand(0)) == Blah
+        // INSN(XInst) == INSN(Blah)
+        // EXPR(condIC->getOperand(1)) == EXInstPR(YConst)
+
+        Instruction *Blah = dyn_cast<Instruction>(condIC->getOperand(0));
+        assert("This must be instruction." || Blah);
+        std::string Blah_id = llvmberry::getVariable(*Blah);
+
+        PROPAGATE(LESSDEF(VAR(condI_id, Physical), INSN(*condI), SRC),
+                  BOUNDS(INSTPOS(SRC, condI), BBPredSuccPos));
+
+        // [ true >= VAR(condI) >= INSN(condI) ]
+        INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
+                                   llvmberry::TyExpr::make(*CI_cond),
+                                   VAR(condI_id, Physical), INSN(*condI)));
+
+        // [ true >= INSN(condI) ] implies
+        // [ VAR(Blah) <=> YConst ]
+        INFRULE(BBPredSuccPos, llvmberry::ConsIcmpEqSame::make(*condIC));
+
+        // // [ Var(Blah) <=> 0 ]
+        // // [ Var(0) <=> 0 ]
+        // INFRULE(BBPredSuccPos,
+        //         llvmberry::ConsAndTrueBool::make(
+        //             llvmberry::TyValue::make(*condIC->getOperand(0)),
+        //             llvmberry::TyValue::make(*condIC->getOperand(1))));
+
+        dbgs() << "Blah != XInst : " << (Blah != XInst) << "\n";
+        if (Blah != XInst) {
+          // [ INSN(Blah) == INSN(XInst) >= Var(Blah) >= Var(YConst) ]
+          INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
+                                     INSN(*Blah), VAR(Blah_id, Physical),
+                                     llvmberry::TyExpr::make(*YConst)));
+
+          // [ Var(XInst) >= INSN(XInst) >= Var(YConst) ]
+          INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
+                                     VAR(XInst_id, Physical), INSN(*XInst),
+                                     llvmberry::TyExpr::make(*YConst)));
+
+          // INFRULE(BBPredSuccPos,
+          //         llvmberry::ConsTransitivity::make
+          //         (INSN(*XInst),
+          //          VAR(BlahI_id, Physical),
+          //          llvmberry::TyExpr::make(*CI_cond)));
+
+          // Somehow create XInst >= YConst in pos(BBPred->BBSucc)
+        }
+      } else if (condIC->getPredicate() == CmpInst::ICMP_NE) {
+        assert(CI_cond == ConstantInt::getFalse(BBSucc->getContext()));
+        assert("NE case not yet covered" && false);
+      } else
+        assert("What is this case? Not yet covered" && false);
+    } else
+      assert("What is this case? Not yet covered" && false);
+  }
 }
 
 // [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi->getParent())
@@ -885,117 +996,247 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   std::string Phi_id = llvmberry::getVariable(*Phi);
   PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
 
-  if (PREAR->isSameForAll) {
-    llvmberry::ValidationUnit::GetInstance()->intrude(
-        [&CurInst, &Phi, &PhiBlock, &CurInst_id,
-         &Phi_id](llvmberry::ValidationUnit::Dictionary &data,
-                  llvmberry::CoreHint &hints) {
-          if (isa<CallInst>(CurInst)) {
-            hints.appendToDescription("CurInstIsCall");
-            hints.setReturnCodeToAdmitted();
+  dbgs() << "Start Generating Hint For " << *CurInst << " and " << *Phi << "\n";
+  if (PREAR->PrevPRE.size() == 0) {
+    llvmberry::ValidationUnit::GetInstance()
+        ->intrude([&CurInst, &Phi, &PhiBlock, &CurInst_id, &Phi_id, &PREAR](
+              llvmberry::ValidationUnit::Dictionary &data,
+              llvmberry::CoreHint &hints) {
+  if (isa<CallInst>(CurInst)) {
+    hints.appendToDescription("CurInstIsCall");
+    hints.setReturnCodeToAdmitted();
+    return;
+  }
+
+  if (PREAR->isFromNonLocalLoad) {
+    hints.appendToDescription("isFromNonLocalLoad");
+    hints.setReturnCodeToAdmitted();
+    return;
+  }
+
+  // For each pred block, propagate the chain of involved values until
+  // the
+  // end
+  // of the pred block
+  for (auto PI = pred_begin(PhiBlock), PE = pred_end(PhiBlock); PI != PE;
+       ++PI) {
+    BasicBlock *PB = *PI;
+    Value *V = Phi->getIncomingValueForBlock(PB);
+
+    auto PBPhiPos =
+        llvmberry::TyPosition::make(SRC, PhiBlock->getName(), PB->getName());
+
+    hints.setDescription(
+        (hints.getDescription() + "\nV is: " + (*V).getName()).str());
+    hints.appendToDescription("CurInst is: " + ((*CurInst).getName()).str());
+
+    if (Instruction *VI = dyn_cast<Instruction>(V)) {
+      std::string VI_id = llvmberry::getVariable(*VI);
+      hints.appendToDescription("VI_id is: " + VI_id);
+      hints.appendToDescription("VI's getName is: " + ((*VI).getName()).str());
+
+      Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
+
+      // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
+      // VPHI)
+      if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
+        // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
+        // start_of_block(VPHI)
+        generateHintForPRE(CurInstInPB, VPHI);
+
+        // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
+        PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
+                  BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                             llvmberry::Source,
+                             llvmberry::getBasicBlockIndex(VPHI->getParent())),
+                         PBPhiPos));
+      }
+      // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
+      // VPHI)
+      else {
+        int diffs = 0;
+        // Assume diffs <= 1 for now
+        // Below hint relies on [ INSN(CurInstInPB) >= Var(VI) ]
+        // It should generate hint for that
+        for (int i = 0; i < CurInstInPB->getNumOperands(); i++) {
+          if (CurInstInPB->getOperand(i) != VI->getOperand(i)) {
+            diffs++;
+            dbgs() << "----------------------CurInstInPB and VI "
+                      "differs----------------------\n";
+            dbgs() << "CurInstInPB : " << *CurInstInPB << "\n";
+            dbgs() << "VI : " << *VI << "\n";
+            // just to get BB from dictionary. we may able to store it as a map
+            // or something but it would be wasteful
+
+            Constant *OpConst;
+            Instruction *OpInst;
+            // Both are constant -> must be already same
+            // Both are instruction -> may not occur, expects it to be
+            // propagated from propagateEquality
+            if (isa<Constant>(CurInstInPB->getOperand(i))) {
+              OpConst = dyn_cast<Constant>(CurInstInPB->getOperand(i));
+              OpInst = dyn_cast<Instruction>(VI->getOperand(i));
+              assert(OpInst && "One constant, one Inst expceted.");
+            } else if (isa<Constant>(VI->getOperand(i))) {
+              OpConst = dyn_cast<Constant>(VI->getOperand(i));
+              OpInst = dyn_cast<Instruction>(CurInstInPB->getOperand(i));
+              assert(OpInst && "One constant, one Inst expceted.");
+            } else
+              assert(false && "One constant, one Inst expceted.");
+
+            auto OpConstObj = llvmberry::TyExpr::make(*OpConst);
+            const BasicBlock *BBSucc = llvmberry::PassDictionary::GetInstance()
+                                           .get<llvmberry::ArgForGVNPRE>()
+                                           ->prevLeaderBBs[PB];
+            assert(BBSucc && "Expect BBSucc to exist");
+            const BasicBlock *BBPred = BBSucc->getSinglePredecessor();
+            assert(BBPred &&
+                   "Expect it to be introduced from propagateEquality, and "
+                   "it checks "
+                   "RootDominatesEnd, meaning it has single predecessor");
+
+            // Somehow create VAR(OpInst) >= EXPR(OpConst) in
+            // pos(BBPred->BBSucc)
+            // TODO might need both direction?
+            generateHintForPropEq(hints, BBSucc, BBPred, OpInst, OpConst);
+            auto BBPredSuccPos = llvmberry::TyPosition::make(
+                SRC, BBSucc->getName(), BBPred->getName());
+
+            std::string OpInst_id = llvmberry::getVariable(*OpInst);
+            PROPAGATE(LESSDEF(VAR(OpInst_id, Physical), OpConstObj, SRC),
+                      BOUNDS(BBPredSuccPos, PBPhiPos));
+
+            std::string CurInstInPBOp_id =
+                llvmberry::getVariable(*CurInstInPB->getOperand(i));
+            // Substitute [ INSN(CurInstInPB) >= INSN(VI) ]
+            // CurInstInPB[CurInstOp := VIOp] = VI
+            INFRULE(PBPhiPos,
+                    llvmberry::ConsSubstitute::make(
+                        REGISTER(CurInstInPBOp_id, Physical),
+                        VAL(VI->getOperand(i), Physical), INSN(*CurInstInPB)));
+
+            // Transitivity [ INSN(CurInstInPB) >= INSN(VI) >= Var(VI) ]
+            INFRULE(PBPhiPos,
+                    llvmberry::ConsTransitivity::make(
+                        INSN(*CurInstInPB), INSN(*VI), VAR(VI_id, Physical)));
           }
-          // For each pred block, propagate the chain of involved values until
-          // the
-          // end
-          // of the pred block
-          for (auto PI = pred_begin(PhiBlock), PE = pred_end(PhiBlock);
-               PI != PE; ++PI) {
-            BasicBlock *PB = *PI;
-            Value *V = Phi->getIncomingValueForBlock(PB);
+        }
+        if (diffs > 1) {
+          hints.appendToDescription("Diffs > 1");
+          hints.setReturnCodeToFail();
+          delete CurInstInPB;
+          return;
+        }
 
-            hints.setDescription(
-                (hints.getDescription() + "\nV is: " + (*V).getName()).str());
-            hints.appendToDescription("CurInst is: " +
-                                      ((*CurInst).getName()).str());
+        // Propagate [ RHS(VI) >= VAR(VI) ]
+        PROPAGATE(LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
+                  BOUNDS(INSTPOS(SRC, VI), PBPhiPos));
 
-            assert(isa<Instruction>(V) &&
-                   "Value not an instruction: not yet handled.");
-            Instruction *VI = dyn_cast<Instruction>(V);
-            if (!propagateInstrUntilBlockEnd(hints, VI, PB)) {
-              hints.appendToDescription("propagateInstrUntilBlockEnd");
-              hints.setReturnCodeToFail();
+        // Somehow get [ INSN(CurInstInPB) >= Var(VI) ]
+        // Expect INSN(CurInstInPB) is already Var(VI)
+
+        bool inboundsRemovalOccured = false;
+        if (auto *CurInstInPBGEP = dyn_cast<GetElementPtrInst>(CurInstInPB)) {
+          if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
+            if (!CurInstInPBGEP->isInBounds() && VIGEP->isInBounds()) {
+              hints.appendToDescription("gep removal - bug");
+              hints.setReturnCodeToAdmitted();
+              delete CurInstInPB;
+              // hints.setReturnCodeToFail();
               return;
             }
+            if (CurInstInPBGEP->isInBounds() && !VIGEP->isInBounds())
+              inboundsRemovalOccured = true;
+          } else
+            assert(false && "This cannot occur");
+        }
 
-            std::string VI_id = llvmberry::getVariable(*VI);
-            hints.appendToDescription("VI_id is: " + VI_id);
-            hints.appendToDescription("VI's getName is: " +
-                                      ((*VI).getName()).str());
+        if (inboundsRemovalOccured) {
+          // CurInstInPB has inbounds
+          // This VI does not have inbounds
 
-            // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-            // Currently, assume Rhs(VI) = Rhs(CurInst)
-            // TODO: difference btw BB->getName() and
-            // llvmberry::getBasicBlockIndex?
-            INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                PB->getName()),
-                    llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-                                                      VAR(VI_id, Previous),
-                                                      VAR(Phi_id, Physical)));
+          // GEP Inbounds Remove [ INSN(CurInstInPB) >= INSN(VI) ]
+          INFRULE(PBPhiPos, llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
+          // Transitivity [ INSN(CurInstInPB) >= INSN(VI) >= Var(Phi) ]
+          INFRULE(PBPhiPos,
+                  llvmberry::ConsTransitivity::make(
+                      INSN(*CurInstInPB), INSN(*VI), VAR(VI_id, Physical)));
+        }
+      }
 
-            // Transitivity [ Rhs(VI) >= Var(VI) >= Var(Phi) ]
-            // Currently, assume Rhs(VI) = Rhs(CurInst)
-            // TODO: difference btw BB->getName() and
-            // llvmberry::getBasicBlockIndex?
-            INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                PB->getName()),
-                    llvmberry::ConsTransitivity::make(RHS(VI_id, Physical, SRC),
-                                                      VAR(VI_id, Physical),
-                                                      VAR(Phi_id, Physical)));
+      // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
+      INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                            VAR(VI_id, Physical), VAR(VI_id, Previous),
+                            VAR(Phi_id, Physical)));
 
-            bool inboundsRemovalOccured = false;
-            if (auto *CurInstGEP = dyn_cast<GetElementPtrInst>(CurInst)) {
-              if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
-                if (!CurInstGEP->isInBounds() && VIGEP->isInBounds()) {
-                  hints.appendToDescription("gep removal - bug");
-                  hints.setReturnCodeToFail();
-                  return;
-                }
-                if (CurInstGEP->isInBounds() && !VIGEP->isInBounds())
-                  inboundsRemovalOccured = true;
-              } else
-                assert(false && "This cannot occur");
-            }
+      // Transitivity [ INSN(CurInstInPB) >= Var(VI) >= Var(Phi) ]
+      INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                            INSN(*CurInstInPB), VAR(VI_id, Physical),
+                            VAR(Phi_id, Physical)));
 
-            if (inboundsRemovalOccured) {
-              // CurInst has inbounds
-              // This VI does not have inbounds
+      // Transitivity [ INSN(CurInst) <=> INSN(CurInstInPB) ]
+      llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
 
-              // GEP Inbounds Remove [ INSN(CurInst) >= INSN(VI) ]
-              INFRULE(llvmberry::TyPosition::make(
-                          SRC, Phi->getParent()->getName(), PB->getName()),
-                      llvmberry::ConsGepInboundsRemove::make(INSN(*VI)));
-              // Transitivity [ INSN(CurInst) >= INSN(VI) >= Var(Phi) ]
-              INFRULE(llvmberry::TyPosition::make(
-                          SRC, Phi->getParent()->getName(), PB->getName()),
-                      llvmberry::ConsTransitivity::make(
-                          INSN(*CurInst), INSN(*VI), VAR(Phi_id, Physical)));
-            }
-          }
-        });
+      // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi) ]
+      INFRULE(PBPhiPos,
+              llvmberry::ConsTransitivity::make(
+                  INSN(*CurInst), INSN(*CurInstInPB), VAR(Phi_id, Physical)));
+
+      delete CurInstInPB;
+    } else {
+      assert(isa<Constant>(V));
+      auto VConst = dyn_cast<ConstantInt>(V);
+      auto VConstObj = llvmberry::TyExpr::make(*VConst);
+      // If repl is not an instruction, then it's always from
+      // propagateEquality.
+
+      const BasicBlock *BBSucc = llvmberry::PassDictionary::GetInstance()
+                                     .get<llvmberry::ArgForGVNPRE>()
+                                     ->prevLeaderBBs[PB];
+      assert(BBSucc && "Expect BBSucc to exist");
+      const BasicBlock *BBPred = BBSucc->getSinglePredecessor();
+      assert(BBPred && "Expect it to be introduced from propagateEquality, and "
+                       "it checks "
+                       "RootDominatesEnd, meaning it has single predecessor");
+
+      // [ Var(CurInst) >= Expr(VConst) ]
+      generateHintForPropEq(hints, BBSucc, BBPred, CurInst, VConst);
+      auto BBPredSuccPos = llvmberry::TyPosition::make(SRC, BBSucc->getName(),
+                                                       BBPred->getName());
+      // TODO this hint gen works??
+      // Var(CurInst) ~ INSN(CurInst) ? Gap?
+
+      PROPAGATE(LESSDEF(INSN(*CurInst), VConstObj, SRC),
+                BOUNDS(BBPredSuccPos, PBPhiPos));
+
+      // Transitivity [ INSN(CurInst) >= CI_cond >= Var(Phi) ]
+      INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                            INSN(*CurInst), VConstObj, VAR(Phi_id, Physical)));
+
+      // Inbounds removal may not occur, because V is const...
+    }
+  }
+          });
   } else {
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi,
-                                                       &CurInst_id, &PhiBlock,
-                                                       &Phi_id, &PREAR](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
+    llvmberry::ValidationUnit::GetInstance()
+        ->intrude([&CurInst, &Phi, &CurInst_id, &PhiBlock, &Phi_id, &PREAR](
+              llvmberry::ValidationUnit::Dictionary &data,
+              llvmberry::CoreHint &hints) {
       if (isa<CallInst>(CurInst)) {
         hints.appendToDescription("CurInstIsCall");
         hints.setReturnCodeToAdmitted();
+        return;
       }
 
       if (PREAR->isFromNonLocalLoad) {
         hints.appendToDescription("isFromNonLocalLoad");
         hints.setReturnCodeToAdmitted();
+        return;
       }
       dbgs() << "CurInst : " << *CurInst << "\n";
       dbgs() << "Phi : " << *Phi << "\n";
       // if is same for all, it does not involve previous PRE and just works
       // it is treated below
-      for (int i = 0; i < PREAR->notSameIdx.size(); i++)
-        for (int j = 0; j < PREAR->notSameIdx[i].size(); j++)
-          hints.appendToDescription("notSameIdx " + std::to_string(i) + ": " +
-                                    std::to_string(j));
-
       if (PREAR->PrevPRENotEnough) {
         hints.appendToDescription("PrevPRENotEnough");
         hints.setReturnCodeToFail();
@@ -1030,17 +1271,20 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
-          // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
-          // start_of_block(VPHI)
-          generateHintForPRE(CurInstInPB, VPHI);
+          assert("VPHI case should not occur" && false);
+          // // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
+          // // start_of_block(VPHI)
+          // generateHintForPRE(CurInstInPB, VPHI);
 
-          // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
-          PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                               llvmberry::Source, llvmberry::getBasicBlockIndex(
-                                                      VPHI->getParent())),
-                           llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                       PB->getName())));
+          // // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
+          // PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
+          //           BOUNDS(llvmberry::TyPosition::make_start_of_block(
+          //                      llvmberry::Source,
+          // llvmberry::getBasicBlockIndex(
+          //                                             VPHI->getParent())),
+          //                  llvmberry::TyPosition::make(SRC,
+          // PhiBlock->getName(),
+          //                                              PB->getName())));
         }
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VI)
         else {
@@ -1133,8 +1377,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       }
 
       return;
-    });
+          });
   }
+  dbgs() << "Done Generating Hint For " << *CurInst << " and " << *Phi << "\n";
 }
 }
 
@@ -2757,7 +3002,7 @@ bool GVN::processNonLocalLoad(LoadInst *LI) {
         llvmberry::intrude([]() {
           llvmberry::PassDictionary &pdata =
               llvmberry::PassDictionary::GetInstance();
-          pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad = true;
+          pdata.get<llvmberry::ArgForGVNPRE>()->isFromNonLocalLoad = true;
         });
         performScalarPRE(I);
       }
@@ -3099,9 +3344,10 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
     // llvmberry::ValidationUnit::GetInstance()->intrude(
     //     [&Vals](llvmberry::Dictionary &data, llvmberry::CoreHint &hints)
     //     { data.get<llvmberry::ArgForGVNReplace>()->BB = Vals.BB; });
-    llvmberry::intrude([&Vals]() {
+    llvmberry::intrude([&Vals, &BB]() {
       llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
       pdata.get<llvmberry::ArgForGVNReplace>()->BB = Vals.BB;
+      pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs[BB] = Vals.BB;
     });
     if (isa<Constant>(Val)) return Val;
   }
@@ -3110,17 +3356,19 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
   while (Next) {
     if (DT->dominates(Next->BB, BB)) {
       if (isa<Constant>(Next->Val)) {
-        llvmberry::intrude([&Next]() {
+        llvmberry::intrude([&Next, &BB]() {
           llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
           pdata.get<llvmberry::ArgForGVNReplace>()->BB = Next->BB;
+          pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs[BB] = Next->BB;
         });
         return Next->Val;
       }
       if (!Val) {
         Val = Next->Val;
-        llvmberry::intrude([&Next]() {
+        llvmberry::intrude([&Next, &BB]() {
           llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
           pdata.get<llvmberry::ArgForGVNReplace>()->BB = Next->BB;
+          pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs[BB] = Next->BB;
         });
       }
     }
@@ -3435,7 +3683,7 @@ bool GVN::runOnFunction(Function& F) {
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.create<llvmberry::ArgForGVNReplace>();
-    pdata.create<llvmberry::ArgForGVNPREIntro>();
+    pdata.create<llvmberry::ArgForGVNPRE>();
   });
   if (!NoLoads)
     MD = &getAnalysis<MemoryDependenceAnalysis>();
@@ -3493,7 +3741,7 @@ bool GVN::runOnFunction(Function& F) {
   llvmberry::intrude([]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.erase<llvmberry::ArgForGVNReplace>();
-    pdata.erase<llvmberry::ArgForGVNPREIntro>();
+    pdata.erase<llvmberry::ArgForGVNPRE>();
   });
 
   llvmberry::ValidationUnit::EndPass();
@@ -3623,6 +3871,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   BasicBlock *CurrentBlock = CurInst->getParent();
   predMap.clear();
 
+  llvmberry::intrude([]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.get<llvmberry::ArgForGVNPRE>()->prevLeaderBBs.clear();
+  });
   for (pred_iterator PI = pred_begin(CurrentBlock), PE = pred_end(CurrentBlock);
        PI != PE; ++PI) {
     BasicBlock *P = *PI;
@@ -3710,7 +3962,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   llvmberry::intrude([&CurInst, &Phi]() {
     PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
     llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
-    if (PREAR->isSameForAll)
+    if (PREAR->PrevPRE.size() == 0)
       llvmberry::ValidationUnit::Begin("GVN_PRE",
                                        CurInst->getParent()->getParent());
     else
@@ -3829,7 +4081,7 @@ bool GVN::performPRE(Function &F) {
       llvmberry::intrude([]() {
         llvmberry::PassDictionary &pdata =
             llvmberry::PassDictionary::GetInstance();
-        pdata.get<llvmberry::ArgForGVNPREIntro>()->isFromNonLocalLoad = false;
+        pdata.get<llvmberry::ArgForGVNPRE>()->isFromNonLocalLoad = false;
       });
       Changed = performScalarPRE(CurInst);
     }

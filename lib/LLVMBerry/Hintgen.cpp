@@ -2347,31 +2347,61 @@ bool hasBitcastOrGEP(llvm::AllocaInst* AI) {
 
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope) {
-  ValidationUnit::GetInstance()->intrude(
-      [&I, &PB, &scope](Dictionary &data, CoreHint &hints) {
-    for (unsigned i = 0, e = I->getNumOperands(); i != e; ++i) {
-      llvm::Value *Op = I->getOperand(i);
-      if (llvm::PHINode *OpPHI = llvm::dyn_cast<llvm::PHINode>(Op)) {
-        if (I->getParent() != OpPHI->getParent())
-          continue;
+  ValidationUnit::GetInstance()->intrude([&I, &PB, &scope](Dictionary &data,
+                                                           CoreHint &hints) {
+    llvm::Instruction *I_evolving = (*I).clone();
+        for (unsigned i = 0, e = I->getNumOperands(); i != e; ++i) {
+          llvm::Value *Op = I->getOperand(i);
+          if (llvm::PHINode *OpPHI = llvm::dyn_cast<llvm::PHINode>(Op)) {
+            if (I->getParent() != OpPHI->getParent())
+              continue;
+            llvm::Value *OpPHIResolved = OpPHI->getIncomingValueForBlock(PB);
+            std::string OpPHI_id = getVariable(*OpPHI);
+            std::string OpPHIResolved_id = getVariable(*OpPHIResolved);
+            auto IPBPos = llvmberry::TyPosition::make(
+                SRC, getBasicBlockIndex(I->getParent()),
+                getBasicBlockIndex(PB));
 
-        llvm::Value *OpPHIResolved = OpPHI->getIncomingValueForBlock(PB);
-        std::string OpPHI_id = getVariable(*OpPHI);
-        std::string OpPHIResolved_id = getVariable(*OpPHIResolved);
+            INFRULE(IPBPos,
+                    ConsTransitivity::make(VAR(OpPHIResolved_id, Physical),
+                                           VAR(OpPHIResolved_id, Previous),
+                                           VAR(OpPHI_id, Physical)));
 
-        INFRULE(TyPosition::make(scope, getBasicBlockIndex(I->getParent()),
-                                 getBasicBlockIndex(PB)),
-                ConsTransitivity::make(VAR(OpPHIResolved_id, Physical),
-                                       VAR(OpPHIResolved_id, Previous),
-                                       VAR(OpPHI_id, Physical)));
+            INFRULE(IPBPos,
+                    ConsTransitivity::make(VAR(OpPHI_id, Physical),
+                                           VAR(OpPHIResolved_id, Previous),
+                                           VAR(OpPHIResolved_id, Physical)));
 
-        INFRULE(TyPosition::make(scope, getBasicBlockIndex(I->getParent()),
-                                 getBasicBlockIndex(PB)),
-                ConsTransitivity::make(VAR(OpPHI_id, Physical),
-                                       VAR(OpPHIResolved_id, Previous),
-                                       VAR(OpPHIResolved_id, Physical)));
-      }
-    }
+            llvm::Instruction *I_evolving_next = (*I_evolving).clone();
+            (*I_evolving_next).setOperand(i, OpPHIResolved);
+
+            // SubstituteRev [ I_evolving_next >= I_evolving ]
+            // I_evolving_next = I_evolving[OpPHI := OpPHIResolved]
+            INFRULE(IPBPos, llvmberry::ConsSubstituteRev::make(
+                                REGISTER(OpPHI_id, Physical),
+                                VAL(OpPHIResolved, Physical),
+                                llvmberry::ConsInsn::make(*I_evolving)));
+
+            // SubstituteRev [ I_evolving >= I_evolving_next ]
+            // I_evolving = I_evolving_next[OpPHIResolved := OpPHI]
+            INFRULE(IPBPos, llvmberry::ConsSubstituteRev::make(
+                                REGISTER(OpPHIResolved_id, Physical),
+                                VAL(OpPHI, Physical),
+                                llvmberry::ConsInsn::make(*I_evolving_next)));
+
+            INFRULE(IPBPos,
+                    llvmberry::ConsTransitivity::make(
+                        INSN(*I_evolving_next), INSN(*I_evolving), INSN(*I)));
+
+            INFRULE(IPBPos,
+                    llvmberry::ConsTransitivity::make(
+                        INSN(*I), INSN(*I_evolving), INSN(*I_evolving_next)));
+
+            delete I_evolving;
+            I_evolving = I_evolving_next;
+          }
+        }
+        delete I_evolving;
   });
 }
 
