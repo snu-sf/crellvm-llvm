@@ -1405,7 +1405,6 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
 }
 
 void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instruction *Inst) {
-
   ValidationUnit::GetInstance()->intrude([&BB, &AI, &Inst]
                                                  (Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
@@ -1541,6 +1540,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
     auto &usePile = *(data.get<ArgForMem2Reg>()->usePile);
     auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
     auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
+
     for(auto IN = BB->begin(), IE = BB->end(); IN != IE; ++IN) {
       llvm::Instruction *Inst = IN;
 
@@ -1599,7 +1599,6 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
           }
 
             checkTag_propagate(BB, AI, LI);
-
             ignore = true;
 
             // add hints per every use of LI
@@ -1977,7 +1976,6 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
         IItmp = BBtmp->begin();
 
         // do not check same block again
-        // now working
         std::pair <llvm::BasicBlock *, llvm::BasicBlock *> tmp = std::make_pair(Predtmp, BBtmp);
         if (std::find(reachedEdge[Ralloca].begin(), reachedEdge[Ralloca].end(), tmp) != reachedEdge[Ralloca].end())
           continue;
