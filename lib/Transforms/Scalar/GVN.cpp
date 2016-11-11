@@ -824,6 +824,18 @@ bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
   return true;
 }
 
+bool hasSameRHS(Instruction *X, Instruction *Y) {
+  if (X->getType() != Y->getType())
+    return false;
+  if (X->getOpcode() != Y->getOpcode())
+    return false;
+  if (X->getNumOperands() != Y->getNumOperands())
+    return false;
+  for (int i = 0; i < X->getNumOperands(); i++)
+    if (X->getOperand(i) != Y->getOperand(i))
+      return false;
+  return true;
+}
 // Somehow create VAR(XInst) >= EXPR(YConst) in pos(BBPred->BBSucc)
 // Not INSN(XInst), 75.alias.o.find_base_value.1 -> XInst is Phi
 void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
@@ -877,7 +889,7 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
   dbgs() << "condI: " << *condI << "\n";
   dbgs() << "XInst: " << *XInst << "\n";
   dbgs() << "CI_cond: " << *CI_cond << "\n";
-  if (condI == XInst) {
+  if (hasSameRHS(XInst, condI)) {
     // both are also constant int
     assert(dyn_cast<ConstantInt>(YConst)->getUniqueInteger() ==
            dyn_cast<ConstantInt>(CI_cond)->getUniqueInteger());
