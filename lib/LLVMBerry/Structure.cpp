@@ -1412,6 +1412,14 @@ std::shared_ptr<TyPointer> TyPointer::make(const llvm::Value &v) {
       new TyPointer(TyValue::make(v), TyValueType::make(*ty)));
 }
 
+std::shared_ptr<TyPointer> TyPointer::makeWithElementType(const llvm::Value &v) {
+  llvm::PointerType *ty = llvm::dyn_cast<llvm::PointerType>(v.getType());
+  assert(ty && "ty must be a pointer type.");
+  return std::shared_ptr<TyPointer>(
+      new TyPointer(TyValue::make(v), TyValueType::make(*(ty->getElementType()))));
+}
+
+
 // valuetype
 
 std::shared_ptr<TyValueType> TyValueType::make(const llvm::Type &type) {
@@ -1799,6 +1807,7 @@ std::shared_ptr<TyLoadInst> TyLoadInst::makeAlignOne(llvm::Instruction *i) {
         1));
   } else {
     assert("Instruction should be Load, Store, or Alloca" && false);
+    return nullptr;
   }
 }
 
@@ -2444,6 +2453,7 @@ std::shared_ptr<TyExpr> TyExpr::make(const std::shared_ptr<TyValue> vptr) {
     return std::shared_ptr<TyExpr>(new ConsConst(ccv->constant));
   } else {
     assert("Unknown value type" && false);
+    return nullptr;
   }
   return nullptr;
 }

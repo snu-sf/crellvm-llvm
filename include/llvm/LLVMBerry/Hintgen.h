@@ -17,6 +17,7 @@
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
 #define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
+#define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
 #define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
 #define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
 #define PROPAGATE(what, where)                                                 \
@@ -168,13 +169,6 @@ extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
 void makeReachableBlockMap(llvm::BasicBlock* Src,
                            llvm::BasicBlock* Tgt);
 
-void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> lessdef_src,
-                                             std::shared_ptr<TyPropagateObject> lessdef_tgt,
-                                             llvm::Instruction* from,
-                                             llvm::Instruction* to,
-                                             std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> worklist,
-                                             llvm::BasicBlock* BB);
-
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst* SI,
                                           llvm::Instruction* next,
@@ -195,7 +189,6 @@ void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
                                llvm::BasicBlock::iterator II,
                                llvm::DenseMap<llvm::PHINode*, unsigned> PAM,
                                llvm::DenseMap<llvm::AllocaInst*, unsigned> AL,
-                               std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> >succs,
                                bool isSameBB);
 
 void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB, 

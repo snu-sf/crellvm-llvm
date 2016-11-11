@@ -28,7 +28,6 @@ enum DictKeys {
   ArgForLoadLoadStore,
   ArgForSelectIcmpConst,
   ArgForVisitICmp,
-  ArgForDeadCodeElim,
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
@@ -92,11 +91,14 @@ struct FindAvailableLoadedValueArg {
 public:
   typedef std::vector<std::pair<
       llvmberry::StripPointerCastsArg::TyStrippedValues,
-      std::pair<llvm::StoreInst *, std::string>>> TyOrthogonalStoresObj;
+      std::pair<llvm::Instruction *, std::string>>> TyOrthogonalInsnsObj;
+      // Note that there are two kinds of orthogonal instructions : 
+      // store, and 'call'.
+
   typedef llvmberry::StripPointerCastsArg::TyStrippedValuesObj TyPtrEqValuesObj;
-  typedef std::shared_ptr<TyOrthogonalStoresObj> TyOrthogonalStores;
+  typedef std::shared_ptr<TyOrthogonalInsnsObj> TyOrthogonalInsns;
   typedef std::shared_ptr<TyPtrEqValuesObj> TyPtrEqValues;
-  TyOrthogonalStores orthogonalStores;
+  TyOrthogonalInsns orthogonalInsns;
   TyPtrEqValues ptr1EquivalentValues;
   TyPtrEqValues ptr2EquivalentValues;
   bool isLoadStore;
@@ -193,8 +195,6 @@ public:
   typedef std::shared_ptr<TyReachableObj> TyReachable;
   TyReachable isReachable;
 
-  std::vector<llvm::StructType*> namedts;
-
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
   static bool isUndef(std::shared_ptr<TyExpr> e);
@@ -263,14 +263,6 @@ public:
 };
 
 DEFINE_TRAITS(ArgForSelectIcmpConst, SelectIcmpConstArg);
-
-// lib/Transforms/InstCombine/InstructionCombining.cpp : TryToSinkInstruction
-struct DeadCodeElimArg {
-public:
-  std::vector<llvm::StructType *> namedts;
-  llvm::Module *M;
-};
-DEFINE_TRAITS(ArgForDeadCodeElim, DeadCodeElimArg);
 
 // lib/Transforms/Scalar/GVN.cpp : processInstruction, findLeader
 struct GVNReplaceArg {

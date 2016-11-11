@@ -792,8 +792,12 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                   EXPR(UndefVal, Physical),
                   TGT);
 
-        std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> worklist;
-        llvmberry::generateHintForMem2RegPropagatePerBlock(lessdef_src, lessdef_tgt, AI, LI, worklist, LI->getParent());
+        PROPAGATE(lessdef_src,
+                  BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                         llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+        PROPAGATE(lessdef_tgt,
+                  BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+                         llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
                 llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
@@ -1025,7 +1029,6 @@ void PromoteMem2Reg::run() {
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
   
-  llvmberry::name_instructions(F);
   llvmberry::ValidationUnit::Begin("mem2reg", &F);
   llvmberry::ValidationUnit::GetInstance()->intrude
           ([]
@@ -1033,9 +1036,8 @@ void PromoteMem2Reg::run() {
       data.create<llvmberry::ArgForMem2Reg>();
   });
 
-  std::vector<AllocaInst *> &allocs = Allocas;
   llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&allocs, &F, this]
+          ([&F, this]
             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
     auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
@@ -1044,9 +1046,6 @@ void PromoteMem2Reg::run() {
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
     auto &strVec = *(data.get<llvmberry::ArgForMem2Reg>()->strVec);
     auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
-    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
-
-    namedts = F.getParent()->getIdentifiedStructTypes();
 
     for (auto BS = F.begin(), BE = F.end(); BS != BE;) {
       BasicBlock *BB = BS++;
@@ -1056,22 +1055,61 @@ void PromoteMem2Reg::run() {
 
       strVec.clear();
       isReachable[BB].push_back(BB);
-      llvmberry::makeReachableBlockMap(BB, BB); 
+      llvmberry::makeReachableBlockMap(BB, BB);
+
+      for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
+        AllocaInst *AItmp = Allocas[tmpNum];
+        BasicBlock* AIB = AItmp->getParent();
+        std::string Ralloca = llvmberry::getVariable(*AItmp);
+        std::string AIBname = llvmberry::getBasicBlockIndex(AIB);
+
+        allocas.push_back(AItmp);
+        instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
+
+        // TODO: if we can validate "call -> nop" we need this condition
+        //if (!llvmberry::hasBitcastOrGEP(AI)) { 
+        if (BB == AIB) {
+          PROPAGATE(UNIQUE(Ralloca,
+                           SRC),
+                    BOUNDS(llvmberry::TyPosition::make
+                            (SRC, *AItmp, instrIndex[AItmp], ""),
+                           llvmberry::TyPosition::make_end_of_block
+                            (SRC, *AIB, termIndex[AIBname])));
+
+          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
+                            SRC),
+                    BOUNDS(llvmberry::TyPosition::make
+                            (SRC, *AItmp, instrIndex[AItmp], ""),
+                           llvmberry::TyPosition::make_end_of_block
+                            (SRC, *AIB, termIndex[AIBname])));
+        } else {
+          PROPAGATE(UNIQUE(Ralloca,
+                           SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block
+                            (SRC, blockName),
+                           llvmberry::TyPosition::make_end_of_block
+                            (SRC, *BB, termIndex[blockName])));
+
+          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
+                            SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block
+                            (SRC, blockName),
+                           llvmberry::TyPosition::make_end_of_block
+                            (SRC, *BB, termIndex[blockName])));
+        }
+        //}
+      }
     }
 
     // initialize dictionary datum
     // memorize indices of alloca, store, load, and terminator instructions
-    for (unsigned tmpNum = 0; tmpNum != allocs.size(); ++tmpNum) {
-      AllocaInst *AItmp = allocs[tmpNum];
-      std::string bname = llvmberry::getBasicBlockIndex(AItmp->getParent());
-      
-      allocas.push_back(AItmp);
-      instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
+    for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
+      AllocaInst *AItmp = Allocas[tmpNum];
 
       // initialize information of each alloca's store and alloca
       for (auto UI = AItmp->user_begin(), E = AItmp->user_end(); UI != E;) {
         Instruction *tmpInst = cast<Instruction>(*UI++);
-        bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
+        //bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
         instrIndex[tmpInst] = llvmberry::getCommandIndex(*tmpInst);
 
         // save information of instruction's use
@@ -1103,9 +1141,9 @@ void PromoteMem2Reg::run() {
               }
 
               if ((std::find(isReachable[useBB].begin(), isReachable[useBB].end(), checkBB) != 
-                    isReachable[useBB].end()) && 
+                   isReachable[useBB].end()) && 
                   (std::find(isReachable[checkBB].begin(), isReachable[checkBB].end(), useBB) !=
-                  isReachable[checkBB].end())) {
+                   isReachable[checkBB].end())) {
                   flag = true;
               }
 
@@ -1162,56 +1200,6 @@ void PromoteMem2Reg::run() {
     assert(isAllocaPromotable(AI) && "Cannot promote non-promotable alloca!");
     assert(AI->getParent()->getParent() == &F &&
            "All allocas should be in the same function, which is same as DF!");
-
-    llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&F, &AI]
-              (llvmberry::Dictionary &data, 
-               llvmberry::CoreHint &hints) {
-      auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-      auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
-      BasicBlock* AIB = AI->getParent();
-      std::string Ralloca = llvmberry::getVariable(*AI);
-      std::string AIBname = llvmberry::getBasicBlockIndex(AIB);
-
-      if (!llvmberry::hasBitcastOrGEP(AI)) {
-        PROPAGATE(UNIQUE(Ralloca,
-                         SRC),
-                  BOUNDS(llvmberry::TyPosition::make
-                          (SRC, *AI, instrIndex[AI], ""),
-                         llvmberry::TyPosition::make_end_of_block
-                          (SRC, *AIB, termIndex[AIBname])));
-
-        PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
-                          SRC),
-                  BOUNDS(llvmberry::TyPosition::make
-                          (SRC, *AI, instrIndex[AI], ""),
-                         llvmberry::TyPosition::make_end_of_block
-                          (SRC, *AIB, termIndex[AIBname])));
-
-        for (auto BS = F.begin(), BE = F.end(); BS != BE;) {
-          BasicBlock *BB = BS++;
-
-          if (BB == AIB)
-            continue;
-
-          std::string bName = llvmberry::getBasicBlockIndex(BB);
-
-          PROPAGATE(UNIQUE(Ralloca,
-                           SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block
-                            (SRC, bName),
-                           llvmberry::TyPosition::make_end_of_block
-                            (SRC, *BB, termIndex[bName])));
-
-          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical),
-                            SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block
-                            (SRC, bName),
-                           llvmberry::TyPosition::make_end_of_block
-                            (SRC, *BB, termIndex[bName])));
-        }
-      }
-    });
 
     removeLifetimeIntrinsicUsers(AI);
 
@@ -1549,17 +1537,6 @@ void PromoteMem2Reg::run() {
     }
   }
 
-  llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&F]
-             (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-    auto &namedts = data.get<llvmberry::ArgForMem2Reg>()->namedts;
-    auto namedts2 = F.getParent()->getIdentifiedStructTypes();
-
-    if (namedts != F.getParent()->getIdentifiedStructTypes()) {
-      hints.setReturnCodeToAdmitted();
-    }
-  });
-
   NewPhiNodes.clear();
   llvmberry::ValidationUnit::End();
   llvmberry::ValidationUnit::EndPass();
@@ -1702,19 +1679,19 @@ NextIteration:
           APN->addIncoming(IncomingVals[AllocaNo], Pred);
 
         llvmberry::ValidationUnit::GetInstance()->intrude
-                ([&APN, &Pred, &AllocaNo, &IncomingVals, this]
+                ([&APN, &Pred, &AllocaNo, &IncomingVals]
                    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
           Value* UndefVal = UndefValue::get(APN->getType());
 
-          if (IncomingVals[AllocaNo] == UndefVal) {
+          if (IncomingVals[AllocaNo] == UndefVal && APN != NULL) {
             // alloca's use search
             // among them load which is dominated by bb.
             // then propagate phi to load
             
             llvmberry::generateHintForMem2RegPhiUndef(APN, Pred);
-            }
+          }
 
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
@@ -1792,9 +1769,8 @@ NextIteration:
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*> > succs;
         llvmberry::generateHintForMem2RegPHI
-          (BB, Pred, Dest, SI, II, PAM, AL, succs, true);
+          (BB, Pred, Dest, SI, II, PAM, AL, true);
       });
 
       // what value were we writing?

@@ -295,6 +295,7 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
               llvmberry::insertSrcNopAtTgtI(hints, Y);
 
               llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Physical);
+              llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Previous);
               llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Physical);
               llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Previous);
               INFRULE(INSTPOS(TGT, Z),
