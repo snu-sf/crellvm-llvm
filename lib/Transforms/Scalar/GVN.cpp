@@ -824,11 +824,12 @@ bool propagateInstrUntilBlockEnd(llvmberry::CoreHint &hints, Instruction *Inst,
   return true;
 }
 
-// Somehow create VAR(XInst) >= EXInstPR(YConst) in pos(BBPred->BBSucc)
+// Somehow create VAR(XInst) >= EXPR(YConst) in pos(BBPred->BBSucc)
 // Not INSN(XInst), 75.alias.o.find_base_value.1 -> XInst is Phi
 void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
                            const BasicBlock *BBPred, Instruction *XInst,
                            Constant *YConst) {
+  std::string XInst_id = llvmberry::getVariable(*XInst);
   auto BBPredSuccPos =
       llvmberry::TyPosition::make(SRC, BBSucc->getName(), BBPred->getName());
 
@@ -873,6 +874,9 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
 
   hints.appendToDescription("condI: " + ((*condI).getName()).str());
   hints.appendToDescription("XInst: " + ((*XInst).getName()).str());
+  dbgs() << "condI: " << *condI << "\n";
+  dbgs() << "XInst: " << *XInst << "\n";
+  dbgs() << "CI_cond: " << *CI_cond << "\n";
   if (condI == XInst) {
     // both are also constant int
     assert(dyn_cast<ConstantInt>(YConst)->getUniqueInteger() ==
@@ -880,10 +884,10 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
     // XInst != Phi, so condI != Phi
 
     // No VI_id
-    // WTS (final goal of this block): INSN(XInst) >= Var(Phi)
+    // WTS (final goal of this block): Var(XInst) >= Var(Phi)
 
     // YConst <=> Var(Phi)
-    // WTS: INSN(XInst) >= YConst
+    // WTS: Var(XInst) >= YConst
 
     // condI == XInst
     // CI_cond == 13
@@ -897,6 +901,12 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
     INFRULE(BBPredSuccPos,
             llvmberry::ConsTransitivity::make(
                 INSN(*XInst), VAR(condI_id, Physical), CI_cond_obj));
+
+    // Transitivity [ Var(XInst) >= INSN(XInst) >= CI_cond ]
+    INFRULE(BBPredSuccPos,
+            llvmberry::ConsTransitivity::make(VAR(XInst_id, Physical),
+                                              INSN(*XInst), CI_cond_obj));
+
   } else {
     if (condI->getOpcode() == Instruction::And) {
       assert(CI_cond == ConstantInt::getTrue(BBSucc->getContext()));
@@ -910,7 +920,7 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
 
         // INSN(condIC->getOperand(0)) == Blah
         // INSN(XInst) == INSN(Blah)
-        // EXInstPR(condIC->getOperand(1)) == EXInstPR(YConst)
+        // EXPR(condIC->getOperand(1)) == EXInstPR(YConst)
 
         Instruction *Blah = dyn_cast<Instruction>(condIC->getOperand(0));
         assert("This must be instruction." || Blah);
@@ -928,25 +938,33 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
         // [ VAR(Blah) <=> YConst ]
         INFRULE(BBPredSuccPos, llvmberry::ConsIcmpEqSame::make(*condIC));
 
-        // [ Var(Blah) <=> 0 ]
-        // [ Var(0) <=> 0 ]
-        INFRULE(BBPredSuccPos,
-                llvmberry::ConsAndTrueBool::make(
-                    llvmberry::TyValue::make(*condIC->getOperand(0)),
-                    llvmberry::TyValue::make(*condIC->getOperand(1))));
-
-        // [ INSN(Blah) == INSN(XInst) >= Var(Blah) >= Var(YConst) ]
-        INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
-                                   INSN(*Blah), VAR(Blah_id, Physical),
-                                   llvmberry::TyExpr::make(*YConst)));
-
+        // // [ Var(Blah) <=> 0 ]
+        // // [ Var(0) <=> 0 ]
         // INFRULE(BBPredSuccPos,
-        //         llvmberry::ConsTransitivity::make
-        //         (INSN(*XInst),
-        //          VAR(BlahI_id, Physical),
-        //          llvmberry::TyExpr::make(*CI_cond)));
+        //         llvmberry::ConsAndTrueBool::make(
+        //             llvmberry::TyValue::make(*condIC->getOperand(0)),
+        //             llvmberry::TyValue::make(*condIC->getOperand(1))));
 
-        // Somehow create XInst >= YConst in pos(BBPred->BBSucc)
+        dbgs() << "Blah != XInst : " << (Blah != XInst) << "\n";
+        if (Blah != XInst) {
+          // [ INSN(Blah) == INSN(XInst) >= Var(Blah) >= Var(YConst) ]
+          INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
+                                     INSN(*Blah), VAR(Blah_id, Physical),
+                                     llvmberry::TyExpr::make(*YConst)));
+
+          // [ Var(XInst) >= INSN(XInst) >= Var(YConst) ]
+          INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
+                                     VAR(XInst_id, Physical), INSN(*XInst),
+                                     llvmberry::TyExpr::make(*YConst)));
+
+          // INFRULE(BBPredSuccPos,
+          //         llvmberry::ConsTransitivity::make
+          //         (INSN(*XInst),
+          //          VAR(BlahI_id, Physical),
+          //          llvmberry::TyExpr::make(*CI_cond)));
+
+          // Somehow create XInst >= YConst in pos(BBPred->BBSucc)
+        }
       } else if (condIC->getPredicate() == CmpInst::ICMP_NE) {
         assert(CI_cond == ConstantInt::getFalse(BBSucc->getContext()));
         assert("NE case not yet covered" && false);
@@ -1024,11 +1042,11 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
       // VPHI)
       else {
-        for (int i = 0; i < CurInst->getNumOperands(); i++) {
-          if (CurInst->getOperand(i) != VI->getOperand(i)) {
-            dbgs() << "----------------------CurInst and VI "
+        for (int i = 0; i < CurInstInPB->getNumOperands(); i++) {
+          if (CurInstInPB->getOperand(i) != VI->getOperand(i)) {
+            dbgs() << "----------------------CurInstInPB and VI "
                       "differs----------------------\n";
-            dbgs() << "CurInst : " << *CurInst << "\n";
+            dbgs() << "CurInstInPB : " << *CurInstInPB << "\n";
             dbgs() << "VI : " << *VI << "\n";
             // just to get BB from dictionary. we may able to store it as a map
             // or something but it would be wasteful
@@ -1038,13 +1056,13 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             // Both are constant -> must be already same
             // Both are instruction -> may not occur, expects it to be
             // propagated from propagateEquality
-            if (isa<Constant>(CurInst->getOperand(i))) {
-              OpConst = dyn_cast<Constant>(CurInst->getOperand(i));
+            if (isa<Constant>(CurInstInPB->getOperand(i))) {
+              OpConst = dyn_cast<Constant>(CurInstInPB->getOperand(i));
               OpInst = dyn_cast<Instruction>(VI->getOperand(i));
               assert(OpInst && "One constant, one Inst expceted.");
             } else if (isa<Constant>(VI->getOperand(i))) {
               OpConst = dyn_cast<Constant>(VI->getOperand(i));
-              OpInst = dyn_cast<Instruction>(CurInst->getOperand(i));
+              OpInst = dyn_cast<Instruction>(CurInstInPB->getOperand(i));
               assert(OpInst && "One constant, one Inst expceted.");
             } else
               assert(false && "One constant, one Inst expceted.");
@@ -1064,12 +1082,14 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             auto BBPredSuccPos = llvmberry::TyPosition::make(
                 SRC, BBSucc->getName(), BBPred->getName());
 
-            PROPAGATE(LESSDEF(INSN(*OpInst), OpConstObj, SRC),
+            std::string OpInst_id = llvmberry::getVariable(*OpInst);
+            PROPAGATE(LESSDEF(VAR(OpInst_id, Physical), OpConstObj, SRC),
                       BOUNDS(BBPredSuccPos, PBPhiPos));
 
-            // // Transitivity [ INSN(CurInst) >= CI_cond >= Var(Phi) ]
-            // INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make
-            //         (INSN(*CurInst), VConstObj, VAR(Phi_id, Physical)));
+            // Transitivity [ INSN(CurInstInPB) >= INSN(VI) >= Var(VI) ]
+            INFRULE(PBPhiPos,
+                    llvmberry::ConsTransitivity::make(
+                        INSN(*CurInstInPB), INSN(*VI), VAR(VI_id, Physical)));
 
             // // Inbounds removal may not occur, because V is const...
           }
@@ -1168,9 +1188,12 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                        "it checks "
                        "RootDominatesEnd, meaning it has single predecessor");
 
+      // [ Var(CurInst) >= Expr(VConst) ]
       generateHintForPropEq(hints, BBSucc, BBPred, CurInst, VConst);
       auto BBPredSuccPos = llvmberry::TyPosition::make(SRC, BBSucc->getName(),
                                                        BBPred->getName());
+      // TODO this hint gen works??
+      // Var(CurInst) ~ INSN(CurInst) ? Gap?
 
       PROPAGATE(LESSDEF(INSN(*CurInst), VConstObj, SRC),
                 BOUNDS(BBPredSuccPos, PBPhiPos));
