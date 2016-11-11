@@ -1054,7 +1054,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
       // VPHI)
       else {
+        int diffs = 0;
+        // Assume diffs <= 1 for now
         for (int i = 0; i < CurInstInPB->getNumOperands(); i++) {
+          diffs++;
           if (CurInstInPB->getOperand(i) != VI->getOperand(i)) {
             dbgs() << "----------------------CurInstInPB and VI "
                       "differs----------------------\n";
@@ -1105,6 +1108,11 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
             // // Inbounds removal may not occur, because V is const...
           }
+        }
+        if (diffs > 1) {
+          hints.appendToDescription("Diffs > 1");
+          hints.setReturnCodeToFail();
+          return;
         }
 
         // Propagate [ RHS(VI) >= VAR(VI) ]
