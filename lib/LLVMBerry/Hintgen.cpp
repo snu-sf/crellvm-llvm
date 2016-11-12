@@ -142,7 +142,7 @@ void applyCommutativity(llvm::Instruction *position,
         hints.addCommand(ConsInfrule::make(
             TyPosition::make(Source, *position),
             ConsFbopCommutative::make(VAR(regname, Physical), fbop,
-                                     TyValue::make(*expression->getOperand(0)),
+                                      TyValue::make(*expression->getOperand(0)),
                                       TyValue::make(*expression->getOperand(1)),
                                       getFloatType(expression->getType()))));
       } else {

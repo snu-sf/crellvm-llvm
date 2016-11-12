@@ -5506,6 +5506,44 @@ void ConsIcmpSwapOperands::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(icmp_swap_operands));
 }
 
+TyFcmpSwapOperands::TyFcmpSwapOperands(enum TyFcmpPred _predicate,
+                                       TyFloatType _fty,
+                                       std::shared_ptr<TyValue> _x,
+                                       std::shared_ptr<TyValue> _y,
+                                       std::shared_ptr<TyValue> _z)
+    : predicate(_predicate), fty(_fty), x(_x), y(_y), z(_z) {}
+
+void TyFcmpSwapOperands::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(cereal::make_nvp("predicate", toString(predicate)));
+  archive(cereal::make_nvp("fty", toString(fty)));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(z));
+}
+
+ConsFcmpSwapOperands::ConsFcmpSwapOperands(std::shared_ptr<TyFcmpSwapOperands> _fcmp_swap_operands)
+    : fcmp_swap_operands(_fcmp_swap_operands) {}
+
+std::shared_ptr<TyInfrule> ConsFcmpSwapOperands::make(llvm::FCmpInst &CI) {
+  enum TyFcmpPred pred = getFcmpPred(CI.getPredicate());
+  TyFloatType fty = getFloatType(CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+  std::shared_ptr<TyValue> z = TyValue::make(CI);
+
+  std::shared_ptr<TyFcmpSwapOperands> _fcmp_so =
+      std::make_shared<TyFcmpSwapOperands>(pred, fty, x, y, z);
+
+  return std::make_shared<ConsFcmpSwapOperands>(_fcmp_so);
+}
+
+void ConsFcmpSwapOperands::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("FcmpSwapOperands");
+  archive(CEREAL_NVP(fcmp_swap_operands));
+}
+
 TyIcmpEqSame::TyIcmpEqSame(std::shared_ptr<TyValueType> _ty,
                            std::shared_ptr<TyValue> _x,
                            std::shared_ptr<TyValue> _y)
