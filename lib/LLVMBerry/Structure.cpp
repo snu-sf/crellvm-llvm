@@ -1670,6 +1670,10 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
   } else if (const llvm::UIToFPInst *ui = llvm::dyn_cast<llvm::UIToFPInst>(&i)) {
     return std::shared_ptr<TyInstruction>(
         new ConsUitofpInst(TyUitofpInst::make(*ui)));
+  } else if (const llvm::FPToSIInst *fp =
+                 llvm::dyn_cast<llvm::FPToSIInst>(&i)) {
+    return std::shared_ptr<TyInstruction>(
+        new ConsFptosiInst(TyFptosiInst::make(*fp)));
   } else if (const llvm::SIToFPInst *si = llvm::dyn_cast<llvm::SIToFPInst>(&i)) {
     return std::shared_ptr<TyInstruction>(
         new ConsSitofpInst(TySitofpInst::make(*si)));
@@ -1853,6 +1857,12 @@ TyTruncInst::make(const llvm::TruncInst &ti) {
   return std::shared_ptr<TyTruncInst>(new TyTruncInst(
       TyValueType::make(*ti.getSrcTy()), TyValue::make(*ti.getOperand(0)),
       TyValueType::make(*ti.getDestTy())));
+}
+
+std::shared_ptr<TyFptosiInst> TyFptosiInst::make(const llvm::FPToSIInst &ftsi) {
+  return std::shared_ptr<TyFptosiInst>(new TyFptosiInst(
+      TyValueType::make(*ftsi.getSrcTy()), TyValue::make(*ftsi.getOperand(0)),
+      TyValueType::make(*ftsi.getDestTy())));
 }
 
 std::shared_ptr<TySitofpInst>
@@ -2205,6 +2215,27 @@ void ConsTruncInst::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(trunc_inst));
 }
 
+ConsFptosiInst::ConsFptosiInst(std::shared_ptr<TyFptosiInst> _fptosi_inst)
+    : fptosi_inst(_fptosi_inst) {}
+std::shared_ptr<TyInstruction>
+ConsFptosiInst::make(std::shared_ptr<TyValueType> _fromty,
+                     std::shared_ptr<TyValue> _v,
+                     std::shared_ptr<TyValueType> _toty) {
+  std::shared_ptr<TyFptosiInst> _val(new TyFptosiInst(_fromty, _v, _toty));
+  return std::shared_ptr<TyInstruction>(new ConsFptosiInst(_val));
+}
+std::shared_ptr<TyInstruction>
+ConsFptosiInst::make(const llvm::FPToSIInst &ftsi) {
+  return std::shared_ptr<TyInstruction>(
+      new ConsFptosiInst(TyFptosiInst::make(ftsi)));
+}
+void ConsFptosiInst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("FptosiInst");
+  archive(CEREAL_NVP(fptosi_inst));
+}
+
 ConsSitofpInst::ConsSitofpInst(std::shared_ptr<TySitofpInst> _sitofp_inst) : sitofp_inst(_sitofp_inst){
 }
 std::shared_ptr<TyInstruction> ConsSitofpInst::make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty){
@@ -2415,6 +2446,14 @@ void TySextInst::serialize(cereal::JSONOutputArchive& archive) const{
 TyTruncInst::TyTruncInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty) : fromty(_fromty), v(_v), toty(_toty){
 }
 void TyTruncInst::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(CEREAL_NVP(fromty), CEREAL_NVP(v), CEREAL_NVP(toty));
+}
+
+TyFptosiInst::TyFptosiInst(std::shared_ptr<TyValueType> _fromty,
+                           std::shared_ptr<TyValue> _v,
+                           std::shared_ptr<TyValueType> _toty)
+    : fromty(_fromty), v(_v), toty(_toty) {}
+void TyFptosiInst::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(fromty), CEREAL_NVP(v), CEREAL_NVP(toty));
 }
 
