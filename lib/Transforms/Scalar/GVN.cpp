@@ -922,7 +922,29 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
   } else {
     if (condI->getOpcode() == Instruction::And) {
       assert(CI_cond == ConstantInt::getTrue(BBSucc->getContext()));
-      // assert("And case not yet covered" && false);
+      std::shared_ptr<llvmberry::TyExpr> expr_true =
+          llvmberry::TyExpr::make(*TrueVal);
+
+      PROPAGATE(
+          LESSDEF(VAR(condI_id, Physical), RHS(condI_id, Physical, SRC), SRC),
+          BOUNDS(INSTPOS(SRC, condI), BBPredSuccPos));
+
+      INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
+                                 expr_true, VAR(condI_id, Physical),
+                                 RHS(condI_id, Physical, SRC)));
+
+      INFRULE(BBPredSuccPos,
+              llvmberry::ConsAndTrueBool::make(
+                  llvmberry::TyValue::make(*condI->getOperand(0)),
+                  llvmberry::TyValue::make(*condI->getOperand(1))));
+      if (hasSameRHS(XInst, condI->getOperand(0))) {
+
+      } else if (hasSameRHS(XInst, condI->getOperand(1))) {
+      } else {
+        hints.appendToDescription("And nested case not yet covered");
+        hints.setReturnCodeToFail();
+        // return;
+      }
     } else if (condI->getOpcode() == Instruction::Or) {
       assert(CI_cond == ConstantInt::getFalse(BBSucc->getContext()));
       assert("Or case not yet covered" && false);
@@ -1735,8 +1757,7 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
               BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
 
     INFRULE(pos_BB_infr,
-            llvmberry::ConsTransitivity::make(expr_true,
-                                              VAR(id_I_A, Physical),
+            llvmberry::ConsTransitivity::make(expr_true, VAR(id_I_A, Physical),
                                               RHS(id_I_A, Physical, SRC)));
 
     INFRULE(pos_BB_infr, llvmberry::ConsAndTrueBool::make(
