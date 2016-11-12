@@ -1540,7 +1540,8 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
         INFRULE(INSTPOS(SRC, POS),
                 llvmberry::ConsIcmpSwapOperands::make(*cast<ICmpInst>(I1)));
       } else if (isa<FCmpInst>(I1)) {
-        assert(false && "GVN same_vn: FCmp case not handled yet.");
+        INFRULE(INSTPOS(SRC, POS),
+                llvmberry::ConsFcmpSwapOperands::make(*cast<FCmpInst>(I1)));
       } else if (BinaryOperator *BI1 = dyn_cast<BinaryOperator>(I1)) {
         llvmberry::applyCommutativity(POS, BI1, SRC);
       }
