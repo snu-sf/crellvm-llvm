@@ -922,7 +922,7 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
   } else {
     if (condI->getOpcode() == Instruction::And) {
       assert(CI_cond == ConstantInt::getTrue(BBSucc->getContext()));
-      assert("And case not yet covered" && false);
+      // assert("And case not yet covered" && false);
     } else if (condI->getOpcode() == Instruction::Or) {
       assert(CI_cond == ConstantInt::getFalse(BBSucc->getContext()));
       assert("Or case not yet covered" && false);
@@ -1073,16 +1073,18 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             // Both are constant -> must be already same
             // Both are instruction -> may not occur, expects it to be
             // propagated from propagateEquality
-            if (isa<Constant>(CurInstInPB->getOperand(i))) {
-              OpConst = dyn_cast<Constant>(CurInstInPB->getOperand(i));
-              OpInst = dyn_cast<Instruction>(VI->getOperand(i));
-              assert(OpInst && "One constant, one Inst expceted.");
-            } else if (isa<Constant>(VI->getOperand(i))) {
-              OpConst = dyn_cast<Constant>(VI->getOperand(i));
-              OpInst = dyn_cast<Instruction>(CurInstInPB->getOperand(i));
-              assert(OpInst && "One constant, one Inst expceted.");
-            } else
-              assert(false && "One constant, one Inst expceted.");
+            if ((OpConst = dyn_cast<Constant>(CurInstInPB->getOperand(i))) &&
+                (OpInst = dyn_cast<Instruction>(VI->getOperand(i)))) {
+            } else if ((OpConst = dyn_cast<Constant>(VI->getOperand(i))) &&
+                       (OpInst = dyn_cast<Instruction>(
+                            CurInstInPB->getOperand(i)))) {
+            } else {
+              hints.appendToDescription(
+                  "One instruction, one constant expected");
+              hints.setReturnCodeToFail();
+              delete CurInstInPB;
+              return;
+            }
 
             auto OpConstObj = llvmberry::TyExpr::make(*OpConst);
             const BasicBlock *BBSucc = llvmberry::PassDictionary::GetInstance()
