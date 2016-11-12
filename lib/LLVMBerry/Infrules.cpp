@@ -277,6 +277,38 @@ std::shared_ptr<TyInfrule> ConsBopCommutative::make(
   return std::shared_ptr<TyInfrule>(new ConsBopCommutative(_bop_comm));
 }
 
+TyFbopCommutative::TyFbopCommutative(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                                     std::shared_ptr<TyValue> _x,
+                                     std::shared_ptr<TyValue> _y,
+                                     TyFloatType _fty)
+    : e(_e), fbop(_fbop), x(_x), y(_y), fty(_fty) {}
+
+void TyFbopCommutative::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", llvmberry::toString(fbop)),
+          CEREAL_NVP(x), CEREAL_NVP(y), cereal::make_nvp("fty", toString(fty)));
+}
+
+ConsFbopCommutative::ConsFbopCommutative(
+    std::shared_ptr<TyFbopCommutative> _fbop_commutative)
+    : fbop_commutative(_fbop_commutative) {}
+
+void ConsFbopCommutative::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("FbopCommutative");
+  archive(CEREAL_NVP(fbop_commutative));
+}
+
+std::shared_ptr<TyInfrule> ConsFbopCommutative::make(
+    std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+    std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+    TyFloatType _fty) {
+  std::shared_ptr<TyFbopCommutative> _fbop_comm(
+      new TyFbopCommutative(_e, _fbop, _x, _y, _fty));
+  return std::shared_ptr<TyInfrule>(new ConsFbopCommutative(_fbop_comm));
+}
+
 TyAddDistSub::TyAddDistSub(std::shared_ptr<TyRegister> _z,
                            std::shared_ptr<TyRegister> _minusx,
                            std::shared_ptr<TyValue> _minusy,
