@@ -106,7 +106,9 @@ void applyCommutativity(llvm::Instruction *position,
                        : expression->getType()->getIntegerBitWidth();
     std::string regname = getVariable(*expression);
     if (scope == Source) {
+      bool is_fbop = false;
       TyBop bop;
+      TyFbop fbop;
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
         bop = BopAdd;
@@ -123,18 +125,34 @@ void applyCommutativity(llvm::Instruction *position,
       case llvm::Instruction::Xor:
         bop = BopXor;
         break;
+      case llvm::Instruction::FAdd:
+        fbop = BopFadd;
+        is_fbop = true;
+        break;
+      case llvm::Instruction::FMul:
+        fbop = BopFmul;
+        is_fbop = true;
+        break;
       default:
-        assert("applyCommutativity() : we don't support commutativity rule for "
-               "this binary operator");
+        // Unreachable: see lib/IR/Instruction.cpp, line 498
+        assert("applyCommutativity() : Unreachable - we covered cases exhaustively.");
       }
 
-      hints.addCommand(ConsInfrule::make(
-          TyPosition::make(Source, *position),
-          ConsBopCommutative::make(VAR(regname, Physical),
-                                   bop,
-                                   TyValue::make(*expression->getOperand(0)),
-                                   TyValue::make(*expression->getOperand(1)),
-                                   ConsSize::make(bitwidth))));
+      if (is_fbop) {
+        hints.addCommand(ConsInfrule::make(
+            TyPosition::make(Source, *position),
+            ConsFbopCommutative::make(VAR(regname, Physical), fbop,
+                                      TyValue::make(*expression->getOperand(0)),
+                                      TyValue::make(*expression->getOperand(1)),
+                                      getFloatType(expression->getType()))));
+      } else {
+        hints.addCommand(ConsInfrule::make(
+            TyPosition::make(Source, *position),
+            ConsBopCommutative::make(VAR(regname, Physical), bop,
+                                     TyValue::make(*expression->getOperand(0)),
+                                     TyValue::make(*expression->getOperand(1)),
+                                     ConsSize::make(bitwidth))));
+      }
     } else if (scope == Target) {
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
