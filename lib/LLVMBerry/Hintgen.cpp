@@ -1574,6 +1574,10 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
         }
       } else if(llvm::LoadInst *LI = llvm::dyn_cast<llvm::LoadInst>(Inst)) {
         if(LI->getOperand(0)->getName() == AI->getName()) {
+          llvm::AllocaInst *Src = llvm::dyn_cast<llvm::AllocaInst>(LI->getPointerOperand());
+          if (!Src)
+              continue;  
+          
           llvm::Value *UndefVal = llvm::UndefValue::get(LI->getType());
 
           if (BB == LI->getParent()->getParent()->begin()) {
