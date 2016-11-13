@@ -769,7 +769,6 @@ public:
         for (unsigned i = 0, e = numPredBlocks; i != e; ++i) {
           BasicBlock *PB = PN->getIncomingBlock(i);
           Value *V = PN->getIncomingValue(i);
-          dbgs() << "V is : " << *V << "\n";
 
           // it may be constant int... ?!
           if (Instruction *VI = dyn_cast<Instruction>(V)) {
@@ -884,11 +883,6 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
     assert(false && "This might.. not occur, propagateEquality occurrs in "
                     "GVN, and numbering Phi only occurs in PRE");
 
-  hints.appendToDescription("condI: " + ((*condI).getName()).str());
-  hints.appendToDescription("XInst: " + ((*XInst).getName()).str());
-  dbgs() << "condI: " << *condI << "\n";
-  dbgs() << "XInst: " << *XInst << "\n";
-  dbgs() << "CI_cond: " << *CI_cond << "\n";
   if (hasSameRHS(XInst, condI)) {
     // both are also constant int
     assert(dyn_cast<ConstantInt>(YConst)->getUniqueInteger() ==
@@ -941,11 +935,9 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
                   llvmberry::TyValue::make(*condI->getOperand(1))));
       if (Instruction *newCondI = dyn_cast<Instruction>(condI->getOperand(0))) {
         std::string newCondI_id = llvmberry::getVariable(*newCondI);
-        dbgs() << "newCondI case1: " << *newCondI << "\n";
         Instruction *newCondIOp =
             dyn_cast<Instruction>(newCondI->getOperand(0));
         if (newCondIOp && hasSameRHS(newCondIOp, XInst)) {
-          dbgs() << "Case 1: " << *newCondIOp << "\n";
           /*
             TODO Below is copied from icmp eq case
             Refactor with recurison, like in hintgen_propeq
@@ -985,7 +977,6 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
               //             llvmberry::TyValue::make(*newCondIC->getOperand(0)),
               //             llvmberry::TyValue::make(*newCondIC->getOperand(1))));
 
-              dbgs() << "Blah != XInst : " << (Blah != XInst) << "\n";
               if (Blah != XInst) {
                 // [ INSN(Blah) == INSN(XInst) >= Var(Blah) >= Var(YConst) ]
                 INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
@@ -1055,7 +1046,6 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
         //             llvmberry::TyValue::make(*condIC->getOperand(0)),
         //             llvmberry::TyValue::make(*condIC->getOperand(1))));
 
-        dbgs() << "Blah != XInst : " << (Blah != XInst) << "\n";
         if (Blah != XInst) {
           // [ INSN(Blah) == INSN(XInst) >= Var(Blah) >= Var(YConst) ]
           INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
@@ -1087,14 +1077,11 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
 
 // [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi->getParent())
 void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
-  // dbgs() << "CurInst : " << *CurInst << "\n";
-  // dbgs() << "Phi : " << *Phi << "\n";
   BasicBlock *PhiBlock = Phi->getParent();
   std::string CurInst_id = llvmberry::getVariable(*CurInst);
   std::string Phi_id = llvmberry::getVariable(*Phi);
   PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
 
-  dbgs() << "Start Generating Hint For " << *CurInst << " and " << *Phi << "\n";
   if (PREAR->PrevPRE.size() == 0) {
     llvmberry::ValidationUnit::GetInstance()
         ->intrude([&CurInst, &Phi, &PhiBlock, &CurInst_id, &Phi_id, &PREAR](
@@ -1124,15 +1111,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
     auto PBPhiPos =
         llvmberry::TyPosition::make(SRC, PhiBlock->getName(), PB->getName());
 
-    hints.setDescription(
-        (hints.getDescription() + "\nV is: " + (*V).getName()).str());
-    hints.appendToDescription("CurInst is: " + ((*CurInst).getName()).str());
-
     if (Instruction *VI = dyn_cast<Instruction>(V)) {
       std::string VI_id = llvmberry::getVariable(*VI);
-      hints.appendToDescription("VI_id is: " + VI_id);
-      hints.appendToDescription("VI's getName is: " + ((*VI).getName()).str());
-
       Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
       CurInstInPB->insertBefore(VI->getParent()->getTerminator());
       CurInstInPB->setName(CurInst->getName() + ".llvmberry.phi.resolved");
@@ -1160,13 +1140,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         // It should generate hint for that
         for (int i = 0; i < CurInstInPB->getNumOperands(); i++) {
           if (CurInstInPB->getOperand(i) != VI->getOperand(i)) {
-            dbgs() << "----------------------CurInstInPB and VI "
-                      "differs----------------------\n";
-            dbgs() << "CurInstInPB : " << *CurInstInPB << "\n";
-            dbgs() << "VI : " << *VI << "\n";
-            dbgs() << "CurInst: " << *CurInst << "\n";
-            dbgs() << "PB: " << *PB << "\n";
-            dbgs() << "CurInst->getParent(): " << *CurInst->getParent() << "\n";
             // just to get BB from dictionary. we may able to store it as a map
             // or something but it would be wasteful
 
@@ -1180,14 +1153,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             } else if ((OpConst = dyn_cast<Constant>(VI->getOperand(i))) &&
                        (OpInst = dyn_cast<Instruction>(
                             CurInstInPB->getOperand(i)))) {
-            } else {
-              // hints.appendToDescription(
-              //     "One instruction, one constant expected");
-              // hints.setReturnCodeToFail();
-              // delete CurInstInPB;
-              // return;
+            } else
               continue;
-            }
 
             auto OpConstObj = llvmberry::TyExpr::make(*OpConst);
             const BasicBlock *BBSucc = llvmberry::PassDictionary::GetInstance()
@@ -1339,8 +1306,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         hints.setReturnCodeToAdmitted();
         return;
       }
-      dbgs() << "CurInst : " << *CurInst << "\n";
-      dbgs() << "Phi : " << *Phi << "\n";
       // if is same for all, it does not involve previous PRE and just works
       // it is treated below
       if (PREAR->PrevPRENotEnough) {
@@ -1369,10 +1334,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
         Instruction *VI = dyn_cast<Instruction>(V);
         std::string VI_id = llvmberry::getVariable(*VI);
-        hints.appendToDescription("VI_id is: " + VI_id);
 
-        dbgs() << "CurInst: " << *CurInst << "\n";
-        dbgs() << "PB: " << *PB << "\n";
         Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
         CurInstInPB->insertBefore(VI->getParent()->getTerminator());
         CurInstInPB->setName(CurInst->getName() + ".llvmberry.phi.resolved");
@@ -1412,9 +1374,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
           // Somehow get [ INSN(CurInstInPB) >= Var(VI) ]
           for (auto k : PrevPRE) {
-            // dbgs() << "VI_evolving : " << *VI_evolving << "\n";
             PHINode *PrevPhi = k.first;
-            dbgs() << "PrevPhi " << *PrevPhi << "\n";
             std::string PrevPhi_id = llvmberry::getVariable(*PrevPhi);
             int idx = k.second;
 
@@ -1427,9 +1387,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                     llvmberry::ConsTransitivity::make(VAR(PrevPhi_id, Physical),
                                                       VAR(VI_op_id, Previous),
                                                       VAR(VI_op_id, Physical)));
-
-            // dbgs() << "VI_op : " << *VI_op << "\n";
-            // dbgs() << "VI_evolving : " << *VI_evolving << "\n";
 
             // SubstituteRev [ VI_evolving_next >= VI_evolving ]
             // VI_evolving_next = VI_evolving[VI_op := PrevPhi]
@@ -1487,7 +1444,6 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       return;
           });
   }
-  dbgs() << "Done Generating Hint For " << *CurInst << " and " << *Phi << "\n";
 }
 }
 
