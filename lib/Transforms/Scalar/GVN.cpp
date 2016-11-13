@@ -921,7 +921,9 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
 
   } else {
     if (condI->getOpcode() == Instruction::And) {
-      assert(CI_cond == ConstantInt::getTrue(BBSucc->getContext()));
+      ConstantInt *TrueVal = ConstantInt::getTrue(BBSucc->getContext());
+      assert(CI_cond == TrueVal);
+
       std::shared_ptr<llvmberry::TyExpr> expr_true =
           llvmberry::TyExpr::make(*TrueVal);
 
@@ -937,9 +939,83 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
               llvmberry::ConsAndTrueBool::make(
                   llvmberry::TyValue::make(*condI->getOperand(0)),
                   llvmberry::TyValue::make(*condI->getOperand(1))));
-      if (hasSameRHS(XInst, condI->getOperand(0))) {
+      if (Instruction *newCondI = dyn_cast<Instruction>(condI->getOperand(0))) {
+        std::string newCondI_id = llvmberry::getVariable(*newCondI);
+        dbgs() << "newCondI case1: " << *newCondI << "\n";
+        Instruction *newCondIOp =
+            dyn_cast<Instruction>(newCondI->getOperand(0));
+        if (newCondIOp && hasSameRHS(newCondIOp, XInst)) {
+          dbgs() << "Case 1: " << *newCondIOp << "\n";
+          /*
+            TODO Below is copied from icmp eq case
+            Refactor with recurison, like in hintgen_propeq
+          */
+          if (ICmpInst *newCondIC = dyn_cast<ICmpInst>(newCondI)) {
+            if (newCondIC->getPredicate() == CmpInst::ICMP_EQ) {
+              assert(CI_cond == ConstantInt::getTrue(BBSucc->getContext()));
 
-      } else if (hasSameRHS(XInst, condI->getOperand(1))) {
+              // INSN(newCondIC->getOperand(0)) == Blah
+              // INSN(XInst) == INSN(Blah)
+              // EXPR(newCondIC->getOperand(1)) == EXInstPR(YConst)
+
+              Instruction *Blah =
+                  dyn_cast<Instruction>(newCondIC->getOperand(0));
+              assert("This must be instruction." || Blah);
+              std::string Blah_id = llvmberry::getVariable(*Blah);
+
+              PROPAGATE(
+                  LESSDEF(VAR(newCondI_id, Physical), INSN(*newCondI), SRC),
+                  BOUNDS(INSTPOS(SRC, newCondI), BBPredSuccPos));
+
+              // [ true >= VAR(newCondI) >= INSN(newCondI) ]
+              INFRULE(BBPredSuccPos,
+                      llvmberry::ConsTransitivity::make(
+                          llvmberry::TyExpr::make(*CI_cond),
+                          VAR(newCondI_id, Physical), INSN(*newCondI)));
+
+              // [ true >= INSN(newCondI) ] implies
+              // [ VAR(Blah) <=> YConst ]
+              INFRULE(BBPredSuccPos,
+                      llvmberry::ConsIcmpEqSame::make(*newCondIC));
+
+              // // [ Var(Blah) <=> 0 ]
+              // // [ Var(0) <=> 0 ]
+              // INFRULE(BBPredSuccPos,
+              //         llvmberry::ConsAndTrueBool::make(
+              //             llvmberry::TyValue::make(*newCondIC->getOperand(0)),
+              //             llvmberry::TyValue::make(*newCondIC->getOperand(1))));
+
+              dbgs() << "Blah != XInst : " << (Blah != XInst) << "\n";
+              if (Blah != XInst) {
+                // [ INSN(Blah) == INSN(XInst) >= Var(Blah) >= Var(YConst) ]
+                INFRULE(BBPredSuccPos, llvmberry::ConsTransitivity::make(
+                                           INSN(*Blah), VAR(Blah_id, Physical),
+                                           llvmberry::TyExpr::make(*YConst)));
+
+                // [ Var(XInst) >= INSN(XInst) >= Var(YConst) ]
+                INFRULE(BBPredSuccPos,
+                        llvmberry::ConsTransitivity::make(
+                            VAR(XInst_id, Physical), INSN(*XInst),
+                            llvmberry::TyExpr::make(*YConst)));
+
+                // INFRULE(BBPredSuccPos,
+                //         llvmberry::ConsTransitivity::make
+                //         (INSN(*XInst),
+                //          VAR(BlahI_id, Physical),
+                //          llvmberry::TyExpr::make(*CI_cond)));
+
+                // Somehow create XInst >= YConst in pos(BBPred->BBSucc)
+              }
+            } else if (newCondIC->getPredicate() == CmpInst::ICMP_NE) {
+              assert(CI_cond == ConstantInt::getFalse(BBSucc->getContext()));
+              assert("NE case not yet covered" && false);
+            } else
+              assert("What is this case? Not yet covered" && false);
+          }
+        }
+      } else if (Instruction *newCondI =
+                     dyn_cast<Instruction>(condI->getOperand(1))) {
+        assert(false && "This ordering may not occur");
       } else {
         hints.appendToDescription("And nested case not yet covered");
         hints.setReturnCodeToFail();
