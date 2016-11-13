@@ -163,6 +163,14 @@ void applyCommutativity(llvm::Instruction *position,
                                   TyValue::make(*expression->getOperand(0)),
                                   TyValue::make(*expression->getOperand(1)),
                                   getFloatType(expression->getType()))));
+        break;
+      case llvm::Instruction::FMul:
+        INFRULE(INSTPOS(Target, position), ConsFmulCommutativeTgt::make(
+                REGISTER(regname, Physical),
+                VAL(expression->getOperand(0), Physical),
+                VAL(expression->getOperand(1), Physical),
+                getFloatType(expression->getType())));
+        break;
       case llvm::Instruction::Or:
         INFRULE(
             INSTPOS(llvmberry::Target, position),

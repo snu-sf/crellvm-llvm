@@ -591,6 +591,15 @@ private:
   std::shared_ptr<TyConstGlobalVarAddr> const_global_var_addr;
 };
 
+struct ConsConstZeroInitializer : public TyConstant{
+public : 
+  ConsConstZeroInitializer(std::shared_ptr<TyValueType> _value_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValueType> value_type;
+};
+
 struct ConsConstExpr : public TyConstant {
 public:
   ConsConstExpr(std::shared_ptr<TyConstantExpr> _constant_expr);

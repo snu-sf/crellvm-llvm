@@ -911,6 +911,20 @@ private:
   std::shared_ptr<TyValueType> selty;
 };
 
+struct TyFmulCommutativeTgt {
+public:
+  TyFmulCommutativeTgt(std::shared_ptr<TyRegister> _z,
+                       std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                       TyFloatType _fty);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  TyFloatType fty;
+};
+
 struct TyFpextBitcast {
 public:
   TyFpextBitcast(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid,
@@ -3870,6 +3884,20 @@ public:
 private:
   std::shared_ptr<TyFbopDistributiveOverSelectinst2>
       fbop_distributive_over_selectinst2;
+};
+
+struct ConsFmulCommutativeTgt : public TyInfrule {
+public:
+  ConsFmulCommutativeTgt(
+      std::shared_ptr<TyFmulCommutativeTgt> _fmul_commutative_tgt);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _z,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         TyFloatType _fty);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyFmulCommutativeTgt> fmul_commutative_tgt;
 };
 
 struct ConsFpextBitcast : public TyInfrule {

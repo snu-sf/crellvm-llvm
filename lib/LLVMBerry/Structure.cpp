@@ -1027,6 +1027,20 @@ ConsConstGlobalVarAddr::make(const llvm::GlobalVariable &gv) {
       new ConsConstGlobalVarAddr(TyConstGlobalVarAddr::make(gv)));
 }
 
+ConsConstZeroInitializer::ConsConstZeroInitializer(std::shared_ptr<TyValueType> _value_type) : value_type(_value_type){
+}
+void ConsConstZeroInitializer::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstZeroInitializer");
+  if (auto p = std::dynamic_pointer_cast<ConsVoidType>(value_type)) {
+    archive.writeName();
+    archive.saveValue("VoidType");
+  } else {
+    archive(CEREAL_NVP(value_type));
+  }
+}
+
 // constant expressions
 
 std::shared_ptr<TyConstantExpr>
@@ -1043,7 +1057,7 @@ TyConstantExpr::make(const llvm::ConstantExpr &ce) {
   llvm::raw_string_ostream rso(output);
   ce.print(rso);
   rso.str();
-  std::cerr << output << std::endl;
+  std::cerr << "TyConstantExpr::make : Unsupported const expr : " << output << std::endl;
   assert("TyConstantExpr::make() : unsupported constant expression" && false);
   return nullptr;
 }
@@ -1367,6 +1381,10 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     }
     return std::shared_ptr<TyConstant>(
         new ConsConstDataVector(TyValueType::make(*elemty), elems));
+  } else if (const llvm::ConstantAggregateZero *az = 
+                  llvm::dyn_cast<llvm::ConstantAggregateZero>(&value)) {
+    return std::shared_ptr<TyConstant>(
+        new ConsConstZeroInitializer(TyValueType::make(*az->getType())));
   }
   std::string output;
   llvm::raw_string_ostream rso(output);
