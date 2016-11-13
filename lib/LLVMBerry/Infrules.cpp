@@ -2461,6 +2461,37 @@ void ConsFbopDistributiveOverSelectinst2::serialize(
   archive(CEREAL_NVP(fbop_distributive_over_selectinst2));
 }
 
+TyFmulCommutativeTgt::TyFmulCommutativeTgt(std::shared_ptr<TyRegister> _z,
+                                           std::shared_ptr<TyValue> _x,
+                                           std::shared_ptr<TyValue> _y,
+                                           TyFloatType _fty)
+    : z(_z), x(_x), y(_y), fty(_fty) {}
+void TyFmulCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(z));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(cereal::make_nvp("fty", toString(fty)));
+}
+
+ConsFmulCommutativeTgt::ConsFmulCommutativeTgt(
+    std::shared_ptr<TyFmulCommutativeTgt> _fmul_commutative_tgt)
+    : fmul_commutative_tgt(_fmul_commutative_tgt) {}
+std::shared_ptr<TyInfrule>
+ConsFmulCommutativeTgt::make(std::shared_ptr<TyRegister> _z,
+                             std::shared_ptr<TyValue> _x,
+                             std::shared_ptr<TyValue> _y, TyFloatType _fty) {
+  std::shared_ptr<TyFmulCommutativeTgt> _val(new TyFmulCommutativeTgt(
+      _z, _x, _y, _fty));
+  return std::shared_ptr<TyInfrule>(new ConsFmulCommutativeTgt(_val));
+}
+void
+ConsFmulCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("FmulCommutativeTgt");
+  archive(CEREAL_NVP(fmul_commutative_tgt));
+}
+
 TyFpextBitcast::TyFpextBitcast(std::shared_ptr<TyValue> _src,
                                std::shared_ptr<TyValue> _mid,
                                std::shared_ptr<TyValue> _dst,

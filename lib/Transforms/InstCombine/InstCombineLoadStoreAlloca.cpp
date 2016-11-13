@@ -962,8 +962,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
         std::shared_ptr<llvmberry::TyExpr> vprime; // gepinst's ptr operand
         if (GetElementPtrInst *gepinstI = dyn_cast<GetElementPtrInst>(gep)) {
           vprime = EXPR(gepinstI->getPointerOperand(), Physical);
-          // applyGepZeroAndPropagate will make
-          // src >= vprime >= gepinst
+          // applyGepZeroAndPropagate will make src >= vprime >= gepinst.
           INFRULE(rulepos, llvmberry::ConsGepzero::make(
                                VAL(gepinstI->getPointerOperand(), Physical),
                                INSN(*gepinstI)));
@@ -1089,6 +1088,13 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       // step 1. prove %ptr2 >= %ptr1
       // step 1-(1). prove %ptr1src >= %ptr1
       assert(ptr1EquivalentValues->at(0) == ptr1);
+      INFRULE(v1_inst_pos,
+          llvmberry::ConsIntroEq::make(VAL(ptr1src, Physical)));
+      if (!isSameCommandPos(v1_inst_pos, LIpos)) {
+        PROPAGATE(LESSDEF(EXPR(ptr1src, Physical), EXPR(ptr1src, Physical),
+                          llvmberry::Source),
+                  BOUNDS(v1_inst_pos, LIpos));
+      }
       if (ptr1EquivalentValues->size() >= 2) {
         // note : ptr1EquivalentValues->back() == ptr1src.
         auto ptr1itr = ptr1EquivalentValues->end() - 1;
@@ -1119,14 +1125,15 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                           llvmberry::Source),
                   BOUNDS(INSTPOS(llvmberry::Source, v1_inst), LIpos));
       } else {
-        INFRULE(v1_inst_pos,
-          llvmberry::ConsIntroEq::make(VAL(ptr1src, Physical)));
-        PROPAGATE(LESSDEF(EXPR(ptr1src, Physical), EXPR(ptr1src, Physical),
-                          llvmberry::Source),
-                  BOUNDS(v1_inst_pos, LIpos));
+        // INFRULE(v1_inst_pos,
+        //   llvmberry::ConsIntroEq::make(VAL(ptr1src, Physical)));
+        // PROPAGATE(LESSDEF(EXPR(ptr1src, Physical), EXPR(ptr1src, Physical),
+        //                  llvmberry::Source),
+        //          BOUNDS(v1_inst_pos, LIpos));
       }
       // step 1-(2). prove %ptr2 >= %ptr2src
       assert(ptr2EquivalentValues->at(0) == ptr2);
+      INFRULE(LIpos, llvmberry::ConsIntroEq::make(VAL(ptr2src, Physical)));
       if (ptr2EquivalentValues->size() >= 2) {
         auto ptr2itr = ptr2EquivalentValues->end() - 1;
         auto ptr2beg = ptr2EquivalentValues->begin();
@@ -1150,7 +1157,6 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             applyAddrSpacePtrAndPropagate(v, false, ptr2src, rulepos, LIpos);
         } while (ptr2itr != ptr2beg);
       } else {
-        INFRULE(LIpos, llvmberry::ConsIntroEq::make(VAL(ptr2src, Physical)));
       }
       // step 1-(3). prove %ptr2 >= %ptr1 by transitivity
       // (%ptr2 >= %ptr2src >= %ptr1src >= %ptr1)
@@ -1293,6 +1299,8 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
 
           // ptr1src >= ptr1 is already shown.
           // We have to show ptr3src >= ptr3.
+          INFRULE(diffblock_propagate_end_pos,
+              llvmberry::ConsIntroEq::make(VAL(ptr3src, Physical)));
           if (ptr3EquivalentValues->size() > 1) {
             auto itr = ptr3EquivalentValues->end() - 1;
             auto ibeg = ptr3EquivalentValues->begin();
@@ -1321,11 +1329,14 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             } while (itr != ibeg);
           } else {
             // ptr3src >= ptr3src
-            assert(ptr3src == ptr3);
-            INFRULE(diffblock_propagate_end_pos,
-              llvmberry::ConsIntroEq::make(VAL(ptr3src, Physical)));
+            // assert(ptr3src == ptr3);
           }
-          // Now, apply DiffblockLessthan. : it makes ptr1src _||_ ptr3src => ptr1 _||_ ptr3
+          // Note that, if ptr1src is global and ptr2src and global, and
+          // ptr3 dominates v1_inst, then we NEED this introeq case at
+          // INSTPOS(ptr3).
+          INFRULE(diffblock_propagate_end_pos,
+              llvmberry::ConsIntroEq::make(VAL(ptr1src, Physical)));
+         // Now, apply DiffblockLessthan. : it makes ptr1src _||_ ptr3src => ptr1 _||_ ptr3
           INFRULE(diffblock_propagate_end_pos,
                   llvmberry::ConsDiffblockLessthan::make(
                       VAL(ptr1src, Physical), VAL(ptr3src, Physical),
