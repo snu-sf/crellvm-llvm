@@ -1134,6 +1134,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       hints.appendToDescription("VI's getName is: " + ((*VI).getName()).str());
 
       Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
+      CurInstInPB->insertBefore(VI->getParent()->getTerminator());
+      CurInstInPB->setName(CurInst->getName() + ".llvmberry.phi.resolved");
 
       // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
       // VPHI)
@@ -1158,11 +1160,13 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         // It should generate hint for that
         for (int i = 0; i < CurInstInPB->getNumOperands(); i++) {
           if (CurInstInPB->getOperand(i) != VI->getOperand(i)) {
-            diffs++;
             dbgs() << "----------------------CurInstInPB and VI "
                       "differs----------------------\n";
             dbgs() << "CurInstInPB : " << *CurInstInPB << "\n";
             dbgs() << "VI : " << *VI << "\n";
+            dbgs() << "CurInst: " << *CurInst << "\n";
+            dbgs() << "PB: " << *PB << "\n";
+            dbgs() << "CurInst->getParent(): " << *CurInst->getParent() << "\n";
             // just to get BB from dictionary. we may able to store it as a map
             // or something but it would be wasteful
 
@@ -1177,11 +1181,12 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                        (OpInst = dyn_cast<Instruction>(
                             CurInstInPB->getOperand(i)))) {
             } else {
-              hints.appendToDescription(
-                  "One instruction, one constant expected");
-              hints.setReturnCodeToFail();
-              delete CurInstInPB;
-              return;
+              // hints.appendToDescription(
+              //     "One instruction, one constant expected");
+              // hints.setReturnCodeToFail();
+              // delete CurInstInPB;
+              // return;
+              continue;
             }
 
             auto OpConstObj = llvmberry::TyExpr::make(*OpConst);
@@ -1219,12 +1224,13 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             INFRULE(PBPhiPos,
                     llvmberry::ConsTransitivity::make(
                         INSN(*CurInstInPB), INSN(*VI), VAR(VI_id, Physical)));
+            diffs++;
           }
         }
         if (diffs > 1) {
           hints.appendToDescription("Diffs > 1");
           hints.setReturnCodeToFail();
-          delete CurInstInPB;
+          CurInstInPB->eraseFromParent(); // delete will not work
           return;
         }
 
@@ -1241,7 +1247,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             if (!CurInstInPBGEP->isInBounds() && VIGEP->isInBounds()) {
               hints.appendToDescription("gep removal - bug");
               hints.setReturnCodeToAdmitted();
-              delete CurInstInPB;
+              CurInstInPB->eraseFromParent(); // delete will not work
               // hints.setReturnCodeToFail();
               return;
             }
@@ -1282,7 +1288,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               llvmberry::ConsTransitivity::make(
                   INSN(*CurInst), INSN(*CurInstInPB), VAR(Phi_id, Physical)));
 
-      delete CurInstInPB;
+      CurInstInPB->eraseFromParent(); // delete will not work
     } else {
       assert(isa<Constant>(V));
       auto VConst = dyn_cast<ConstantInt>(V);
@@ -1368,6 +1374,8 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         dbgs() << "CurInst: " << *CurInst << "\n";
         dbgs() << "PB: " << *PB << "\n";
         Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
+        CurInstInPB->insertBefore(VI->getParent()->getTerminator());
+        CurInstInPB->setName(CurInst->getName() + ".llvmberry.phi.resolved");
 
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
@@ -1473,7 +1481,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                 llvmberry::ConsTransitivity::make(
                     INSN(*CurInst), INSN(*CurInstInPB), VAR(Phi_id, Physical)));
 
-        delete CurInstInPB;
+        CurInstInPB->eraseFromParent(); // delete will not work
       }
 
       return;
