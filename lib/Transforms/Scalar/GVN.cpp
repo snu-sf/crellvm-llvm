@@ -1100,9 +1100,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   }
 
   // For each pred block, propagate the chain of involved values until
-  // the
-  // end
-  // of the pred block
+  // the end of the pred block
   for (auto PI = pred_begin(PhiBlock), PE = pred_end(PhiBlock); PI != PE;
        ++PI) {
     BasicBlock *PB = *PI;
@@ -1117,11 +1115,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       CurInstInPB->insertBefore(VI->getParent()->getTerminator());
       CurInstInPB->setName(CurInst->getName() + ".llvmberry.phi.resolved");
 
-      // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
-      // VPHI)
+      // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
       if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
-        // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
-        // start_of_block(VPHI)
+        // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in start_of_block(VPHI)
         generateHintForPRE(CurInstInPB, VPHI);
 
         // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
@@ -1131,8 +1127,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                              llvmberry::getBasicBlockIndex(VPHI->getParent())),
                          PBPhiPos));
       }
-      // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi,
-      // VPHI)
+      // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
       else {
         int diffs = 0;
         // Assume diffs <= 1 for now
@@ -1277,6 +1272,15 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       auto BBPredSuccPos = llvmberry::TyPosition::make(SRC, BBSucc->getName(),
                                                        BBPred->getName());
       // TODO this hint gen works??
+      // Actually, there is something wrong here, application fail might occur
+      // generateHintForPropEq has two uses, but there may not be a semantics
+      // for generateHintForPropEq that satisfies both uses.
+      // Here, VAR(XInst) should not be used, because it is not defined in
+      // BBPredSuccPos.
+      // Above, INSN(XInst) should not be used, because it may be PHINode.
+      // For now, it somehow works despite of application fail (other infrules
+      // generate INSN(XInst)
+
       // Var(CurInst) ~ INSN(CurInst) ? Gap?
 
       PROPAGATE(LESSDEF(INSN(*CurInst), VConstObj, SRC),
@@ -1342,28 +1346,9 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
           assert("VPHI case should not occur" && false);
-          // // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in
-          // // start_of_block(VPHI)
-          // generateHintForPRE(CurInstInPB, VPHI);
-
-          // // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
-          // PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
-          //           BOUNDS(llvmberry::TyPosition::make_start_of_block(
-          //                      llvmberry::Source,
-          // llvmberry::getBasicBlockIndex(
-          //                                             VPHI->getParent())),
-          //                  llvmberry::TyPosition::make(SRC,
-          // PhiBlock->getName(),
-          //                                              PB->getName())));
         }
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VI)
         else {
-          // TODO if it is not isSameForAll, and PrevPRE is empty, what does
-          // this
-          // mean..?
-          // if (!PrevPRE.size())
-          //   break;
-
           // Propagate [ RHS(VI) >= VAR(VI) ]
           PROPAGATE(
               LESSDEF(RHS(VI_id, Physical, SRC), VAR(VI_id, Physical), SRC),
