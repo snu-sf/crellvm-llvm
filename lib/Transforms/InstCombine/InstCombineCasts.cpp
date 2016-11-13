@@ -378,9 +378,7 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
             makeInfruleFunc = llvmberry::ConsBitcastFptrunc::make;
 
         } else if (llvm::isa<IntToPtrInst>(mid)) {
-          if (llvm::isa<BitCastInst>(dst)) 
-            makeInfruleFunc = llvmberry::ConsBitcastInttoptr::make;
-          else if (llvm::isa<PtrToIntInst>(dst))
+          if (llvm::isa<PtrToIntInst>(dst))
             makeInfruleFunc = llvmberry::ConsPtrtointInttoptr::make;
             
         } else if (llvm::isa<PtrToIntInst>(mid)) {
@@ -418,8 +416,6 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
         } else if (llvm::isa<ZExtInst>(mid)) {
           if (llvm::isa<BitCastInst>(dst))
             makeInfruleFunc = llvmberry::ConsBitcastZext::make;
-          else if (llvm::isa<IntToPtrInst>(dst)) 
-            makeInfruleFunc = llvmberry::ConsInttoptrZext::make;
           else if (llvm::isa<SExtInst>(dst)) 
             makeInfruleFunc = llvmberry::ConsSextZext::make;
           else if (llvm::isa<SIToFPInst>(dst))

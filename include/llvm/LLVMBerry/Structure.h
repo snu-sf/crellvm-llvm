@@ -591,6 +591,15 @@ private:
   std::shared_ptr<TyConstGlobalVarAddr> const_global_var_addr;
 };
 
+struct ConsConstZeroInitializer : public TyConstant{
+public : 
+  ConsConstZeroInitializer(std::shared_ptr<TyValueType> _value_type);
+  void serialize(cereal::JSONOutputArchive& archive) const;
+
+private : 
+  std::shared_ptr<TyValueType> value_type;
+};
+
 struct ConsConstExpr : public TyConstant {
 public:
   ConsConstExpr(std::shared_ptr<TyConstantExpr> _constant_expr);
@@ -877,6 +886,19 @@ private :
   std::shared_ptr<TyValueType> toty;
 };
 
+struct TyFptosiInst {
+public:
+  TyFptosiInst(std::shared_ptr<TyValueType> _fromty,
+               std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+  static std::shared_ptr<TyFptosiInst> make(const llvm::FPToSIInst &ftsi);
+
+private:
+  std::shared_ptr<TyValueType> fromty;
+  std::shared_ptr<TyValue> v;
+  std::shared_ptr<TyValueType> toty;
+};
+
 struct TySitofpInst{
 public : 
   TySitofpInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
@@ -1116,6 +1138,19 @@ public :
 
 private : 
   std::shared_ptr<TyTruncInst> trunc_inst;
+};
+
+struct ConsFptosiInst : public TyInstruction {
+public:
+  ConsFptosiInst(std::shared_ptr<TyFptosiInst> _fptosi_inst);
+  static std::shared_ptr<TyInstruction>
+  make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v,
+       std::shared_ptr<TyValueType> _toty);
+  static std::shared_ptr<TyInstruction> make(const llvm::FPToSIInst &ftsi);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyFptosiInst> fptosi_inst;
 };
 
 struct ConsSitofpInst : public TyInstruction{
