@@ -106,7 +106,9 @@ void applyCommutativity(llvm::Instruction *position,
                        : expression->getType()->getIntegerBitWidth();
     std::string regname = getVariable(*expression);
     if (scope == Source) {
+      bool is_fbop = false;
       TyBop bop;
+      TyFbop fbop;
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
         bop = BopAdd;
@@ -123,18 +125,34 @@ void applyCommutativity(llvm::Instruction *position,
       case llvm::Instruction::Xor:
         bop = BopXor;
         break;
+      case llvm::Instruction::FAdd:
+        fbop = BopFadd;
+        is_fbop = true;
+        break;
+      case llvm::Instruction::FMul:
+        fbop = BopFmul;
+        is_fbop = true;
+        break;
       default:
-        assert("applyCommutativity() : we don't support commutativity rule for "
-               "this binary operator");
+        // Unreachable: see lib/IR/Instruction.cpp, line 498
+        assert("applyCommutativity() : Unreachable - we covered cases exhaustively.");
       }
 
-      hints.addCommand(ConsInfrule::make(
-          TyPosition::make(Source, *position),
-          ConsBopCommutative::make(VAR(regname, Physical),
-                                   bop,
-                                   TyValue::make(*expression->getOperand(0)),
-                                   TyValue::make(*expression->getOperand(1)),
-                                   ConsSize::make(bitwidth))));
+      if (is_fbop) {
+        hints.addCommand(ConsInfrule::make(
+            TyPosition::make(Source, *position),
+            ConsFbopCommutative::make(VAR(regname, Physical), fbop,
+                                      TyValue::make(*expression->getOperand(0)),
+                                      TyValue::make(*expression->getOperand(1)),
+                                      getFloatType(expression->getType()))));
+      } else {
+        hints.addCommand(ConsInfrule::make(
+            TyPosition::make(Source, *position),
+            ConsBopCommutative::make(VAR(regname, Physical), bop,
+                                     TyValue::make(*expression->getOperand(0)),
+                                     TyValue::make(*expression->getOperand(1)),
+                                     ConsSize::make(bitwidth))));
+      }
     } else if (scope == Target) {
       switch (expression->getOpcode()) {
       case llvm::Instruction::Add:
@@ -908,83 +926,6 @@ void makeReachableBlockMap(llvm::BasicBlock* Src,
   });
 }
 
-void generateHintForMem2RegPropagatePerBlock(std::shared_ptr<TyPropagateObject> lessdef_src,
-                                             std::shared_ptr<TyPropagateObject> lessdef_tgt,
-                                             llvm::Instruction* from,
-                                             llvm::Instruction* to, 
-                                             std::vector<std::pair<llvm::BasicBlock *, llvm::BasicBlock *>> worklist,
-                                             llvm::BasicBlock* BB) {
-  ValidationUnit::GetInstance()->intrude([&lessdef_src, &lessdef_tgt, &from,
-                                          &to, &worklist, &BB](
-      Dictionary &data, CoreHint &hints) {
-    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
-    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
-    llvm::BasicBlock* fromBB = from->getParent();
-    llvm::BasicBlock* toBB = to->getParent();
-    std::string fromBBname = getBasicBlockIndex(fromBB);
-    std::string toBBname = getBasicBlockIndex(toBB);
-    std::string from_name = getVariable(*from);
-
-    if (fromBB == toBB) {
-      PROPAGATE(lessdef_src,
-                BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
-                       TyPosition::make(SRC, *to, instrIndex[to], "")));
-      PROPAGATE(lessdef_tgt,
-                BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
-                       TyPosition::make(SRC, *to, instrIndex[to], "")));
-      return;
-    }
-
-    if (fromBB == BB) {
-      PROPAGATE(lessdef_src,
-                BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
-                       TyPosition::make_end_of_block(SRC, *fromBB, termIndex[fromBBname])));
-      PROPAGATE(lessdef_tgt,
-                BOUNDS(TyPosition::make(SRC, *from, instrIndex[from], ""),
-                       TyPosition::make_end_of_block(SRC, *fromBB, termIndex[fromBBname])));
-
-      // propagate from inst to end of block
-      while(!worklist.empty()) {
-        llvm::BasicBlock *BBtmp = (*worklist.rbegin()).second;
-        std::string BBtmpName = getBasicBlockIndex(BBtmp);
-        worklist.pop_back();
-
-        if (toBB == BBtmp) {
-          PROPAGATE(lessdef_src,
-                    BOUNDS(TyPosition::make_start_of_block(SRC, toBBname),
-                           TyPosition::make(SRC, *to, instrIndex[to], "")));
-          PROPAGATE(lessdef_tgt,
-                    BOUNDS(TyPosition::make_start_of_block(SRC, toBBname),
-                           TyPosition::make(SRC, *to, instrIndex[to], "")));
-        } else { 
-          PROPAGATE(lessdef_src,
-                    BOUNDS(TyPosition::make_start_of_block(SRC, BBtmpName),
-                           TyPosition::make_end_of_block(SRC, *BBtmp, termIndex[BBtmpName])));
-          PROPAGATE(lessdef_tgt,
-                    BOUNDS(TyPosition::make_start_of_block(SRC, BBtmpName),
-                           TyPosition::make_end_of_block(SRC, *BBtmp, termIndex[BBtmpName])));
-        }
-      }
-
-      if (worklist.empty()) 
-        return;
-    }
-
-    // to block's propagate start to to Inst. 
-    
-    for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE;) {
-      llvm::BasicBlock* pred = *(BI++);
-      std::pair<llvm::BasicBlock *, llvm::BasicBlock *> pred_edge = std::make_pair(pred, BB);
-      
-      if (std::find(worklist.begin(), worklist.end(), pred_edge) != worklist.end())
-        continue;
-
-      worklist.push_back(pred_edge);
-      generateHintForMem2RegPropagatePerBlock(lessdef_src, lessdef_tgt, from, to, worklist, pred);
-    }
-  });
-}
-
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst* SI,
                                           llvm::Instruction* next,
@@ -1641,6 +1582,10 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
         }
       } else if(llvm::LoadInst *LI = llvm::dyn_cast<llvm::LoadInst>(Inst)) {
         if(LI->getOperand(0)->getName() == AI->getName()) {
+          llvm::AllocaInst *Src = llvm::dyn_cast<llvm::AllocaInst>(LI->getPointerOperand());
+          if (!Src)
+              continue;  
+          
           llvm::Value *UndefVal = llvm::UndefValue::get(LI->getType());
 
           if (BB == LI->getParent()->getParent()->begin()) {
@@ -2434,31 +2379,61 @@ bool hasBitcastOrGEP(llvm::AllocaInst* AI) {
 
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope) {
-  ValidationUnit::GetInstance()->intrude(
-      [&I, &PB, &scope](Dictionary &data, CoreHint &hints) {
-    for (unsigned i = 0, e = I->getNumOperands(); i != e; ++i) {
-      llvm::Value *Op = I->getOperand(i);
-      if (llvm::PHINode *OpPHI = llvm::dyn_cast<llvm::PHINode>(Op)) {
-        if (I->getParent() != OpPHI->getParent())
-          continue;
+  ValidationUnit::GetInstance()->intrude([&I, &PB, &scope](Dictionary &data,
+                                                           CoreHint &hints) {
+    llvm::Instruction *I_evolving = (*I).clone();
+        for (unsigned i = 0, e = I->getNumOperands(); i != e; ++i) {
+          llvm::Value *Op = I->getOperand(i);
+          if (llvm::PHINode *OpPHI = llvm::dyn_cast<llvm::PHINode>(Op)) {
+            if (I->getParent() != OpPHI->getParent())
+              continue;
+            llvm::Value *OpPHIResolved = OpPHI->getIncomingValueForBlock(PB);
+            std::string OpPHI_id = getVariable(*OpPHI);
+            std::string OpPHIResolved_id = getVariable(*OpPHIResolved);
+            auto IPBPos = llvmberry::TyPosition::make(
+                SRC, getBasicBlockIndex(I->getParent()),
+                getBasicBlockIndex(PB));
 
-        llvm::Value *OpPHIResolved = OpPHI->getIncomingValueForBlock(PB);
-        std::string OpPHI_id = getVariable(*OpPHI);
-        std::string OpPHIResolved_id = getVariable(*OpPHIResolved);
+            INFRULE(IPBPos,
+                    ConsTransitivity::make(VAR(OpPHIResolved_id, Physical),
+                                           VAR(OpPHIResolved_id, Previous),
+                                           VAR(OpPHI_id, Physical)));
 
-        INFRULE(TyPosition::make(scope, getBasicBlockIndex(I->getParent()),
-                                 getBasicBlockIndex(PB)),
-                ConsTransitivity::make(VAR(OpPHIResolved_id, Physical),
-                                       VAR(OpPHIResolved_id, Previous),
-                                       VAR(OpPHI_id, Physical)));
+            INFRULE(IPBPos,
+                    ConsTransitivity::make(VAR(OpPHI_id, Physical),
+                                           VAR(OpPHIResolved_id, Previous),
+                                           VAR(OpPHIResolved_id, Physical)));
 
-        INFRULE(TyPosition::make(scope, getBasicBlockIndex(I->getParent()),
-                                 getBasicBlockIndex(PB)),
-                ConsTransitivity::make(VAR(OpPHI_id, Physical),
-                                       VAR(OpPHIResolved_id, Previous),
-                                       VAR(OpPHIResolved_id, Physical)));
-      }
-    }
+            llvm::Instruction *I_evolving_next = (*I_evolving).clone();
+            (*I_evolving_next).setOperand(i, OpPHIResolved);
+
+            // SubstituteRev [ I_evolving_next >= I_evolving ]
+            // I_evolving_next = I_evolving[OpPHI := OpPHIResolved]
+            INFRULE(IPBPos, llvmberry::ConsSubstituteRev::make(
+                                REGISTER(OpPHI_id, Physical),
+                                VAL(OpPHIResolved, Physical),
+                                llvmberry::ConsInsn::make(*I_evolving)));
+
+            // SubstituteRev [ I_evolving >= I_evolving_next ]
+            // I_evolving = I_evolving_next[OpPHIResolved := OpPHI]
+            INFRULE(IPBPos, llvmberry::ConsSubstituteRev::make(
+                                REGISTER(OpPHIResolved_id, Physical),
+                                VAL(OpPHI, Physical),
+                                llvmberry::ConsInsn::make(*I_evolving_next)));
+
+            INFRULE(IPBPos,
+                    llvmberry::ConsTransitivity::make(
+                        INSN(*I_evolving_next), INSN(*I_evolving), INSN(*I)));
+
+            INFRULE(IPBPos,
+                    llvmberry::ConsTransitivity::make(
+                        INSN(*I), INSN(*I_evolving), INSN(*I_evolving_next)));
+
+            delete I_evolving;
+            I_evolving = I_evolving_next;
+          }
+        }
+        delete I_evolving;
   });
 }
 

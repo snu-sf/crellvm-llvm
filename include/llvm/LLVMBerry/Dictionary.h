@@ -32,7 +32,7 @@ enum DictKeys {
   ArgForMem2Reg,
   // GVN
   ArgForGVNReplace,
-  ArgForGVNPREIntro
+  ArgForGVNPRE
 };
 
 /*
@@ -276,10 +276,11 @@ DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
 
 // lib/Transforms/Scalar/GVN.cpp : to check whether perFormScalaPRE is from
 // processNonLocalLoad
-struct GVNPREIntroArg {
+struct GVNPREArg {
   bool isFromNonLocalLoad;
+  std::map<const llvm::BasicBlock *, const llvm::BasicBlock *> prevLeaderBBs;
 };
-DEFINE_TRAITS(ArgForGVNPREIntro, GVNPREIntroArg);
+DEFINE_TRAITS(ArgForGVNPRE, GVNPREArg);
 
 class Dictionary {
 private:

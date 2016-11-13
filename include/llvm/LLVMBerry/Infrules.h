@@ -290,6 +290,21 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyFbopCommutative {
+public:
+  TyFbopCommutative(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                    std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                    TyFloatType _fty);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> e;
+  TyFbop fbop;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  TyFloatType fty;
+};
+
 struct TyBitcastBitcast {
 public:
   TyBitcastBitcast(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid,
@@ -2913,6 +2928,21 @@ private:
   std::shared_ptr<TyValue> z;
 };
 
+struct TyFcmpSwapOperands {
+public:
+  TyFcmpSwapOperands(enum TyFcmpPred _predicate, TyFloatType _fty,
+                     std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                     std::shared_ptr<TyValue> _z);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyFcmpPred predicate;
+  TyFloatType fty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> z;
+};
+
 struct TyIcmpEqXorNot{
 public : 
   TyIcmpEqXorNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s);
@@ -3467,6 +3497,20 @@ public:
 
 private:
   std::shared_ptr<TyBopCommutative> bop_commutative;
+};
+
+struct ConsFbopCommutative : TyInfrule {
+public:
+  ConsFbopCommutative(std::shared_ptr<TyFbopCommutative> _fbop_commutative);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         TyFloatType _fty);
+
+private:
+  std::shared_ptr<TyFbopCommutative> fbop_commutative;
 };
 
 struct ConsAndXorConst : public TyInfrule {
@@ -5730,6 +5774,16 @@ public:
 
 private:
   std::shared_ptr<TyIcmpSwapOperands> icmp_swap_operands;
+};
+
+struct ConsFcmpSwapOperands : public TyInfrule {
+public:
+  ConsFcmpSwapOperands(std::shared_ptr<TyFcmpSwapOperands> _fcmp_swap_operands);
+  static std::shared_ptr<TyInfrule> make(llvm::FCmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyFcmpSwapOperands> fcmp_swap_operands;
 };
 
 struct ConsIcmpUgeOrNot : public TyInfrule{
