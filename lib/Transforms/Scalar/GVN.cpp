@@ -1208,7 +1208,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
           if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
             if (!CurInstInPBGEP->isInBounds() && VIGEP->isInBounds()) {
               hints.appendToDescription("gep removal - bug");
-              hints.setReturnCodeToAdmitted();
+              // hints.setReturnCodeToAdmitted();
               CurInstInPB->eraseFromParent(); // delete will not work
               // hints.setReturnCodeToFail();
               return;
