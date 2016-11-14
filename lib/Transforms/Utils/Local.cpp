@@ -996,7 +996,7 @@ bool llvm::ConvertDebugDeclareToDebugValue(DbgDeclareInst *DDI,
             ([]
               (llvmberry::Dictionary &data, 
                llvmberry::CoreHint &hints) {
-      llvm::dbgs()<< "Admit ConvertDebugDeclareToDebugValue\n";
+      hints.appendToDescription("ConvertDebugDeclareToDebugValue");
       hints.setReturnCodeToAdmitted();
     });
   }
