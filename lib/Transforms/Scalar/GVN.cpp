@@ -1516,6 +1516,8 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
 
   if (!is_same_vn(VN, I1, I2, isI2Conc)) {
     hints.appendToDescription("GVN hintgen_same_vn: is_same_vn I1 I2 failed.");
+    hints.appendToDescription("Admitted due to load-optimization interference.");
+    hints.setReturnCodeToAdmitted();
     return false;
   }
 
