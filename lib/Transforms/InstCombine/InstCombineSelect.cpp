@@ -919,6 +919,8 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
           llvmberry::insertSrcNopAtTgtI(hints, Zprime);
           llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Zprime),
                                             llvmberry::Physical);
+          llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Zprime),
+                                            llvmberry::Previous);
           llvmberry::propagateInstruction(V, Z, llvmberry::Target);
           llvmberry::propagateInstruction(Zprime, Z, llvmberry::Target);
 
