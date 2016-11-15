@@ -518,6 +518,28 @@ private :
   std::shared_ptr<TyConstExprPtrtoint> const_expr_ptrtoint;
 };
 
+struct TyConstExprBinaryOp {
+public:
+  TyConstExprBinaryOp(TyBop _opcode, std::shared_ptr<TyConstant> _v1,
+                   std::shared_ptr<TyConstant> _v2);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  TyBop opcode;
+  std::shared_ptr<TyConstant> v1;
+  std::shared_ptr<TyConstant> v2;
+};
+
+struct ConsConstExprBinaryOp : public TyConstantExpr {
+public:
+  ConsConstExprBinaryOp(std::shared_ptr<TyConstExprBinaryOp> _const_expr_binaryop);
+  static std::shared_ptr<TyConstantExpr> make(TyBop _opcode, std::shared_ptr<TyConstant> _v1, std::shared_ptr<TyConstant> _v2);
+  static std::shared_ptr<TyConstantExpr> make(const llvm::ConstantExpr &ce);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyConstExprBinaryOp> const_expr_binaryop;
+};
 
 // constants
 

@@ -1208,7 +1208,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
           if (auto *VIGEP = dyn_cast<GetElementPtrInst>(VI)) {
             if (!CurInstInPBGEP->isInBounds() && VIGEP->isInBounds()) {
               hints.appendToDescription("gep removal - bug");
-              hints.setReturnCodeToAdmitted();
+              // hints.setReturnCodeToAdmitted();
               CurInstInPB->eraseFromParent(); // delete will not work
               // hints.setReturnCodeToFail();
               return;
@@ -1516,6 +1516,8 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
 
   if (!is_same_vn(VN, I1, I2, isI2Conc)) {
     hints.appendToDescription("GVN hintgen_same_vn: is_same_vn I1 I2 failed.");
+    hints.appendToDescription("Admitted due to load-optimization interference.");
+    hints.setReturnCodeToAdmitted();
     return false;
   }
 
@@ -3108,12 +3110,6 @@ static void patchReplacementInstruction(Instruction *I, Value *Repl) {
     ReplOp->andIRFlags(Op);
 
   if (Instruction *ReplInst = dyn_cast<Instruction>(Repl)) {
-    // llvmberry: patch for getelementptr inbounds
-    // Mimics llvm trunk, r275532
-    if (auto *SrcGEP = dyn_cast<GetElementPtrInst>(I))
-      if (auto *DestGEP = dyn_cast<GetElementPtrInst>(ReplInst))
-        DestGEP->setIsInBounds(SrcGEP->isInBounds() & DestGEP->isInBounds());
-
     // FIXME: If both the original and replacement value are part of the
     // same control-flow region (meaning that the execution of one
     // guarentees the executation of the other), then we can combine the

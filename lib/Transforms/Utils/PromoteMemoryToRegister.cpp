@@ -332,7 +332,7 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
             ([&I]
               (llvmberry::Dictionary &data, 
                llvmberry::CoreHint &hints) {
-      dbgs() << "Admit removelifetime\n";      
+      hints.appendToDescription("removeLifeTime");
       hints.setReturnCodeToAdmitted();
     });
 

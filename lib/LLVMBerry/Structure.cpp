@@ -1053,6 +1053,8 @@ TyConstantExpr::make(const llvm::ConstantExpr &ce) {
     return ConsConstExprInttoptr::make(ce);
   else if (ce.getOpcode() == llvm::Instruction::PtrToInt)
     return ConsConstExprPtrtoint::make(ce);
+  else if (llvm::Instruction::isBinaryOp(ce.getOpcode()))
+    return ConsConstExprBinaryOp::make(ce);
   std::string output;
   llvm::raw_string_ostream rso(output);
   ce.print(rso);
@@ -1211,6 +1213,36 @@ void TyConstExprPtrtoint::serialize(cereal::JSONOutputArchive& archive) const{
   archive(CEREAL_NVP(v), CEREAL_NVP(dstty));
 }
 
+// ConsConstExprBinaryOp
+
+ConsConstExprBinaryOp::ConsConstExprBinaryOp(std::shared_ptr<TyConstExprBinaryOp> _const_expr_binaryop) : const_expr_binaryop(_const_expr_binaryop){
+}
+std::shared_ptr<TyConstantExpr> ConsConstExprBinaryOp::make(TyBop tbop, std::shared_ptr<TyConstant> _v1, std::shared_ptr<TyConstant> _v2){
+  std::shared_ptr<TyConstExprBinaryOp> _val(new TyConstExprBinaryOp(tbop, _v1, _v2));
+  return std::shared_ptr<TyConstantExpr>(new ConsConstExprBinaryOp(_val));
+}
+std::shared_ptr<TyConstantExpr>
+ConsConstExprBinaryOp::make(const llvm::ConstantExpr &ce) {
+  TyBop bop = getBop((llvm::Instruction::BinaryOps)ce.getOpcode());
+  llvm::Constant *v1 = llvm::dyn_cast<llvm::Constant>(ce.getOperand(0));
+  llvm::Constant *v2 = llvm::dyn_cast<llvm::Constant>(ce.getOperand(1));
+  auto c1 = TyConstant::make(*v1);
+  auto c2 = TyConstant::make(*v2);
+  return make(bop, c1, c2);
+}
+void ConsConstExprBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("ConstExprBinaryOp");
+  archive(CEREAL_NVP(const_expr_binaryop));
+}
+
+TyConstExprBinaryOp::TyConstExprBinaryOp(TyBop tbop, std::shared_ptr<TyConstant> _v1, std::shared_ptr<TyConstant> _v2) : opcode(tbop), v1(_v1), v2(_v2) {}
+void TyConstExprBinaryOp::serialize(cereal::JSONOutputArchive& archive) const{
+  archive(cereal::make_nvp("opcode", toString(opcode)));
+  archive(CEREAL_NVP(v1));
+  archive(CEREAL_NVP(v2));
+}
 
 
 void ConsConstGlobalVarAddr::serialize(
