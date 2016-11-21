@@ -1063,12 +1063,12 @@ void PromoteMem2Reg::run() {
         std::string Ralloca = llvmberry::getVariable(*AItmp);
         std::string AIBname = llvmberry::getBasicBlockIndex(AIB);
 
-        allocas.push_back(AItmp);
-        instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
-
         // TODO: if we can validate "call -> nop" we need this condition
         //if (!llvmberry::hasBitcastOrGEP(AI)) { 
         if (BB == AIB) {
+          allocas.push_back(AItmp);
+          instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
+
           PROPAGATE(UNIQUE(Ralloca,
                            SRC),
                     BOUNDS(llvmberry::TyPosition::make
@@ -1342,7 +1342,7 @@ void PromoteMem2Reg::run() {
   RenamePassData::ValVector Values(Allocas.size());
   for (unsigned i = 0, e = Allocas.size(); i != e; ++i)
     Values[i] = UndefValue::get(Allocas[i]->getAllocatedType());
-  
+
   // Walks all basic blocks in the function performing the SSA rename algorithm
   // and inserting the phi nodes we marked as necessary
   //
@@ -1684,12 +1684,13 @@ NextIteration:
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
           Value* UndefVal = UndefValue::get(APN->getType());
+          auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
 
           if (IncomingVals[AllocaNo] == UndefVal && APN != NULL) {
             // alloca's use search
             // among them load which is dominated by bb.
             // then propagate phi to load
-            
+          
             llvmberry::generateHintForMem2RegPhiUndef(APN, Pred);
           }
 
