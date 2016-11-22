@@ -1543,7 +1543,7 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
                                                 VAR(id_I2, Physical)));
       }
 
-      hints.appendToDescription("GVN hintgen_same_vn: PRE & GVN combined case.");
+      // hints.appendToDescription("GVN hintgen_same_vn: PRE & GVN combined case.");
 
       return true;
     }
@@ -1553,7 +1553,7 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
   }
 
   if (!is_rhs_available(I1) || !is_rhs_available(I2)) {
-    hints.appendToDescription("GVN hintgen_same_vn: rhs of I1 or I2 not available");
+    // hints.appendToDescription("GVN hintgen_same_vn: rhs of I1 or I2 not available");
     return false;
   }
 
@@ -1633,15 +1633,15 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
     std::string id_I_ops1 = llvmberry::getVariable(*I_ops1),
                 id_I_ops2 = llvmberry::getVariable(*I_ops2);
 
-    if (!is_same_vn(VN, I_ops1, I_ops2, true))
-      hints.appendToDescription("GVN hintgen_same_vn: I_ops1 and I_ops2 have different VNs.");
+    // if (!is_same_vn(VN, I_ops1, I_ops2, true))
+    //   hints.appendToDescription("GVN hintgen_same_vn: I_ops1 and I_ops2 have different VNs.");
     // assert(is_same_vn(VN, I_ops1, I_ops2, true) &&
     //        "GVN same_vn: I_ops1 and I_ops2 have different VNs.");
 
     // This generates [ id(I_ops1) >= exp(I_ops2) ] at POS.
     bool hintgen = hintgen_same_vn(hints, VN, I_ops1, I_ops2, true, POS);
     if (!hintgen) {
-      hints.appendToDescription("GVN same_vn: Failed to generate hint for operands.");
+      // hints.appendToDescription("GVN same_vn: Failed to generate hint for operands.");
       delete Ii;
       return false;
     }
@@ -1737,7 +1737,7 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
     // same_vn generates [ I >= I_A ] at I.
     bool hintgen = hintgen_same_vn(hints, VN, I, I_A, true, I);
     if (!hintgen) {
-      hints.appendToDescription("GVN propeq: hintgen_same_vn failed.");
+      // hints.appendToDescription("GVN propeq: hintgen_same_vn failed.");
       return false;
     }
     // assert(hintgen && "GVN propeq: Base case same_vn failed!");
@@ -1963,9 +1963,9 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
            "GVN make_repl_inv: repl and I have different value numbers!");
     // This produces [ id(I) >= I_repl ] at I.
     bool hintgen = hintgen_same_vn(hints, VN, I, I_repl, true, I);
-    if (!hintgen) {
-      hints.appendToDescription("GVN repl_inv: hintgen_same_vn failed.");
-    }
+    // if (!hintgen) {
+    //   hints.appendToDescription("GVN repl_inv: hintgen_same_vn failed.");
+    // }
 
     // We admit redundant readonly call cases.
     if ((I->getOpcode() == Instruction::Call) &&
@@ -2056,9 +2056,9 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
     bool hintgen = hintgen_propeq(hints, VN, condI, CI_cond, I, repl,
                                   BB_pred, BB_succ);
     // assert(hintgen && "GVN make_repl_inv: hintgen_propeq failed!");
-    if (!hintgen) {
-      hints.appendToDescription("GVN repl_inv: hintgen_propeq failed.");
-    }
+    // if (!hintgen) {
+    //   hints.appendToDescription("GVN repl_inv: hintgen_propeq failed.");
+    // }
   }
 
   return LESSDEF(VAR(id_I, Physical), llvmberry::TyExpr::make(*repl), SRC);
@@ -3138,6 +3138,12 @@ static void patchAndReplaceAllUsesWith(Instruction *I, Value *Repl) {
 
   llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Repl](
       llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+
+    if (GetElementPtrInst *gep_I = dyn_cast<GetElementPtrInst>(I))
+      if (GetElementPtrInst *gep_Repl = dyn_cast<GetElementPtrInst>(Repl))
+        if (!gep_I->isInBounds() && gep_Repl->isInBounds())
+          hints.appendToDescription("GVN GEP BUG FOUND BY US");
+
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     if (!pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace) {
       llvmberry::ValidationUnit::GetInstance()->setIsAborted();
