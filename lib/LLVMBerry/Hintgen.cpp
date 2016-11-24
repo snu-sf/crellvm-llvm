@@ -1138,11 +1138,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                                          int useIndex,
                                          llvm::Instruction* use) {
   assert(I != NULL && "Input Instruction should not be NULL");
-  llvm::dbgs() << "PropagateLoad begin\n";
-if (use == NULL)
-  llvm::dbgs() << "use is NULL yeah \n";
-else
-  llvm::dbgs() << *use << "\n";
+
   ValidationUnit::GetInstance()->intrude([&I, &LI, &use, &useIndex, &useBB](
       Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
@@ -1152,8 +1148,6 @@ else
     llvm::PHINode* phiNode = NULL;
     if (use != NULL)
       phiNode = llvm::dyn_cast<llvm::PHINode>(use);
-    else 
-      llvm::dbgs()<<"use is NULL wow!!! \n";
 
     if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
       std::string Rstore = getVariable(*(SI->getOperand(1)));
@@ -1339,7 +1333,6 @@ else
       mem2regCmd[Rload].transTgt.push_back(transTgt);
     }
   });
-  llvm::dbgs() << "PropagateLoad end\n";
 }
 
 void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
@@ -2363,6 +2356,9 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
 
 int getIndexofMem2Reg(llvm::Instruction* I,
                       int instrIndex, int termIndex) {
+  if (I == nullptr)
+    return instrIndex;
+
   if (llvm::dyn_cast<llvm::TerminatorInst>(I) != NULL)
     return termIndex;
   else

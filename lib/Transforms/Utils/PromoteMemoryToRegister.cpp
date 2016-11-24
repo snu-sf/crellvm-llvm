@@ -546,7 +546,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           } else {
             findReachable = true;
           }
-
           UI2++;
         }
 
@@ -684,6 +683,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
              llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
     auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+    auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
     std::string Ralloca = llvmberry::getVariable(*AI);
 
     // propagate maydiff
@@ -704,24 +704,19 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     if (position != allocas.end()) 
       allocas.erase(position);
 
-      auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
-      if(LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0))) {
-        for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
-             auto t = *(UI++);
-          if (std::get<2>(t) == OnlyStore) {
-            llvm::dbgs() << "change to NULL " << *OnlyStore << "\n";
-llvm::dbgs() << "1: " <<*std::get<2>(t) << "\n";
-               std::get<2>(t) = NULL;
-               if (std::get<2>(t) == NULL)
-llvm::dbgs() << "2" << "\n";
-               break;
-             }
-           }                   
-         }
+    if(LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0))) {
+      for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
+        auto t = *(UI++);
+        if (std::get<2>(t) == OnlyStore) {
+          auto tuple = std::make_tuple(std::get<0>(t), std::get<1>(t), nullptr);
+          int pos = std::distance(usePile[check].begin(), UI);
 
-
-
-
+          usePile[check].erase(usePile[check].begin()+pos);
+          usePile[check].push_back(tuple);
+          break;
+        }                   
+      }
+    }
   });
 
   // Remove the (now dead) store and alloca.
@@ -989,26 +984,27 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               (llvmberry::Dictionary &data,
                llvmberry::CoreHint &hints) {
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+      auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
 
       hints.addNopPosition
         (llvmberry::TyPosition::make
           (llvmberry::Target, *SI, instrIndex[SI]-1, ""));
       
-      auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
       if(LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
         for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
-             auto t = *(UI++);
-          if (std::get<2>(t) == SI) {
-            llvm::dbgs() << "change to NULL " << *SI << "\n";
-llvm::dbgs() << "1: " <<*std::get<2>(t) << "\n";
-               std::get<2>(t) = NULL;
-               if (std::get<2>(t) == NULL)
-llvm::dbgs() << "2" << "\n";
-               break;
-             }
-           }                   
-         }
+          auto t = *UI;
 
+          if (std::get<2>(t) == SI) {
+            auto tuple = std::make_tuple(std::get<0>(t), std::get<1>(t), nullptr);
+            int pos = std::distance(usePile[check].begin(), UI);
+
+            usePile[check].erase(usePile[check].begin()+pos);
+            usePile[check].push_back(tuple);
+            break;
+          }
+          UI++;
+        }                   
+      }
     });
 
     SI->eraseFromParent();
@@ -1144,7 +1140,6 @@ void PromoteMem2Reg::run() {
       // initialize information of each alloca's store and alloca
       for (auto UI = AItmp->user_begin(), E = AItmp->user_end(); UI != E;) {
         Instruction *tmpInst = cast<Instruction>(*UI++);
-        //bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
         instrIndex[tmpInst] = llvmberry::getCommandIndex(*tmpInst);
 
         // save information of instruction's use
@@ -1153,10 +1148,7 @@ void PromoteMem2Reg::run() {
           
           if (Instruction* tmpUseinst = dyn_cast<Instruction>(U.getUser())) {
             instrIndex[tmpUseinst] = llvmberry::getCommandIndex(*tmpUseinst);
-          if (StoreInst *LP = dyn_cast<StoreInst>(tmpUseinst)) {
-          llvm::dbgs() << "SI getopernd " << *LP->getOperand(0) << "\n";
-          }
-          BasicBlock* useBB = tmpUseinst->getParent();
+            BasicBlock* useBB = tmpUseinst->getParent();
             bool flag = false;
             bool findReachable = false;
 
@@ -1183,7 +1175,6 @@ void PromoteMem2Reg::run() {
                    isReachable[checkBB].end())) {
                   flag = true;
               }
-
 
               if (!DT.dominates(useBB, checkBB)) {
                 flag = true;
@@ -1822,6 +1813,7 @@ NextIteration:
                 (llvmberry::Dictionary &data,
                  llvmberry::CoreHint &hints) {
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
   
         std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
 
@@ -1829,22 +1821,21 @@ NextIteration:
           (llvmberry::TyPosition::make
             (llvmberry::Target, *SI, instrIndex[SI]-1, ""));
 
-        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
-        if(LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
-           for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
-             auto t = *(UI++);
-             if (std::get<2>(t) == SI) {
-llvm::dbgs() << "change to NULL " << *SI << "\n";
-llvm::dbgs() << "1: " <<*std::get<2>(t) << "\n";
-               std::get<2>(t) = NULL;
-               if (std::get<2>(t) == NULL)
-llvm::dbgs() << "2" << "\n";
-               break;
-             }
-           }                   
-         }
-      });
+        if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
+          for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI;) {
+            auto t = *(UI++);
+            
+            if (std::get<2>(t) == SI) {
+              auto tuple = std::make_tuple(std::get<0>(t), std::get<1>(t), nullptr);
+              int pos = std::distance(usePile[check].begin(), UI);
 
+              usePile[check].erase(usePile[check].begin()+pos);
+              usePile[check].push_back(tuple);
+              break;
+            }
+          }                   
+        }
+      });
 
       BB->getInstList().erase(SI);
     }
