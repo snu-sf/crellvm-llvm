@@ -703,6 +703,25 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     std::vector<AllocaInst*>::iterator position = std::find(allocas.begin(), allocas.end(), AI);
     if (position != allocas.end()) 
       allocas.erase(position);
+
+      auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
+      if(LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0))) {
+        for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
+             auto t = *(UI++);
+          if (std::get<2>(t) == OnlyStore) {
+            llvm::dbgs() << "change to NULL " << *OnlyStore << "\n";
+llvm::dbgs() << "1: " <<*std::get<2>(t) << "\n";
+               std::get<2>(t) = NULL;
+               if (std::get<2>(t) == NULL)
+llvm::dbgs() << "2" << "\n";
+               break;
+             }
+           }                   
+         }
+
+
+
+
   });
 
   // Remove the (now dead) store and alloca.
@@ -974,6 +993,22 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
       hints.addNopPosition
         (llvmberry::TyPosition::make
           (llvmberry::Target, *SI, instrIndex[SI]-1, ""));
+      
+      auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
+      if(LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
+        for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
+             auto t = *(UI++);
+          if (std::get<2>(t) == SI) {
+            llvm::dbgs() << "change to NULL " << *SI << "\n";
+llvm::dbgs() << "1: " <<*std::get<2>(t) << "\n";
+               std::get<2>(t) = NULL;
+               if (std::get<2>(t) == NULL)
+llvm::dbgs() << "2" << "\n";
+               break;
+             }
+           }                   
+         }
+
     });
 
     SI->eraseFromParent();
@@ -1115,11 +1150,13 @@ void PromoteMem2Reg::run() {
         // save information of instruction's use
         for (auto UI2 = tmpInst->use_begin(), E2 = tmpInst->use_end(); UI2 != E2;) {
           Use &U = *(UI2++);
-
+          
           if (Instruction* tmpUseinst = dyn_cast<Instruction>(U.getUser())) {
             instrIndex[tmpUseinst] = llvmberry::getCommandIndex(*tmpUseinst);
-
-            BasicBlock* useBB = tmpUseinst->getParent();
+          if (StoreInst *LP = dyn_cast<StoreInst>(tmpUseinst)) {
+          llvm::dbgs() << "SI getopernd " << *LP->getOperand(0) << "\n";
+          }
+          BasicBlock* useBB = tmpUseinst->getParent();
             bool flag = false;
             bool findReachable = false;
 
@@ -1785,12 +1822,29 @@ NextIteration:
                 (llvmberry::Dictionary &data,
                  llvmberry::CoreHint &hints) {
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+  
         std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
 
         hints.addNopPosition
           (llvmberry::TyPosition::make
             (llvmberry::Target, *SI, instrIndex[SI]-1, ""));
+
+        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
+        if(LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
+           for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
+             auto t = *(UI++);
+             if (std::get<2>(t) == SI) {
+llvm::dbgs() << "change to NULL " << *SI << "\n";
+llvm::dbgs() << "1: " <<*std::get<2>(t) << "\n";
+               std::get<2>(t) = NULL;
+               if (std::get<2>(t) == NULL)
+llvm::dbgs() << "2" << "\n";
+               break;
+             }
+           }                   
+         }
       });
+
 
       BB->getInstList().erase(SI);
     }

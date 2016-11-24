@@ -1138,14 +1138,22 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                                          int useIndex,
                                          llvm::Instruction* use) {
   assert(I != NULL && "Input Instruction should not be NULL");
-
+  llvm::dbgs() << "PropagateLoad begin\n";
+if (use == NULL)
+  llvm::dbgs() << "use is NULL yeah \n";
+else
+  llvm::dbgs() << *use << "\n";
   ValidationUnit::GetInstance()->intrude([&I, &LI, &use, &useIndex, &useBB](
       Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
     std::string Rload = getVariable(*LI);
-    auto phiNode = llvm::dyn_cast<llvm::PHINode>(use);
+    llvm::PHINode* phiNode = NULL;
+    if (use != NULL)
+      phiNode = llvm::dyn_cast<llvm::PHINode>(use);
+    else 
+      llvm::dbgs()<<"use is NULL wow!!! \n";
 
     if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
       std::string Rstore = getVariable(*(SI->getOperand(1)));
@@ -1331,6 +1339,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
       mem2regCmd[Rload].transTgt.push_back(transTgt);
     }
   });
+  llvm::dbgs() << "PropagateLoad end\n";
 }
 
 void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
