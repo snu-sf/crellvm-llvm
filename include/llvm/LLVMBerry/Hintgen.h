@@ -192,7 +192,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
                                bool isSameBB);
 
 void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB, 
-                                     std::vector<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> VisitedBlock, 
+                                     std::vector<std::pair<llvm::BasicBlock*,
+                                                           llvm::BasicBlock*>> VisitedBlock, 
                                      llvm::AllocaInst* AI, bool ignore);
 
 llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
@@ -208,6 +209,7 @@ int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
 
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
+
 void generateHintForMem2RegPhiUndef(llvm::PHINode *APN, llvm::BasicBlock *Pred);
 }
 

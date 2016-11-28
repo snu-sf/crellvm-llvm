@@ -1145,6 +1145,9 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
     std::string Rload = getVariable(*LI);
+    llvm::PHINode* phiNode = NULL;
+    if (use != NULL)
+      phiNode = llvm::dyn_cast<llvm::PHINode>(use);
 
     if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
       std::string Rstore = getVariable(*(SI->getOperand(1)));
@@ -1162,13 +1165,12 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
               ConsTransitivity::make(VAR(Rload, Physical), VAR(Rstore, Ghost),
                                      VAR(Rload, Ghost)));
 
-      if (llvm::isa<llvm::PHINode>(use)) {
-        llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
-        for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
+      if (phiNode != NULL) {
+        for (unsigned i = 0; i != phiNode->getNumIncomingValues(); ++i) {
           llvm::Value *iPI =
-              llvm::dyn_cast<llvm::Value>(use_aux->getIncomingValue(i));
+              llvm::dyn_cast<llvm::Value>(phiNode->getIncomingValue(i));
           if (LI == iPI) {
-            std::string prev = use_aux->getIncomingBlock(i)->getName();
+            std::string prev = phiNode->getIncomingBlock(i)->getName();
             PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
                       BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                              TyPosition::make(SRC, *use, useIndex, prev)));
@@ -1194,13 +1196,12 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
 
         mem2regCmd[Rload].lessdef.push_back(lessdef);
         
-        if (llvm::isa<llvm::PHINode>(use)) {
-          llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
-          for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
+        if (phiNode != NULL) {
+          for (unsigned i = 0; i != phiNode->getNumIncomingValues(); ++i) {
             llvm::Value *iPI =
-                llvm::dyn_cast<llvm::Value>(use_aux->getIncomingValue(i));
+                llvm::dyn_cast<llvm::Value>(phiNode->getIncomingValue(i));
             if (LI == iPI) {
-              std::string prev = use_aux->getIncomingBlock(i)->getName();
+              std::string prev = phiNode->getIncomingBlock(i)->getName();
               PROPAGATE(
                   std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                   BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
@@ -1230,13 +1231,12 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
              TyExpr::make(*(SI->getOperand(0)), Physical),
              TGT);
 
-        if (llvm::isa<llvm::PHINode>(use)) {
-          llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
-          for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
+        if (phiNode != NULL) {
+          for (unsigned i = 0; i != phiNode->getNumIncomingValues(); ++i) {
             llvm::Value *iPI =
-                llvm::dyn_cast<llvm::Value>(use_aux->getIncomingValue(i));
+                llvm::dyn_cast<llvm::Value>(phiNode->getIncomingValue(i));
             if (LI == iPI) {
-              std::string prev = use_aux->getIncomingBlock(i)->getName();
+              std::string prev = phiNode->getIncomingBlock(i)->getName();
               PROPAGATE(
                   std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                   BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
@@ -1278,13 +1278,12 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
               ConsTransitivity::make(VAR(Rload, Physical), VAR(Ralloca, Ghost),
                                      VAR(Rload, Ghost)));
 
-      if (llvm::isa<llvm::PHINode>(use)) {
-        llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
-        for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
+      if (phiNode != NULL) {
+        for (unsigned i = 0; i != phiNode->getNumIncomingValues(); ++i) {
           llvm::Value *iPI =
-              llvm::dyn_cast<llvm::Value>(use_aux->getIncomingValue(i));
+              llvm::dyn_cast<llvm::Value>(phiNode->getIncomingValue(i));
           if (LI == iPI) {
-            std::string prev = use_aux->getIncomingBlock(i)->getName();
+            std::string prev = phiNode->getIncomingBlock(i)->getName();
             PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
                       BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
                              TyPosition::make(SRC, *use, useIndex, prev)));
@@ -1304,13 +1303,12 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
 
       mem2regCmd[Rload].lessdef.push_back(lessdef);
 
-      if (llvm::isa<llvm::PHINode>(use)) {
-        llvm::PHINode *use_aux = llvm::dyn_cast<llvm::PHINode>(use);
-        for (unsigned i = 0; i != use_aux->getNumIncomingValues(); ++i) {
+      if (phiNode != NULL) {
+        for (unsigned i = 0; i != phiNode->getNumIncomingValues(); ++i) {
           llvm::Value *iPI =
-              llvm::dyn_cast<llvm::Value>(use_aux->getIncomingValue(i));
+              llvm::dyn_cast<llvm::Value>(phiNode->getIncomingValue(i));
           if (LI == iPI) {
-            std::string prev = use_aux->getIncomingBlock(i)->getName();
+            std::string prev = phiNode->getIncomingBlock(i)->getName();
             PROPAGATE(
                 std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                 BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
@@ -1431,7 +1429,6 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
 }
 
 void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instruction *Inst) {
-
   ValidationUnit::GetInstance()->intrude([&BB, &AI, &Inst]
                                                  (Dictionary &data, CoreHint &hints) {
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
@@ -1567,6 +1564,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
     auto &usePile = *(data.get<ArgForMem2Reg>()->usePile);
     auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
     auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
+
     for(auto IN = BB->begin(), IE = BB->end(); IN != IE; ++IN) {
       llvm::Instruction *Inst = IN;
 
@@ -1629,7 +1627,6 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
           }
 
             checkTag_propagate(BB, AI, LI);
-
             ignore = true;
 
             // add hints per every use of LI
@@ -2007,7 +2004,6 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
         IItmp = BBtmp->begin();
 
         // do not check same block again
-        // now working
         std::pair <llvm::BasicBlock *, llvm::BasicBlock *> tmp = std::make_pair(Predtmp, BBtmp);
         if (std::find(reachedEdge[Ralloca].begin(), reachedEdge[Ralloca].end(), tmp) != reachedEdge[Ralloca].end())
           continue;
@@ -2360,7 +2356,10 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
 
 int getIndexofMem2Reg(llvm::Instruction* I,
                       int instrIndex, int termIndex) {
-  if (llvm::isa<llvm::TerminatorInst>(I))
+  if (I == nullptr)
+    return instrIndex;
+
+  if (llvm::dyn_cast<llvm::TerminatorInst>(I) != NULL)
     return termIndex;
   else
     return instrIndex;

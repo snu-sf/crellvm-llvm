@@ -546,7 +546,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           } else {
             findReachable = true;
           }
-
           UI2++;
         }
 
@@ -684,6 +683,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
              llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
     auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+    auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
     std::string Ralloca = llvmberry::getVariable(*AI);
 
     // propagate maydiff
@@ -703,6 +703,20 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     std::vector<AllocaInst*>::iterator position = std::find(allocas.begin(), allocas.end(), AI);
     if (position != allocas.end()) 
       allocas.erase(position);
+
+    if(LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0))) {
+      for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
+        auto t = *(UI++);
+        if (std::get<2>(t) == OnlyStore) {
+          auto tuple = std::make_tuple(std::get<0>(t), std::get<1>(t), nullptr);
+          int pos = std::distance(usePile[check].begin(), UI);
+
+          usePile[check].erase(usePile[check].begin()+pos);
+          usePile[check].push_back(tuple);
+          break;
+        }                   
+      }
+    }
   });
 
   // Remove the (now dead) store and alloca.
@@ -970,10 +984,27 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               (llvmberry::Dictionary &data,
                llvmberry::CoreHint &hints) {
       auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+      auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
 
       hints.addNopPosition
         (llvmberry::TyPosition::make
           (llvmberry::Target, *SI, instrIndex[SI]-1, ""));
+      
+      if(LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
+        for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
+          auto t = *UI;
+
+          if (std::get<2>(t) == SI) {
+            auto tuple = std::make_tuple(std::get<0>(t), std::get<1>(t), nullptr);
+            int pos = std::distance(usePile[check].begin(), UI);
+
+            usePile[check].erase(usePile[check].begin()+pos);
+            usePile[check].push_back(tuple);
+            break;
+          }
+          UI++;
+        }                   
+      }
     });
 
     SI->eraseFromParent();
@@ -1063,12 +1094,12 @@ void PromoteMem2Reg::run() {
         std::string Ralloca = llvmberry::getVariable(*AItmp);
         std::string AIBname = llvmberry::getBasicBlockIndex(AIB);
 
-        allocas.push_back(AItmp);
-        instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
-
         // TODO: if we can validate "call -> nop" we need this condition
         //if (!llvmberry::hasBitcastOrGEP(AI)) { 
         if (BB == AIB) {
+          allocas.push_back(AItmp);
+          instrIndex[AItmp] = llvmberry::getCommandIndex(*AItmp);
+
           PROPAGATE(UNIQUE(Ralloca,
                            SRC),
                     BOUNDS(llvmberry::TyPosition::make
@@ -1109,16 +1140,14 @@ void PromoteMem2Reg::run() {
       // initialize information of each alloca's store and alloca
       for (auto UI = AItmp->user_begin(), E = AItmp->user_end(); UI != E;) {
         Instruction *tmpInst = cast<Instruction>(*UI++);
-        //bname = llvmberry::getBasicBlockIndex(tmpInst->getParent());
         instrIndex[tmpInst] = llvmberry::getCommandIndex(*tmpInst);
 
         // save information of instruction's use
         for (auto UI2 = tmpInst->use_begin(), E2 = tmpInst->use_end(); UI2 != E2;) {
           Use &U = *(UI2++);
-
+          
           if (Instruction* tmpUseinst = dyn_cast<Instruction>(U.getUser())) {
             instrIndex[tmpUseinst] = llvmberry::getCommandIndex(*tmpUseinst);
-
             BasicBlock* useBB = tmpUseinst->getParent();
             bool flag = false;
             bool findReachable = false;
@@ -1146,7 +1175,6 @@ void PromoteMem2Reg::run() {
                    isReachable[checkBB].end())) {
                   flag = true;
               }
-
 
               if (!DT.dominates(useBB, checkBB)) {
                 flag = true;
@@ -1342,7 +1370,7 @@ void PromoteMem2Reg::run() {
   RenamePassData::ValVector Values(Allocas.size());
   for (unsigned i = 0, e = Allocas.size(); i != e; ++i)
     Values[i] = UndefValue::get(Allocas[i]->getAllocatedType());
-  
+
   // Walks all basic blocks in the function performing the SSA rename algorithm
   // and inserting the phi nodes we marked as necessary
   //
@@ -1684,12 +1712,13 @@ NextIteration:
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
           Value* UndefVal = UndefValue::get(APN->getType());
+          auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
 
           if (IncomingVals[AllocaNo] == UndefVal && APN != NULL) {
             // alloca's use search
             // among them load which is dominated by bb.
             // then propagate phi to load
-            
+          
             llvmberry::generateHintForMem2RegPhiUndef(APN, Pred);
           }
 
@@ -1784,11 +1813,28 @@ NextIteration:
                 (llvmberry::Dictionary &data,
                  llvmberry::CoreHint &hints) {
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
+        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
+  
         std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
 
         hints.addNopPosition
           (llvmberry::TyPosition::make
             (llvmberry::Target, *SI, instrIndex[SI]-1, ""));
+
+        if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
+          for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI;) {
+            auto t = *(UI++);
+            
+            if (std::get<2>(t) == SI) {
+              auto tuple = std::make_tuple(std::get<0>(t), std::get<1>(t), nullptr);
+              int pos = std::distance(usePile[check].begin(), UI);
+
+              usePile[check].erase(usePile[check].begin()+pos);
+              usePile[check].push_back(tuple);
+              break;
+            }
+          }                   
+        }
       });
 
       BB->getInstList().erase(SI);
