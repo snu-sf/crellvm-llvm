@@ -1712,7 +1712,6 @@ NextIteration:
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
           Value* UndefVal = UndefValue::get(APN->getType());
-          auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
 
           if (IncomingVals[AllocaNo] == UndefVal && APN != NULL) {
             // alloca's use search
