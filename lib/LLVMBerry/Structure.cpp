@@ -1389,6 +1389,8 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
         hints.appendToDescription("TyConstant::make() : Unsupported floating point type");
         hints.setReturnCodeToAdmitted();
       });
+
+      return nullptr;
     }
   } else if (const llvm::GlobalVariable *gv =
                  llvm::dyn_cast<llvm::GlobalVariable>(&value)) {

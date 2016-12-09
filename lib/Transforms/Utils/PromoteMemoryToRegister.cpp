@@ -704,9 +704,10 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     if (position != allocas.end()) 
       allocas.erase(position);
 
-    if(LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0))) {
+    if (LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0))) {
       for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
-        auto t = *(UI++);
+        auto t = *UI;
+
         if (std::get<2>(t) == OnlyStore) {
           auto tuple = std::make_tuple(std::get<0>(t), std::get<1>(t), nullptr);
           int pos = std::distance(usePile[check].begin(), UI);
@@ -714,7 +715,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           usePile[check].erase(usePile[check].begin()+pos);
           usePile[check].push_back(tuple);
           break;
-        }                   
+        }
+        UI++;
       }
     }
   });
@@ -990,7 +992,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         (llvmberry::TyPosition::make
           (llvmberry::Target, *SI, instrIndex[SI]-1, ""));
       
-      if(LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
+      if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
         for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI; ) {
           auto t = *UI;
 
@@ -1812,8 +1814,7 @@ NextIteration:
                 (llvmberry::Dictionary &data,
                  llvmberry::CoreHint &hints) {
         auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
-  
+        auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile); 
         std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
 
         hints.addNopPosition
@@ -1822,7 +1823,7 @@ NextIteration:
 
         if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0))) {
           for (auto UI = usePile[check].begin(), EI = usePile[check].end(); UI != EI;) {
-            auto t = *(UI++);
+            auto t = *UI;
             
             if (std::get<2>(t) == SI) {
               auto tuple = std::make_tuple(std::get<0>(t), std::get<1>(t), nullptr);
@@ -1832,7 +1833,8 @@ NextIteration:
               usePile[check].push_back(tuple);
               break;
             }
-          }                   
+            UI++;
+          }
         }
       });
 
