@@ -906,6 +906,10 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
           (llvmberry::TyPosition::make
             (llvmberry::Target, *LI, instrIndex[LI]-1, ""));
         llvmberry::generateHintForMem2RegReplaceHint(UndefVal, LI);
+
+        if (!StoresByIndex.empty()) {
+          hints.appendToDescription("MEM2REG SINGLE BLOCK ALLOCA BUG FOUND BY US");
+        }
       });
 
       // If there is no store before this load, the load takes the undef value.
