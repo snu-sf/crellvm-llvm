@@ -1378,9 +1378,16 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
         std::shared_ptr<llvmberry::TyExpr> casted_form_val;
         auto k_reg = REGISTER("^k", Ghost);
         auto k_var = VAR("^k", Ghost);
+        auto k_id = ID("^k", Ghost);
 
         if (!is_cast_inst) {
           // casting is constant expr!
+          // This is the case like,
+          // ```
+          // store i64 0, i64* %ptr
+          // %v = load i32** %ptr ; %v = inttoptr 0 = null
+          // ```
+          // AvailableVal == 0, NewInst == null
           llvm::Constant *CAV = dyn_cast<Constant>(AvailableVal);
           llvm::Constant *CNewVal = dyn_cast<Constant>(NewInst);
 
@@ -1407,13 +1414,41 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             INFRULE(LIpos, llvmberry::ConsPtrtointLoad::make(
                 VAL(ptr1, Physical),
                 CAVTy, VAL(CAV, Physical),
-                CNewValTy, ID("^k", Ghost),
+                CNewValTy, k_id,
                 BITSIZE(load_align)));
-            // Make ^k >=src ptrtoint %v1 >= (%v1' in tgt)
+            // Make ^k >=tgt ptrtoint %v1 >=tgt (%v1' in tgt)
+            INFRULE(LIpos, llvmberry::ConsTransitivityTgt::make(
+                k_var, casted_form_inst, casted_form_val));
+          } else if (CAV && CNewVal && CAV->getType()->isDoubleTy()
+                     && CNewVal->getType()->isIntegerTy(64)) {
+            // v1 is double, v2 is i64
+            auto CAVTy = VALTYPE(CAV->getType());
+            auto CNewValTy = VALTYPE(CNewVal->getType());
+            // make expr `bitcast CAV`
+            auto bitcast_inst = std::shared_ptr<llvmberry::TyInstruction>(
+                llvmberry::ConsBitCastInst::make(CAVTy, VAL(CAV, Physical), CNewValTy));
+            casted_form_inst = std::shared_ptr<llvmberry::TyExpr>(
+                new llvmberry::ConsInsn(bitcast_inst));
+            casted_form_val = EXPR(CNewVal, Physical);
+            // Add `bitcast CAV >= CNewVal`.
+            INFRULE(LIpos, llvmberry::ConsBitcastDoubleI64::make(
+                llvmberry::TyConstant::make(*CAV), 
+                llvmberry::TyConstInt::make(*dyn_cast<ConstantInt>(CNewVal))));
+            // Make bitcast CAV >=src ^k >=tgt bitcast CAV
+            INFRULE(LIpos, llvmberry::ConsIntroGhost::make(casted_form_inst, k_reg));
+
+            // Make *(%ptr1) >= ^k from (*(%ptr1) >=src %v1) && (bitcast %v1 >=src ^k)
+            INFRULE(LIpos, llvmberry::ConsBitcastLoad::make(
+                VAL(ptr1, Physical),
+                CAVTy, VAL(CAV, Physical),
+                CNewValTy, k_id,
+                BITSIZE(load_align)));
+            // Make ^k >=tgt bitcast %v1 >= (%v1' in tgt)
             INFRULE(LIpos, llvmberry::ConsTransitivityTgt::make(
                 k_var, casted_form_inst, casted_form_val));
           } else {
-            // At least in Python/SPEC this case didn't happen..
+            // At least in Python/SPEC/LLVM Nightly Test, this case didn't happen..
+            assert(false && "Hi, Here comes a new challenger. :)");
           }
         } else {
           Instruction *inst = dyn_cast<Instruction>(NewInst);
