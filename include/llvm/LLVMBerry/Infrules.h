@@ -323,6 +323,16 @@ private:
   std::shared_ptr<TyValueType> dstty;
 };
 
+struct TyBitcastDoubleI64 {
+public:
+  TyBitcastDoubleI64(std::shared_ptr<TyConstant> _src, std::shared_ptr<TyConstInt> _tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyConstant> src;
+  std::shared_ptr<TyConstInt> tgt;
+};
+
 struct TyBitcastFpext {
 public:
   TyBitcastFpext(std::shared_ptr<TyValue> _src, std::shared_ptr<TyValue> _mid,
@@ -3576,6 +3586,17 @@ public:
 
 private:
   std::shared_ptr<TyBitcastBitcast> bitcast_bitcast;
+};
+
+struct ConsBitcastDoubleI64 : public TyInfrule {
+public:
+  ConsBitcastDoubleI64(std::shared_ptr<TyBitcastDoubleI64> _bitcast_double_i64);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyConstant> _src,
+                                         std::shared_ptr<TyConstInt> _tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyBitcastDoubleI64> bitcast_double_i64;
 };
 
 struct ConsBitcastFpext : public TyInfrule {

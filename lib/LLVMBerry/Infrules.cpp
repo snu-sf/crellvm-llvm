@@ -678,6 +678,29 @@ void ConsBitcastBitcast::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(bitcast_bitcast));
 }
 
+TyBitcastDoubleI64::TyBitcastDoubleI64(std::shared_ptr<TyConstant> _src,
+                                   std::shared_ptr<TyConstInt> _tgt)
+    : src(_src), tgt(_tgt) {}
+void TyBitcastDoubleI64::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(src));
+  archive(CEREAL_NVP(tgt));
+}
+ConsBitcastDoubleI64::ConsBitcastDoubleI64(
+    std::shared_ptr<TyBitcastDoubleI64> _bitcast_double_i64)
+    : bitcast_double_i64(_bitcast_double_i64) {}
+std::shared_ptr<TyInfrule> ConsBitcastDoubleI64::make(
+    std::shared_ptr<TyConstant> _src, std::shared_ptr<TyConstInt> _tgt) {
+  std::shared_ptr<TyBitcastDoubleI64> _val(
+      new TyBitcastDoubleI64(_src, _tgt));
+  return std::shared_ptr<TyInfrule>(new ConsBitcastDoubleI64(_val));
+}
+void ConsBitcastDoubleI64::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("BitcastDoubleI64");
+  archive(CEREAL_NVP(bitcast_double_i64));
+}
+
 TyBitcastFpext::TyBitcastFpext(std::shared_ptr<TyValue> _src,
                                std::shared_ptr<TyValue> _mid,
                                std::shared_ptr<TyValue> _dst,
