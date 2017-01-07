@@ -1434,10 +1434,12 @@ void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instr
     auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
     auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
     auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
+
     
+    llvm::Value *UndefVal = llvm::UndefValue::get(AI->getAllocatedType());
+
     for (auto BI = pred_begin(BB), BE = pred_end(BB); BI != BE; ++BI) {
       llvm::BasicBlock *pred = *BI;
-      llvm::Value *UndefVal = llvm::UndefValue::get(Inst->getType());
 
       std::pair<llvm::BasicBlock *, llvm::BasicBlock *> edge = std::make_pair(pred, BB);
 
@@ -1565,6 +1567,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
     auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
     auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
 
+    llvm::Value *UndefVal = llvm::UndefValue::get(AI->getAllocatedType());
+    
     for(auto IN = BB->begin(), IE = BB->end(); IN != IE; ++IN) {
       llvm::Instruction *Inst = IN;
 
@@ -1583,8 +1587,6 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
           llvm::AllocaInst *Src = llvm::dyn_cast<llvm::AllocaInst>(LI->getPointerOperand());
           if (!Src)
               continue;  
-          
-          llvm::Value *UndefVal = llvm::UndefValue::get(LI->getType());
 
           if (BB == LI->getParent()->getParent()->begin()) {
             PROPAGATE(
@@ -1596,7 +1598,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                            TyPosition::make(SRC, *LI, instrIndex[LI], "")));
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
-                            EXPR(llvm::UndefValue::get(LI->getType()), Physical),
+                            EXPR(UndefVal, Physical),
                             TGT),
                     BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
                            TyPosition::make(SRC, *LI, instrIndex[LI], "")));
@@ -1671,7 +1673,6 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
         } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue) != reachedEdgeTag.end()) { 
           while (!VisitedBlock.empty()) {
             llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
-            llvm::Value *UndefVal = llvm::UndefValue::get(AI->getType());
             std::pair<std::pair<llvm::BasicBlock*,
                               llvm::BasicBlock*>,
                     llvmberry::Mem2RegArg::Tr_Type> blockPairTag1 = std::make_pair(*VisitedBlock.rbegin(), llvmberry::Mem2RegArg::LoadStart);
@@ -1759,7 +1760,6 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
         } else if (std::find(reachedEdgeTag.begin(), reachedEdgeTag.end(), BpairTrue) != reachedEdgeTag.end()) { 
         while (!VisitedBlock.empty()) {
           llvm::BasicBlock *current = (*VisitedBlock.rbegin()).first;
-          llvm::Value *UndefVal = llvm::UndefValue::get(AI->getType());
            std::pair<std::pair<llvm::BasicBlock*,
                               llvm::BasicBlock*>,
                     llvmberry::Mem2RegArg::Tr_Type> blockPairTag1 = std::make_pair(*VisitedBlock.rbegin(), llvmberry::Mem2RegArg::False);
