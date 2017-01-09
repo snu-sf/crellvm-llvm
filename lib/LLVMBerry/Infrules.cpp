@@ -2853,6 +2853,35 @@ void ConsLessthanUndefTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lessthan_undef_tgt));
 }
 
+TyLessthanUndefConstIntTgt::TyLessthanUndefConstIntTgt(std::shared_ptr<TyConstInt> _c,
+                                                       std::shared_ptr<TySize> _sz)
+    : c(_c), sz(_sz) {}
+
+void TyLessthanUndefConstIntTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(c));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsLessthanUndefConstIntTgt::ConsLessthanUndefConstIntTgt(
+    std::shared_ptr<TyLessthanUndefConstIntTgt> _lessthan_undef_constint_tgt)
+    : lessthan_undef_constint_tgt(_lessthan_undef_constint_tgt) {}
+
+std::shared_ptr<TyInfrule>
+ConsLessthanUndefConstIntTgt::make(std::shared_ptr<TyConstInt> _c,
+                                   std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyLessthanUndefConstIntTgt> _val(
+      new TyLessthanUndefConstIntTgt(_c, _sz));
+
+  return std::shared_ptr<TyInfrule>(new ConsLessthanUndefConstIntTgt(_val));
+}
+
+void ConsLessthanUndefConstIntTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("LessthanUndefConstIntTgt");
+  archive(CEREAL_NVP(lessthan_undef_constint_tgt));
+}
+
 TyMulNeg::TyMulNeg(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _mx,
                    std::shared_ptr<TyValue> _my, std::shared_ptr<TyValue> _x,
                    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz)
