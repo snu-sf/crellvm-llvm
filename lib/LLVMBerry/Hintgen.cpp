@@ -2102,16 +2102,13 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                 INFRULE(TyPosition::make(TGT, PHI->getParent()->getName(),
                                          Predtmp->getName()),
                         std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transitivitytgt)));
-               
-                if (SIname != "")
-                  mem2regCmd[getVariable(*(SItmp->getOperand(0)))].transTgt.push_back(transitivitytgt);
 
                 if (storeItem[SItmp].op0 != "%") {
                   transTgt.push_back(transitivitytgt);
                 }
 
                 if (SIname != "") {
-                  mem2regCmd[getVariable(*SItmp->getOperand(0))].transTgt.push_back(transitivitytgt);
+                  mem2regCmd["%"+SIname].transTgt.push_back(transitivitytgt);
                 }
                 //check end
               }
@@ -2167,10 +2164,12 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                  SRC, getBasicBlockIndex(PHI->getParent())),
                                  TyPosition::make_end_of_block(SRC, *usePred, termIndex[getBasicBlockIndex(usePred)])));
 
+                      std::string useName = "%"+std::string(use->getName());
+
                       std::shared_ptr<TyTransitivityTgt> transitivitytgt
                         (new TyTransitivityTgt(VAR(Rstore, Ghost),
                                                VAR(Rphi, Previous),
-                                               VAR(getVariable(*use), Physical)));
+                                               VAR(useName, Physical)));
                      
                       INFRULE(TyPosition::make(TGT, target->getName(),
                                                usePred->getName()),

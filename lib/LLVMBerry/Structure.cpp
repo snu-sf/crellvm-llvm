@@ -223,6 +223,7 @@ std::string getVariable(const llvm::Value &value) {
   } else if (llvm::isa<llvm::Instruction>(value) ||
              llvm::isa<llvm::Argument>(value) ||
              llvm::isa<llvm::ConstantExpr>(value) ||
+             llvm::isa<llvm::ConstantPointerNull>(value) ||
              llvm::isa<llvm::UndefValue>(value)) {
     val = std::string("%");
   } else {
