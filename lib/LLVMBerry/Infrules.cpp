@@ -2853,33 +2853,30 @@ void ConsLessthanUndefTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lessthan_undef_tgt));
 }
 
-TyLessthanUndefConstIntTgt::TyLessthanUndefConstIntTgt(std::shared_ptr<TyConstInt> _c,
-                                                       std::shared_ptr<TySize> _sz)
-    : c(_c), sz(_sz) {}
+TyLessthanUndefConstTgt::TyLessthanUndefConstTgt(std::shared_ptr<TyConstant> _c)
+    : c(_c) {}
 
-void TyLessthanUndefConstIntTgt::serialize(cereal::JSONOutputArchive &archive) const {
+void TyLessthanUndefConstTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(c));
-  archive(CEREAL_NVP(sz));
 }
 
-ConsLessthanUndefConstIntTgt::ConsLessthanUndefConstIntTgt(
-    std::shared_ptr<TyLessthanUndefConstIntTgt> _lessthan_undef_constint_tgt)
-    : lessthan_undef_constint_tgt(_lessthan_undef_constint_tgt) {}
+ConsLessthanUndefConstTgt::ConsLessthanUndefConstTgt(
+    std::shared_ptr<TyLessthanUndefConstTgt> _lessthan_undef_const_tgt)
+    : lessthan_undef_const_tgt(_lessthan_undef_const_tgt) {}
 
 std::shared_ptr<TyInfrule>
-ConsLessthanUndefConstIntTgt::make(std::shared_ptr<TyConstInt> _c,
-                                   std::shared_ptr<TySize> _sz) {
-  std::shared_ptr<TyLessthanUndefConstIntTgt> _val(
-      new TyLessthanUndefConstIntTgt(_c, _sz));
+ConsLessthanUndefConstTgt::make(std::shared_ptr<TyConstant> _c) {
+  std::shared_ptr<TyLessthanUndefConstTgt> _val(
+      new TyLessthanUndefConstTgt(_c));
 
-  return std::shared_ptr<TyInfrule>(new ConsLessthanUndefConstIntTgt(_val));
+  return std::shared_ptr<TyInfrule>(new ConsLessthanUndefConstTgt(_val));
 }
 
-void ConsLessthanUndefConstIntTgt::serialize(cereal::JSONOutputArchive &archive) const {
+void ConsLessthanUndefConstTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive.makeArray();
   archive.writeName();
-  archive.saveValue("LessthanUndefConstIntTgt");
-  archive(CEREAL_NVP(lessthan_undef_constint_tgt));
+  archive.saveValue("LessthanUndefConstTgt");
+  archive(CEREAL_NVP(lessthan_undef_const_tgt));
 }
 
 TyMulNeg::TyMulNeg(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _mx,

@@ -1463,47 +1463,48 @@ void PromoteMem2Reg::run() {
         llvmberry::ValidationUnit::GetInstance()->intrude
                         ([&PN, &V]
                                  (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+          auto &termIndex = *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
 
-        for (unsigned i = 0; i != PN->getNumIncomingValues(); ++i) {
-          Value *check = dyn_cast<Value>(PN->getIncomingValue(i));
-          Value *UndefVal = UndefValue::get(PN->getType());
-          std::string ghost = PN->getName().substr(0, PN->getName().rfind("."));
+          for (unsigned i = 0; i != PN->getNumIncomingValues(); ++i) {
+            Value *check = dyn_cast<Value>(PN->getIncomingValue(i));
+            Value *UndefVal = UndefValue::get(PN->getType());
+            std::string ghost = PN->getName().substr(0, PN->getName().rfind("."));
 
-          // find undef prev block
-          if (UndefVal == check) {
-            BasicBlock *Income = PN->getIncomingBlock(i);
-            BasicBlock *Current = PN->getParent();
+            // find undef prev block
+            if (UndefVal == check) {
+              BasicBlock *Income = PN->getIncomingBlock(i);
+              BasicBlock *Current = PN->getParent();
 
-            // value is instr
-            if (Instruction *In = dyn_cast<Instruction>(V)) {
-              // from to prpagate undef > value
-              PROPAGATE(LESSDEF(EXPR(UndefVal, Physical), VAR(llvmberry::getVariable(*In), Physical), TGT),
-                        BOUNDS(llvmberry::TyPosition::make(TGT, *In),
-                               llvmberry::TyPosition::make_end_of_block(SRC, *Income, termIndex[llvmberry::getBasicBlockIndex(Income)])));
+              if (Instruction *In = dyn_cast<Instruction>(V)) {
+              // value is instr
+                // from to prpagate undef > value
+                PROPAGATE(LESSDEF(EXPR(UndefVal, Physical), VAR(llvmberry::getVariable(*In), Physical), TGT),
+                          BOUNDS(llvmberry::TyPosition::make(TGT, *In),
+                                 llvmberry::TyPosition::make_end_of_block(SRC, *Income, termIndex[llvmberry::getBasicBlockIndex(Income)])));
 
-              //transivity at phi node X > undef > value
-              INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
-                      llvmberry::ConsTransitivityTgt::make(VAR(ghost, Ghost),
-                                                           EXPR(UndefVal, Physical),
-                                                           EXPR(In, Physical)));
-            }
-              // value is const
-            else if (ConstantInt *Con = dyn_cast<ConstantInt>(V)) {
+                // transitivity at phi node X > undef > value
+                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
+                        llvmberry::ConsTransitivityTgt::make(VAR(ghost, Ghost),
+                                                             EXPR(UndefVal, Physical),
+                                                             EXPR(In, Physical)));
+              } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
+              // value is constInt or constFloat
+                // infrule lessthanundef target undef > const
+                Constant *C = dyn_cast<Constant>(V);
+                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
+                        llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
 
-              // infrule lessthanundef target undef > const
-              INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
-                      llvmberry::ConsLessthanUndefConstIntTgt::make(llvmberry::TyConstInt::make(*Con), 
-                                                                    llvmberry::ConsSize::make(Con->getType()->getIntegerBitWidth())));
-
-              //transivity at phi node X > undef > const
-              INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
-                      llvmberry::ConsTransitivityTgt::make(VAR(ghost, Ghost),
-                                                           EXPR(UndefVal, Physical),
-                                                           EXPR(Con, Physical)));
+                // transitivity at phi node X > undef > const
+                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
+                        llvmberry::ConsTransitivityTgt::make(VAR(ghost, Ghost),
+                                                             EXPR(UndefVal, Physical),
+                                                             EXPR(C, Physical)));
+              } else {
+                hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT");
+              }
             }
           }
-        }
+
           llvmberry::generateHintForMem2RegReplaceHint(V, PN);
         });
 
