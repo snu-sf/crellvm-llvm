@@ -1738,12 +1738,6 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
               llvmberry::ConsAndUndef::make(
                   VAL(Z, Physical), VAL(Op0, Physical),
                   llvmberry::ConsSize::make(bitwidth))));
-          hints.addCommand(llvmberry::ConsInfrule::make(
-              INSTPOS(llvmberry::Source, Z),
-              llvmberry::ConsLessthanUndef::make(
-                  llvmberry::TyValueType::make(*Op0->getType()),
-                  llvmberry::TyValue::make(*zero))));
-          llvmberry::applyTransitivity(Z, Z, Op1, zero, llvmberry::Source);
         });
       });
     }
@@ -2094,9 +2088,6 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
           }
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrUndef::make(
               VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsLessthanUndef::make(
-              VALTYPE(Op0->getType()), VAL(one, Physical)));
-          llvmberry::applyTransitivity(Z, Z, Op1, one, SRC);
         });
       });
     }
@@ -2371,9 +2362,6 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
           }
           INFRULE(INSTPOS(llvmberry::Source, Z),
               llvmberry::ConsXorUndef::make(VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
-          INFRULE(INSTPOS(llvmberry::Source, Z),
-              llvmberry::ConsLessthanUndef::make(VALTYPE(Op0->getType()), VAL(zero, Physical)));
-          llvmberry::applyTransitivity(Z, Z, Op1, zero, llvmberry::Source);
         });
       });
     }
