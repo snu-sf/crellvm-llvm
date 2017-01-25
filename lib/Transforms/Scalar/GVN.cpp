@@ -835,6 +835,23 @@ bool hasSameRHS(Instruction *X, Instruction *Y) {
       return false;
   return true;
 }
+
+bool isCommutPair(Instruction *X, Instruction *Y) {
+  if (X->getType() != Y->getType())
+    return false;
+  if (X->getOpcode() != Y->getOpcode())
+    return false;
+  if (X->getNumOperands() != Y->getNumOperands())
+    return false;
+  if (X->getNumOperands() != 2)
+    return false;
+  if (!isa<BinaryOperator>(X) || !isa<BinaryOperator>(Y))
+    return false;
+  if (X->getOperand(0) == Y->getOperand(1) &&
+      X->getOperand(1) == Y->getOperand(0))
+    return true;
+  return false;
+}
 // Somehow create VAR(XInst) >= EXPR(YConst) in pos(BBPred->BBSucc)
 // Not INSN(XInst), 75.alias.o.find_base_value.1 -> XInst is Phi
 bool generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
@@ -1147,7 +1164,20 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         // Below hint relies on [ INSN(CurInstInPB) >= Var(VI) ]
         // It should generate hint for that
         for (int i = 0; i < CurInstInPB->getNumOperands(); i++) {
-          if (CurInstInPB->getOperand(i) != VI->getOperand(i)) {
+          if (isCommutPair(CurInstInPB, VI)) {
+            BinaryOperator *VIB = dyn_cast<BinaryOperator>(VI);
+            // Copied from: llvmberry::applyCommutativity
+
+            // Only care Bop case for now (not fbop, blah)
+            int bitwidth = llvmberry::isFloatOpcode(VIB->getOpcode())
+                               ? -1
+                               : VIB->getType()->getIntegerBitWidth();
+            INFRULE(PBPhiPos, llvmberry::ConsBopCommutativeRev::make(
+                                  VAR(VI_id, Physical), llvmberry::BopAdd,
+                                  llvmberry::TyValue::make(*VIB->getOperand(0)),
+                                  llvmberry::TyValue::make(*VIB->getOperand(1)),
+                                  llvmberry::ConsSize::make(bitwidth)));
+          } else if (CurInstInPB->getOperand(i) != VI->getOperand(i)) {
             // just to get BB from dictionary. we may able to store it as a map
             // or something but it would be wasteful
 
