@@ -837,7 +837,7 @@ bool hasSameRHS(Instruction *X, Instruction *Y) {
 }
 // Somehow create VAR(XInst) >= EXPR(YConst) in pos(BBPred->BBSucc)
 // Not INSN(XInst), 75.alias.o.find_base_value.1 -> XInst is Phi
-void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
+bool generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
                            const BasicBlock *BBPred, Instruction *XInst,
                            Constant *YConst) {
   std::string XInst_id = llvmberry::getVariable(*XInst);
@@ -875,7 +875,12 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
   } else
     assert(false && "GVN make_repl_inv: Unexpected terminator.");
 
-  assert(condI && "GVN make_repl_inv: Branch case with non-instr cond!");
+  if (!condI) {
+    hints.appendToDescription("YS assertion fail");
+    hints.setReturnCodeToFail();
+    return false;
+  }
+  // assert(condI && "GVN make_repl_inv: Branch case with non-instr cond!");
   assert(CI_cond && "GVN make_repl_inv: Branch condition constant not found!");
 
   std::string condI_id = llvmberry::getVariable(*condI);
@@ -1001,7 +1006,7 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
               assert(CI_cond == ConstantInt::getFalse(BBSucc->getContext()));
               assert("NE case not yet covered" && false);
             } else
-              assert("What is this case? Not yet covered" && false);
+              assert("What is this case? Not yet covered1" && false);
           }
         }
       } else if (Instruction *newCondI =
@@ -1068,15 +1073,20 @@ void generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
       } else if (condIC->getPredicate() == CmpInst::ICMP_NE) {
         assert(CI_cond == ConstantInt::getFalse(BBSucc->getContext()));
         assert("NE case not yet covered" && false);
-      } else
-        assert("What is this case? Not yet covered" && false);
+      } else {
+        hints.appendToDescription("YS assertion fail 2");
+        hints.setReturnCodeToFail();
+        // assert("What is this case? Not yet covered2" && false);
+        return false;
+      }
     } else
-      assert("What is this case? Not yet covered" && false);
+      assert("What is this case? Not yet covered3" && false);
   }
+  return true;
 }
 
 // [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi->getParent())
-void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
+bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   BasicBlock *PhiBlock = Phi->getParent();
   std::string CurInst_id = llvmberry::getVariable(*CurInst);
   std::string Phi_id = llvmberry::getVariable(*Phi);
@@ -1090,13 +1100,13 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   if (isa<CallInst>(CurInst)) {
     hints.appendToDescription("CurInstIsCall");
     hints.setReturnCodeToAdmitted();
-    return;
+    return true;
   }
 
   if (PREAR->isFromNonLocalLoad) {
     hints.appendToDescription("isFromNonLocalLoad");
     hints.setReturnCodeToAdmitted();
-    return;
+    return true;
   }
 
   // For each pred block, propagate the chain of involved values until
@@ -1118,7 +1128,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
       if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in start_of_block(VPHI)
-        generateHintForPRE(CurInstInPB, VPHI);
+        if (!generateHintForPRE(CurInstInPB, VPHI)) {
+          CurInstInPB->eraseFromParent();
+          return false;
+        }
 
         // Propagate [ INSN(CurInstInPB) >= VAR(VI) ]
         PROPAGATE(LESSDEF(INSN(*CurInstInPB), VAR(VI_id, Physical), SRC),
@@ -1157,15 +1170,24 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                            ->prevLeaderBBs[PB];
             assert(BBSucc && "Expect BBSucc to exist");
             const BasicBlock *BBPred = BBSucc->getSinglePredecessor();
-            assert(BBPred &&
-                   "Expect it to be introduced from propagateEquality, and "
-                   "it checks "
-                   "RootDominatesEnd, meaning it has single predecessor");
+            // assert(BBPred &&
+            //        "Expect it to be introduced from propagateEquality, and "
+            //        "it checks "
+            //        "RootDominatesEnd, meaning it has single predecessor");
+            if (!BBPred) {
+              hints.appendToDescription("YS singlepred 1");
+              CurInstInPB->eraseFromParent();
+              return false;
+            }
 
             // Somehow create VAR(OpInst) >= EXPR(OpConst) in
             // pos(BBPred->BBSucc)
             // TODO might need both direction?
-            generateHintForPropEq(hints, BBSucc, BBPred, OpInst, OpConst);
+            if (!generateHintForPropEq(hints, BBSucc, BBPred, OpInst, OpConst)) {
+              // error
+              CurInstInPB->eraseFromParent();
+              return false;
+            }
             auto BBPredSuccPos = llvmberry::TyPosition::make(
                 SRC, BBSucc->getName(), BBPred->getName());
 
@@ -1193,7 +1215,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
           hints.appendToDescription("Diffs > 1");
           hints.setReturnCodeToFail();
           CurInstInPB->eraseFromParent(); // delete will not work
-          return;
+          return true;
         }
 
         // Propagate [ RHS(VI) >= VAR(VI) ]
@@ -1211,7 +1233,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               // hints.setReturnCodeToAdmitted();
               CurInstInPB->eraseFromParent(); // delete will not work
               // hints.setReturnCodeToFail();
-              return;
+              return true;
             }
             if (CurInstInPBGEP->isInBounds() && !VIGEP->isInBounds())
               inboundsRemovalOccured = true;
@@ -1263,12 +1285,19 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                      ->prevLeaderBBs[PB];
       assert(BBSucc && "Expect BBSucc to exist");
       const BasicBlock *BBPred = BBSucc->getSinglePredecessor();
-      assert(BBPred && "Expect it to be introduced from propagateEquality, and "
-                       "it checks "
-                       "RootDominatesEnd, meaning it has single predecessor");
+
+      if (!BBPred) {
+        hints.appendToDescription("YS singlepred 2");
+        return false;
+      }
+      // assert(BBPred && "Expect it to be introduced from propagateEquality, and "
+      //                  "it checks "
+      //                  "RootDominatesEnd, meaning it has single predecessor");
 
       // [ Var(CurInst) >= Expr(VConst) ]
-      generateHintForPropEq(hints, BBSucc, BBPred, CurInst, VConst);
+      if (!generateHintForPropEq(hints, BBSucc, BBPred, CurInst, VConst)) {
+        return true;
+      }
       auto BBPredSuccPos = llvmberry::TyPosition::make(SRC, BBSucc->getName(),
                                                        BBPred->getName());
       // TODO this hint gen works??
@@ -1293,6 +1322,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       // Inbounds removal may not occur, because V is const...
     }
   }
+  return true;
           });
   } else {
     llvmberry::ValidationUnit::GetInstance()
@@ -1302,20 +1332,20 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
       if (isa<CallInst>(CurInst)) {
         hints.appendToDescription("CurInstIsCall");
         hints.setReturnCodeToAdmitted();
-        return;
+        return true;
       }
 
       if (PREAR->isFromNonLocalLoad) {
         hints.appendToDescription("isFromNonLocalLoad");
         hints.setReturnCodeToAdmitted();
-        return;
+        return true;
       }
       // if is same for all, it does not involve previous PRE and just works
       // it is treated below
       if (PREAR->PrevPRENotEnough) {
         hints.appendToDescription("PrevPRENotEnough");
         hints.setReturnCodeToFail();
-        return;
+        return true;
       }
       std::vector<std::pair<PHINode *, int>> PrevPRE = PREAR->PrevPRE;
       hints.appendToDescription("CurInst is: " + ((*CurInst).getName()).str());
@@ -1329,7 +1359,7 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
           // constant int occurs... How can constant int get value number???
           hints.appendToDescription("V not instruction");
           hints.setReturnCodeToFail();
-          return;
+          return true;
         }
 
         // TODO cleanse Somehow get in comment
@@ -1426,9 +1456,10 @@ void generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         CurInstInPB->eraseFromParent(); // delete will not work
       }
 
-      return;
+      return true;
           });
   }
+  return true;
 }
 }
 
@@ -1527,7 +1558,9 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
   if (I1->getOpcode() != I2->getOpcode()) {
     if (isa<PHINode>(I1) || isa<PHINode>(I2)) {
       if (PHINode *phi_I2 = dyn_cast<PHINode>(I2)) {
-        generateHintForPRE(I1, phi_I2);
+        if (!generateHintForPRE(I1, phi_I2)) {
+          return false;
+        }
         PROPAGATE(
             LESSDEF(RHS(id_I1, Physical, SRC), VAR(id_I2, Physical), SRC),
             BOUNDS(llvmberry::TyPosition::make_start_of_block(
@@ -1988,9 +2021,14 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
                                      .get<llvmberry::ArgForGVNReplace>()
                                      ->BB;
     const BasicBlock *BB_pred = BB_succ->getSinglePredecessor();
-    assert(BB_pred &&
-           "Expect it to be introduced from propagateEquality, and it checks "
-           "RootDominatesEnd, meaning it has single predecessor");
+
+    if (!BB_pred) {
+      hints.appendToDescription("YS singlepred 3");
+      return false;
+    }
+    // assert(BB_pred &&
+    //        "Expect it to be introduced from propagateEquality, and it checks "
+    //        "RootDominatesEnd, meaning it has single predecessor");
 
     TerminatorInst *TI =
         const_cast<TerminatorInst *>(BB_pred->getTerminator());
