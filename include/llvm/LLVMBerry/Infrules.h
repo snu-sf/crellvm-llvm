@@ -290,6 +290,21 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyBopCommutativeRev {
+public:
+  TyBopCommutativeRev(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                   std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                   std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> e;
+  TyBop bop;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyFbopCommutative {
 public:
   TyFbopCommutative(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
@@ -3507,6 +3522,20 @@ public:
 
 private:
   std::shared_ptr<TyBopCommutative> bop_commutative;
+};
+
+struct ConsBopCommutativeRev : TyInfrule {
+public:
+  ConsBopCommutativeRev(std::shared_ptr<TyBopCommutativeRev> _bop_commutative_rev);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
+
+private:
+  std::shared_ptr<TyBopCommutativeRev> bop_commutative_rev;
 };
 
 struct ConsFbopCommutative : TyInfrule {
