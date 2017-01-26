@@ -2876,6 +2876,32 @@ void ConsLessthanUndefTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lessthan_undef_tgt));
 }
 
+TyLessthanUndefConstTgt::TyLessthanUndefConstTgt(std::shared_ptr<TyConstant> _c)
+    : c(_c) {}
+
+void TyLessthanUndefConstTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(c));
+}
+
+ConsLessthanUndefConstTgt::ConsLessthanUndefConstTgt(
+    std::shared_ptr<TyLessthanUndefConstTgt> _lessthan_undef_const_tgt)
+    : lessthan_undef_const_tgt(_lessthan_undef_const_tgt) {}
+
+std::shared_ptr<TyInfrule>
+ConsLessthanUndefConstTgt::make(std::shared_ptr<TyConstant> _c) {
+  std::shared_ptr<TyLessthanUndefConstTgt> _val(
+      new TyLessthanUndefConstTgt(_c));
+
+  return std::shared_ptr<TyInfrule>(new ConsLessthanUndefConstTgt(_val));
+}
+
+void ConsLessthanUndefConstTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("LessthanUndefConstTgt");
+  archive(CEREAL_NVP(lessthan_undef_const_tgt));
+}
+
 TyMulNeg::TyMulNeg(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _mx,
                    std::shared_ptr<TyValue> _my, std::shared_ptr<TyValue> _x,
                    std::shared_ptr<TyValue> _y, std::shared_ptr<TySize> _sz)
