@@ -746,7 +746,26 @@ class PREAnalysisResult {
 public:
   bool PrevPRENotEnough;
   std::vector<std::pair<PHINode *, int>> PrevPRE;
+  std::vector<int> diffWithoutPrevPRE;
   bool isFromNonLocalLoad;
+
+  bool getDiffIdxWithoutPrevPRE(Instruction *X, Instruction *Y,
+                                std::vector<int> &result) {
+    if (X->getType() != Y->getType())
+      return false;
+    if (X->getOpcode() != Y->getOpcode())
+      return false;
+    if (X->getNumOperands() != Y->getNumOperands())
+      return false;
+    for (int i = 0; i < X->getNumOperands(); i++)
+      if (X->getOperand(i) != Y->getOperand(i))
+        if (find_if(PrevPRE.begin(), PrevPRE.end(),
+                    [&i](const std::pair<PHINode *, int> &x) {
+                      return x.second == i;
+                    }) == PrevPRE.end())
+          result.push_back(i);
+    return true;
+  }
 
   PREAnalysisResult(Instruction *CurInst, PHINode *PN) {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
@@ -1398,6 +1417,19 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
         Instruction *VI = dyn_cast<Instruction>(V);
         std::string VI_id = llvmberry::getVariable(*VI);
+
+        std::vector<int> diffIdxWithoutPrevPRE;
+        if (!PREAR->getDiffIdxWithoutPrevPRE(CurInst, VI,
+                                             diffIdxWithoutPrevPRE))
+          assert("getDiffIdxWithoutPrevPRE failed!" && false);
+        for (auto i : diffIdxWithoutPrevPRE) {
+          hints.appendToDescription("diffIdxWithoutPrevPRE is: " +
+                                    std::to_string(i));
+        }
+        if (diffIdxWithoutPrevPRE.size() != 0) {
+          hints.setReturnCodeToFail();
+          return true;
+        }
 
         Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
         CurInstInPB->insertBefore(VI->getParent()->getTerminator());
