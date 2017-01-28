@@ -1419,8 +1419,6 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         std::string VI_id = llvmberry::getVariable(*VI);
 
         Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
-        CurInstInPB->insertBefore(VI->getParent()->getTerminator());
-        CurInstInPB->setName(CurInst->getName() + ".llvmberry.phi.resolved");
 
         std::vector<int> diffIdxWithoutPrevPRE;
         if (!PREAR->getDiffIdxWithoutPrevPRE(CurInst, VI,
@@ -1457,6 +1455,18 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                     BOUNDS(INSTPOS(SRC, CurInstOp), INSTPOS(SRC, CurInst)));
           // WIP, need to introduce ghost
         }
+        std::shared_ptr<llvmberry::TyExpr> CurInstInPBObj;
+        if (diffIdxWithoutPrevPRE.size())
+          // Currently INSNWithGhostIdxs is implemented ad-hoc
+          // So use it only when needed
+          CurInstInPBObj = std::shared_ptr<llvmberry::TyExpr>(
+              new llvmberry::ConsInsn(llvmberry::INSNWithGhostIdxs(
+                  *CurInstInPB, diffIdxWithoutPrevPRE)));
+        else
+          CurInstInPBObj = INSN(*CurInstInPB);
+        // TODO: Rename INSNWithGhostIdxs, and make macro (unity with INSN)
+        CurInstInPB->insertBefore(VI->getParent()->getTerminator());
+        CurInstInPB->eraseFromParent(); // delete will not work
 
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
@@ -1526,7 +1536,7 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         // Transitivity [ INSN(CurInstInPB) >= Var(VI) >= Var(Phi) ]
         INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                             PB->getName()),
-                llvmberry::ConsTransitivity::make(INSN(*CurInstInPB),
+                llvmberry::ConsTransitivity::make(CurInstInPBObj,
                                                   VAR(VI_id, Physical),
                                                   VAR(Phi_id, Physical)));
 
@@ -1536,9 +1546,7 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
                                             PB->getName()),
                 llvmberry::ConsTransitivity::make(
-                    INSN(*CurInst), INSN(*CurInstInPB), VAR(Phi_id, Physical)));
-
-        CurInstInPB->eraseFromParent(); // delete will not work
+                    INSN(*CurInst), CurInstInPBObj, VAR(Phi_id, Physical)));
       }
 
       return true;
