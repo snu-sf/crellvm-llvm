@@ -1426,6 +1426,20 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         if (!PREAR->getDiffIdxWithoutPrevPRE(CurInst, VI,
                                              diffIdxWithoutPrevPRE))
           assert("getDiffIdxWithoutPrevPRE failed!" && false);
+
+        std::shared_ptr<llvmberry::TyExpr> CurInstInPBObj;
+        if (diffIdxWithoutPrevPRE.size())
+          // Currently INSNWithGhostIdxs is implemented ad-hoc
+          // So use it only when needed
+          CurInstInPBObj = std::shared_ptr<llvmberry::TyExpr>(
+              new llvmberry::ConsInsn(llvmberry::INSNWithGhostIdxs(
+                  *CurInstInPB, diffIdxWithoutPrevPRE)));
+        else
+          CurInstInPBObj = INSN(*CurInstInPB);
+        // TODO: Rename INSNWithGhostIdxs, and make macro (unity with INSN)
+        CurInstInPB->insertBefore(VI->getParent()->getTerminator());
+        CurInstInPB->eraseFromParent(); // delete will not work
+
         for (auto idx : diffIdxWithoutPrevPRE) {
           hints.appendToDescription("diffIdxWithoutPrevPRE is: " +
                                     std::to_string(idx));
@@ -1450,27 +1464,25 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
           // WIP, need to introduce ghost
 
           INFRULE(PBPhiPos,
-                  llvmberry::ConsIntroGhost::make(
+                  llvmberry::ConsIntroGhostSrc::make(
                       INSN(*CurInstOp), // may useRHS or EXPR
                       REGISTER(CurInstOp_id, Ghost)));
 
+          // TODO currently this code works only when idx size is one
+          // if there are more, we need to perform "evolvig" blah like below
           INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
                                 VAR(CurInstOp_id, Ghost),
                                 RHS(CurInstOp_id, Physical, SRC),
                                 VAR(VIOp_id, Physical)));
+
+          INFRULE(PBPhiPos, llvmberry::ConsSubstitute::make(
+                                REGISTER(CurInstOp_id, Ghost),
+                                VAL(VIOp, Physical), CurInstInPBObj));
+
+          INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                                CurInstInPBObj, RHS(VI_id, Physical, SRC),
+                                VAR(VI_id, Physical)));
         }
-        std::shared_ptr<llvmberry::TyExpr> CurInstInPBObj;
-        if (diffIdxWithoutPrevPRE.size())
-          // Currently INSNWithGhostIdxs is implemented ad-hoc
-          // So use it only when needed
-          CurInstInPBObj = std::shared_ptr<llvmberry::TyExpr>(
-              new llvmberry::ConsInsn(llvmberry::INSNWithGhostIdxs(
-                  *CurInstInPB, diffIdxWithoutPrevPRE)));
-        else
-          CurInstInPBObj = INSN(*CurInstInPB);
-        // TODO: Rename INSNWithGhostIdxs, and make macro (unity with INSN)
-        CurInstInPB->insertBefore(VI->getParent()->getTerminator());
-        CurInstInPB->eraseFromParent(); // delete will not work
 
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {
