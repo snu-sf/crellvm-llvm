@@ -1122,6 +1122,7 @@ bool generateHintForPropEq(llvmberry::CoreHint &hints, const BasicBlock *BBSucc,
 }
 
 // [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi->getParent())
+// For operands whoes idx is in diffIdxWithoutPrevPRE, it is ghost.
 bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
   BasicBlock *PhiBlock = Phi->getParent();
   std::string CurInst_id = llvmberry::getVariable(*CurInst);
@@ -1427,15 +1428,12 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                              diffIdxWithoutPrevPRE))
           assert("getDiffIdxWithoutPrevPRE failed!" && false);
 
-        std::shared_ptr<llvmberry::TyExpr> CurInstInPBObj;
-        if (diffIdxWithoutPrevPRE.size())
-          // Currently INSNWithGhostIdxs is implemented ad-hoc
-          // So use it only when needed
-          CurInstInPBObj = std::shared_ptr<llvmberry::TyExpr>(
-              new llvmberry::ConsInsn(llvmberry::INSNWithGhostIdxs(
-                  *CurInstInPB, diffIdxWithoutPrevPRE)));
-        else
-          CurInstInPBObj = INSN(*CurInstInPB);
+        std::shared_ptr<llvmberry::TyExpr> CurInstInPBObj =
+            std::shared_ptr<llvmberry::TyExpr>(
+                new llvmberry::ConsInsn(llvmberry::INSNWithGhostIdxs(
+                    *CurInstInPB, diffIdxWithoutPrevPRE)));
+        // CurInstInPBObj = INSN(*CurInstInPB);
+
         // TODO: Rename INSNWithGhostIdxs, and make macro (unity with INSN)
         CurInstInPB->insertBefore(VI->getParent()->getTerminator());
         CurInstInPB->eraseFromParent(); // delete will not work

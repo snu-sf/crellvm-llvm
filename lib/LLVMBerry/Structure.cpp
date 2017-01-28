@@ -984,6 +984,8 @@ std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value,
 
 std::shared_ptr<TyInstruction> INSNWithGhostIdxs(const llvm::Instruction &i,
                                                  std::vector<int> ghostIdxs) {
+  if (ghostIdxs.size() == 0)
+    return TyInstruction::make(i);
   if (auto si = llvm::dyn_cast<llvm::SelectInst>(&i)) {
     // TODO generalize a bit more to support previous?
     llvmberry::TyTag tags[3] = {llvmberry::Physical, llvmberry::Physical,
