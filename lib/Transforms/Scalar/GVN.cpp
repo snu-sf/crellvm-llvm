@@ -746,9 +746,10 @@ class PREAnalysisResult {
 public:
   bool PrevPRENotEnough;
   std::vector<std::pair<PHINode *, int>> PrevPRE;
-  std::vector<int> diffWithoutPrevPRE;
   bool isFromNonLocalLoad;
 
+  // Currently, it is called for every PB.
+  // TODO: change to only once? may enough
   bool getDiffIdxWithoutPrevPRE(Instruction *X, Instruction *Y,
                                 std::vector<int> &result) {
     if (X->getType() != Y->getType())
@@ -4166,24 +4167,34 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
     // Somehow get [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi)
     generateHintForPRE(CurInst, Phi);
 
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi](
+    llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi, &PREAR](
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
       std::string CurInst_id = llvmberry::getVariable(*CurInst);
       std::string Phi_id = llvmberry::getVariable(*Phi);
 
+      std::vector<int> diffIdxWithoutPrevPRE;
+      Value *V = Phi->getIncomingValueForBlock(*pred_begin(Phi->getParent()));
+      if (Instruction *VI = dyn_cast<Instruction>(V)) {
+        if (!PREAR->getDiffIdxWithoutPrevPRE(CurInst, VI,
+                                             diffIdxWithoutPrevPRE))
+          assert("getDiffIdxWithoutPrevPRE failed!" && false);
+      }
+      auto CurInstObj =
+          std::shared_ptr<llvmberry::TyExpr>(new llvmberry::ConsInsn(
+              llvmberry::INSNWithGhostIdxs(*CurInst, diffIdxWithoutPrevPRE)));
+
       // Propagate [ INSN(CurInst) >= Var(Phi) ] until CurInst
-      PROPAGATE(LESSDEF(INSN(*CurInst), VAR(Phi_id, Physical), SRC),
+      PROPAGATE(LESSDEF(CurInstObj, VAR(Phi_id, Physical), SRC),
                 BOUNDS(llvmberry::TyPosition::make_start_of_block(
                            llvmberry::Source,
                            llvmberry::getBasicBlockIndex(Phi->getParent())),
                        INSTPOS(SRC, CurInst)));
 
       // Transitivity [ Var(CurInst) >= INSN(CurInst) >= Var(Phi) ]
-      INFRULE(INSTPOS(SRC, CurInst),
-              llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
-                                                INSN(*CurInst),
-                                                VAR(Phi_id, Physical)));
+      INFRULE(INSTPOS(SRC, CurInst), llvmberry::ConsTransitivity::make(
+                                         VAR(CurInst_id, Physical), CurInstObj,
+                                         VAR(Phi_id, Physical)));
 
       // TODO: for all uses of CurInst
       // replace curInst -> phi
