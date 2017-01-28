@@ -1457,6 +1457,13 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                      llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
                                                               *PB)));
 
+          // Needed in intro_ghost_src
+          PROPAGATE(
+              LESSDEF(VAR(VIOp_id, Physical), RHS(VIOp_id, Physical, SRC), SRC),
+              BOUNDS(INSTPOS(SRC, VIOp),
+                     llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
+                                                              *PB)));
+
           // CurInstInPB->setOperand(idx, VIOp);
           PROPAGATE(LESSDEF(VAR(CurInstOp_id, Physical),
                             RHS(CurInstOp_id, Physical, SRC), SRC),
