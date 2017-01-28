@@ -1448,6 +1448,16 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                             RHS(CurInstOp_id, Physical, SRC), SRC),
                     BOUNDS(INSTPOS(SRC, CurInstOp), INSTPOS(SRC, CurInst)));
           // WIP, need to introduce ghost
+
+          INFRULE(PBPhiPos,
+                  llvmberry::ConsIntroGhost::make(
+                      INSN(*CurInstOp), // may useRHS or EXPR
+                      REGISTER(CurInstOp_id, Ghost)));
+
+          INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                                VAR(CurInstOp_id, Ghost),
+                                RHS(CurInstOp_id, Physical, SRC),
+                                VAR(VIOp_id, Physical)));
         }
         std::shared_ptr<llvmberry::TyExpr> CurInstInPBObj;
         if (diffIdxWithoutPrevPRE.size())
