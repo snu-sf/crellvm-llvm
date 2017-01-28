@@ -1403,6 +1403,8 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
            ++PI) {
         BasicBlock *PB = *PI;
         Value *V = Phi->getIncomingValueForBlock(PB);
+        auto PBPhiPos = llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+                                                    PB->getName());
 
         if (!isa<Instruction>(V)) {
           // constant int occurs... How can constant int get value number???
@@ -1440,14 +1442,6 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               BOUNDS(INSTPOS(SRC, VIOp),
                      llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
                                                               *PB)));
-
-          // INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-          //                                     PB->getName()),
-          //         llvmberry::ConsTransitivity::make(VAR(PrevPhi_id,
-          //         Physical),
-          //                                           VAR(VI_op_id, Previous),
-          //                                           VAR(VI_op_id,
-          //                                           Physical)));
 
           // CurInstInPB->setOperand(idx, VIOp);
           PROPAGATE(LESSDEF(VAR(CurInstOp_id, Physical),
@@ -1492,16 +1486,14 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             std::string VI_op_id = llvmberry::getVariable(*VI_op);
 
             // Transitivity [ VAR(PrevPhi) >= VAR(VI_op)p >= Var(VI_op) ]
-            INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                PB->getName()),
+            INFRULE(PBPhiPos,
                     llvmberry::ConsTransitivity::make(VAR(PrevPhi_id, Physical),
                                                       VAR(VI_op_id, Previous),
                                                       VAR(VI_op_id, Physical)));
 
             // SubstituteRev [ VI_evolving_next >= VI_evolving ]
             // VI_evolving_next = VI_evolving[VI_op := PrevPhi]
-            INFRULE(llvmberry::TyPosition::make(SRC, (*PhiBlock).getName(),
-                                                (*PB).getName()),
+            INFRULE(PBPhiPos,
                     llvmberry::ConsSubstituteRev::make(
                         REGISTER(VI_op_id, Physical), VAL(PrevPhi, Physical),
                         llvmberry::ConsInsn::make(*VI_evolving)));
@@ -1514,11 +1506,9 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
 
             // At first, INSN(VI_evolving) = RHS(VI) >= Var(VI)
             // Next, recursively
-            INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                                PB->getName()),
-                    llvmberry::ConsTransitivity::make(INSN(*VI_evolving_next),
-                                                      INSN(*VI_evolving),
-                                                      VAR(VI_id, Physical)));
+            INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                                  INSN(*VI_evolving_next), INSN(*VI_evolving),
+                                  VAR(VI_id, Physical)));
 
             delete VI_evolving;
             VI_evolving = VI_evolving_next;
@@ -1527,24 +1517,19 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         }
 
         // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
-        INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                            PB->getName()),
-                llvmberry::ConsTransitivity::make(VAR(VI_id, Physical),
-                                                  VAR(VI_id, Previous),
-                                                  VAR(Phi_id, Physical)));
+        INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                              VAR(VI_id, Physical), VAR(VI_id, Previous),
+                              VAR(Phi_id, Physical)));
 
         // Transitivity [ INSN(CurInstInPB) >= Var(VI) >= Var(Phi) ]
-        INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                            PB->getName()),
-                llvmberry::ConsTransitivity::make(CurInstInPBObj,
-                                                  VAR(VI_id, Physical),
-                                                  VAR(Phi_id, Physical)));
+        INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                              CurInstInPBObj, VAR(VI_id, Physical),
+                              VAR(Phi_id, Physical)));
 
         llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
 
         // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi) ]
-        INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
-                                            PB->getName()),
+        INFRULE(PBPhiPos,
                 llvmberry::ConsTransitivity::make(
                     INSN(*CurInst), CurInstInPBObj, VAR(Phi_id, Physical)));
       }
