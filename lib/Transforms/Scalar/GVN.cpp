@@ -1418,22 +1418,45 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
         Instruction *VI = dyn_cast<Instruction>(V);
         std::string VI_id = llvmberry::getVariable(*VI);
 
+        Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
+        CurInstInPB->insertBefore(VI->getParent()->getTerminator());
+        CurInstInPB->setName(CurInst->getName() + ".llvmberry.phi.resolved");
+
         std::vector<int> diffIdxWithoutPrevPRE;
         if (!PREAR->getDiffIdxWithoutPrevPRE(CurInst, VI,
                                              diffIdxWithoutPrevPRE))
           assert("getDiffIdxWithoutPrevPRE failed!" && false);
-        for (auto i : diffIdxWithoutPrevPRE) {
+        for (auto idx : diffIdxWithoutPrevPRE) {
           hints.appendToDescription("diffIdxWithoutPrevPRE is: " +
-                                    std::to_string(i));
-        }
-        if (diffIdxWithoutPrevPRE.size() != 0) {
-          hints.setReturnCodeToFail();
-          return true;
-        }
+                                    std::to_string(idx));
+          Instruction *VIOp = dyn_cast<Instruction>(VI->getOperand(idx));
+          Instruction *CurInstOp =
+              dyn_cast<Instruction>(CurInst->getOperand(idx));
+          std::string VIOp_id = llvmberry::getVariable(*VIOp);
+          std::string CurInstOp_id = llvmberry::getVariable(*CurInstOp);
+          assert(hasSameRHS(VIOp, CurInstOp));
+          // Later, we need to get [ INSN(CurInstInPB) >= VAR(VI) ]
+          // Here, we need to get [ VAR(CurInstOp) >= VAR(VIOp) ]
+          PROPAGATE(
+              LESSDEF(RHS(VIOp_id, Physical, SRC), VAR(VIOp_id, Physical), SRC),
+              BOUNDS(INSTPOS(SRC, VIOp),
+                     llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
+                                                              *PB)));
 
-        Instruction *CurInstInPB = llvmberry::getPHIResolved(CurInst, PB);
-        CurInstInPB->insertBefore(VI->getParent()->getTerminator());
-        CurInstInPB->setName(CurInst->getName() + ".llvmberry.phi.resolved");
+          // INFRULE(llvmberry::TyPosition::make(SRC, PhiBlock->getName(),
+          //                                     PB->getName()),
+          //         llvmberry::ConsTransitivity::make(VAR(PrevPhi_id,
+          //         Physical),
+          //                                           VAR(VI_op_id, Previous),
+          //                                           VAR(VI_op_id,
+          //                                           Physical)));
+
+          // CurInstInPB->setOperand(idx, VIOp);
+          PROPAGATE(LESSDEF(VAR(CurInstOp_id, Physical),
+                            RHS(CurInstOp_id, Physical, SRC), SRC),
+                    BOUNDS(INSTPOS(SRC, CurInstOp), INSTPOS(SRC, CurInst)));
+          // WIP, need to introduce ghost
+        }
 
         // Somehow get [ INSN(CurInstInPB) >= Var(VI) ] in block(Phi, VPHI)
         if (PHINode *VPHI = dyn_cast<PHINode>(V)) {

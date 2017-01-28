@@ -1537,6 +1537,9 @@ private:
   std::shared_ptr<TyInfrule> infrule;
 };
 
+std::shared_ptr<TyInstruction> INSNWithGhostIdxs(const llvm::Instruction &i,
+                                                 std::vector<int> ghostIdxs);
+
 /* core hint */
 
 struct CoreHint {
