@@ -4221,6 +4221,20 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                            llvmberry::getBasicBlockIndex(Phi->getParent())),
                        INSTPOS(SRC, CurInst)));
 
+      // For now, consider only this case
+      // It can && should be extended (evolving blah above), but let's do it
+      // lazy
+      if (diffIdxWithoutPrevPRE.size() == 1) {
+        int idx = diffIdxWithoutPrevPRE[0];
+        // Transitivity [ INSN(CurInst) >= CurInstObj ]
+        auto CurInstOp = CurInst->getOperand(idx);
+        auto CurInstOp_id = llvmberry::getVariable(*CurInstOp);
+        INFRULE(INSTPOS(SRC, CurInst),
+                llvmberry::ConsSubstitute::make(
+                    REGISTER(CurInstOp_id, Physical), VAL(CurInstOp, Ghost),
+                    INSN(*CurInst)));
+      }
+
       // Transitivity [ Var(CurInst) >= INSN(CurInst) >= CurInstObj ]
       // CurInstObj may filled with ghost
       INFRULE(INSTPOS(SRC, CurInst),
