@@ -30,7 +30,7 @@
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define INSNWITHGHOST(x, y)                                                    \
   std::shared_ptr<llvmberry::TyExpr>(                                          \
-      new llvmberry::ConsInsn(llvmberry::instructionWithGhostIdxs(x, y)));
+      new llvmberry::ConsInsn(llvmberry::instructionWithGhostIdxs(x, y)))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
 // LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
 // TyPropagateObject instance
