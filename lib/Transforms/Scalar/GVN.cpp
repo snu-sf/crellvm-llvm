@@ -1433,9 +1433,6 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             INSNWITHGHOST(*CurInstInPB, diffIdxWithoutPrevPRE);
         // CurInstInPBObj = INSN(*CurInstInPB);
 
-        CurInstInPB->insertBefore(VI->getParent()->getTerminator());
-        CurInstInPB->eraseFromParent(); // delete will not work
-
         for (auto idx : diffIdxWithoutPrevPRE) {
           hints.appendToDescription("diffIdxWithoutPrevPRE is: " +
                                     std::to_string(idx));
@@ -1499,7 +1496,11 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
               BOUNDS(INSTPOS(SRC, VI), llvmberry::TyPosition::make_end_of_block(
                                            llvmberry::Source, *PB)));
 
-          Instruction *VI_evolving = (*VI).clone();
+          // Just renaming of var
+          Instruction *CurInstInPB_evolving = (*CurInstInPB).clone();
+          CurInstInPB->insertBefore(VI->getParent()->getTerminator());
+          CurInstInPB->eraseFromParent(); // delete will not work
+          // Why did delete not work..?
 
           // Somehow get [ INSN(CurInstInPB) >= Var(VI) ]
           for (auto k : PrevPRE) {
@@ -1516,29 +1517,33 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                                       VAR(VI_op_id, Previous),
                                                       VAR(VI_op_id, Physical)));
 
-            // SubstituteRev [ VI_evolving_next >= VI_evolving ]
-            // VI_evolving_next = VI_evolving[VI_op := PrevPhi]
+            // Substitute [ CurInstInPB_evolving >= CurInstInPB_evolving_next ]
+            // CurInstInPB_evolving_next = CurInstInPB_evolving[VI_op :=
+            // PrevPhi]
             INFRULE(PBPhiPos,
-                    llvmberry::ConsSubstituteRev::make(
-                        REGISTER(VI_op_id, Physical), VAL(PrevPhi, Physical),
-                        llvmberry::ConsInsn::make(*VI_evolving)));
+                    llvmberry::ConsSubstitute::make(
+                        REGISTER(PrevPhi_id, Physical), ID(VI_op_id, Physical),
+                        INSN(*CurInstInPB_evolving)));
 
-            Instruction *VI_evolving_next = (*VI_evolving).clone();
-            (*VI_evolving_next).setOperand(idx, PrevPhi);
+            Instruction *CurInstInPB_evolving_next =
+                (*CurInstInPB_evolving).clone();
+            (*CurInstInPB_evolving_next).setOperand(idx, VI_op);
 
-            // Transitivity [ INSN(VI_evolving_next) >= INSN(VI_evolving) >=
+            // Transitivity [ INSN(CurInstInPB_evolving_next) >=
+            // INSN(CurInstInPB_evolving) >=
             // Var(VI) ]
 
-            // At first, INSN(VI_evolving) = RHS(VI) >= Var(VI)
+            // At first, INSN(CurInstInPB_evolving) = RHS(VI) >= Var(VI)
             // Next, recursively
-            INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
-                                  INSN(*VI_evolving_next), INSN(*VI_evolving),
-                                  VAR(VI_id, Physical)));
+            INFRULE(PBPhiPos,
+                    llvmberry::ConsTransitivity::make(
+                        INSN(*CurInstInPB_evolving_next),
+                        INSN(*CurInstInPB_evolving), VAR(VI_id, Physical)));
 
-            delete VI_evolving;
-            VI_evolving = VI_evolving_next;
+            delete CurInstInPB_evolving;
+            CurInstInPB_evolving = CurInstInPB_evolving_next;
           }
-          delete VI_evolving;
+          delete CurInstInPB_evolving;
         }
 
         // Transitivity [ Var(VI) >= Var(VI)p >= Var(Phi) ]
