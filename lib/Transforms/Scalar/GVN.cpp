@@ -1518,8 +1518,7 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                                                       VAR(VI_op_id, Physical)));
 
             // Substitute [ CurInst_evolving >= CurInst_evolving_next ]
-            // CurInst_evolving_next = CurInst_evolving[VI_op :=
-            // PrevPhi]
+            // CurInst_evolving_next = CurInst_evolving[VI_op := PrevPhi]
             INFRULE(
                 PBPhiPos,
                 llvmberry::ConsSubstitute::make(
@@ -1530,18 +1529,26 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
             (*CurInst_evolving_next).setOperand(idx, VI_op);
 
             // Transitivity [ INSN(CurInst_evolving_next) >=
-            // INSN(CurInst_evolving) >=
-            // Var(VI) ]
+            // INSN(CurInst_evolving) >= Var(VI) ]
+
+            // // At first, INSN(CurInst_evolving) = RHS(VI) >= Var(VI)
+            // // Next, recursively
+            // INFRULE(PBPhiPos,
+            //         llvmberry::ConsTransitivity::make(
+            //             INSNWITHGHOST(*CurInst_evolving_next,
+            //                           diffIdxWithoutPrevPRE),
+            //           INSNWITHGHOST(*CurInst_evolving,
+            //           diffIdxWithoutPrevPRE),
+            //             VAR(VI_id, Physical)));
 
             // At first, INSN(CurInst_evolving) = RHS(VI) >= Var(VI)
             // Next, recursively
-            INFRULE(PBPhiPos,
-                    llvmberry::ConsTransitivity::make(
-                        INSNWITHGHOST(*CurInst_evolving_next,
-                                      diffIdxWithoutPrevPRE),
-                        INSNWITHGHOST(*CurInst_evolving, diffIdxWithoutPrevPRE),
-                        VAR(VI_id, Physical)));
-
+            INFRULE(
+                PBPhiPos,
+                llvmberry::ConsTransitivity::make(
+                    INSN(*CurInst), INSNWITHGHOST(*CurInst_evolving_next,
+                                                  diffIdxWithoutPrevPRE),
+                    INSNWITHGHOST(*CurInst_evolving, diffIdxWithoutPrevPRE)));
             delete CurInst_evolving;
             CurInst_evolving = CurInst_evolving_next;
           }
@@ -1558,12 +1565,20 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                               CurInstInPBObj, VAR(VI_id, Physical),
                               VAR(Phi_id, Physical)));
 
-        // llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
+        llvmberry::generateHintForPHIResolved(CurInst, PB, SRC);
+        // Get rid of it? application fail in difFIdx, because CurInst is not
+        // filled with ghost.
+        // However, getting rid of it gives 2 more VFail, should investigate
 
         // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi) ]
-        INFRULE(PBPhiPos,
-                llvmberry::ConsTransitivity::make(
-                    INSN(*CurInst), CurInstInPBObj, VAR(Phi_id, Physical)));
+        INFRULE(PBPhiPos, llvmberry::ConsTransitivity::make(
+                              INSNWITHGHOST(*CurInst, diffIdxWithoutPrevPRE),
+                              CurInstInPBObj, VAR(Phi_id, Physical)));
+
+        // Transitivity [ INSN(CurInst) >= INSN(CurInstInPB) >= Var(Phi) ]
+        // INFRULE(PBPhiPos,
+        //         llvmberry::ConsTransitivity::make(
+        //             INSN(*CurInst), CurInstInPBObj, VAR(Phi_id, Physical)));
       }
 
       return true;
@@ -4192,6 +4207,12 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                            llvmberry::Source,
                            llvmberry::getBasicBlockIndex(Phi->getParent())),
                        INSTPOS(SRC, CurInst)));
+
+      // Transitivity [ Var(CurInst) >= INSN(CurInst) >= CurInstObj ]
+      // CurInstObj may filled with ghost
+      INFRULE(INSTPOS(SRC, CurInst),
+              llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
+                                                INSN(*CurInst), CurInstObj));
 
       // Transitivity [ Var(CurInst) >= INSN(CurInst) >= Var(Phi) ]
       INFRULE(INSTPOS(SRC, CurInst), llvmberry::ConsTransitivity::make(
