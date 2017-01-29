@@ -1457,16 +1457,29 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
                      llvmberry::TyPosition::make_end_of_block(llvmberry::Source,
                                                               *PB)));
 
-          // CurInstInPB->setOperand(idx, VIOp);
-          PROPAGATE(LESSDEF(VAR(CurInstOp_id, Physical),
-                            RHS(CurInstOp_id, Physical, SRC), SRC),
-                    BOUNDS(INSTPOS(SRC, CurInstOp), INSTPOS(SRC, CurInst)));
-          // WIP, need to introduce ghost
+          // PROPAGATE(LESSDEF(VAR(CurInstOp_id, Physical),
+          //                   RHS(CurInstOp_id, Physical, SRC), SRC),
+          //           BOUNDS(INSTPOS(SRC, CurInstOp), INSTPOS(SRC, CurInst)));
 
+          // WIP, need to introduce ghost
           INFRULE(PBPhiPos,
                   llvmberry::ConsIntroGhostSrc::make(
                       INSN(*CurInstOp), // may useRHS or EXPR
                       REGISTER(CurInstOp_id, Ghost)));
+
+          // At INSTPOS(CurInstOp), CurInstOp[Phys] >= CurInstOp[Ghost]
+          // && Propagate this to INSTPOS(CurInst)
+          PROPAGATE(LESSDEF(INSN(*CurInstOp), VAR(CurInstOp_id, Ghost), SRC),
+                    BOUNDS(PBPhiPos, INSTPOS(SRC, CurInstOp)));
+
+          INFRULE(INSTPOS(SRC, CurInstOp), llvmberry::ConsTransitivity::make(
+                                               VAR(CurInstOp_id, Physical),
+                                               RHS(CurInstOp_id, Physical, SRC),
+                                               VAR(CurInstOp_id, Ghost)));
+
+          PROPAGATE(LESSDEF(VAR(CurInstOp_id, Physical),
+                            VAR(CurInstOp_id, Ghost), SRC),
+                    BOUNDS(INSTPOS(SRC, CurInstOp), INSTPOS(SRC, CurInst)));
 
           // TODO currently this code works only when idx size is one
           // if there are more, we need to perform "evolvig" blah like below
