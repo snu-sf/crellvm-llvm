@@ -982,8 +982,9 @@ std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value,
   return nullptr;
 }
 
-std::shared_ptr<TyInstruction> INSNWithGhostIdxs(const llvm::Instruction &i,
-                                                 std::vector<int> ghostIdxs) {
+std::shared_ptr<TyInstruction>
+instructionWithGhostIdxs(const llvm::Instruction &i,
+                         std::vector<int> ghostIdxs) {
   if (ghostIdxs.size() == 0)
     return TyInstruction::make(i);
   if (auto si = llvm::dyn_cast<llvm::SelectInst>(&i)) {
@@ -1008,7 +1009,7 @@ std::shared_ptr<TyInstruction> INSNWithGhostIdxs(const llvm::Instruction &i,
     i.print(rso);
     rso.str();
     std::cerr << output << std::endl;
-    assert("INSNWithGhostIdxs : unsupporting instruction type" && false);
+    assert("instructionWithGhostIdxs : unsupporting instruction type" && false);
     return std::shared_ptr<TyInstruction>(nullptr);
   }
 }

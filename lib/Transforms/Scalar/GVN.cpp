@@ -1430,12 +1430,9 @@ bool generateHintForPRE(Instruction *CurInst, PHINode *Phi) {
           assert("getDiffIdxWithoutPrevPRE failed!" && false);
 
         std::shared_ptr<llvmberry::TyExpr> CurInstInPBObj =
-            std::shared_ptr<llvmberry::TyExpr>(
-                new llvmberry::ConsInsn(llvmberry::INSNWithGhostIdxs(
-                    *CurInstInPB, diffIdxWithoutPrevPRE)));
+            INSNWITHGHOST(*CurInstInPB, diffIdxWithoutPrevPRE);
         // CurInstInPBObj = INSN(*CurInstInPB);
 
-        // TODO: Rename INSNWithGhostIdxs, and make macro (unity with INSN)
         CurInstInPB->insertBefore(VI->getParent()->getTerminator());
         CurInstInPB->eraseFromParent(); // delete will not work
 
@@ -4180,9 +4177,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
                                              diffIdxWithoutPrevPRE))
           assert("getDiffIdxWithoutPrevPRE failed!" && false);
       }
-      auto CurInstObj =
-          std::shared_ptr<llvmberry::TyExpr>(new llvmberry::ConsInsn(
-              llvmberry::INSNWithGhostIdxs(*CurInst, diffIdxWithoutPrevPRE)));
+      auto CurInstObj = INSNWITHGHOST(*CurInst, diffIdxWithoutPrevPRE);
 
       // Propagate [ INSN(CurInst) >= Var(Phi) ] until CurInst
       PROPAGATE(LESSDEF(CurInstObj, VAR(Phi_id, Physical), SRC),
