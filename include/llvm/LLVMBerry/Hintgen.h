@@ -18,17 +18,35 @@
 #define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
 #define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
-#define REGISTER(name, tag) llvmberry::TyRegister::make(name, llvmberry::tag)
+// Below code snippet is tu support overloading of two macro functions : 
+// REGISTER(str) := llvmberry::TyRegister::make(str, llvmberry::Physical)
+// REGISTER(str, tag) := llvmberry::TyRegister::make(str, llvmberry::tag)
+#define _REGISTER_PHYS(n) llvmberry::TyRegister::make(n, llvmberry::Physical)
+#define _REGISTER(n, tag) llvmberry::TyRegister::make(n, llvmberry::tag)
+#define _REGISTER_X(x, ARG1, ARG2, FUNC, ...) FUNC
+#define REGISTER(...) _REGISTER_X(,##__VA_ARGS__,                              \
+                                  _REGISTER(__VA_ARGS__),                      \
+                                  _REGISTER_PHYS(__VA_ARGS__))
+
 #define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
 #define PROPAGATE(what, where)                                                 \
   hints.addCommand(llvmberry::ConsPropagate::make(what, where))
 #define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
+
 // EXPR, VAR, RHS, INSN macros make TyExpr object
-#define VAR(name, tag) llvmberry::ConsVar::make(name, llvmberry::tag)
+// Below code snippet is tu support overloading of two macro functions : 
+// VAR(str) := llvmberry::ConsVar::make(str, llvmberry::Physical)
+// VAR(str, tag) := llvmberry::ConsVar::make(str, llvmberry::tag)
+#define _VAR_PHYS(n) llvmberry::ConsVar::make(n, llvmberry::Physical)
+#define _VAR(n, tag) llvmberry::ConsVar::make(n, llvmberry::tag)
+#define _VAR_X(x, ARG1, ARG2, FUNC, ...) FUNC
+#define VAR(...) _VAR_X(,##__VA_ARGS__,_VAR(__VA_ARGS__),_VAR_PHYS(__VA_ARGS__))
+
 #define RHS(name, tag, SCOPE)                                                  \
   llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
+
 // LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
 // TyPropagateObject instance
 #define LESSDEF(left, right, SCOPE)                                            \
@@ -39,13 +57,24 @@
   llvmberry::ConsDiffblock::make(v1, v2, SCOPE)
 #define UNIQUE(reg, SCOPE) llvmberry::ConsUnique::make(reg, SCOPE)
 #define PRIVATE(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
-#define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, tag)
+#define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, llvmberry::tag)
+
 // VAL, ID macros make TyValue object
-#define VAL(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
 #define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
+// Below snippet is to support overloading of two macro functions : 
+// VAL(v) := llvmberry::TyValue::make(*(v), llvmberry::Physical)
+// VAL(v, tag) := llvmberry::TyValue::make(*(v), llvmberry::tag)
+#define _VAL_SRC(I) llvmberry::TyValue::make(*(I), llvmberry::Physical)
+#define _VAL_TAG(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
+#define _VAL_X(x,ARG1, ARG2, FUNC, ...) FUNC
+#define VAL(...) _VAL_X(,##__VA_ARGS__,                                        \
+                                _VAL_TAG(__VA_ARGS__),                         \
+                                _VAL_SRC(__VA_ARGS__))
+
 // VALTYPE, TYPEOF macros make TyValueType object
 #define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
 #define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
+
 // BINOP, FBINOP, BINARYINSN make TyInstruction object
 #define BINOP(bop, type, val1, val2)                                           \
   llvmberry::ConsBinaryOp::make(bop, type, val1, val2)
@@ -55,6 +84,9 @@
   llvmberry::isFloatOpcode((binop).getOpcode())                                \
       ? FBINOP(llvmberry::getFbop((binop).getOpcode()), type, val1, val2)      \
       : BINOP(llvmberry::getBop((binop).getOpcode()), type, val1, val2)
+
+// CONSTINT make TyConstInt object
+#define CONSTINT(val, bitwidth) llvmberry::TyConstInt::make(val, bitwidth)
 
 #define SRC llvmberry::Source
 #define TGT llvmberry::Target

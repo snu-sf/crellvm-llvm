@@ -1585,18 +1585,16 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
           llvmberry::CoreHint &hints) {
         BinaryOperator *Z = &I;
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
-		BinaryOperator *X;
+        BinaryOperator *X;
 
-		int is_x_second = Y->getOperand(0) == A;
-		
-		if (is_x_second) {
-		  X = dyn_cast<BinaryOperator>(Y->getOperand(1));
-		}
-		else {
-		  X = dyn_cast<BinaryOperator>(Y->getOperand(0));
-		}
+        int is_x_second = Y->getOperand(0) == A;
 
-		Value *B = Op1;
+        if (is_x_second)
+          X = dyn_cast<BinaryOperator>(Y->getOperand(1));
+        else
+          X = dyn_cast<BinaryOperator>(Y->getOperand(0));
+
+        Value *B = Op1;
 
         std::string reg_x_name = llvmberry::getVariable(*X);
         std::string reg_y_name = llvmberry::getVariable(*Y);
@@ -1607,18 +1605,12 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
         llvmberry::propagateInstruction(X, Z, llvmberry::Target);
         llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
 
-		if (is_x_second) {
-		  llvmberry::applyCommutativity(Z, Y, llvmberry::Target);
-		}
+        if (is_x_second)
+           llvmberry::applyCommutativity(Z, Y, llvmberry::Target);
 
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Target, I),
-            llvmberry::ConsAndOrNot1::make(
-                llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_x_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_y_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*A), llvmberry::TyValue::make(*B),
-                llvmberry::ConsSize::make(bitwidth))));
+        INFRULE(INSTPOS(TGT, &I), llvmberry::ConsAndOrNot1::make(
+                REGISTER(reg_z_name), REGISTER(reg_x_name),
+                REGISTER(reg_y_name), VAL(A), VAL(B), BITSIZE(bitwidth)));
       });
 
       return BinaryOperator::CreateAnd(A, Op1);
