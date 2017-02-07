@@ -278,67 +278,36 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
 
     if(the_case == llvmberry::FoldSelectOpOpArg::YX_ZX){
       if(llvmberry::isFloatOpcode(bop)){
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Target, *T0),
+        INFRULE(INSTPOS(TGT, T0),
             llvmberry::ConsFbopDistributiveOverSelectinst2::make(
-                llvmberry::getFbop(bop),
-                llvmberry::TyRegister::make(reg_r_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_s_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_tprime_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_t0_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*X),
-                llvmberry::TyValue::make(*Y),
-                llvmberry::TyValue::make(*Z),
-                llvmberry::TyValue::make(*C),
-                llvmberry::getFloatType(R->getType()),
-                llvmberry::TyValueType::make(*C->getType()))));
+              llvmberry::getFbop(bop), REGISTER(reg_r_name),
+              REGISTER(reg_s_name), REGISTER(reg_tprime_name),
+              REGISTER(reg_t0_name), VAL(X), VAL(Y), VAL(Z),VAL(C),
+              llvmberry::getFloatType(R->getType()), VALTYPE(C->getType())));
       }else{
-         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Target, *T0),
+        INFRULE(INSTPOS(TGT, T0), 
             llvmberry::ConsBopDistributiveOverSelectinst2::make(
-                llvmberry::getBop(bop),
-                llvmberry::TyRegister::make(reg_r_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_s_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_tprime_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_t0_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*X),
-                llvmberry::TyValue::make(*Y),
-                llvmberry::TyValue::make(*Z),
-                llvmberry::TyValue::make(*C),
-                llvmberry::ConsSize::make(R->getType()->getIntegerBitWidth()),
-                llvmberry::TyValueType::make(*C->getType()))));
+              llvmberry::getBop(bop), REGISTER(reg_r_name),
+              REGISTER(reg_s_name), REGISTER(reg_tprime_name),
+              REGISTER(reg_t0_name), VAL(X), VAL(Y), VAL(Z), VAL(C),
+              BITSIZE(R->getType()->getIntegerBitWidth()),
+              VALTYPE(C->getType())));
       }
     }else{
       if(llvmberry::isFloatOpcode(bop)){
-        hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Target, *T0),
+        INFRULE(INSTPOS(TGT, T0),
             llvmberry::ConsFbopDistributiveOverSelectinst::make(
-                llvmberry::getFbop(bop),
-                llvmberry::TyRegister::make(reg_r_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_s_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_tprime_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_t0_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*X),
-                llvmberry::TyValue::make(*Y),
-                llvmberry::TyValue::make(*Z),
-                llvmberry::TyValue::make(*C),
-                llvmberry::getFloatType(R->getType()),
-                llvmberry::TyValueType::make(*C->getType()))));
+              llvmberry::getFbop(bop), REGISTER(reg_r_name), REGISTER(reg_s_name),
+              REGISTER(reg_tprime_name), REGISTER(reg_t0_name), VAL(X), VAL(Y),
+              VAL(Z), VAL(C), llvmberry::getFloatType(R->getType()),
+              VALTYPE(C->getType())));
       }else{
-         hints.addCommand(llvmberry::ConsInfrule::make(
-            llvmberry::TyPosition::make(llvmberry::Target, *T0),
+        INFRULE(INSTPOS(TGT, T0),
             llvmberry::ConsBopDistributiveOverSelectinst::make(
-                llvmberry::getBop(bop),
-                llvmberry::TyRegister::make(reg_r_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_s_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_tprime_name, llvmberry::Physical),
-                llvmberry::TyRegister::make(reg_t0_name, llvmberry::Physical),
-                llvmberry::TyValue::make(*X),
-                llvmberry::TyValue::make(*Y),
-                llvmberry::TyValue::make(*Z),
-                llvmberry::TyValue::make(*C),
-                llvmberry::ConsSize::make(R->getType()->getIntegerBitWidth()),
-                llvmberry::TyValueType::make(*C->getType()))));
+              llvmberry::getBop(bop), REGISTER(reg_r_name), REGISTER(reg_s_name),
+              REGISTER(reg_tprime_name), REGISTER(reg_t0_name), VAL(X), VAL(Y),
+              VAL(Z), VAL(C), BITSIZE(R->getType()->getIntegerBitWidth()),
+              VALTYPE(C->getType())));
       }
     }
   });
