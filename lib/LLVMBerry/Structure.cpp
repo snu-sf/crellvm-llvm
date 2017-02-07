@@ -983,6 +983,38 @@ std::shared_ptr<TyValue> TyValue::make(const llvm::Value &value,
   return nullptr;
 }
 
+std::shared_ptr<TyInstruction>
+instructionWithGhostIdxs(const llvm::Instruction &i,
+                         std::vector<int> ghostIdxs) {
+  if (ghostIdxs.size() == 0)
+    return TyInstruction::make(i);
+  if (auto si = llvm::dyn_cast<llvm::SelectInst>(&i)) {
+    // TODO generalize a bit more to support previous?
+    llvmberry::TyTag tags[3] = {llvmberry::Physical, llvmberry::Physical,
+                                llvmberry::Physical};
+    for (auto idx : ghostIdxs) {
+      assert(0 <= idx && idx < i.getNumOperands());
+      tags[idx] = llvmberry::Ghost;
+    }
+
+    auto ret = std::shared_ptr<TySelectInst>(
+        new TySelectInst(TyValue::make(*(si->getCondition()), tags[0]),
+                         TyValueType::make(*(si->getType())),
+                         TyValue::make(*(si->getTrueValue()), tags[1]),
+                         TyValue::make(*(si->getFalseValue()), tags[2])));
+
+    return std::shared_ptr<TyInstruction>(new ConsSelectInst(ret));
+  } else {
+    std::string output;
+    llvm::raw_string_ostream rso(output);
+    i.print(rso);
+    rso.str();
+    std::cerr << output << std::endl;
+    assert("instructionWithGhostIdxs : unsupporting instruction type" && false);
+    return std::shared_ptr<TyInstruction>(nullptr);
+  }
+}
+
 ConsConstInt::ConsConstInt(std::shared_ptr<TyConstInt> _const_int)
     : const_int(_const_int) {}
 

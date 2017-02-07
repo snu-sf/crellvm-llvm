@@ -290,6 +290,21 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyBopCommutativeRev {
+public:
+  TyBopCommutativeRev(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                   std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                   std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> e;
+  TyBop bop;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyFbopCommutative {
 public:
   TyFbopCommutative(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
@@ -2435,6 +2450,20 @@ private:
   std::shared_ptr<TyRegister> g;
 };
 
+struct TyIntroGhostSrc {
+public:
+  TyIntroGhostSrc(std::shared_ptr<TyExpr> _x, std::shared_ptr<TyRegister> _g);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  std::shared_ptr<TyExpr> getExpr();
+  std::shared_ptr<TyRegister> getReg();
+  void updateExpr(std::shared_ptr<TyExpr> newExpr);
+
+private:
+  std::shared_ptr<TyExpr> x;
+  std::shared_ptr<TyRegister> g;
+};
+
 struct TyIntroEq {
 public:
   TyIntroEq(std::shared_ptr<TyExpr> _x);
@@ -3516,6 +3545,20 @@ public:
 
 private:
   std::shared_ptr<TyBopCommutative> bop_commutative;
+};
+
+struct ConsBopCommutativeRev : TyInfrule {
+public:
+  ConsBopCommutativeRev(std::shared_ptr<TyBopCommutativeRev> _bop_commutative_rev);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
+
+private:
+  std::shared_ptr<TyBopCommutativeRev> bop_commutative_rev;
 };
 
 struct ConsFbopCommutative : TyInfrule {
@@ -5500,6 +5543,17 @@ public:
 
 private:
   std::shared_ptr<TyIntroGhost> intro_ghost;
+};
+
+struct ConsIntroGhostSrc : public TyInfrule {
+public:
+  ConsIntroGhostSrc(std::shared_ptr<TyIntroGhostSrc> _intro_ghost_src);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _x,
+                                         std::shared_ptr<TyRegister> _g);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIntroGhostSrc> intro_ghost_src;
 };
 
 struct ConsIntroEq : public TyInfrule {

@@ -277,6 +277,38 @@ std::shared_ptr<TyInfrule> ConsBopCommutative::make(
   return std::shared_ptr<TyInfrule>(new ConsBopCommutative(_bop_comm));
 }
 
+TyBopCommutativeRev::TyBopCommutativeRev(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                                   std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y,
+                                   std::shared_ptr<TySize> _sz)
+    : e(_e), bop(_bop), x(_x), y(_y), sz(_sz) {}
+
+void TyBopCommutativeRev::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(e), cereal::make_nvp("bop", llvmberry::toString(bop)),
+          CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
+}
+
+ConsBopCommutativeRev::ConsBopCommutativeRev(
+    std::shared_ptr<TyBopCommutativeRev> _bop_commutative_rev)
+    : bop_commutative_rev(_bop_commutative_rev) {}
+
+void ConsBopCommutativeRev::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+
+  archive.saveValue("BopCommutativeRev");
+  archive(CEREAL_NVP(bop_commutative_rev));
+}
+
+std::shared_ptr<TyInfrule> ConsBopCommutativeRev::make(
+    std::shared_ptr<TyExpr> _e, TyBop _bop,
+    std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+    std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyBopCommutativeRev> _bop_comm(
+      new TyBopCommutativeRev(_e, _bop, _x, _y, _sz));
+  return std::shared_ptr<TyInfrule>(new ConsBopCommutativeRev(_bop_comm));
+}
+
 TyFbopCommutative::TyFbopCommutative(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
                                      std::shared_ptr<TyValue> _x,
                                      std::shared_ptr<TyValue> _y,
@@ -4869,6 +4901,41 @@ void ConsIntroGhost::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("IntroGhost");
   archive(CEREAL_NVP(intro_ghost));
+}
+
+TyIntroGhostSrc::TyIntroGhostSrc(std::shared_ptr<TyExpr> _x,
+                                 std::shared_ptr<TyRegister> _g)
+    : x(_x), g(_g) {}
+
+void TyIntroGhostSrc::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(g));
+}
+
+std::shared_ptr<TyExpr> TyIntroGhostSrc::getExpr() { return x; }
+
+std::shared_ptr<TyRegister> TyIntroGhostSrc::getReg() { return g; }
+
+void TyIntroGhostSrc::updateExpr(std::shared_ptr<TyExpr> newExpr) {
+  x = newExpr;
+}
+
+ConsIntroGhostSrc::ConsIntroGhostSrc(
+    std::shared_ptr<TyIntroGhostSrc> _intro_ghost_src)
+    : intro_ghost_src(_intro_ghost_src) {}
+
+std::shared_ptr<TyInfrule>
+ConsIntroGhostSrc::make(std::shared_ptr<TyExpr> _x,
+                        std::shared_ptr<TyRegister> _g) {
+  std::shared_ptr<TyIntroGhostSrc> _val(new TyIntroGhostSrc(_x, _g));
+  return std::shared_ptr<TyInfrule>(new ConsIntroGhostSrc(_val));
+}
+
+void ConsIntroGhostSrc::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IntroGhostSrc");
+  archive(CEREAL_NVP(intro_ghost_src));
 }
 
 TyIntroEq::TyIntroEq(std::shared_ptr<TyExpr> _x) : x(_x) {}
