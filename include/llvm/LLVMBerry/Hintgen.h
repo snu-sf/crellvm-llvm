@@ -9,13 +9,19 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/Analysis/CFG.h"
 
+#define INFRULE(pos, x)                                                        \
+  hints.addCommand(llvmberry::ConsInfrule::make(pos, x),                       \
+                   llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
+#define PROPAGATE(what, where)                                                 \
+  hints.addCommand(llvmberry::ConsPropagate::make(what, where),                \
+                   llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
+
 #define PHIPOS(SCOPE, PN, prevI)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(),                \
                               prevI->getParent()->getName())
 #define PHIPOSJustPhi(SCOPE, PN)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
-#define INFRULE(pos, x) hints.addCommand(llvmberry::ConsInfrule::make(pos, x))
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
 #define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
 // Below code snippet is tu support overloading of two macro functions : 
@@ -29,8 +35,6 @@
                                   _REGISTER_PHYS(__VA_ARGS__))
 
 #define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
-#define PROPAGATE(what, where)                                                 \
-  hints.addCommand(llvmberry::ConsPropagate::make(what, where))
 #define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
 
 // EXPR, VAR, RHS, INSN macros make TyExpr object
