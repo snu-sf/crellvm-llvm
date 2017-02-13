@@ -20,6 +20,7 @@
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/InfrulesAndOrXor.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
@@ -224,15 +225,12 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
         llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Previous);
         llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Previous);
 
-        INFRULE(
-            INSTPOS(TGT, Z),
-            llvmberry::ConsAndXorConst::make(
-                REGISTER(reg_z_name, Physical), REGISTER(reg_y_name, Physical),
-                REGISTER(reg_yprime_name, Physical), VAL(X, Physical),
-                llvmberry::TyConstInt::make(c1, bitwidth),
-                llvmberry::TyConstInt::make(c2, bitwidth),
-                llvmberry::TyConstInt::make(c3, bitwidth), BITSIZE(bitwidth)));
-            });
+        INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndXorConst::make(
+                REGISTER(reg_z_name), REGISTER(reg_y_name),
+                REGISTER(reg_yprime_name), VAL(X), CONSTINT(c1, bitwidth),
+                CONSTINT(c2, bitwidth), CONSTINT(c3, bitwidth),
+                BITSIZE(bitwidth)));
+      });
       return BinaryOperator::CreateXor(And, Together);
     }
     break;
@@ -300,16 +298,12 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
               llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Previous);
               llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Physical);
               llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Previous);
-              INFRULE(INSTPOS(TGT, Z),
-                      llvmberry::ConsAndOrConst2::make(
-                          REGISTER(reg_z_name, Physical),
-                          REGISTER(reg_y_name, Physical),
-                          REGISTER(reg_yprime_name, Physical), VAL(X, Physical),
-                          llvmberry::TyConstInt::make(c1, bitwidth),
-                          llvmberry::TyConstInt::make(c2, bitwidth),
-                          llvmberry::TyConstInt::make(c3, bitwidth),
-                          BITSIZE(bitwidth)));
-              });
+              INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndOrConst2::make(
+                      REGISTER(reg_z_name), REGISTER(reg_y_name),
+                      REGISTER(reg_yprime_name), VAL(X),
+                      CONSTINT(c1, bitwidth), CONSTINT(c2, bitwidth),
+                      CONSTINT(c3, bitwidth), BITSIZE(bitwidth)));
+        });
 
         return BinaryOperator::CreateOr(And, OpRHS);
       }
@@ -1504,21 +1498,18 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
           std::string reg_zprime_name = llvmberry::getVariable(*Zprime);
           int bitwidth = Z->getType()->getIntegerBitWidth();
 
-          llvmberry::propagateInstruction(X, Z, llvmberry::Target);
-          llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
+          llvmberry::propagateInstruction(X, Z, TGT);
+          llvmberry::propagateInstruction(Y, Z, TGT);
 
           llvmberry::insertSrcNopAtTgtI(hints, Zprime);
           llvmberry::propagateMaydiffGlobal(reg_zprime_name, llvmberry::Physical); 
           
-          llvmberry::propagateInstruction(Zprime, Z, llvmberry::Target);
+          llvmberry::propagateInstruction(Zprime, Z, TGT);
           
-          INFRULE(INSTPOS(llvmberry::Target, Z), 
-              llvmberry::ConsAndDeMorgan::make(
-                  REGISTER(reg_z_name, Physical),
-                  REGISTER(reg_x_name, Physical),
-                  REGISTER(reg_y_name, Physical),
-                  REGISTER(reg_zprime_name, Physical),
-                  VAL(A, Physical), VAL(B, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndDeMorgan::make(
+                  REGISTER(reg_z_name), REGISTER(reg_x_name),
+                  REGISTER(reg_y_name), REGISTER(reg_zprime_name),
+                  VAL(A), VAL(B), BITSIZE(bitwidth)));
         });
 
         return BinaryOperator::CreateNot(Or);
@@ -1602,11 +1593,11 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
 
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
-        llvmberry::propagateInstruction(X, Z, llvmberry::Target);
-        llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
+        llvmberry::propagateInstruction(X, Z, TGT);
+        llvmberry::propagateInstruction(Y, Z, TGT);
 
         if (is_x_second)
-           llvmberry::applyCommutativity(Z, Y, llvmberry::Target);
+           llvmberry::applyCommutativity(Z, Y, TGT);
 
         INFRULE(INSTPOS(TGT, &I), llvmberry::ConsAndOrNot1::make(
                 REGISTER(reg_z_name), REGISTER(reg_x_name),
@@ -2512,16 +2503,15 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       Value *B = Y->getOperand(1);
       int bitwidth = Z->getType()->getIntegerBitWidth();
 
-      llvmberry::propagateInstruction(X, Z, llvmberry::Source);
-      llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+      llvmberry::propagateInstruction(X, Z, SRC);
+      llvmberry::propagateInstruction(Y, Z, SRC);
       if(X->getOperand(1) == A){
         // commutativity.
-        llvmberry::applyCommutativity(Z, X, llvmberry::Source);
+        llvmberry::applyCommutativity(Z, X, SRC);
       }
 
       INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrOr::make(
-          VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical),
-          VAL(A, Physical), VAL(B, Physical), BITSIZE(bitwidth)));
+          VAL(Z), VAL(X), VAL(Y), VAL(A), VAL(B), BITSIZE(bitwidth)));
     });
 
     return BinaryOperator::CreateOr(A, B);
@@ -2557,19 +2547,17 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       llvmberry::insertSrcNopAtTgtI(hints, Yprime);
       llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Yprime), llvmberry::Physical);
  
-      llvmberry::propagateInstruction(X, Z, llvmberry::Target);
-      llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
-      llvmberry::propagateInstruction(Yprime, Z, llvmberry::Target);
-      if(Y->getOperand(1) == A){
-        llvmberry::applyCommutativity(Z, Y, llvmberry::Target);
-      }
-      if(Yprime->getOperand(1) == A){
-        llvmberry::applyCommutativity(Z, Yprime, llvmberry::Target);
-      }
+      llvmberry::propagateInstruction(X, Z, TGT);
+      llvmberry::propagateInstruction(Y, Z, TGT);
+      llvmberry::propagateInstruction(Yprime, Z, TGT);
+      if(Y->getOperand(1) == A)
+        llvmberry::applyCommutativity(Z, Y, TGT);
+
+      if(Yprime->getOperand(1) == A)
+        llvmberry::applyCommutativity(Z, Yprime, TGT);
       
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsOrOr2::make(
-          VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical),
-          VAL(Yprime, Physical), VAL(A, Physical), VAL(B, Physical),
+          VAL(Z), VAL(X), VAL(Y), VAL(Yprime), VAL(A), VAL(B),
           BITSIZE(bitwidth)));
     });
  
@@ -2756,22 +2744,18 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
-        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(Y, Z, SRC);
         if (Op0 == B)
-          llvmberry::applyCommutativity(Z, Y, llvmberry::Source);
+          llvmberry::applyCommutativity(Z, Y, SRC);
         if (SwappedForXor)
-          llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
+          llvmberry::applyCommutativity(Z, Z, SRC);
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrXor3::make(
-            VAL(Z, Physical), VAL(Y, Physical), 
-            Op0 == B ? VAL(B, Physical) : VAL(A, Physical), 
-            Op0 == B ? VAL(A, Physical) : VAL(B, Physical), 
-            BITSIZE(bitwidth)));
+            VAL(Z), VAL(Y), (Op0 == B ? VAL(B) : VAL(A)),
+            (Op0 == B ? VAL(A) : VAL(B)), BITSIZE(bitwidth)));
         if (Op0 == B) {
-          INFRULE(INSTPOS(SRC, Z),
-                  llvmberry::ConsBopCommutative::make(
-                      VAR(llvmberry::getVariable(*Z), Physical),
-                      llvmberry::TyBop::BopOr, VAL(B, Physical),
-                      VAL(A, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsBopCommutative::make(
+              VAR(llvmberry::getVariable(*Z)), llvmberry::TyBop::BopOr,
+              VAL(B), VAL(A), BITSIZE(bitwidth)));
         }
       });
 
@@ -2792,14 +2776,14 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
-        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
-        llvmberry::propagateInstruction(X, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(Y, Z, SRC);
+        llvmberry::propagateInstruction(X, Z, SRC);
         if (match(Op0, m_And(m_Specific(B), m_Specific(A))))
-          llvmberry::applyCommutativity(Z, X, llvmberry::Source);
+          llvmberry::applyCommutativity(Z, X, SRC);
         if (SwappedForXor)
-          llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
+          llvmberry::applyCommutativity(Z, Z, SRC);
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrAndXor::make(
-            VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), VAL(A, Physical), VAL(B, Physical), BITSIZE(bitwidth)));
+            VAL(Z), VAL(X), VAL(Y), VAL(A), VAL(B), BITSIZE(bitwidth)));
       });
      
       return BinaryOperator::CreateOr(A, B);
