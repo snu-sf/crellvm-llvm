@@ -2990,6 +2990,18 @@ ConsInfrule::make(std::shared_ptr<TyPosition> _position,
       new ConsInfrule(_position, _infrule));
 }
 
+TyCppDebugInfo::TyCppDebugInfo(const std::string &_file_name,
+                               int _line_number)
+    : file_name(_file_name), line_number(_line_number) {}
+void TyCppDebugInfo::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(file_name), CEREAL_NVP(line_number));
+}
+std::shared_ptr<TyCppDebugInfo> TyCppDebugInfo::make(const char *_file_name,
+                                                int _line_number) {
+  return std::shared_ptr<TyCppDebugInfo>(
+      new TyCppDebugInfo(std::string(_file_name), _line_number));
+}
+
 // core hint
 
 CoreHint::CoreHint() : return_code(CoreHint::ACTUAL) {}
@@ -3027,7 +3039,13 @@ void CoreHint::setReturnCodeToFail() {
 }
 
 void CoreHint::addCommand(std::shared_ptr<TyCommand> c) {
-  commands.push_back(c);
+  commands.push_back(std::make_pair(c,
+                                    llvmberry::TyCppDebugInfo::make("", 0)));
+}
+
+void CoreHint::addCommand(std::shared_ptr<TyCommand> c,
+                          std::shared_ptr<TyCppDebugInfo> d) {
+  commands.push_back(std::make_pair(c, d));
 }
 
 void CoreHint::addNopPosition(std::shared_ptr<TyPosition> position) {
