@@ -90,6 +90,7 @@
 
 // CONSTINT make TyConstInt object
 #define CONSTINT(val, bitwidth) llvmberry::TyConstInt::make(val, bitwidth)
+#define CONSTGLOBALADDR(val) llvmberry::ConsConstGlobalVarAddr::make(*(val))
 
 #define SRC llvmberry::Source
 #define TGT llvmberry::Target

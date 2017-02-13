@@ -1,6 +1,13 @@
 #ifndef INFRULES_ADD_SUB
 #define INFRUELS_ADD_SUB
 
+#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/IR/Instructions.h"
+#include "cereal/types/memory.hpp"
+#include "cereal/archives/json.hpp"
+
+namespace llvmberry {
+
 struct TyAddSignbit {
 public:
   TyAddSignbit(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyValue> _e1,
@@ -482,5 +489,162 @@ private:
   std::shared_ptr<TySubShl> sub_shl;
 };
 
+struct TyAddMask {
+public:
+  TyAddMask(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+            std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x,
+            std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2,
+            std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyRegister> yprime;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyConstInt> c1;
+  std::shared_ptr<TyConstInt> c2;
+  std::shared_ptr<TySize> sz;
+};
+
+struct ConsAddMask : public TyInfrule {
+public:
+  ConsAddMask(std::shared_ptr<TyAddMask> _add_mask);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
+       std::shared_ptr<TyRegister> _yprime, std::shared_ptr<TyValue> _x,
+       std::shared_ptr<TyConstInt> _c1, std::shared_ptr<TyConstInt> _c2,
+       std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAddMask> add_mask;
+};
+
+struct TyAddSelectZero {
+public:
+  TyAddSelectZero(std::shared_ptr<TyRegister> _z,
+                  std::shared_ptr<TyRegister> _x,
+                  std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c,
+                  std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a,
+                  std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> c;
+  std::shared_ptr<TyValue> n;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
+};
+
+struct ConsAddSelectZero : public TyInfrule {
+public:
+  ConsAddSelectZero(std::shared_ptr<TyAddSelectZero> _add_select_zero);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
+       std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c,
+       std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAddSelectZero> add_select_zero;
+};
+
+struct TyAddSelectZero2 {
+public:
+  TyAddSelectZero2(std::shared_ptr<TyRegister> _z,
+                   std::shared_ptr<TyRegister> _x,
+                   std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c,
+                   std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a,
+                   std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TyValue> c;
+  std::shared_ptr<TyValue> n;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TySize> sz;
+};
+
+struct ConsAddSelectZero2 : public TyInfrule {
+public:
+  ConsAddSelectZero2(std::shared_ptr<TyAddSelectZero2> _add_select_zero2);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
+       std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _c,
+       std::shared_ptr<TyValue> _n, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAddSelectZero2> add_select_zero2;
+};
+
+struct TyAddOrAnd {
+public:
+  TyAddOrAnd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a,
+             std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x,
+             std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TySize> sz;
+};
+
+struct ConsAddOrAnd : public TyInfrule {
+public:
+  ConsAddOrAnd(std::shared_ptr<TyAddOrAnd> _add_or_and);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x,
+       std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAddOrAnd> add_or_and;
+};
+
+struct TyAddXorAnd {
+public:
+  TyAddXorAnd(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a,
+              std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x,
+              std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyRegister> z;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyRegister> x;
+  std::shared_ptr<TyRegister> y;
+  std::shared_ptr<TySize> sz;
+};
+
+struct ConsAddXorAnd : public TyInfrule {
+public:
+  ConsAddXorAnd(std::shared_ptr<TyAddXorAnd> _add_xor_and);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TyValue> _b, std::shared_ptr<TyRegister> _x,
+       std::shared_ptr<TyRegister> _y, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAddXorAnd> add_xor_and;
+};
+
+} // llvmberry
 
 #endif

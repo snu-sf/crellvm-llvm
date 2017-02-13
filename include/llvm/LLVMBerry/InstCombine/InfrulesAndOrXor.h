@@ -1,6 +1,13 @@
 #ifndef INFRULES_AND_OR_XOR
 #define INFRUELS_AND_OR_XOR
 
+#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/IR/Instructions.h"
+#include "cereal/types/memory.hpp"
+#include "cereal/archives/json.hpp"
+
+namespace llvmberry {
+
 struct TyAndXorConst {
 public:
   TyAndXorConst(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _y,
@@ -102,19 +109,6 @@ private:
   std::shared_ptr<TyAndDeMorgan> and_de_morgan;
 };
 
-struct ConsAndOrNot1 : public TyInfrule {
-public:
-  ConsAndOrNot1(std::shared_ptr<TyAndOrNot1> _and_or_not1);
-  static std::shared_ptr<TyInfrule>
-  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
-       std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _a,
-       std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  std::shared_ptr<TyAndOrNot1> and_or_not1;
-};
-
 struct TyAndOrNot1 {
 public:
   TyAndOrNot1(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
@@ -129,6 +123,19 @@ private:
   std::shared_ptr<TyValue> a;
   std::shared_ptr<TyValue> b;
   std::shared_ptr<TySize> sz;
+};
+
+struct ConsAndOrNot1 : public TyInfrule {
+public:
+  ConsAndOrNot1(std::shared_ptr<TyAndOrNot1> _and_or_not1);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyRegister> _z, std::shared_ptr<TyRegister> _x,
+       std::shared_ptr<TyRegister> _y, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAndOrNot1> and_or_not1;
 };
 
 struct TyOrOr {
@@ -250,6 +257,103 @@ private:
   std::shared_ptr<TyOrAndXor> or_and_xor;
 };
 
+struct TyOrXor {
+public:
+  TyOrXor(std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _z,
+          std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+          std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b,
+          std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
 
+private:
+  std::shared_ptr<TyValue> w;
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
+};
+
+struct ConsOrXor : public TyInfrule {
+public:
+  ConsOrXor(std::shared_ptr<TyOrXor> _or_xor);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyValue> _w, std::shared_ptr<TyValue> _z,
+       std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+       std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b,
+       std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyOrXor> or_xor;
+};
+
+struct TyOrXor2 {
+public:
+  TyOrXor2(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x1,
+           std::shared_ptr<TyValue> _y1, std::shared_ptr<TyValue> _x2,
+           std::shared_ptr<TyValue> _y2, std::shared_ptr<TyValue> _a,
+           std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x1;
+  std::shared_ptr<TyValue> y1;
+  std::shared_ptr<TyValue> x2;
+  std::shared_ptr<TyValue> y2;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TySize> sz;
+};
+
+struct ConsOrXor2 : public TyInfrule {
+public:
+  ConsOrXor2(std::shared_ptr<TyOrXor2> _or_xor2);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x1,
+       std::shared_ptr<TyValue> _y1, std::shared_ptr<TyValue> _x2,
+       std::shared_ptr<TyValue> _y2, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyOrXor2> or_xor2;
+};
+
+struct TyOrXor4 {
+public:
+  TyOrXor4(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
+           std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a,
+           std::shared_ptr<TyValue> _b, std::shared_ptr<TyValue> _nb,
+           std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyValue> a;
+  std::shared_ptr<TyValue> b;
+  std::shared_ptr<TyValue> nb;
+  std::shared_ptr<TySize> sz;
+};
+
+struct ConsOrXor4 : public TyInfrule {
+public:
+  ConsOrXor4(std::shared_ptr<TyOrXor4> _or_xor4);
+  static std::shared_ptr<TyInfrule>
+  make(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
+       std::shared_ptr<TyValue> _y, std::shared_ptr<TyValue> _a,
+       std::shared_ptr<TyValue> _b, std::shared_ptr<TyValue> _nb,
+       std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyOrXor4> or_xor4;
+};
+
+} // llvmberry
 
 #endif
