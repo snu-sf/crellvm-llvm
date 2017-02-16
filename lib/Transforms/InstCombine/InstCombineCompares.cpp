@@ -28,6 +28,7 @@
 
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/InstCombine/InfrulesCompares.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 #include "llvm/LLVMBerry/Dictionary.h"
 
@@ -2648,8 +2649,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
     llvmberry::ValidationUnit::Begin("icmp_swap", I.getParent()->getParent());
     llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1]
         (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-      INFRULE(INSTPOS(SRC, &I),
-         llvmberry::ConsIcmpSwapOperands::make(I));
+      INFRULE(INSTPOS(SRC, &I), llvmberry::ConsIcmpSwapOperands::make(I));
     });
 
     I.swapOperands();
@@ -2763,8 +2763,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ugt_and_not");
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsIcmpUgtAndNot::make(
+          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUgtAndNot::make(
                 VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ult_and_not");
@@ -2806,13 +2805,11 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sgt_and_not");
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsIcmpSgtAndNot::make(
+          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSgtAndNot::make(
                 VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_slt_and_not");
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsIcmpSltAndNot::make(
+          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSltAndNot::make(
                 VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
         }
       });
@@ -2960,7 +2957,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             // X = sub A B     | X = sub A B
             // Z = icmp eq X 0 | Z = icmp eq A B
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpEqSub::make(
-                    VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
+                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
           } else if (I.getPredicate() == ICmpInst::ICMP_NE) {
             llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
                 "icmp_ne_sub");
@@ -2968,7 +2965,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             // X = sub A B     | X = sub A B
             // Z = icmp ne X 0 | Z = icmp ne A B
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSub::make(
-                    VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
+                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
           } else {
             assert(false && "I.getPredicate() must be EQ or NE");
           }
@@ -3664,7 +3661,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             ICmpInst *Z = &I;
             unsigned bitsize = W->getType()->getIntegerBitWidth();
             Constant *newv = ConstantInt::getFalse(Z->getType());
-            llvmberry::propagateInstruction(W, Z, SRC);
+            llvmberry::propagateInstruction(W, Z, llvmberry::Source);
             if (Y == Z->getOperand(0))
               // Needs to swap icmp operands
               INFRULE(INSTPOS(SRC, Z),
@@ -3692,14 +3689,12 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             ICmpInst *Z = &I;
             unsigned bitsize = W->getType()->getIntegerBitWidth();
             Constant *newv = ConstantInt::getTrue(Z->getType());
-            llvmberry::propagateInstruction(W, Z, SRC);
-            if (Y == Z->getOperand(0)) {
+            llvmberry::propagateInstruction(W, Z, llvmberry::Source);
+            if (Y == Z->getOperand(0))
               // Needs to swap icmp operands
               INFRULE(INSTPOS(SRC, Z),
                       llvmberry::ConsIcmpSwapOperands::make(*Z));
-            }
-            INFRULE(INSTPOS(SRC, Z),
-                    llvmberry::ConsIcmpNeSrem::make(
+            INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSrem::make(
                         VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(bitsize)));
             llvmberry::generateHintForReplaceAllUsesWith(Z, newv);
           });

@@ -19,6 +19,7 @@
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/InstCombine/InfrulesMulDivRem.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
@@ -450,18 +451,9 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
         // propagate Y = 1 << A
         llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
         
-        if(needsTransitivity){
+        if(needsTransitivity)
           // replace Z = X * Y to Z = Y * X
           llvmberry::applyCommutativity(Z, Z, SRC);
-          //hints.addCommand(llvmberry::ConsInfrule::make(
-          //    llvmberry::TyPosition::make(llvmberry::Source, *Z),
-          //    llvmberry::ConsBopCommutative::make(
-          //        VAR(reg_z_name, Physical),
-          //        llvmberry::TyBop::BopMul,
-          //        llvmberry::TyValue::make(*X),
-          //        llvmberry::TyValue::make(*Y),
-          //        llvmberry::ConsSize::make(bitwidth))));
-        }
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsMulShl::make(
                 REGISTER(reg_z_name), REGISTER(reg_y_name), VAL(X), VAL(A),
@@ -1277,23 +1269,17 @@ Instruction *InstCombiner::visitUDiv(BinaryOperator &I) {
           std::string reg_y_name = llvmberry::getVariable(*Y);
           Value *B = Y->getOperand(0);
           
-          llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsUdivZext::make(
-                REGISTER(reg_z_name, Physical),
-                REGISTER(reg_x_name, Physical),
-                REGISTER(reg_y_name, Physical),
-                REGISTER(reg_k_name, Physical),
-                VAL(A, Physical), VAL(B, Physical), BITSIZE(size1), BITSIZE(size2)));
+          llvmberry::propagateInstruction(Y, Z, TGT);
+          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsUdivZext::make(
+                REGISTER(reg_z_name), REGISTER(reg_x_name),
+                REGISTER(reg_y_name), REGISTER(reg_k_name),
+                VAL(A), VAL(B), BITSIZE(size1), BITSIZE(size2)));
         } else if(isa<ConstantInt>(Op1)) {
           ConstantInt *C = dyn_cast<ConstantInt>(Op1);
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsUdivZextConst::make(
-                REGISTER(reg_z_name, Physical),
-                REGISTER(reg_x_name, Physical),
-                llvmberry::TyConstInt::make(C->getSExtValue(), C->getBitWidth()),
-                REGISTER(reg_k_name, Physical),
-                VAL(A, Physical), BITSIZE(size1), BITSIZE(size2)));
+          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsUdivZextConst::make(
+                REGISTER(reg_z_name), REGISTER(reg_x_name),
+                CONSTINT(C->getSExtValue(), C->getBitWidth()),
+                REGISTER(reg_k_name), VAL(A), BITSIZE(size1), BITSIZE(size2)));
         } else {
           assert("Must be constant int or ZExtInst, by dyn_castZExtVal definition " && false);
         }
@@ -1671,22 +1657,16 @@ Instruction *InstCombiner::visitURem(BinaryOperator &I) {
           Value *B = Y->getOperand(0);
           
           llvmberry::propagateInstruction(Y, Z, llvmberry::Target);
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsUremZext::make(
-                REGISTER(reg_z_name, Physical),
-                REGISTER(reg_x_name, Physical),
-                REGISTER(reg_y_name, Physical),
-                REGISTER(reg_k_name, Physical),
-                VAL(A, Physical), VAL(B, Physical), BITSIZE(size1), BITSIZE(size2)));
+          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsUremZext::make(
+                REGISTER(reg_z_name), REGISTER(reg_x_name),
+                REGISTER(reg_y_name), REGISTER(reg_k_name),
+                VAL(A), VAL(B), BITSIZE(size1), BITSIZE(size2)));
         } else if(isa<ConstantInt>(Op1)) {
           ConstantInt *C = dyn_cast<ConstantInt>(Op1);
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsUremZextConst::make(
-                REGISTER(reg_z_name, Physical),
-                REGISTER(reg_x_name, Physical),
-                llvmberry::TyConstInt::make(C->getSExtValue(), C->getBitWidth()),
-                REGISTER(reg_k_name, Physical),
-                VAL(A, Physical), BITSIZE(size1), BITSIZE(size2)));
+          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsUremZextConst::make(
+                REGISTER(reg_z_name), REGISTER(reg_x_name),
+                CONSTINT(C->getSExtValue(), C->getBitWidth()),
+                REGISTER(reg_k_name), VAL(A), BITSIZE(size1), BITSIZE(size2)));
         } else {
           assert("Must be constant int or ZExtInst, by dyn_castZExtVal definition " && false);
         }
