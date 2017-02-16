@@ -19,6 +19,7 @@
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/InstCombine/InfrulesCasts.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
@@ -637,7 +638,7 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
       
       llvmberry::propagateInstruction(Y, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsTruncOnebit::make(
-          VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), BITSIZE(s)));
+          VAL(Z), VAL(X), VAL(Y), BITSIZE(s)));
     });
     Value *Zero = Constant::getNullValue(Src->getType());
     return new ICmpInst(ICmpInst::ICMP_NE, Src, Zero);
@@ -1058,7 +1059,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       llvmberry::propagateInstruction(Y, Z, SRC);
       llvmberry::propagateInstruction(W, Z, SRC);
       INFRULE(INSTPOS(SRC, Z), llvmberry::ConsZextTruncAnd::make(
-          VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), VAL(W, Physical),
+          VAL(Z), VAL(X), VAL(Y), VAL(W),
           llvmberry::TyConstant::make(*C), BITSIZE(s), BITSIZE(sprime)));
     });
     return BinaryOperator::CreateAnd(X, ConstantExpr::getZExt(C, CI.getType()));
@@ -1100,8 +1101,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       llvmberry::propagateInstruction(Y, Z, TGT);
       llvmberry::propagateInstruction(Yprime, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsZextTruncAndXor::make(
-          VAL(Z, Physical), VAL(X, Physical), VAL(V, Physical), VAL(W, Physical),
-          VAL(Y, Physical), VAL(Yprime, Physical),
+          VAL(Z), VAL(X), VAL(V), VAL(W), VAL(Y), VAL(Yprime),
           llvmberry::TyConstant::make(*C), BITSIZE(s), BITSIZE(sprime)));
     });
     return BinaryOperator::CreateXor(NewAnd, ZC);
@@ -1134,8 +1134,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       llvmberry::propagateInstruction(Y, Z, TGT);
       llvmberry::propagateInstruction(Yprime, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsZextXor::make(
-          VAL(Z, Physical), VAL(Y, Physical), VAL(Yprime, Physical), VAL(X, Physical),
-          BITSIZE(sz)));
+          VAL(Z), VAL(Y), VAL(Yprime), VAL(X), BITSIZE(sz)));
     });
     return BinaryOperator::CreateXor(New, ConstantInt::get(CI.getType(), 1));
   }
@@ -1379,11 +1378,10 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
         llvmberry::insertSrcNopAtTgtI(hints, Xprime);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Xprime), 
             llvmberry::Physical);
-        llvmberry::propagateInstruction(X, Z, llvmberry::Target);
-        llvmberry::propagateInstruction(Xprime, Z, llvmberry::Target);
+        llvmberry::propagateInstruction(X, Z, TGT);
+        llvmberry::propagateInstruction(Xprime, Z, TGT);
         INFRULE(INSTPOS(TGT, Z), llvmberry::ConsSextTruncAshr::make(
-            VAL(Z, Physical), VAL(X, Physical), VAL(Xprime, Physical),
-            VAL(V, Physical), BITSIZE(s1), BITSIZE(s2), 
+            VAL(Z), VAL(X), VAL(Xprime), VAL(V), BITSIZE(s1), BITSIZE(s2), 
             llvmberry::TyConstInt::make(*i3)));
       });
       return BinaryOperator::CreateAShr(Res, ShAmt);
@@ -2039,8 +2037,7 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
     llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &Src]
           (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       INFRULE(INSTPOS(SRC, &CI), llvmberry::ConsBitcastSametype::make(
-                  VAL(Src, Physical), VAL(&CI, Physical),
-                  VALTYPE(Src->getType())));
+                  VAL(Src), VAL(&CI), VALTYPE(Src->getType())));
       llvmberry::generateHintForReplaceAllUsesWith(&CI, Src);
     });
     return ReplaceInstUsesWith(CI, Src);

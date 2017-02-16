@@ -243,12 +243,9 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
               llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
 
-              INFRULE(
-                  INSTPOS(SRC, &I),
-                  llvmberry::ConsBopAssociative::make(
-                      REGISTER(reg0_name, Physical),
-                      REGISTER(reg1_name, Physical),
-                      REGISTER(reg2_name, Physical), llvmberry::getBop(Opcode),
+              INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopAssociative::make(
+                      REGISTER(reg0_name), REGISTER(reg1_name),
+                      REGISTER(reg2_name), llvmberry::getBop(Opcode),
                       llvmberry::TyConstInt::make(*B_const),
                       llvmberry::TyConstInt::make(*C_const),
                       llvmberry::TyConstInt::make(*V_const), BITSIZE(b_bw)));
