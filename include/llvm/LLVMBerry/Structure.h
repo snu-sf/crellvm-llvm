@@ -1541,6 +1541,19 @@ std::shared_ptr<TyInstruction>
 instructionWithGhostIdxs(const llvm::Instruction &i,
                          std::vector<int> ghostIdxs);
 
+/* .cpp Debugging infos */
+struct TyCppDebugInfo {
+public:
+  TyCppDebugInfo(const std::string &_file_name, int _line_number);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+  static std::shared_ptr<TyCppDebugInfo> make(const char *_file_name,
+                                              int _line_number);
+
+private:
+  std::string file_name;
+  int line_number;
+};
+
 /* core hint */
 
 struct CoreHint {
@@ -1556,6 +1569,8 @@ public:
   void setReturnCodeToAdmitted();
   void setReturnCodeToFail();
   void addCommand(std::shared_ptr<TyCommand> c);
+  void addCommand(std::shared_ptr<TyCommand> c,
+                  std::shared_ptr<TyCppDebugInfo> d);
   void setOptimizationName(const std::string &name);
   void addNopPosition(std::shared_ptr<TyPosition> position);
   void serialize(cereal::JSONOutputArchive &archive) const;
@@ -1567,7 +1582,8 @@ private:
   std::string description;
   RETURN_CODE return_code;
   std::vector<std::shared_ptr<TyPosition>> nop_positions;
-  std::vector<std::shared_ptr<TyCommand>> commands;
+  std::vector<std::pair<std::shared_ptr<TyCommand>,
+                        std::shared_ptr<TyCppDebugInfo>>> commands;
 };
 
 void intrude(std::function<void()> func);
