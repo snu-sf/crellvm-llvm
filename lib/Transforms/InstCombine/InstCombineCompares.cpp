@@ -2763,18 +2763,8 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ugt_and_not");
-<<<<<<< HEAD
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUgtAndNot::make(
                 VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
-||||||| merged common ancestors
-          INFRULE(INSTPOS(llvmberry::Target, Z),
-              llvmberry::ConsIcmpUgtAndNot::make(
-                VAL(Z, Physical), VAL(Zprime, Physical), VAL(A, Physical), VAL(B, Physical), BITSIZE(bitsize)));
-=======
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsIcmpUgtAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
->>>>>>> a8028926fa84948b88f5930de8395b2aec63cbbd
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ult_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUltAndNot::make(
@@ -2815,32 +2805,12 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sgt_and_not");
-<<<<<<< HEAD
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSgtAndNot::make(
                 VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
-||||||| merged common ancestors
-          INFRULE(INSTPOS(llvmberry::Target, Z),
-              llvmberry::ConsIcmpSgtAndNot::make(
-                VAL(Z, Physical), VAL(Zprime, Physical), VAL(A, Physical), VAL(B, Physical), BITSIZE(bitsize)));
-=======
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsIcmpSgtAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
->>>>>>> a8028926fa84948b88f5930de8395b2aec63cbbd
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_slt_and_not");
-<<<<<<< HEAD
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSltAndNot::make(
                 VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
-||||||| merged common ancestors
-          INFRULE(INSTPOS(llvmberry::Target, Z),
-              llvmberry::ConsIcmpSltAndNot::make(
-                VAL(Z, Physical), VAL(Zprime, Physical), VAL(A, Physical), VAL(B, Physical), BITSIZE(bitsize)));
-=======
-          INFRULE(INSTPOS(TGT, Z),
-              llvmberry::ConsIcmpSltAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
->>>>>>> a8028926fa84948b88f5930de8395b2aec63cbbd
         }
       });
       
@@ -2986,36 +2956,16 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             //     <src>       |     <tgt>
             // X = sub A B     | X = sub A B
             // Z = icmp eq X 0 | Z = icmp eq A B
-<<<<<<< HEAD
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpEqSub::make(
                         VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
-||||||| merged common ancestors
-            INFRULE(INSTPOS(SRC, Z),
-                    llvmberry::ConsIcmpEqSub::make(
-                        VAL(Z, Physical), VAL(X, Physical), VAL(A, Physical),
-                        VAL(B, Physical), BITSIZE(bitsize)));
-=======
-            INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpEqSub::make(
-                    VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
->>>>>>> a8028926fa84948b88f5930de8395b2aec63cbbd
           } else if (I.getPredicate() == ICmpInst::ICMP_NE) {
             llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
                 "icmp_ne_sub");
             //     <src>       |     <tgt>
             // X = sub A B     | X = sub A B
             // Z = icmp ne X 0 | Z = icmp ne A B
-<<<<<<< HEAD
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSub::make(
                         VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
-||||||| merged common ancestors
-            INFRULE(INSTPOS(SRC, Z),
-                    llvmberry::ConsIcmpNeSub::make(
-                        VAL(Z, Physical), VAL(X, Physical), VAL(A, Physical),
-                        VAL(B, Physical), BITSIZE(bitsize)));
-=======
-            INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSub::make(
-                    VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
->>>>>>> a8028926fa84948b88f5930de8395b2aec63cbbd
           } else {
             assert(false && "I.getPredicate() must be EQ or NE");
           }
@@ -3711,16 +3661,8 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             ICmpInst *Z = &I;
             unsigned bitsize = W->getType()->getIntegerBitWidth();
             Constant *newv = ConstantInt::getFalse(Z->getType());
-<<<<<<< HEAD
             llvmberry::propagateInstruction(W, Z, llvmberry::Source);
             if (Y == Z->getOperand(0))
-||||||| merged common ancestors
-            llvmberry::propagateInstruction(W, Z, llvmberry::Source);
-            if (Y == Z->getOperand(0)) {
-=======
-            llvmberry::propagateInstruction(W, Z, SRC);
-            if (Y == Z->getOperand(0))
->>>>>>> a8028926fa84948b88f5930de8395b2aec63cbbd
               // Needs to swap icmp operands
               INFRULE(INSTPOS(SRC, Z),
                       llvmberry::ConsIcmpSwapOperands::make(*Z));
@@ -3747,34 +3689,13 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             ICmpInst *Z = &I;
             unsigned bitsize = W->getType()->getIntegerBitWidth();
             Constant *newv = ConstantInt::getTrue(Z->getType());
-<<<<<<< HEAD
             llvmberry::propagateInstruction(W, Z, llvmberry::Source);
             if (Y == Z->getOperand(0))
-||||||| merged common ancestors
-            llvmberry::propagateInstruction(W, Z, llvmberry::Source);
-            if (Y == Z->getOperand(0)) {
-=======
-            llvmberry::propagateInstruction(W, Z, SRC);
-            if (Y == Z->getOperand(0)) {
->>>>>>> a8028926fa84948b88f5930de8395b2aec63cbbd
               // Needs to swap icmp operands
               INFRULE(INSTPOS(SRC, Z),
                       llvmberry::ConsIcmpSwapOperands::make(*Z));
-<<<<<<< HEAD
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSrem::make(
                         VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(bitsize)));
-||||||| merged common ancestors
-            }
-            INFRULE(INSTPOS(SRC, Z),
-                    llvmberry::ConsIcmpNeSrem::make(
-                        VAL(Z, Physical), VAL(W, Physical), VAL(X, Physical),
-                        VAL(Y, Physical), BITSIZE(bitsize)));
-=======
-            }
-            INFRULE(INSTPOS(SRC, Z),
-                    llvmberry::ConsIcmpNeSrem::make(
-                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(bitsize)));
->>>>>>> a8028926fa84948b88f5930de8395b2aec63cbbd
             llvmberry::generateHintForReplaceAllUsesWith(Z, newv);
           });
 
