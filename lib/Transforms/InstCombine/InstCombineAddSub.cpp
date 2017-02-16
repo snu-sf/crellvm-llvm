@@ -21,6 +21,7 @@
 #include "llvm/LLVMBerry/ValidationUnit.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/InfrulesAddSub.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 
 using namespace llvm;
@@ -1275,15 +1276,6 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           PROPAGATE(LESSDEF(RHS(reg_w_name, Physical, TGT),
                             VAR(reg_w_name, Physical), TGT),
                     BOUNDS(INSTPOS(TGT, W), INSTPOS(TGT, Z)));
-          //hints.addCommand(llvmberry::ConsPropagate::make(
-          //        llvmberry::ConsLessdef::make(
-          //            llvmberry::ConsRhs::make(reg_w_name, llvmberry::Physical,
-          //                                     llvmberry::Target),
-          //            llvmberry::ConsVar::make(reg_w_name, llvmberry::Physical),
-          //            llvmberry::Target),
-          //        llvmberry::ConsBounds::make(
-          //            llvmberry::TyPosition::make(llvmberry::Target, *W),
-          //            llvmberry::TyPosition::make(llvmberry::Target, *Z))));
 
           // maydiff global w
           PROPAGATE(MAYDIFF(reg_w_name, Physical), llvmberry::ConsGlobal::make());
@@ -1293,16 +1285,6 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
                   REGISTER(reg_z_name), REGISTER(reg_mx_name),
                   VAL(MY), REGISTER(reg_w_name),
                   VAL(X), VAL(Y), BITSIZE(bitwidth)));
-          // hints.addCommand(llvmberry::ConsInfrule::make(
-          //    llvmberry::TyPosition::make(llvmberry::Target, *Z),
-          //    llvmberry::ConsAddDistSub::make(
-          //        llvmberry::TyRegister::make(reg_z_name, llvmberry::Physical),
-          //        llvmberry::TyRegister::make(reg_mx_name, llvmberry::Physical),
-          //        llvmberry::TyValue::make(*MY),
-          //        llvmberry::TyRegister::make(reg_w_name, llvmberry::Physical),
-          //        llvmberry::TyValue::make(*X),
-          //        llvmberry::TyValue::make(*Y),
-          //        llvmberry::ConsSize::make(bitwidth))));
         });
 
 
@@ -1327,15 +1309,6 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
       // propagate "my = 0 - y"
       llvmberry::propagateInstruction(reg_my_instr, &I, SRC);
-      // hints.addCommand(llvmberry::ConsPropagate::make(
-      //    llvmberry::ConsLessdef::make(
-      //        llvmberry::ConsVar::make(reg_my_name, llvmberry::Physical),
-      //        llvmberry::ConsRhs::make(reg_my_name, llvmberry::Physical,
-      //                                 llvmberry::Source),
-      //        llvmberry::Source),
-      //    llvmberry::ConsBounds::make(
-      //        llvmberry::TyPosition::make(llvmberry::Source, *reg_my_instr),
-      //        llvmberry::TyPosition::make(llvmberry::Source, I))));
 
       // from "z = my + x", create "z = x + my"
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopCommutative::make(
@@ -1371,15 +1344,6 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
         // propagate "my = 0 - y"
         llvmberry::propagateInstruction(reg_my_instr, &I, SRC);
-        // hints.addCommand(llvmberry::ConsPropagate::make(
-        //    llvmberry::ConsLessdef::make(
-        //        llvmberry::ConsVar::make(reg_my_name, llvmberry::Physical),
-        //        llvmberry::ConsRhs::make(reg_my_name, llvmberry::Physical,
-        //                                 llvmberry::Source),
-        //        llvmberry::Source),
-        //    llvmberry::ConsBounds::make(
-        //        llvmberry::TyPosition::make(llvmberry::Source, *reg_my_instr),
-        //        llvmberry::TyPosition::make(llvmberry::Source, I))));
 
         // from "z = x + my" and "my = 0 - y", create "z = x - y"
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSub::make(
@@ -1420,14 +1384,6 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
         // propagate "Y = X ^ -1"
         llvmberry::propagateInstruction(Y, Z, SRC);
-        // hints.addCommand(llvmberry::ConsPropagate::make(
-        //    llvmberry::ConsLessdef::make(
-        //        llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-        //        llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
-        //        llvmberry::Source),
-        //    llvmberry::ConsBounds::make(
-        //        llvmberry::TyPosition::make(llvmberry::Source, *Y),
-        //        llvmberry::TyPosition::make(llvmberry::Source, *Z))));
 
         // To Z, apply add_const_not
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAddConstNot::make(
@@ -1487,25 +1443,9 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
           // propagate "Y = X & c2" in target
           llvmberry::propagateInstruction(Y, Z, TGT);
-          // hints.addCommand(llvmberry::ConsPropagate::make(
-          //    llvmberry::ConsLessdef::make(
-          //        llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Target),
-          //        llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-          //        llvmberry::Target),
-          //    llvmberry::ConsBounds::make(
-          //        llvmberry::TyPosition::make(llvmberry::Target, *Y),
-          //        llvmberry::TyPosition::make(llvmberry::Target, *Z))));
 
           // propagate "Y' = X + c1" in target
           llvmberry::propagateInstruction(Yprime, Z, TGT);
-          // hints.addCommand(llvmberry::ConsPropagate::make(
-          //    llvmberry::ConsLessdef::make(
-          //        llvmberry::ConsRhs::make(reg_yprime_name, llvmberry::Physical, llvmberry::Target),
-          //        llvmberry::ConsVar::make(reg_yprime_name, llvmberry::Physical),
-          //        llvmberry::Target),
-          //    llvmberry::ConsBounds::make(
-          //        llvmberry::TyPosition::make(llvmberry::Target, *Yprime),
-          //        llvmberry::TyPosition::make(llvmberry::Target, *Z))));
 
           // To Z, apply add_mask
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAddMask::make(
@@ -1906,10 +1846,9 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
       std::string reg0_name = llvmberry::getVariable(I);
       unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
 
-      INFRULE(INSTPOS(SRC, &I),
-              llvmberry::ConsSubAdd::make(
-                  REGISTER(reg0_name, Physical), VAL(Op1, Physical),
-                  VAL(Op0, Physical), VAL(V, Physical), BITSIZE(sz_bw)));
+      INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubAdd::make(
+              REGISTER(reg0_name), VAL(Op1), VAL(Op0), VAL(V),
+              BITSIZE(sz_bw)));
     });
 
     return Res;
@@ -1988,14 +1927,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
         llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
-        //hints.addCommand(llvmberry::ConsPropagate::make(
-        //    llvmberry::ConsLessdef::make(
-        //        llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-        //        llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
-        //        llvmberry::Source),
-        //    llvmberry::ConsBounds::make(
-        //        llvmberry::TyPosition::make(llvmberry::Source, *Y),
-        //        llvmberry::TyPosition::make(llvmberry::Source, *Z))));
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubConstNot::make(
                 REGISTER(reg_z_name), REGISTER(reg_y_name), VAL(X),
@@ -2041,14 +1972,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
         llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
-        // hints.addCommand(llvmberry::ConsPropagate::make(
-        //     llvmberry::ConsLessdef::make(
-        //         llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-        //         llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical, llvmberry::Source),
-        //         llvmberry::Source),
-        //     llvmberry::ConsBounds::make(
-        //         llvmberry::TyPosition::make(llvmberry::Source, *Y),
-        //         llvmberry::TyPosition::make(llvmberry::Source, *Z))));
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubConstAdd::make(
                 REGISTER(reg_z_name), REGISTER(reg_y_name), VAL(X),
@@ -2267,15 +2190,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         int64_t cprime_val = -c_val;
 
         llvmberry::propagateInstruction(Y, Z, SRC);
-        //hints.addCommand(llvmberry::ConsPropagate::make(
-        //    llvmberry::ConsLessdef::make(
-        //        llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-        //        llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical,
-        //                                 llvmberry::Source),
-        //        llvmberry::Source),
-        //    llvmberry::ConsBounds::make(
-        //        llvmberry::TyPosition::make(llvmberry::Source, *Y),
-        //        llvmberry::TyPosition::make(llvmberry::Source, *Z))));
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubSdiv::make(
                 REGISTER(reg_z_name), REGISTER(reg_y_name), VAL(X),
                 CONSTINT(c_val, bitwidth), CONSTINT(cprime_val, bitwidth),
@@ -2308,15 +2222,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
             int bitwidth = Z->getType()->getIntegerBitWidth();
 
             llvmberry::propagateInstruction(Y, Z, SRC);
-            //hints.addCommand(llvmberry::ConsPropagate::make(
-            //    llvmberry::ConsLessdef::make(
-            //        llvmberry::ConsVar::make(reg_y_name, llvmberry::Physical),
-            //        llvmberry::ConsRhs::make(reg_y_name, llvmberry::Physical,
-            //                                 llvmberry::Source),
-            //        llvmberry::Source),
-            //    llvmberry::ConsBounds::make(
-            //        llvmberry::TyPosition::make(llvmberry::Source, *Y),
-            //        llvmberry::TyPosition::make(llvmberry::Source, *Z))));
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubShl::make(
                     REGISTER(reg_z_name), VAL(X), REGISTER(reg_y_name), VAL(mX),
                     VAL(A), BITSIZE(bitwidth)));

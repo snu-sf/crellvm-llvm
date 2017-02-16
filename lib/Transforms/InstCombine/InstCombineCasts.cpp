@@ -433,9 +433,8 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
         if (!(makeInfruleFunc == nullptr)) {
           new_optname = _create_infrule_name(mid, dst);
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName(new_optname);
-          INFRULE(INSTPOS(SRC, dst), makeInfruleFunc(
-                  VAL(src, Physical), VAL(mid, Physical), VAL(dst, Physical),
-                  VALTYPE(srcty), VALTYPE(midty), VALTYPE(dstty)));
+          INFRULE(INSTPOS(SRC, dst), makeInfruleFunc(VAL(src), VAL(mid),
+                  VAL(dst), VALTYPE(srcty), VALTYPE(midty), VALTYPE(dstty)));
         } else {
           llvmberry::ValidationUnit::Abort();
         }

@@ -2,6 +2,10 @@
 #include "llvm/LLVMBerry/Dictionary.h"
 #include "llvm/LLVMBerry/Hintgen.h"
 #include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/InstCombine/InfrulesAddSub.h"
+#include "llvm/LLVMBerry/InstCombine/InfrulesAndOrXor.h"
+#include "llvm/LLVMBerry/InstCombine/InfrulesCompares.h"
+#include "llvm/LLVMBerry/InstCombine/InfrulesSelect.h"
 #include "llvm/Support/Debug.h"
 
 namespace llvmberry {
