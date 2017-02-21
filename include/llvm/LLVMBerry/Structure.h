@@ -1474,6 +1474,20 @@ private:
   std::shared_ptr<TyPosition> to;
 };
 
+struct ConsBoundSet : public TyPropagateRange {
+public:
+  ConsBoundSet(std::shared_ptr<TyPosition> _from,
+             std::vector<std::shared_ptr<TyPosition>> _to_set);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyPropagateRange>
+          make(std::shared_ptr<TyPosition> _from, std::vector<std::shared_ptr<TyPosition>> _to_set);
+
+private:
+  std::shared_ptr<TyPosition> from;
+  std::vector<std::shared_ptr<TyPosition>> to_set;
+};
+
 struct ConsGlobal : public TyPropagateRange {
 public:
   ConsGlobal();
