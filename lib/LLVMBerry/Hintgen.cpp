@@ -2461,4 +2461,37 @@ void calculateIndices(llvm::Function* F) {
   });
 }
 
+void saveInstrInfo(llvm::Instruction* I, unsigned key) {
+  ValidationUnit::GetInstance()->intrude
+    ([&I, &key]
+     (Dictionary &data, CoreHint &hints) {
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
+    auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
+
+    if (llvm::AllocaInst* AI = llvm::dyn_cast<llvm::AllocaInst>(I)) {
+      llvm::Value* UndefVal = llvm::UndefValue::get(AI->getAllocatedType());
+
+      recentInstr[key].instrL = INSN(std::shared_ptr<llvmberry::TyInstruction>
+                                      (new llvmberry::ConsLoadInst
+                                        (llvmberry::TyLoadInst::makeAlignOne(AI))));
+      recentInstr[key].instrR = EXPR(UndefVal, Physical);
+      recentInstr[key].instrVal = nullptr;
+      recentInstr[key].instrPos = llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""); 
+      recentInstr[key].op0 = "";
+      recentInstr[key].op1 = "";
+      recentInstr[key].instrBB = AI->getParent();
+    } else if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
+      recentInstr[key].instrL = INSN(std::shared_ptr<llvmberry::TyInstruction>
+                                      (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(SI))));
+      recentInstr[key].instrR = llvmberry::TyExpr::make(*(SI->getOperand(0)), llvmberry::Physical);
+      recentInstr[key].instrVal = llvmberry::TyValue::make(*(SI->getOperand(0)));
+      recentInstr[key].instrPos = llvmberry::TyPosition::make(SRC, *SI, instrIndex[SI], "");
+      recentInstr[key].op0 = llvmberry::getVariable(*(SI->getOperand(0)));
+      recentInstr[key].op1 = llvmberry::getVariable(*(SI->getOperand(1)));
+      recentInstr[key].instrBB = SI->getParent();
+    }
+  });
+}
+
 } // llvmberry

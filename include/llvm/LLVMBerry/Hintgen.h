@@ -253,6 +253,8 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
 void generateHintForMem2RegPhiUndef(llvm::PHINode *APN, llvm::BasicBlock *Pred);
 
 void calculateIndices(llvm::Function* F);
+
+void saveInstrInfo(llvm::Instruction* I, unsigned key);
 }
 
 #endif

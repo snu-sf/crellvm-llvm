@@ -1376,8 +1376,16 @@ void PromoteMem2Reg::run() {
   // been stored yet.  In this case, it will get this null value.
   //
   RenamePassData::ValVector Values(Allocas.size());
-  for (unsigned i = 0, e = Allocas.size(); i != e; ++i)
+  for (unsigned i = 0, e = Allocas.size(); i != e; ++i) {
     Values[i] = UndefValue::get(Allocas[i]->getAllocatedType());
+
+    llvmberry::ValidationUnit::GetInstance()->intrude
+            ([&i, this]
+             (llvmberry::Dictionary &data,
+              llvmberry::CoreHint &hints) {
+      llvmberry::saveInstrInfo(Allocas[i], i);
+    });
+  }
 
   // Walks all basic blocks in the function performing the SSA rename algorithm
   // and inserting the phi nodes we marked as necessary

@@ -81,7 +81,8 @@ Mem2RegArg::Mem2RegArg()
       reachedEdge(new TyReachedEdgeObj()), reachedEdgeTag(new TyReachedEdgeTagObj()),
       storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
       transTgt(new TyTransTgtObj()), strVec(new TyStrVecObj()),
-      blockPairVec(new TyBlockPairVecObj()), isReachable(new TyReachableObj()) {}
+      blockPairVec(new TyBlockPairVecObj()), isReachable(new TyReachableObj()),
+      recentInstr(new TyRecentInstrObj()) {}
 
 bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                             std::shared_ptr<TyExpr> e2) {

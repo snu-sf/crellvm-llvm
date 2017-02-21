@@ -210,6 +210,20 @@ public:
   typedef std::shared_ptr<TyReachableObj> TyReachable;
   TyReachable isReachable;
 
+  struct RenamePassTuple {
+    std::shared_ptr<TyExpr> instrL;
+    std::shared_ptr<TyExpr> instrR;
+    std::shared_ptr<TyValue> instrVal;
+    std::shared_ptr<TyPosition> instrPos;
+    std::string op0;
+    std::string op1;
+    llvm::BasicBlock* instrBB;
+  };
+
+  typedef std::map<unsigned, RenamePassTuple> TyRecentInstrObj;
+  typedef std::shared_ptr<TyRecentInstrObj> TyRecentInstr;
+  TyRecentInstr recentInstr;
+
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
   static bool isUndef(std::shared_ptr<TyExpr> e);
