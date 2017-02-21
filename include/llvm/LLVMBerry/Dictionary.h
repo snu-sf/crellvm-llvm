@@ -17,6 +17,7 @@ enum DictKeys {
   // Common
   ArgForStripPointerCasts,
   ArgForFindAvailableLoadedValue,
+  ArgForIndices,
   // InstSimplify
   ArgForSimplifyAndInst,
   ArgForSimplifyOrInst,
@@ -107,6 +108,20 @@ public:
   FindAvailableLoadedValueArg();
 };
 DEFINE_TRAITS(ArgForFindAvailableLoadedValue, FindAvailableLoadedValueArg);
+
+struct IndicesArg {
+public:
+  typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndicesObj;
+  typedef std::shared_ptr<TyInstrIndicesObj> TyInstrIndices;
+  TyInstrIndices instrIndices;
+
+  typedef std::map<std::string, unsigned> TyTermIndicesObj;
+  typedef std::shared_ptr<TyTermIndicesObj> TyTermIndices;
+  TyTermIndices termIndices;
+
+  IndicesArg();
+};
+DEFINE_TRAITS(ArgForIndices, IndicesArg);
 
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Mem2RegArg
 struct Mem2RegArg {

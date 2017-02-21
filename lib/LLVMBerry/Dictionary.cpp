@@ -66,6 +66,10 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg() {
   loadstoreStoreInst = nullptr;
 }
 
+IndicesArg::IndicesArg()
+    : instrIndices(new TyInstrIndicesObj()),
+      termIndices(new TyTermIndicesObj()) {}
+
 VisitICmpArg::VisitICmpArg() {
   swapOps = false;
 }

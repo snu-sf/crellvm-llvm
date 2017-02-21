@@ -251,6 +251,8 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
 
 void generateHintForMem2RegPhiUndef(llvm::PHINode *APN, llvm::BasicBlock *Pred);
+
+void calculateIndices(llvm::Function* F);
 }
 
 #endif

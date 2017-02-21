@@ -936,8 +936,8 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           int nextIndex) {
   ValidationUnit::GetInstance()->intrude([&Pred, &SI, &next, &nextIndex](
       Dictionary &data, CoreHint &hints) {
-    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
-    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     std::string Rstore = getVariable(*(SI->getOperand(1)));
@@ -948,8 +948,8 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
       PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                           new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
                         VAR(Rstore, Ghost), SRC),
-                BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-                       TyPosition::make_end_of_block(TGT, *Pred, termIndex[predName])));
+                BOUNDS(TyPosition::make(SRC, *SI, instrIndices[SI], ""),
+                       TyPosition::make_end_of_block(TGT, *Pred, termIndices[predName])));
 
       std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
                                                   (VAR(Rstore, Ghost),
@@ -961,13 +961,13 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
         mem2regCmd[getVariable(*(SI->getOperand(0)))].lessdef.push_back(lessdef);
 
       PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
-                       TyPosition::make_end_of_block(SRC, *Pred, termIndex[predName])));
+                BOUNDS(TyPosition::make(SRC, *SI, instrIndices[SI], ""),
+                       TyPosition::make_end_of_block(SRC, *Pred, termIndices[predName])));
     } else {
       PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                           new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
                         VAR(Rstore, Ghost), SRC),
-                BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
+                BOUNDS(TyPosition::make(SRC, *SI, instrIndices[SI], ""),
                        TyPosition::make(SRC, *next, nextIndex, "")));
 
       std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
@@ -980,7 +980,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
         mem2regCmd[getVariable(*(SI->getOperand(0)))].lessdef.push_back(lessdef);
     
       PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                BOUNDS(TyPosition::make(SRC, *SI, instrIndex[SI], ""),
+                BOUNDS(TyPosition::make(SRC, *SI, instrIndices[SI], ""),
                        TyPosition::make(SRC, *next, nextIndex, "")));
     }
 
@@ -1000,7 +1000,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                 VAR(Rstore, Ghost)));
 
       std::shared_ptr<TyPosition> position =
-        TyPosition::make(SRC, *SI, instrIndex[SI], "");
+        TyPosition::make(SRC, *SI, instrIndices[SI], "");
 
       if (storeItem[SI].op0 != "%") {
         mem2regCmd[getVariable(*(SI->getOperand(0)))].ghost.push_back(ghost);
@@ -1016,20 +1016,20 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
           std::shared_ptr<TyInfrule>(new ConsTransitivity(transitivity)));
     } else {
       std::shared_ptr<TyPosition> position =
-        TyPosition::make(SRC, *SI, instrIndex[SI], "");
+        TyPosition::make(SRC, *SI, instrIndices[SI], "");
 
       // stored value will be changed in another iteration
-      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndex[SI], ""),
+      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndices[SI], ""),
               ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost),
                                    REGISTER(Rstore, Ghost)));
 
-      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndex[SI], ""),
+      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndices[SI], ""),
               ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
                                        new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
                                      VAR(storeItem[SI].op0, Physical),
                                      VAR(storeItem[SI].op0, Ghost)));
 
-      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndex[SI], ""),
+      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndices[SI], ""),
               ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
                                        new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
                                      VAR(storeItem[SI].op0, Ghost),
@@ -1145,7 +1145,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
 
   ValidationUnit::GetInstance()->intrude([&I, &LI, &use, &useIndex, &useBB](
       Dictionary &data, CoreHint &hints) {
-    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     auto &blockPairVec = *(data.get<ArgForMem2Reg>()->blockPairVec);
     std::string Rload = getVariable(*LI);
@@ -1156,16 +1156,16 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
     if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
       std::string Rstore = getVariable(*(SI->getOperand(1)));
 
-      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+      INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
               ConsIntroGhost::make(VAR(Rstore, Ghost), REGISTER(Rload, Ghost)));
 
-      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+      INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
               ConsTransitivity::make(VAR(Rload, Physical),
                                      INSN(std::shared_ptr<TyInstruction>(
                                        new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
                                      VAR(Rstore, Ghost)));
 
-      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+      INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
               ConsTransitivity::make(VAR(Rload, Physical), VAR(Rstore, Ghost),
                                      VAR(Rload, Ghost)));
 
@@ -1176,13 +1176,13 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
           if (LI == iPI) {
             std::string prev = phiNode->getIncomingBlock(i)->getName();
             PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
-                      BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                      BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                              TyPosition::make(SRC, *use, useIndex, prev)));
           }
         }
       } else {
         PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
-                  BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                  BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                          TyPosition::make(SRC, *useBB, useIndex)));
       }
 
@@ -1208,14 +1208,14 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
               std::string prev = phiNode->getIncomingBlock(i)->getName();
               PROPAGATE(
                   std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                  BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                  BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                          TyPosition::make(SRC, *use, useIndex, prev)));
             }
           }
         } else {
           PROPAGATE(
               std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-              BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+              BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                      TyPosition::make(SRC, *useBB, useIndex)));
         }
 
@@ -1224,7 +1224,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                                                       VAR(Rstore, Ghost),
                                                       VAR(Rload, Physical)));
 
-        INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+        INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                 std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
 
         mem2regCmd[Rload].transTgt.push_back(transTgt);
@@ -1243,14 +1243,14 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
               std::string prev = phiNode->getIncomingBlock(i)->getName();
               PROPAGATE(
                   std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                  BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                  BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                          TyPosition::make(SRC, *use, useIndex, prev)));
             }
           }
         } else {
           PROPAGATE(
               std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-              BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+              BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                      TyPosition::make(SRC, *useBB, useIndex)));
         }
         std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
@@ -1258,7 +1258,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                                                       VAR(Rstore, Ghost),
                                                       TyExpr::make(*(SI->getOperand(0)), Physical)));
 
-        INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+        INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                 std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
 
         if (SI->getOperand(0)->getName()!="") {
@@ -1269,16 +1269,16 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
     } else if (llvm::AllocaInst* AI = llvm::dyn_cast<llvm::AllocaInst>(I)) {
       std::string Ralloca = getVariable(*AI);
 
-      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+      INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
               ConsIntroGhost::make(VAR(Ralloca, Ghost), REGISTER(Rload, Ghost)));
 
-      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+      INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
               ConsTransitivity::make(VAR(Rload, Physical),
                                      INSN(std::shared_ptr<TyInstruction>(
                                        new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                                      VAR(Ralloca, Ghost)));
 
-      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+      INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
               ConsTransitivity::make(VAR(Rload, Physical), VAR(Ralloca, Ghost),
                                      VAR(Rload, Ghost)));
 
@@ -1289,13 +1289,13 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
           if (LI == iPI) {
             std::string prev = phiNode->getIncomingBlock(i)->getName();
             PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
-                      BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                      BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                              TyPosition::make(SRC, *use, useIndex, prev)));
           }
         }
       } else {
         PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
-                  BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                  BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                          TyPosition::make(SRC, *useBB, useIndex)));
       }
 
@@ -1315,14 +1315,14 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
             std::string prev = phiNode->getIncomingBlock(i)->getName();
             PROPAGATE(
                 std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+                BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                        TyPosition::make(SRC, *use, useIndex, prev)));
           }
         }
       } else {
         PROPAGATE(
             std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-            BOUNDS(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+            BOUNDS(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
                    TyPosition::make(SRC, *useBB, useIndex)));
       }
 
@@ -1331,7 +1331,7 @@ void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
                                                     VAR(Ralloca, Ghost),
                                                     VAR(Rload, Physical)));
 
-      INFRULE(TyPosition::make(SRC, *LI, instrIndex[LI], ""),
+      INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
               std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
 
       mem2regCmd[Rload].transTgt.push_back(transTgt);
@@ -1435,8 +1435,8 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
 void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instruction *Inst) {
   ValidationUnit::GetInstance()->intrude([&BB, &AI, &Inst]
                                                  (Dictionary &data, CoreHint &hints) {
-    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
-    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
 
     
@@ -1470,7 +1470,7 @@ void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instr
                           VAR(getVariable(*AI), Ghost),
                           SRC),
                   BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(pred)),
-                         TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+                         TyPosition::make_end_of_block(SRC, *pred, termIndices[getBasicBlockIndex(pred)])));
 
 
           PROPAGATE(
@@ -1478,28 +1478,28 @@ void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instr
                           EXPR(UndefVal, Physical),
                           TGT),
                   BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(pred)),
-                         TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+                         TyPosition::make_end_of_block(SRC, *pred, termIndices[getBasicBlockIndex(pred)])));
         } else {
           PROPAGATE(
                   LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                                   new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                           VAR(getVariable(*AI), Ghost),
                           SRC),
-                  BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                         TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+                  BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                         TyPosition::make_end_of_block(SRC, *pred, termIndices[getBasicBlockIndex(pred)])));
 
           PROPAGATE(
                   LESSDEF(VAR(getVariable(*AI), Ghost),
                           EXPR(UndefVal, Physical),
                           TGT),
-                  BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                         TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+                  BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                         TyPosition::make_end_of_block(SRC, *pred, termIndices[getBasicBlockIndex(pred)])));
 
-          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                   llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
                                                   REGISTER(getVariable(*AI), Ghost)));
 
-          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+          INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                   llvmberry::ConsTransitivity::make(INSN(*AI),
                                                     EXPR(UndefVal, Physical),
                                                     VAR(getVariable(*AI), Ghost)));
@@ -1518,7 +1518,7 @@ void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instr
                         VAR(getVariable(*AI), Ghost),
                         SRC),
                 BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(pred)),
-                       TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+                       TyPosition::make_end_of_block(SRC, *pred, termIndices[getBasicBlockIndex(pred)])));
 
 
         PROPAGATE(
@@ -1526,28 +1526,28 @@ void checkTag_propagate (llvm::BasicBlock *BB, llvm::AllocaInst *AI, llvm::Instr
                         EXPR(UndefVal, Physical),
                         TGT),
                 BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(pred)),
-                       TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+                       TyPosition::make_end_of_block(SRC, *pred, termIndices[getBasicBlockIndex(pred)])));
       } else {
         PROPAGATE(
                 LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                                 new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                         VAR(getVariable(*AI), Ghost),
                         SRC),
-                BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                       TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+                BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                       TyPosition::make_end_of_block(SRC, *pred, termIndices[getBasicBlockIndex(pred)])));
 
         PROPAGATE(
                 LESSDEF(VAR(getVariable(*AI), Ghost),
                         EXPR(UndefVal, Physical),
                         TGT),
-                BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                       TyPosition::make_end_of_block(SRC, *pred, termIndex[getBasicBlockIndex(pred)])));
+                BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                       TyPosition::make_end_of_block(SRC, *pred, termIndices[getBasicBlockIndex(pred)])));
 
-        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                 llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
                                                 REGISTER(getVariable(*AI), Ghost)));
 
-        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                 llvmberry::ConsTransitivity::make(INSN(*AI),
                                                   EXPR(UndefVal, Physical),
                                                   VAR(getVariable(*AI), Ghost)));
@@ -1565,8 +1565,8 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                      llvm::AllocaInst *AI, bool ignore) {
   ValidationUnit::GetInstance()->intrude([&BB, &VisitedBlock, &AI, &ignore]
       (Dictionary &data, CoreHint &hints) {
-    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
-    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &usePile = *(data.get<ArgForMem2Reg>()->usePile);
     auto &reachedEdgeTag = *(data.get<ArgForMem2Reg>()->reachedEdgeTag);
     auto &isReachable = *(data.get<ArgForMem2Reg>()->isReachable);
@@ -1598,20 +1598,20 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                                   new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                             VAR(getVariable(*AI), Ghost),
                             SRC),
-                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                           TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                           TyPosition::make(SRC, *LI, instrIndices[LI], "")));
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
                             EXPR(UndefVal, Physical),
                             TGT),
-                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                           TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                           TyPosition::make(SRC, *LI, instrIndices[LI], "")));
             
-            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                     llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
                                                     REGISTER(getVariable(*AI), Ghost)));
 
-            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                     llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
                                                           new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                                                       EXPR(UndefVal, Physical),
@@ -1623,13 +1623,13 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                             VAR(getVariable(*AI), Ghost),
                             SRC),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
-                           TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                           TyPosition::make(SRC, *LI, instrIndices[LI], "")));
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
                             EXPR(UndefVal, Physical),
                             TGT),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(BB)),
-                           TyPosition::make(SRC, *LI, instrIndex[LI], ""))); 
+                           TyPosition::make(SRC, *LI, instrIndices[LI], ""))); 
           }
 
             checkTag_propagate(BB, AI, LI);
@@ -1641,11 +1641,11 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
               llvm::BasicBlock* useBB = std::get<0>(t);
               int useIndex =
                 llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
-                                             termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
+                                             termIndices[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
 
               // set index of use
               if ((LI->getParent() == useBB &&
-                   instrIndex[LI] < std::get<1>(t)) ||
+                   instrIndices[LI] < std::get<1>(t)) ||
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
                              useBB) != isReachable[LI->getParent()].end())) {
@@ -1708,35 +1708,35 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                             VAR(getVariable(*AI), Ghost),
                             SRC),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                           TyPosition::make_end_of_block(SRC, *current, termIndices[getBasicBlockIndex(current)])));
 
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
                             EXPR(UndefVal, Physical),
                             TGT),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                           TyPosition::make_end_of_block(SRC, *current, termIndices[getBasicBlockIndex(current)])));
           } else {
             PROPAGATE(
                     LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                                   new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                             VAR(getVariable(*AI), Ghost),
                             SRC),
-                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                           TyPosition::make_end_of_block(SRC, *current, termIndices[getBasicBlockIndex(current)])));
 
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
                             EXPR(UndefVal, Physical),
                             TGT),
-                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                           TyPosition::make_end_of_block(SRC, *current, termIndices[getBasicBlockIndex(current)])));
 
-            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                     llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
                                                     REGISTER(getVariable(*AI), Ghost)));
 
-            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                     llvmberry::ConsTransitivity::make(INSN(*AI),
                                                       EXPR(UndefVal, Physical),
                                                       VAR(getVariable(*AI), Ghost)));
@@ -1786,35 +1786,35 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                             VAR(getVariable(*AI), Ghost),
                             SRC),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                           TyPosition::make_end_of_block(SRC, *current, termIndices[getBasicBlockIndex(current)])));
 
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
                             EXPR(UndefVal, Physical),
                             TGT),
                     BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(current)),
-                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                           TyPosition::make_end_of_block(SRC, *current, termIndices[getBasicBlockIndex(current)])));
           } else {
             PROPAGATE(
                     LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                                   new ConsLoadInst(TyLoadInst::makeAlignOne(AI)))),
                             VAR(getVariable(*AI), Ghost),
                             SRC),
-                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                           TyPosition::make_end_of_block(SRC, *current, termIndices[getBasicBlockIndex(current)])));
 
             PROPAGATE(
                     LESSDEF(VAR(getVariable(*AI), Ghost),
                             EXPR(UndefVal, Physical),
                             TGT),
-                    BOUNDS(TyPosition::make(SRC, *AI, instrIndex[AI], ""),
-                           TyPosition::make_end_of_block(SRC, *current, termIndex[getBasicBlockIndex(current)])));
+                    BOUNDS(TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+                           TyPosition::make_end_of_block(SRC, *current, termIndices[getBasicBlockIndex(current)])));
 
-            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                     llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
                                                     REGISTER(getVariable(*AI), Ghost)));
 
-            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndex[AI], ""),
+            INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                     llvmberry::ConsTransitivity::make(INSN(*AI),
                                                       EXPR(UndefVal, Physical),
                                                       VAR(getVariable(*AI), Ghost)));
@@ -1838,8 +1838,8 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
           ([&APN, &Pred]
            (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
-    auto &instrIndex = *(data.get<llvmberry::ArgForMem2Reg>()->instrIndex);
-    auto &termIndex =  *(data.get<llvmberry::ArgForMem2Reg>()->termIndex);
+    auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
+    auto &termIndices =  *(data.get<llvmberry::ArgForIndices>()->termIndices);
     auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
     auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
     auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
@@ -1877,7 +1877,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
             }
 
             if (ST != NULL) {
-              if ((ST->getParent() == LI->getParent()) && (instrIndex[ST] > instrIndex[LI])) {
+              if ((ST->getParent() == LI->getParent()) && (instrIndices[ST] > instrIndices[LI])) {
                 blockPairVec.clear();
                 llvm::Instruction *tmpI = properPHI(LI->getParent(), Ralloca, APN, true, false, data); //to check there is phi in same block as LI
                 llvm::PHINode *checkPHI = NULL;
@@ -1895,7 +1895,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
                                   VAR(Ralloca, Ghost),
                                   SRC),
                           BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(checkPHI->getParent())),
-                                 llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                                 llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
                   std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
                           (VAR(Ralloca, Ghost),
@@ -1903,7 +1903,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
 
                   PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
                             BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(checkPHI->getParent())),
-                                   llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                                   llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
                   mem2regCmd[Rphi].lessdef.push_back(lessdef);
                 }
@@ -1917,7 +1917,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
                               VAR(Ralloca, Ghost),
                               SRC),
                       BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
-                             llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                             llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
               std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
                       (VAR(Ralloca, Ghost),
@@ -1925,7 +1925,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
 
               PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
                         BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(APN->getParent())),
-                               llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                               llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
               mem2regCmd[Rphi].lessdef.push_back(lessdef);
             } else if (check != NULL) {
               std::string Rphi = llvmberry::getVariable(*check);
@@ -1937,7 +1937,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
                               SRC),
                       BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(
                                      check->getParent())),
-                             llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                             llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
               std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef = llvmberry::TyPropagateLessdef::make
                       (VAR(Ralloca, Ghost),
@@ -1946,7 +1946,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
               PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>(new llvmberry::ConsLessdef(lessdef)),
                         BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(
                                        check->getParent())),
-                               llvmberry::TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                               llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
               mem2regCmd[Rphi].lessdef.push_back(lessdef);
             }
           }
@@ -1956,7 +1956,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
 
             int useIndex =
                     llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
-                                                 termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
+                                                 termIndices[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
 
             llvmberry::generateHintForMem2RegPropagateLoad(AI, APN, LI, std::get<0>(t),
                                                            useIndex, std::get<2>(t));
@@ -1983,8 +1983,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
     llvm::AllocaInst *AItmp = AI;
 
     // prepare variables
-    auto &instrIndex = *(data.get<ArgForMem2Reg>()->instrIndex);
-    auto &termIndex = *(data.get<ArgForMem2Reg>()->termIndex);
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &usePile = *(data.get<ArgForMem2Reg>()->usePile);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &transTgt = *(data.get<ArgForMem2Reg>()->transTgt);
@@ -2039,7 +2039,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
               // if there is no other PHI between SI and current PHI,
               // we can propagate store to current PHI
               if (Itmp == NULL) {
-                generateHintForMem2RegPropagateStore(Predtmp, SItmp, PHI, termIndex[getBasicBlockIndex(Predtmp)]);
+                generateHintForMem2RegPropagateStore(Predtmp, SItmp, PHI, termIndices[getBasicBlockIndex(Predtmp)]);
               } else if (llvm::PHINode* PHItmp = llvm::dyn_cast<llvm::PHINode>(Itmp)) {
               // <Condition 2-2>
               // if we find another PHI(PHItmp) after SI,
@@ -2052,7 +2052,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                             VAR(Rstore, Ghost), SRC),
                     BOUNDS(TyPosition::make_start_of_block(
                                SRC, getBasicBlockIndex(PHItmp->getParent())),
-                           TyPosition::make_end_of_block(SRC, *Predtmp, termIndex[getBasicBlockIndex(Predtmp)])));
+                           TyPosition::make_end_of_block(SRC, *Predtmp, termIndices[getBasicBlockIndex(Predtmp)])));
 
                 std::shared_ptr<TyPropagateLessdef> lessdef =
                   TyPropagateLessdef::make(VAR(Rstore, Ghost),
@@ -2065,7 +2065,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                     std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                     BOUNDS(TyPosition::make_start_of_block(
                                SRC, getBasicBlockIndex(PHItmp->getParent())),
-                           TyPosition::make_end_of_block(SRC, *Predtmp, termIndex[getBasicBlockIndex(Predtmp)])));
+                           TyPosition::make_end_of_block(SRC, *Predtmp, termIndices[getBasicBlockIndex(Predtmp)])));
 
                 std::shared_ptr<TyTransitivityTgt> transitivitytgt
                   (new TyTransitivityTgt(VAR(Rstore, Ghost),
@@ -2082,10 +2082,10 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                      (std::find(isReachable[SItmp->getParent()].begin(),
                                 isReachable[SItmp->getParent()].end(),
                                 SISI->getParent()) != isReachable[SItmp->getParent()].end())) ||
-                    (SItmp->getParent() == SISI->getParent() && instrIndex[SItmp]<instrIndex[SISI]))
-                  generateHintForMem2RegPropagateStore(Predtmp, SItmp, SISI, instrIndex[SISI]);
+                    (SItmp->getParent() == SISI->getParent() && instrIndices[SItmp]<instrIndices[SISI]))
+                  generateHintForMem2RegPropagateStore(Predtmp, SItmp, SISI, instrIndices[SISI]);
                 else if (SItmp == SISI)
-                  generateHintForMem2RegPropagateStore(Predtmp, SItmp, PHI, termIndex[getBasicBlockIndex(Predtmp)]);
+                  generateHintForMem2RegPropagateStore(Predtmp, SItmp, PHI, termIndices[getBasicBlockIndex(Predtmp)]);
               }
 
               std::string SIname = SItmp->getOperand(0)->getName();
@@ -2124,8 +2124,8 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                     llvm::dyn_cast<llvm::Instruction>(U.getUser());
 
                 int useIndex = getIndexofMem2Reg(
-                    use, instrIndex[use],
-                    termIndex[getBasicBlockIndex(use->getParent())]);
+                    use, instrIndices[use],
+                    termIndices[getBasicBlockIndex(use->getParent())]);
 
                 // if use is other PHI
                 if (llvm::isa<llvm::PHINode>(use)) {
@@ -2154,7 +2154,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                                   VAR(Rstore, Ghost), SRC),
                           BOUNDS(TyPosition::make_start_of_block(
                                  SRC, getBasicBlockIndex(PHI->getParent())),
-                                 TyPosition::make_end_of_block(SRC, *usePred, termIndex[getBasicBlockIndex(usePred)])));
+                                 TyPosition::make_end_of_block(SRC, *usePred, termIndices[getBasicBlockIndex(usePred)])));
 
                       std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
                                                                     (VAR(Rstore,Ghost),
@@ -2166,7 +2166,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                           std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                           BOUNDS(TyPosition::make_start_of_block(
                                  SRC, getBasicBlockIndex(PHI->getParent())),
-                                 TyPosition::make_end_of_block(SRC, *usePred, termIndex[getBasicBlockIndex(usePred)])));
+                                 TyPosition::make_end_of_block(SRC, *usePred, termIndices[getBasicBlockIndex(usePred)])));
 
                       std::string useName = "%"+std::string(use->getName());
 
@@ -2247,7 +2247,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                         VAR(Rstore, Ghost), SRC),
                 BOUNDS(TyPosition::make_start_of_block(
                            SRC, getBasicBlockIndex(PHI->getParent())),
-                       TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                       TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
             std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
                   (VAR(Rstore, Ghost),
@@ -2256,7 +2256,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
             PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                 BOUNDS(TyPosition::make_start_of_block(
                            SRC, getBasicBlockIndex(PHI->getParent())),
-                       TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                       TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
             mem2regCmd[Rphi].lessdef.push_back(lessdef);
 
@@ -2286,12 +2286,12 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
           }
 
           PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC),
-                    BOUNDS(TyPosition::make(SRC, *AItmp, instrIndex[AItmp], ""),
-                           TyPosition::make(SRC, *LI, instrIndex[LI], "")));
+                    BOUNDS(TyPosition::make(SRC, *AItmp, instrIndices[AItmp], ""),
+                           TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
           if ((getVariable(*LI->getOperand(0)) == Rstore) &&
               ((LI->getParent() == SItmp->getParent() &&
-                instrIndex[SItmp] < instrIndex[LI]) ||
+                instrIndices[SItmp] < instrIndices[LI]) ||
                (std::find(isReachable[SItmp->getParent()].begin(),
                           isReachable[SItmp->getParent()].end(),
                           LI->getParent()) != isReachable[SItmp->getParent()].end()))) {
@@ -2302,7 +2302,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
               PHI = llvm::dyn_cast<llvm::PHINode>(Itmp);
 
             if (PHI == NULL) {
-              generateHintForMem2RegPropagateStore(Predtmp, SItmp, LI, instrIndex[LI]);
+              generateHintForMem2RegPropagateStore(Predtmp, SItmp, LI, instrIndices[LI]);
             }
 
             // add hints per every use of LI
@@ -2311,11 +2311,11 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
               llvm::BasicBlock* useBB = std::get<0>(t);
               int useIndex =
                 llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
-                                             termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
+                                             termIndices[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
 
               // set index of use
               if ((LI->getParent() == useBB &&
-                   instrIndex[LI] < std::get<1>(t)) ||
+                   instrIndices[LI] < std::get<1>(t)) ||
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
                              useBB) != isReachable[LI->getParent()].end())) {
@@ -2436,6 +2436,28 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
           }
         }
         delete I_evolving;
+  });
+}
+
+void calculateIndices(llvm::Function* F) {
+  ValidationUnit::GetInstance()->intrude
+    ([&F]
+     (Dictionary &data, CoreHint &hints) {
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
+
+    for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
+      llvm::BasicBlock *BB = BS++;
+      std::string blockName = getBasicBlockIndex(BB);
+
+      termIndices[blockName] = getTerminatorIndex(BB->getTerminator());
+
+      for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
+        llvm::Instruction *I = IS++;
+
+        instrIndices[I] = getCommandIndex(*I);
+      }
+    }
   });
 }
 
