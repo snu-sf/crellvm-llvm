@@ -1136,7 +1136,6 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
 }
 
 void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
-                                         llvm::PHINode* tmp,
                                          llvm::LoadInst* LI,
                                          llvm::BasicBlock* useBB,
                                          int useIndex,
@@ -1649,7 +1648,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
                              useBB) != isReachable[LI->getParent()].end())) {
-                generateHintForMem2RegPropagateLoad(AI, NULL, LI, useBB, useIndex, std::get<2>(t));
+                generateHintForMem2RegPropagateLoad(AI, LI, useBB, useIndex, std::get<2>(t));
               }
             }
 
@@ -1958,7 +1957,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
                     llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
                                                  termIndex[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
 
-            llvmberry::generateHintForMem2RegPropagateLoad(AI, APN, LI, std::get<0>(t),
+            llvmberry::generateHintForMem2RegPropagateLoad(AI, LI, std::get<0>(t),
                                                            useIndex, std::get<2>(t));
           }
         }
@@ -2319,7 +2318,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
                              useBB) != isReachable[LI->getParent()].end())) {
-                generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, useBB, useIndex, std::get<2>(t));
+                generateHintForMem2RegPropagateLoad(SItmp, LI, useBB, useIndex, std::get<2>(t));
               }
             }
           }
