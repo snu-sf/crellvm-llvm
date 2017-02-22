@@ -379,9 +379,11 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         if (StoreIndex == -1)
           StoreIndex = LBI.getInstructionIndex(OnlyStore);
 
+        if (unsigned(StoreIndex) > LBI.getInstructionIndex(LI)) {
           // Can't handle this load, bail out.
           Info.UsingBlocks.push_back(StoreBB);
           continue;
+        }
       } else if (LI->getParent() != StoreBB &&
                  !DT.dominates(StoreBB, LI->getParent())) {
         // If the load and store are in different blocks, use BB dominance to
@@ -493,10 +495,9 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
            (std::find(isReachable[OnlyStore->getParent()].begin(),
                       isReachable[OnlyStore->getParent()].end(),
                       LI->getParent()) != isReachable[OnlyStore->getParent()].end()))) {
-
         // Step1: propagate store instruction
-        //        <src>          |     <tgt>
-        // %x = alloca i32       | nop
+        //        <src>                               |     <tgt>
+        // %x = alloca i32                            | nop
         // store i32 1, %x       | nop
         // %a = load i32 %x      | %a = load i32 1
         // %b = load i32 %x      | %b = load i32 1
@@ -506,160 +507,108 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           (NULL, OnlyStore, LI, instrIndices[LI]);
       }
 
-      // this code will move to library function call
-      std::vector<std::shared_ptr<llvmberry::TyPosition>> destSet;
-      for (auto UI = useIndices[LI].begin(), E = useIndices[LI].end(); UI != E;) {
-        auto t = *(UI++);
-        BasicBlock* useBB = std::get<0>(t);
-        Instruction* use = std::get<1>(t);
-        int useIndex =
-          llvmberry::getIndexofMem2Reg(use, std::get<2>(t),
-                                       termIndices[llvmberry::getBasicBlockIndex(useBB)]);
-        std::shared_ptr<llvmberry::TyPosition> position;
-
-        if(use != nullptr) {
-          if (PHINode* PHI = dyn_cast<PHINode>(use)) {
-            for (unsigned i = 0; i != PHI->getNumIncomingValues(); ++i) {
-              Value *v = dyn_cast<Value>(PHI->getIncomingValue(i));
-
-              if (LI == v) {
-                  std::string prev = PHI->getIncomingBlock(i)->getName();
-
-                  destSet.push_back(llvmberry::TyPosition::make(SRC, *use, useIndex, prev));
-              }
-            }
-          } else {
-            destSet.push_back(llvmberry::TyPosition::make(SRC, *useBB, useIndex));
-          }
-        } else {
-          destSet.push_back(llvmberry::TyPosition::make(SRC, *useBB, useIndex));
-        }
-      }
-
       // add hints per every use of LI
-/*
-      for (auto UI = usePile[LI].begin(), E = usePile[LI].end(); UI != E;) {
-        auto t = *(UI++);
-        // set index of use
-        int useIndex =
-          llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
-                                       termIndices[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
-        Instruction* use = std::get<2>(t);
-        BasicBlock* useBB = std::get<0>(t);
+      std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> destSet
+        = llvmberry::saveDestSet(LI);
+      auto infrule_pos = llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "");
+      auto boundset = BOUNDSET(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
+                               destSet);
 
-        // - store and loads are in the same block
-        //   and store exists before loads
-        // - store and loads are not in the same block
-        //   and store block dominates load block
-        if ((LI->getParent() == OnlyStore->getParent() && 
-             instrIndices[OnlyStore] < instrIndices[LI]) ||
-            (LI->getParent() != OnlyStore->getParent() &&
-             (std::find(isReachable[OnlyStore->getParent()].begin(),
-                        isReachable[OnlyStore->getParent()].end(),
-                        LI->getParent()) != isReachable[OnlyStore->getParent()].end()))) {
-          // Step2: propagate load instruction
-          //        <src>          |     <tgt>
-          // %a = load i32 1       | nop
-          // %b = load i32 1       | nop
-          // %c = add i32 %a, %b   | %c = add i32 1, 1
-          // ret i32 %c            | ret i32 %c
-          llvmberry::generateHintForMem2RegPropagateLoad
-            (OnlyStore, NULL, LI, useBB, useIndex, use);
-*/
-        if (ReplVal != LI) {
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                  llvmberry::ConsIntroGhost::make(VAR(Rstore, Ghost), REGISTER(Rload, Ghost)));
-     
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                  llvmberry::ConsTransitivity::make
-                    (VAR(Rload, Physical),
-                     INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                       new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(OnlyStore)))),
-                     VAR(Rstore, Ghost)));
-     
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                  llvmberry::ConsTransitivity::make(VAR(Rload, Physical), VAR(Rstore, Ghost),
-                                                    VAR(Rload, Ghost)));
-
-          PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
-                    BOUNDSET(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                             destSet));
-
-          std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef =
-            llvmberry::TyPropagateLessdef::make
-              (VAR(Rload, Ghost),
-               llvmberry::TyExpr::make(*(OnlyStore->getOperand(0)), llvmberry::Physical),
-               TGT);
-
-          PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>
-                      (new llvmberry::ConsLessdef(lessdef)),
-                    BOUNDSET(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                             destSet));
-
-          std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
-            (new llvmberry::TyTransitivityTgt
-                   (VAR(Rload, Ghost),
-                    VAR(Rstore, Ghost),
-                    llvmberry::TyExpr::make(*(OnlyStore->getOperand(0)),
-                                            llvmberry::Physical)));
+      if (ReplVal != LI) {
+        // Step2: propagate load instruction
+        //        <src>          |     <tgt>
+        // %a = load i32 1       | nop
+        // %b = load i32 1       | nop
+        // %c = add i32 %a, %b   | %c = add i32 1, 1
+        // ret i32 %c            | ret i32 %c
+        INFRULE(infrule_pos,
+                llvmberry::ConsIntroGhost::make(VAR(Rstore, Ghost), REGISTER(Rload, Ghost)));
    
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                  std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsTransitivityTgt(transTgt)));
+        INFRULE(infrule_pos,
+                llvmberry::ConsTransitivity::make
+                  (VAR(Rload, Physical),
+                   INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                     new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(OnlyStore)))),
+                   VAR(Rstore, Ghost)));
    
-          if (OnlyStore->getOperand(0)->getName()!="") {
-            mem2regCmd[llvmberry::getVariable(*(OnlyStore->getOperand(0)))].lessdef.push_back(lessdef);
-            mem2regCmd[llvmberry::getVariable(*(OnlyStore->getOperand(0)))].transTgt.push_back(transTgt);
-          }
-        } else {
-          // propagate undef from load to use
-          PROPAGATE(LESSDEF(VAR(Rload, Physical),
-                            VAR(Rload, Ghost),
-                            SRC),
-                    BOUNDSET(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                             destSet));
+        INFRULE(infrule_pos,
+                llvmberry::ConsTransitivity::make(VAR(Rload, Physical), VAR(Rstore, Ghost),
+                                                  VAR(Rload, Ghost)));
 
-          std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef =
-            llvmberry::TyPropagateLessdef::make
-              (VAR(Rload, Ghost),
-               EXPR(UndefVal, Physical),
-               TGT);
+        PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
+                  boundset);
 
-          PROPAGATE(
-              std::shared_ptr<llvmberry::TyPropagateObject>
-                (new llvmberry::ConsLessdef(lessdef)),
-              BOUNDSET(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                       destSet));
+        std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef =
+          llvmberry::TyPropagateLessdef::make
+            (VAR(Rload, Ghost),
+             llvmberry::TyExpr::make(*(OnlyStore->getOperand(0)), llvmberry::Physical),
+             TGT);
 
-          mem2regCmd[Rload].lessdef.push_back(lessdef);
+        PROPAGATE(std::shared_ptr<llvmberry::TyPropagateObject>
+                    (new llvmberry::ConsLessdef(lessdef)),
+                  boundset);
 
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                  llvmberry::ConsIntroGhost::make(VAR(Ralloca, Ghost),
-                                                  REGISTER(Rload, Ghost)));
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                  llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                                                    VAR(Ralloca, Ghost),
-                                                    VAR(Rload, Ghost)));
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                  llvmberry::ConsTransitivity::make(VAR(Rload, Physical),
-                                                    INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                                                    VAR(Rload, Ghost)));
-
-          std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
-            (new llvmberry::TyTransitivityTgt(VAR(Rload, Ghost),
-                                              VAR(Ralloca, Ghost),
-                                              EXPR(OnlyStore->getOperand(0), Physical)));
-
-          INFRULE(llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], ""),
-                  std::shared_ptr<llvmberry::TyInfrule>
-                    (new llvmberry::ConsTransitivityTgt(transTgt)));
-
-          mem2regCmd[Rload].transTgt.push_back(transTgt);
+        std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
+          (new llvmberry::TyTransitivityTgt
+                 (VAR(Rload, Ghost),
+                  VAR(Rstore, Ghost),
+                  llvmberry::TyExpr::make(*(OnlyStore->getOperand(0)),
+                                          llvmberry::Physical)));
+ 
+        INFRULE(infrule_pos,
+                std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsTransitivityTgt(transTgt)));
+ 
+        if (OnlyStore->getOperand(0)->getName()!="") {
+          mem2regCmd[llvmberry::getVariable(*(OnlyStore->getOperand(0)))].lessdef.push_back(lessdef);
+          mem2regCmd[llvmberry::getVariable(*(OnlyStore->getOperand(0)))].transTgt.push_back(transTgt);
         }
-//      }
+      } else {
+        // propagate undef from load to use
+        PROPAGATE(LESSDEF(VAR(Rload, Physical),
+                          VAR(Rload, Ghost),
+                          SRC),
+                  boundset);
+
+        std::shared_ptr<llvmberry::TyPropagateLessdef> lessdef =
+          llvmberry::TyPropagateLessdef::make
+            (VAR(Rload, Ghost),
+             EXPR(UndefVal, Physical),
+             TGT);
+
+        PROPAGATE(
+            std::shared_ptr<llvmberry::TyPropagateObject>
+              (new llvmberry::ConsLessdef(lessdef)),
+            boundset);
+
+        mem2regCmd[Rload].lessdef.push_back(lessdef);
+
+        INFRULE(infrule_pos,
+                llvmberry::ConsIntroGhost::make(VAR(Ralloca, Ghost),
+                                                REGISTER(Rload, Ghost)));
+
+        INFRULE(infrule_pos,
+                llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+                                                  VAR(Ralloca, Ghost),
+                                                  VAR(Rload, Ghost)));
+
+        INFRULE(infrule_pos,
+                llvmberry::ConsTransitivity::make(VAR(Rload, Physical),
+                                                  INSN(std::shared_ptr<llvmberry::TyInstruction>(
+                                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+                                                  VAR(Rload, Ghost)));
+
+        std::shared_ptr<llvmberry::TyTransitivityTgt> transTgt
+          (new llvmberry::TyTransitivityTgt(VAR(Rload, Ghost),
+                                            VAR(Ralloca, Ghost),
+                                            EXPR(OnlyStore->getOperand(0), Physical)));
+
+        INFRULE(infrule_pos,
+                std::shared_ptr<llvmberry::TyInfrule>
+                  (new llvmberry::ConsTransitivityTgt(transTgt)));
+
+        mem2regCmd[Rload].transTgt.push_back(transTgt);
+      }
 
       // propagate maydiff
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
@@ -993,7 +942,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
             llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
                                          termIndices[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
 
-          llvmberry::generateHintForMem2RegPropagateLoad(SI, NULL, LI, std::get<0>(t), 
+          llvmberry::generateHintForMem2RegPropagateLoad(SI, LI, std::get<0>(t), 
                                                          useIndex, std::get<2>(t));
         }
 

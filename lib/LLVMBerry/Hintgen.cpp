@@ -1136,7 +1136,6 @@ llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
 }
 
 void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
-                                         llvm::PHINode* tmp,
                                          llvm::LoadInst* LI,
                                          llvm::BasicBlock* useBB,
                                          int useIndex,
@@ -1649,7 +1648,7 @@ void generateHintForMem2RegPHIdelete(llvm::BasicBlock *BB,
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
                              useBB) != isReachable[LI->getParent()].end())) {
-                generateHintForMem2RegPropagateLoad(AI, NULL, LI, useBB, useIndex, std::get<2>(t));
+                generateHintForMem2RegPropagateLoad(AI, LI, useBB, useIndex, std::get<2>(t));
               }
             }
 
@@ -1958,7 +1957,7 @@ void generateHintForMem2RegPhiUndef(llvm::PHINode* APN, llvm::BasicBlock* Pred) 
                     llvmberry::getIndexofMem2Reg(std::get<2>(t), std::get<1>(t),
                                                  termIndices[llvmberry::getBasicBlockIndex(std::get<0>(t))]);
 
-            llvmberry::generateHintForMem2RegPropagateLoad(AI, APN, LI, std::get<0>(t),
+            llvmberry::generateHintForMem2RegPropagateLoad(AI, LI, std::get<0>(t),
                                                            useIndex, std::get<2>(t));
           }
         }
@@ -2319,7 +2318,7 @@ void generateHintForMem2RegPHI(llvm::BasicBlock *BB, llvm::BasicBlock *Pred,
                   (std::find(isReachable[LI->getParent()].begin(),
                              isReachable[LI->getParent()].end(),
                              useBB) != isReachable[LI->getParent()].end())) {
-                generateHintForMem2RegPropagateLoad(SItmp, NULL, LI, useBB, useIndex, std::get<2>(t));
+                generateHintForMem2RegPropagateLoad(SItmp, LI, useBB, useIndex, std::get<2>(t));
               }
             }
           }
@@ -2437,6 +2436,46 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
         }
         delete I_evolving;
   });
+}
+
+std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
+  (llvm::Instruction* I) {
+  std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> destSet(
+          new std::vector<std::shared_ptr<TyPosition>>());
+  
+  ValidationUnit::GetInstance()->intrude
+    ([&I, &destSet]
+     (Dictionary &data, CoreHint &hints) {
+    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
+    auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
+
+    for (auto UI = useIndices[I].begin(), E = useIndices[I].end(); UI != E;) {
+      auto t = *(UI++);
+      llvm::BasicBlock* useBB = std::get<0>(t);
+      llvm::Instruction* use = std::get<1>(t);
+      int useIndex =
+        getIndexofMem2Reg(use, std::get<2>(t),
+                          termIndices[getBasicBlockIndex(useBB)]);
+
+      if (use != nullptr && llvm::isa<llvm::PHINode>(use)) {
+        llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(use);
+
+        for (unsigned i = 0; i != PHI->getNumIncomingValues(); ++i) {
+          llvm::Value *v = llvm::dyn_cast<llvm::Value>(PHI->getIncomingValue(i));
+
+          if (I == v) {
+              const std::string &prev = PHI->getIncomingBlock(i)->getName();
+
+              destSet->push_back(TyPosition::make(SRC, *use, useIndex, prev));
+          }
+        }
+      } else {
+        destSet->push_back(TyPosition::make(SRC, *useBB, useIndex));
+      }
+    }
+  });
+
+  return destSet;
 }
 
 void saveInstrIndices(llvm::Function* F) {

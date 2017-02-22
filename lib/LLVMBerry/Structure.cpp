@@ -2915,7 +2915,7 @@ ConsBounds::make(std::shared_ptr<TyPosition> _from,
 }
 
 ConsBoundSet::ConsBoundSet(std::shared_ptr<TyPosition> _from,
-                           std::vector<std::shared_ptr<TyPosition>> _to_set)
+                           std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> _to_set)
         : from(_from), to_set(_to_set) {}
 
 void ConsBoundSet::serialize(cereal::JSONOutputArchive &archive) const {
@@ -2925,13 +2925,13 @@ void ConsBoundSet::serialize(cereal::JSONOutputArchive &archive) const {
   archive.saveValue("BoundSet");
   archive.startNode();
   archive.makeArray();
-  archive(from, to_set);
+  archive(from, *to_set.get());
   archive.finishNode();
 }
 
 std::shared_ptr<TyPropagateRange>
 ConsBoundSet::make(std::shared_ptr<TyPosition> _from,
-                 std::vector<std::shared_ptr<TyPosition>> _to_set) {
+                   std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> _to_set) {
   return std::shared_ptr<TyPropagateRange>(
           new ConsBoundSet(_from, _to_set));
 }

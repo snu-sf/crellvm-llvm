@@ -216,7 +216,6 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           int nextIndex);
 
 void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
-                                         llvm::PHINode* tmp,
                                          llvm::LoadInst* LI,
                                          llvm::BasicBlock* useBB,
                                          int useIndex,
@@ -252,6 +251,9 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
 
 void generateHintForMem2RegPhiUndef(llvm::PHINode *APN, llvm::BasicBlock *Pred);
+
+std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
+  (llvm::Instruction* I);
 
 void saveInstrIndices(llvm::Function* F);
 
