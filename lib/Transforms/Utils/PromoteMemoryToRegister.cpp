@@ -1392,7 +1392,7 @@ void PromoteMem2Reg::run() {
             ([&i, this]
              (llvmberry::Dictionary &data,
               llvmberry::CoreHint &hints) {
-      llvmberry::saveInstrInfo(Allocas[i], i);
+      llvmberry::saveInstrInfo(Allocas[i], i, "");
     });
   }
 
@@ -1499,7 +1499,8 @@ void PromoteMem2Reg::run() {
                 // from to prpagate undef > value
                 PROPAGATE(LESSDEF(EXPR(UndefVal, Physical), VAR(llvmberry::getVariable(*In), Physical), TGT),
                           BOUNDS(llvmberry::TyPosition::make(TGT, *In),
-                                 llvmberry::TyPosition::make_end_of_block(SRC, *Income, termIndices[llvmberry::getBasicBlockIndex(Income)])));
+                                 llvmberry::TyPosition::make_end_of_block
+                                  (SRC, *Income, termIndices[llvmberry::getBasicBlockIndex(Income)])));
 
                 // transitivity at phi node X > undef > value
                 INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
@@ -1791,6 +1792,8 @@ NextIteration:
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
+
+          llvmberry::saveInstrInfo(APN, AllocaNo, Pred->getName());
         });
 
         // The currently active variable for this block is now the PHI.
@@ -1862,10 +1865,12 @@ NextIteration:
       DenseMap<PHINode *, unsigned> &PAM = PhiToAllocaMap;
       DenseMap<AllocaInst *, unsigned> &AL = AllocaLookup;
       llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL]
+              ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL, &ai]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         llvmberry::generateHintForMem2RegPHI
           (BB, Pred, Dest, SI, II, PAM, AL, true);
+
+        llvmberry::saveInstrInfo(SI, ai->second, "");
       });
 
       // what value were we writing?

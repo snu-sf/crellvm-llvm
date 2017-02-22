@@ -2528,9 +2528,9 @@ void saveUseIndices(llvm::Function* F, unsigned opCode) {
   });
 }
 
-void saveInstrInfo(llvm::Instruction* I, unsigned key) {
+void saveInstrInfo(llvm::Instruction* I, unsigned key, std::string prev) {
   ValidationUnit::GetInstance()->intrude
-    ([&I, &key]
+    ([&I, &key, &prev]
      (Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
@@ -2538,24 +2538,33 @@ void saveInstrInfo(llvm::Instruction* I, unsigned key) {
     if (llvm::AllocaInst* AI = llvm::dyn_cast<llvm::AllocaInst>(I)) {
       llvm::Value* UndefVal = llvm::UndefValue::get(AI->getAllocatedType());
 
-      recentInstr[key].instrL = INSN(std::shared_ptr<llvmberry::TyInstruction>
-                                      (new llvmberry::ConsLoadInst
-                                        (llvmberry::TyLoadInst::makeAlignOne(AI))));
+      recentInstr[key].instrL = INSN(std::shared_ptr<TyInstruction>
+                                      (new ConsLoadInst (TyLoadInst::makeAlignOne(AI))));
       recentInstr[key].instrR = EXPR(UndefVal, Physical);
       recentInstr[key].instrVal = nullptr;
-      recentInstr[key].instrPos = llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""); 
+      recentInstr[key].instrPos = TyPosition::make(SRC, *AI, instrIndices[AI], ""); 
       recentInstr[key].op0 = "";
-      recentInstr[key].op1 = "";
+      recentInstr[key].op1 = getVariable(*AI);
       recentInstr[key].instrBB = AI->getParent();
     } else if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
-      recentInstr[key].instrL = INSN(std::shared_ptr<llvmberry::TyInstruction>
-                                      (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(SI))));
-      recentInstr[key].instrR = llvmberry::TyExpr::make(*(SI->getOperand(0)), llvmberry::Physical);
-      recentInstr[key].instrVal = llvmberry::TyValue::make(*(SI->getOperand(0)));
-      recentInstr[key].instrPos = llvmberry::TyPosition::make(SRC, *SI, instrIndices[SI], "");
-      recentInstr[key].op0 = llvmberry::getVariable(*(SI->getOperand(0)));
-      recentInstr[key].op1 = llvmberry::getVariable(*(SI->getOperand(1)));
+      recentInstr[key].instrL = INSN(std::shared_ptr<TyInstruction>
+                                      (new ConsLoadInst(TyLoadInst::makeAlignOne(SI))));
+      recentInstr[key].instrR = TyExpr::make(*(SI->getOperand(0)), llvmberry::Physical);
+      recentInstr[key].instrVal = TyValue::make(*(SI->getOperand(0)));
+      recentInstr[key].instrPos = TyPosition::make(SRC, *SI, instrIndices[SI], "");
+      recentInstr[key].op0 = getVariable(*(SI->getOperand(0)));
+      recentInstr[key].op1 = getVariable(*(SI->getOperand(1)));
       recentInstr[key].instrBB = SI->getParent();
+    } else if (llvm::PHINode* PHI = llvm::dyn_cast<llvm::PHINode>(I)) {
+      recentInstr[key].instrL = recentInstr[key].instrL;
+      recentInstr[key].instrR = VAR(getVariable(*PHI), Physical);
+      recentInstr[key].instrVal = nullptr;
+      recentInstr[key].instrPos = TyPosition::make(SRC, *PHI, instrIndices[PHI], prev);
+      recentInstr[key].op0 = "llvmberry::PHI"; // when phi is from postion then 
+                                               // we cannot use position above
+                                               // because it should be make_start form
+      recentInstr[key].op1 = getVariable(*PHI);
+      recentInstr[key].instrBB = PHI->getParent();
     }
   });
 }
