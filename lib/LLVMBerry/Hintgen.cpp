@@ -2569,4 +2569,127 @@ void saveInstrInfo(llvm::Instruction* I, unsigned key, std::string prev) {
   });
 }
 
+void propagateFromAISIPhitoLoadPhi (unsigned key, llvm::Instruction *To, llvm::Value *V, llvm::BasicBlock* prev) {
+  ValidationUnit::GetInstance()->intrude([&To, &V, &key, &prev](
+          Dictionary &data, CoreHint &hints) {
+
+    std::string Value = llvmberry::getVariable(*V);
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
+    auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
+
+    //variable which store in store inst can be replace
+    //phi can be replace in prunning part
+    //consider both of them
+
+    std::shared_ptr<TyPosition> from_position = NULL;
+    std::shared_ptr<TyPosition> to_position = NULL;
+    llvm::PHINode* Phi = llvm::dyn_cast<llvm::PHINode>(To);
+    //if from is phi then make start block
+    //if to is phi then need prev block infro
+    // from doesn't matter
+
+    //propagate from to   from : AI SI Phi   to : Phi LI
+    if(recentInstr[key].op0 == "llvmberry::PHI") {
+      //propagate position from is make start of block
+      //position from
+      from_position = TyPosition::make_start_of_block(SRC, recentInstr[key].instrBB->getName());
+    } else {
+      from_position = recentInstr[key].instrPos;
+    }
+
+    if(Phi != NULL) {
+      //propagate position to need prev block infromation
+      to_position = TyPosition::make_end_of_block(SRC, *prev, termIndices[prev->getName()]);
+    } else {
+      to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
+    }
+    PROPAGATE(LESSDEF(recentInstr[key].instrL, VAR(recentInstr[key].op1, Ghost), SRC),
+              BOUNDS(from_position, to_position));
+    PROPAGATE(LESSDEF(VAR(recentInstr[key].op1, Ghost), recentInstr[key].instrR, SRC),
+              BOUNDS(from_position, to_position));
+
+    //Infrule function
+    //if from position is SI or AI, apply infrule  if to position is PHI, apply infrule
+    //if store Ai same rule else if phi different rule
+    
+    //if from is not phi apply infrule here
+    if(recentInstr[key].op0 != "llvmberr::PHI") {
+      applyInfruleforAISI(key);
+    }
+
+    //if to is phi then apply infrule here
+    if(Phi != NULL) {
+      applyInfruleforPhi(key, Phi);
+    }
+  });
+}
+
+void applyInfruleforAISI(unsigned key) {
+  ValidationUnit::GetInstance()->intrude([&key](
+          Dictionary &data, CoreHint &hints) {
+    auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
+
+    INFRULE(recentInstr[key].instrPos,
+            ConsIntroGhost::make(recentInstr[key].instrR, REGISTER(recentInstr[key].op1, Ghost)));
+
+    INFRULE(recentInstr[key].instrPos,
+            ConsTransitivity::make(recentInstr[key].instrL, recentInstr[key].instrR, VAR(recentInstr[key].op1, Ghost)));
+  });
+}
+
+void applyInfruleforPhi(unsigned key, llvm::PHINode *phi) {
+  ValidationUnit::GetInstance()->intrude([&key, &phi](
+          Dictionary &data, CoreHint &hints) {
+    auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
+
+    INFRULE(recentInstr[key].instrPos,
+            ConsIntroGhost::make(VAR(recentInstr[key].op1, Ghost), REGISTER(getVariable(*phi), Ghost)));
+    INFRULE(recentInstr[key].instrPos,
+            ConsTransitivity::make(recentInstr[key].instrL,
+                                   VAR(recentInstr[key].op1, Ghost), VAR(getVariable(*phi), Ghost)));
+    INFRULE(recentInstr[key].instrPos,
+            ConsTransitivityTgt::make(VAR(getVariable(*phi), Ghost),
+                    VAR(recentInstr[key].op1, Ghost), recentInstr[key].instrR));
+  });
+}
+
+void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) {
+
+  ValidationUnit::GetInstance()->intrude([&LI, &V, &In](
+          Dictionary &data, CoreHint &hints) {
+
+    std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> destSet = saveDestSet(LI);
+    std::string Rload = llvmberry::getVariable(*LI);
+    std::string Value = llvmberry::getVariable(*V);
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+
+    //propagate LI to use set
+    PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
+              BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
+
+    PROPAGATE(LESSDEF(VAR(Rload, Ghost), VAR(Value,Physical),TGT),
+              BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
+
+    //infrule at LI index
+    //transitivity %1 = load %x = X   //load variable can be replace consider that later
+    INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
+            ConsIntroGhost::make(VAR(In, Ghost), REGISTER(Rload, Ghost)));
+
+    INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
+            ConsTransitivity::make(VAR(Rload, Physical),
+                                   INSN(std::shared_ptr<TyInstruction>(new ConsLoadInst(TyLoadInst::makeAlignOne(LI)))),
+                                   VAR(In, Ghost)));
+
+    INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
+            ConsTransitivity::make(VAR(Rload, Physical), VAR(In, Ghost),
+                                   VAR(Rload, Ghost)));
+
+    INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""),
+            ConsTransitivityTgt::make(VAR(Rload, Ghost), VAR(In, Ghost),
+                                   VAR(Rload, Physical)));
+
+  });
+}
+
 } // llvmberry
