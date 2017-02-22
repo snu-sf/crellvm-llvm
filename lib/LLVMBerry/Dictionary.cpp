@@ -68,7 +68,8 @@ FindAvailableLoadedValueArg::FindAvailableLoadedValueArg() {
 
 IndicesArg::IndicesArg()
     : instrIndices(new TyInstrIndicesObj()),
-      termIndices(new TyTermIndicesObj()) {}
+      termIndices(new TyTermIndicesObj()),
+      useIndices(new TyUseIndicesObj()) {}
 
 VisitICmpArg::VisitICmpArg() {
   swapOps = false;

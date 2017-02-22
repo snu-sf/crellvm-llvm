@@ -986,7 +986,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
 
     if (storeItem[SI].op0 == "%" ||
         data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, 
-                                                  TyExpr::make(*(SI->getOperand(0)),
+                                                   TyExpr::make(*(SI->getOperand(0)),
                                                                 Physical))) {
       // stored value will not be changed in another iteration
       std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(storeItem[SI].expr,
@@ -2439,7 +2439,7 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
   });
 }
 
-void calculateIndices(llvm::Function* F) {
+void saveInstrIndices(llvm::Function* F) {
   ValidationUnit::GetInstance()->intrude
     ([&F]
      (Dictionary &data, CoreHint &hints) {
@@ -2447,15 +2447,43 @@ void calculateIndices(llvm::Function* F) {
     auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
 
     for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
-      llvm::BasicBlock *BB = BS++;
+      llvm::BasicBlock* BB = BS++;
       std::string blockName = getBasicBlockIndex(BB);
 
       termIndices[blockName] = getTerminatorIndex(BB->getTerminator());
 
       for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
-        llvm::Instruction *I = IS++;
+        llvm::Instruction* I = IS++;
 
         instrIndices[I] = getCommandIndex(*I);
+      }
+    }
+  });
+}
+
+void saveUseIndices(llvm::Function* F, unsigned opCode) {
+  ValidationUnit::GetInstance()->intrude
+    ([&F, &opCode]
+     (Dictionary &data, CoreHint &hints) {
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
+
+    for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
+      llvm::BasicBlock* BB = BS++;
+      for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
+        llvm::Instruction* I = IS++;
+
+        if (I->getOpcode() == opCode) {
+          for (auto UI = I->use_begin(), E = I->use_end(); UI != E;) {
+            llvm::Use &U = *(UI++);
+            llvm::Instruction* use =
+              llvm::dyn_cast<llvm::Instruction>(U.getUser());
+            llvm::BasicBlock* useBB = use->getParent();
+            unsigned index = instrIndices[use];
+
+            useIndices[I].push_back(std::make_tuple(useBB, use, index));
+          }
+        }
       }
     }
   });
@@ -2466,7 +2494,6 @@ void saveInstrInfo(llvm::Instruction* I, unsigned key) {
     ([&I, &key]
      (Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
 
     if (llvm::AllocaInst* AI = llvm::dyn_cast<llvm::AllocaInst>(I)) {
@@ -2486,7 +2513,7 @@ void saveInstrInfo(llvm::Instruction* I, unsigned key) {
                                       (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(SI))));
       recentInstr[key].instrR = llvmberry::TyExpr::make(*(SI->getOperand(0)), llvmberry::Physical);
       recentInstr[key].instrVal = llvmberry::TyValue::make(*(SI->getOperand(0)));
-      recentInstr[key].instrPos = llvmberry::TyPosition::make(SRC, *SI, instrIndex[SI], "");
+      recentInstr[key].instrPos = llvmberry::TyPosition::make(SRC, *SI, instrIndices[SI], "");
       recentInstr[key].op0 = llvmberry::getVariable(*(SI->getOperand(0)));
       recentInstr[key].op1 = llvmberry::getVariable(*(SI->getOperand(1)));
       recentInstr[key].instrBB = SI->getParent();

@@ -36,6 +36,7 @@
 
 #define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
 #define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
+#define BOUNDSET(from, to_set) llvmberry::ConsBoundSet::make(from, to_set)
 
 // EXPR, VAR, RHS, INSN macros make TyExpr object
 // Below code snippet is tu support overloading of two macro functions : 
@@ -252,7 +253,9 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
 
 void generateHintForMem2RegPhiUndef(llvm::PHINode *APN, llvm::BasicBlock *Pred);
 
-void calculateIndices(llvm::Function* F);
+void saveInstrIndices(llvm::Function* F);
+
+void saveUseIndices(llvm::Function* F, unsigned opCode);
 
 void saveInstrInfo(llvm::Instruction* I, unsigned key);
 }

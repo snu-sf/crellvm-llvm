@@ -119,6 +119,15 @@ public:
   typedef std::shared_ptr<TyTermIndicesObj> TyTermIndices;
   TyTermIndices termIndices;
 
+  typedef std::tuple<llvm::BasicBlock*,
+                     llvm::Instruction*,
+                     unsigned> UseTuple;
+
+  typedef std::map<llvm::Instruction*,
+                   std::vector<UseTuple>> TyUseIndicesObj;
+  typedef std::shared_ptr<TyUseIndicesObj> TyUseIndices;
+  TyUseIndices useIndices;
+
   IndicesArg();
 };
 DEFINE_TRAITS(ArgForIndices, IndicesArg);
@@ -141,12 +150,6 @@ public:
   typedef std::map<std::string, unsigned> TyTermIndexObj;
   typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
   TyTermIndex termIndex;
-
-  struct UseTriple {
-    llvm::BasicBlock* BB;
-    int index;
-    llvm::Instruction* I;
-  };
 
   typedef std::tuple<llvm::BasicBlock*, int, llvm::Instruction*> UseTupleType;
 
