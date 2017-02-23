@@ -265,7 +265,7 @@ void propagateFromAISIPhitoLoadPhi (unsigned key, llvm::Instruction *To, llvm::V
 
 void applyInfruleforAISI(unsigned key);
 
-void applyInfruleforPhi(unsigned key, llvm::PHINode *phi);
+void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev);
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In);
 

@@ -1774,6 +1774,10 @@ NextIteration:
         for (unsigned i = 0; i != NumEdges; ++i)
           APN->addIncoming(IncomingVals[AllocaNo], Pred);
 
+
+        // The currently active variable for this block is now the PHI.
+        IncomingVals[AllocaNo] = APN;
+
         llvmberry::ValidationUnit::GetInstance()->intrude
                 ([&APN, &Pred, &AllocaNo, &IncomingVals]
                    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
@@ -1781,23 +1785,14 @@ NextIteration:
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
           Value* UndefVal = UndefValue::get(APN->getType());
 
-          if (IncomingVals[AllocaNo] == UndefVal && APN != NULL) {
-            // alloca's use search
-            // among them load which is dominated by bb.
-            // then propagate phi to load
-          
-            llvmberry::generateHintForMem2RegPhiUndef(APN, Pred);
-          }
-
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
 
+          llvmberry::propagateFromAISIPhitoLoadPhi(AllocaNo, APN, /*not using? */APN, Pred);
+
           llvmberry::saveInstrInfo(APN, AllocaNo, Pred->getName());
         });
-
-        // The currently active variable for this block is now the PHI.
-        IncomingVals[AllocaNo] = APN;
 
         // Get the next phi node.
         ++PNI;
@@ -1830,10 +1825,11 @@ NextIteration:
       Value *V = IncomingVals[AI->second];
 
       llvmberry::ValidationUnit::GetInstance()->intrude
-             ([&LI, &V]
+             ([&LI, &V, &AI]
                 (llvmberry::Dictionary &data,
                  llvmberry::CoreHint &hints) {               
         auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
+        auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
         hints.addNopPosition
           (llvmberry::TyPosition::make
@@ -1842,6 +1838,8 @@ NextIteration:
         // propagate maydiff
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
+
+        llvmberry::propagateLoadInstToUse(LI, V, recentInstr[AI->second].op1);
 
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
       });
@@ -1867,8 +1865,6 @@ NextIteration:
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL, &ai]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        llvmberry::generateHintForMem2RegPHI
-          (BB, Pred, Dest, SI, II, PAM, AL, true);
 
         llvmberry::saveInstrInfo(SI, ai->second, "");
       });
