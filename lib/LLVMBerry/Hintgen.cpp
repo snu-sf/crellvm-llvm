@@ -2528,6 +2528,29 @@ void saveUseIndices(llvm::Function* F, unsigned opCode) {
   });
 }
 
+void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I) {
+  ValidationUnit::GetInstance()->intrude
+    ([&key, &I]
+     (Dictionary &data, CoreHint &hints) {
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
+
+    for (auto UI = useIndices[key].begin(), E = useIndices[key].end(); UI != E;) {
+      auto t = *UI;
+
+      if (std::get<1>(t) == I) {
+        auto tuple = std::make_tuple(std::get<0>(t), nullptr, std::get<2>(t));
+        int pos = std::distance(useIndices[key].begin(), UI);
+
+        useIndices[key].erase(useIndices[key].begin()+pos);
+        useIndices[key].push_back(tuple);
+        break;
+      }
+      UI++;
+    }
+  });
+}
+
 void saveInstrInfo(llvm::Instruction* I, unsigned key, std::string prev) {
   ValidationUnit::GetInstance()->intrude
     ([&I, &key, &prev]

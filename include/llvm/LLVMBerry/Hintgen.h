@@ -259,6 +259,8 @@ void saveInstrIndices(llvm::Function* F);
 
 void saveUseIndices(llvm::Function* F, unsigned opCode);
 
+void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I);
+
 void saveInstrInfo(llvm::Instruction* I, unsigned key, std::string prev);
 }
 

@@ -698,19 +698,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         UI++;
       }
 
-      for (auto UI = useIndices[check].begin(), E = useIndices[check].end(); UI != E; ) {
-        auto t = *UI;
-
-        if (std::get<1>(t) == OnlyStore) {
-          auto tuple = std::make_tuple(std::get<0>(t), nullptr, std::get<2>(t));
-          int pos = std::distance(useIndices[check].begin(), UI);
-
-          useIndices[check].erase(useIndices[check].begin()+pos);
-          useIndices[check].push_back(tuple);
-          break;
-        }
-        UI++;
-      }
+      llvmberry::eraseInstrOfUseIndices(check, OnlyStore);
     }
   });
 
@@ -1005,19 +993,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
           UI++;
         }
 
-        for (auto UI = useIndices[check].begin(), E = useIndices[check].end(); UI != E;) {
-          auto t = *UI;
-
-          if (std::get<1>(t) == SI) {
-            auto tuple = std::make_tuple(std::get<0>(t), nullptr, std::get<2>(t));
-            int pos = std::distance(useIndices[check].begin(), UI);
-
-            useIndices[check].erase(useIndices[check].begin()+pos);
-            useIndices[check].push_back(tuple);
-            break;
-          }
-          UI++;
-        }                   
+        llvmberry::eraseInstrOfUseIndices(check, SI);
       }
     });
 
@@ -1907,19 +1883,7 @@ NextIteration:
             UI++;
           }
 
-          for (auto UI = useIndices[check].begin(), E = useIndices[check].end(); UI != E;) {
-            auto t = *UI;
-
-            if (std::get<1>(t) == SI) {
-              auto tuple = std::make_tuple(std::get<0>(t), nullptr, std::get<2>(t));
-              int pos = std::distance(useIndices[check].begin(), UI);
-
-              useIndices[check].erase(useIndices[check].begin()+pos);
-              useIndices[check].push_back(tuple);
-              break;
-            }
-            UI++;
-          }
+          llvmberry::eraseInstrOfUseIndices(check, SI);
         }
       });
 
