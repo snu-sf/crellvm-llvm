@@ -248,7 +248,9 @@ void Mem2RegArg::replaceTransTgtPrev() {
   std::vector<std::shared_ptr<TyTransitivityTgt>> &vec = *transTgt.get();
 
   for(size_t i = 0; i < vec.size(); i++) {
+      std::cout << "check1" << std::endl;
     if (ConsVar *cv = dynamic_cast<ConsVar *>(vec[i]->getExpr2().get())) {
+      std::cout << cv->getTyReg()->getName() << std::endl;
       vec[i]->updateExpr2(std::shared_ptr<TyExpr>
                             (new ConsVar(std::shared_ptr<TyRegister>
                                           (new TyRegister(cv->getTyReg()->getName(),

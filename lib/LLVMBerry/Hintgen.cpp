@@ -2692,6 +2692,7 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
           Dictionary &data, CoreHint &hints) {
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
+    auto &transTgt = *(data.get<ArgForMem2Reg>()->transTgt);
 
     std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *phi, 0, prev->getName());
     std::string Rphi = getVariable(*phi);
@@ -2716,6 +2717,7 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
                                                         // ^ replace
     mem2regCmd[Rphi].transTgt.push_back(transTgt1);
     mem2regCmd[Rphi].transTgt.push_back(transTgt2);
+    transTgt.push_back(transTgt1);
   });
 }
 

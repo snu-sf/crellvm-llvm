@@ -1400,7 +1400,9 @@ void PromoteMem2Reg::run() {
       auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
       std::string Ralloca = llvmberry::getVariable(*A);
 
+      std::cout<<"check0"<<std::endl;
       data.get<llvmberry::ArgForMem2Reg>()->replaceTransTgtPrev();
+      std::cout<<"check2"<<std::endl;
 
       // propagate maydiff
       llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
