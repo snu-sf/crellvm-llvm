@@ -261,7 +261,7 @@ void saveUseIndices(llvm::Function* F, unsigned opCode);
 
 void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I);
 
-void saveInstrInfo(llvm::Instruction* I, unsigned key, std::string prev);
+void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev);
 
 void propagateFromAISIPhitoLoadPhi (unsigned key, llvm::Instruction *To, llvm::Value *V, llvm::BasicBlock* prev);
 

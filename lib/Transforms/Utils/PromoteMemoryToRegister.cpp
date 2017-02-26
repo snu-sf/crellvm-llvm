@@ -1815,6 +1815,8 @@ NextIteration:
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
 
+        llvmberry::propagateFromAISIPhitoLoadPhi(AI->second, LI, /*not using? */LI, nullptr);
+
         llvmberry::propagateLoadInstToUse(LI, V, recentInstr[AI->second].op1);
 
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
