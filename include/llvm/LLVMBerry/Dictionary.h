@@ -221,6 +221,7 @@ public:
     std::string op0;
     std::string op1;
     llvm::BasicBlock* instrBB;
+    bool check;
   };
 
   typedef std::map<unsigned, RenamePassTuple> TyRecentInstrObj;
