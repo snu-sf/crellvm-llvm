@@ -1845,8 +1845,10 @@ NextIteration:
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&BB, &Pred, &Dest, &SI, &II, &PAM, &AL, &ai]
                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+//        if (!isa<Constant>(SI->getOperand(0)))
+          llvmberry::propagateFromAISIPhitoLoadPhi(ai->second, SI, /*not using? */SI->getOperand(1), NULL);
 
-        llvmberry::saveInstrInfo(SI, ai->second, "");
+          llvmberry::saveInstrInfo(SI, ai->second, "");
       });
 
       // what value were we writing?
