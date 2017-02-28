@@ -228,6 +228,10 @@ public:
   typedef std::shared_ptr<TyRecentInstrObj> TyRecentInstr;
   TyRecentInstr recentInstr;
 
+  typedef std::vector<TyRecentInstrObj> TyInstrWorkListObj;
+  typedef std::shared_ptr<TyInstrWorkListObj> TyInstrWorkList;
+  TyInstrWorkList instrWorkList;
+
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
   static bool isUndef(std::shared_ptr<TyExpr> e);

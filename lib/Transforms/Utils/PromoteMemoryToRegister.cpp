@@ -410,9 +410,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
       // prepare variables
       auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
-      auto &termIndices = *(data.get<llvmberry::ArgForIndices>()->termIndices);
-      auto &useIndices = *(data.get<llvmberry::ArgForIndices>()->useIndices);
-      auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
       auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       auto &isReachable = *(data.get<llvmberry::ArgForMem2Reg>()->isReachable);
       std::string Ralloca = llvmberry::getVariable(*AI);
@@ -661,7 +658,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
              llvmberry::CoreHint &hints) {
     auto &allocas = *(data.get<llvmberry::ArgForMem2Reg>()->allocas);
     auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
-    auto &useIndices = *(data.get<llvmberry::ArgForIndices>()->useIndices);
     auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
     std::string Ralloca = llvmberry::getVariable(*AI);
 
@@ -971,7 +967,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
               (llvmberry::Dictionary &data,
                llvmberry::CoreHint &hints) {
       auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
-      auto &useIndices = *(data.get<llvmberry::ArgForIndices>()->useIndices);
       auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
 
       hints.addNopPosition
@@ -1377,9 +1372,34 @@ void PromoteMem2Reg::run() {
   //
   std::vector<RenamePassData> RenamePassWorkList;
   RenamePassWorkList.emplace_back(F.begin(), nullptr, std::move(Values));
+
+  llvmberry::ValidationUnit::GetInstance()->intrude
+          ([]
+           (llvmberry::Dictionary &data,
+            llvmberry::CoreHint &hints) {
+    auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
+    auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
+
+    instrWorkList.clear();
+    instrWorkList.emplace_back(recentInstr);
+  });
+
   do {
     RenamePassData RPD;
     RPD.swap(RenamePassWorkList.back());
+
+    llvmberry::ValidationUnit::GetInstance()->intrude
+            ([]
+             (llvmberry::Dictionary &data,
+              llvmberry::CoreHint &hints) {
+      auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
+      auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
+
+      recentInstr.clear();
+      recentInstr.swap(instrWorkList.back());
+      instrWorkList.pop_back();
+    });
+
     RenamePassWorkList.pop_back();
     // RenamePass may add new worklist entries.
     RenamePass(RPD.BB, RPD.Pred, RPD.Values, RenamePassWorkList);
@@ -1761,14 +1781,12 @@ NextIteration:
                    (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
-          Value* UndefVal = UndefValue::get(APN->getType());
 
           // propagate maydiff
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
 
           llvmberry::propagateFromAISIPhitoLoadPhi(AllocaNo, APN, /*not using? */APN, Pred);
-
           llvmberry::saveInstrInfo(APN, AllocaNo, Pred->getName());
         });
 
@@ -1862,7 +1880,6 @@ NextIteration:
                 (llvmberry::Dictionary &data,
                  llvmberry::CoreHint &hints) {
         auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
-        auto &useIndices = *(data.get<llvmberry::ArgForIndices>()->useIndices);
         auto &usePile = *(data.get<llvmberry::ArgForMem2Reg>()->usePile);
         std::string Rstore = llvmberry::getVariable(*SI->getOperand(1));
 
@@ -1908,8 +1925,19 @@ NextIteration:
   ++I;
 
   for (; I != E; ++I)
-    if (VisitedSuccs.insert(*I).second)
+    if (VisitedSuccs.insert(*I).second) {
       Worklist.emplace_back(*I, Pred, IncomingVals);
+
+      llvmberry::ValidationUnit::GetInstance()->intrude
+              ([]
+               (llvmberry::Dictionary &data,
+                llvmberry::CoreHint &hints) {
+        auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
+        auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
+
+        instrWorkList.emplace_back(recentInstr);
+      });
+    }
 
   goto NextIteration;
 }
