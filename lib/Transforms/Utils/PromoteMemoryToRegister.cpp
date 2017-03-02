@@ -1485,8 +1485,8 @@ void PromoteMem2Reg::run() {
           for (unsigned i = 0; i != PN->getNumIncomingValues(); ++i) {
             Value *check = dyn_cast<Value>(PN->getIncomingValue(i));
             Value *UndefVal = UndefValue::get(PN->getType());
-            std::string ghost = PN->getName().substr(0, PN->getName().rfind("."));
-
+            std::string ghost = "%" + std::string(PN->getName().substr(0, PN->getName().rfind(".")));
+            std::string Rphi = llvmberry::getVariable(*PN);
             // find undef prev block
             if (UndefVal == check) {
               BasicBlock *Income = PN->getIncomingBlock(i);
@@ -1505,6 +1505,11 @@ void PromoteMem2Reg::run() {
                         llvmberry::ConsTransitivityTgt::make(VAR(ghost, Ghost),
                                                              EXPR(UndefVal, Physical),
                                                              EXPR(In, Physical)));
+
+                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
+                        llvmberry::ConsTransitivityTgt::make(VAR(Rphi, Ghost), 
+                                                            VAR(ghost, Ghost), EXPR(In, Physical)));
+
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
               // value is constInt or constFloat
                 // infrule lessthanundef target undef > const

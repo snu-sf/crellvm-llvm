@@ -194,13 +194,13 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
       }
 
       if (equalsIfConsVar(vec[i]->getExpr2(), keyExprGhost)) {
-        if (phiKey != "")
-          newExpr = ConsVar::make(phiKey, Ghost);
+      //  if (phiKey != "")
+ //         newExpr = ConsVar::make(phiKey, Ghost);
 
-        vec[i]->updateExpr2(newExpr);
+ //       vec[i]->updateExpr2(newExpr);
 
-        if (phiKey != "")
-          (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
+  //      if (phiKey != "")
+    //      (*mem2regCmd.get())[phiKey].transTgt.push_back(vec[i]);
       }
 
       if (equalsIfConsVar(vec[i]->getExpr2(), keyExprPrev)) {
