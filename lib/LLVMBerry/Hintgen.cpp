@@ -2805,6 +2805,14 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
 
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt2)));
                                                         // ^ replace
+   if (recentInstr[key].op0 != "") {
+    mem2regCmd[recentInstr[key].op0].transTgt.push_back(transTgt1);
+   }
+   
+    mem2regCmd[recentInstr[key].op1].transTgt.push_back(transTgt1);
+    mem2regCmd[recentInstr[key].op1].transTgt.push_back(transTgt2);
+    mem2regCmd[recentInstr[key].op1].ghost.push_back(ghost);
+
     mem2regCmd[Rphi].transTgt.push_back(transTgt1);
     mem2regCmd[Rphi].transTgt.push_back(transTgt2);
     mem2regCmd[Rphi].ghost.push_back(ghost);
