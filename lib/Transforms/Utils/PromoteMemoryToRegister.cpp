@@ -1522,6 +1522,10 @@ void PromoteMem2Reg::run() {
                         llvmberry::ConsTransitivityTgt::make(VAR(ghost, Ghost),
                                                              EXPR(UndefVal, Physical),
                                                              EXPR(C, Physical)));
+
+                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
+                        llvmberry::ConsTransitivityTgt::make(VAR(Rphi, Ghost), 
+                                                             VAR(ghost, Ghost), EXPR(C, Physical)));
               } else {
                 hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT");
               }
