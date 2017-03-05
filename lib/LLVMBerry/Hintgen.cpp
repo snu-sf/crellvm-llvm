@@ -2889,7 +2889,7 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) 
 
       
       mem2regCmd[Rval].lessdef.push_back(lessdef);
-      //mem2regCmd[Rval].transTgt.push_back(transTgt); //<- this is in and changed 
+      mem2regCmd[Rval].transTgt.push_back(transTgt); //<- this is in and changed 
     }
 
   /*  
