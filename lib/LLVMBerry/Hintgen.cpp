@@ -2791,7 +2791,6 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
 }
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) {
-
   ValidationUnit::GetInstance()->intrude([&LI, &V, &In](
           Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
@@ -2803,9 +2802,11 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) 
     PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
               BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
 
-    std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make(VAR(Rload, Ghost), EXPR(V, Physical), TGT);
+    std::shared_ptr<TyPropagateLessdef> lessdef =
+      TyPropagateLessdef::make(VAR(Rload, Ghost), EXPR(V, Physical), TGT);
 
-    PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)), BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
+    PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+              BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
     // ^ replace
 
      std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *LI, instrIndices[LI], "");   
@@ -2816,20 +2817,23 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) 
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
 
     std::shared_ptr<TyTransitivity> trans1 (new TyTransitivity
-                                                    (VAR(Rload, Physical),
-                                                     INSN(std::shared_ptr<TyInstruction>(new ConsLoadInst(TyLoadInst::makeAlignOne(LI)))),
-                                                     VAR(In, Ghost)));
+                                              (VAR(Rload, Physical),
+                                               INSN(std::shared_ptr<TyInstruction>
+                                                (new ConsLoadInst(TyLoadInst::makeAlignOne(LI)))),
+                                               VAR(In, Ghost)));
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivity(trans1)));
 
     std::shared_ptr<TyTransitivity> trans2 (new TyTransitivity
-                                                    (VAR(Rload, Physical),
-                                                     VAR(In, Ghost),
-                                                     VAR(Rload, Ghost)));
+                                              (VAR(Rload, Physical),
+                                               VAR(In, Ghost),
+                                               VAR(Rload, Ghost)));
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivity(trans2)));
 
-    std::shared_ptr<TyTransitivityTgt> transTgt (new TyTransitivityTgt(VAR(Rload, Ghost), 
-                                                  VAR(In, Ghost), EXPR(V, Physical)));
-    INFRULE(TyPosition::make(SRC, *LI, instrIndices[LI], ""), std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
+    std::shared_ptr<TyTransitivityTgt> transTgt (new TyTransitivityTgt
+                                                   (VAR(Rload, Ghost), 
+                                                    VAR(In, Ghost),
+                                                    EXPR(V, Physical)));
+    INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
 
     mem2regCmd[In].ghost.push_back(ghost);
     mem2regCmd[In].transSrc.push_back(std::make_pair(position, trans1));
