@@ -3271,11 +3271,13 @@ const char * LLVMAPFloatToString(LLVMAPFloatRef F) {
            "assuming that double is 64 bits!");
     char Buffer[40];
     // Floats are represented in ASCII IR as double, convert.
+    APFloat apf2 = *apf;
+
     if (!isDouble)
-      apf->convert(APFloat::IEEEdouble, APFloat::rmNearestTiesToEven, 
+      apf2.convert(APFloat::IEEEdouble, APFloat::rmNearestTiesToEven, 
                         &ignored);
     out << "0x" <<
-         utohex_buffer(uint64_t(apf->bitcastToAPInt().getZExtValue()), 
+         utohex_buffer(uint64_t(apf2.bitcastToAPInt().getZExtValue()), 
                           Buffer+40);
     cstr = new char [out.str().size()+1];
     strcpy (cstr, out.str().c_str());

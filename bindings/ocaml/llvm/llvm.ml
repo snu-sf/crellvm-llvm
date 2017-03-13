@@ -1528,12 +1528,13 @@ module APFloat = struct
   external to_string : t -> string = "llvm_apfloat_to_string"
 
   let bcompare (f1:t) (f2:t) : bool =
-    match compare f1 f2 with          
-    | CmpResult.LessThan -> false
-    | CmpResult.Equal -> true
-    | CmpResult.GreaterThan -> false
-    | CmpResult.Unordered -> bitwise_is_equal f1 f2
-
+    if get_semantics f1 = get_semantics f2 then
+      match compare f1 f2 with          
+      | CmpResult.LessThan -> false
+      | CmpResult.Equal -> true
+      | CmpResult.GreaterThan -> false
+      | CmpResult.Unordered -> bitwise_is_equal f1 f2
+    else false
 end
 
 external const_int_get_zextvalue : llvalue -> Int64.t 
