@@ -141,6 +141,20 @@ void ValidationUnit::intrude(
   func(_data, _corehint);
 }
 
+static CoreHint::AUTO_OPT getAutoOptOf(ValidationUnit::PASS pass) {
+  switch (pass) {
+  case ValidationUnit::GVN:
+  case ValidationUnit::PRE:
+    return CoreHint::AUTO_GVN;
+  case ValidationUnit::MEM2REG:
+    return CoreHint::AUTO_SROA;
+  case ValidationUnit::INSTCOMBINE:
+    return CoreHint::AUTO_INSTCOMBINE;
+  default:
+    return CoreHint::AUTO_DEFAULT;
+  }
+}
+
 // private functions
 void ValidationUnit::begin(bool rename) {
   assert(!isAborted);
@@ -168,6 +182,7 @@ void ValidationUnit::begin(bool rename) {
   std::string mid = module->getModuleIdentifier();
   std::string fid = _func->getName().str();
   _corehint = CoreHint(mid, fid, _optname);
+  _corehint.setAutoOption(getAutoOptOf(_CurrentPass));
 }
 
 void ValidationUnit::commit() {

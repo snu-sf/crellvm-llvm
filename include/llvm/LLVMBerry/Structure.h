@@ -1574,6 +1574,7 @@ private:
 struct CoreHint {
 public:
   enum RETURN_CODE { ACTUAL = 0, ADMITTED, FAIL };
+  enum AUTO_OPT { AUTO_GVN = 0, AUTO_SROA, AUTO_INSTCOMBINE, AUTO_DEFAULT };
   CoreHint();
   CoreHint(std::string _module_id, std::string _function_id,
            std::string _opt_name, std::string _description = "");
@@ -1587,6 +1588,7 @@ public:
   void addCommand(std::shared_ptr<TyCommand> c,
                   std::shared_ptr<TyCppDebugInfo> d);
   void setOptimizationName(const std::string &name);
+  void setAutoOption(AUTO_OPT opt);
   void addNopPosition(std::shared_ptr<TyPosition> position);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
@@ -1596,6 +1598,7 @@ private:
   std::string opt_name;
   std::string description;
   RETURN_CODE return_code;
+  AUTO_OPT auto_option;
   std::vector<std::shared_ptr<TyPosition>> nop_positions;
   std::vector<std::pair<std::shared_ptr<TyCommand>,
                         std::shared_ptr<TyCppDebugInfo>>> commands;
