@@ -398,7 +398,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     Value *ReplVal = OnlyStore->getOperand(0);
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AI, &OnlyStore, &LI, &ReplVal, &DT, &StoringGlobalVal]
+            ([&AI, &OnlyStore, &LI, &ReplVal, &DT, &StoringGlobalVal, &LBI, &StoreIndex, &StoreBB]
               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       //        <src>          |     <tgt>
       // %x = alloca i32       | nop
@@ -410,6 +410,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
       // prepare variables
       auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
+      auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
       auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
@@ -458,14 +459,28 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                 std::shared_ptr<llvmberry::TyInfrule>
                   (new llvmberry::ConsLessthanUndef(lessthanundef)));
 
-        INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
-                llvmberry::ConsIntroGhost::make(EXPR(OnlyStore->getOperand(0), Physical),
-                                                REGISTER(Rstore, Ghost)));
-      }
+        if (storeItem[OnlyStore].op0 == "%" ||
+            data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(storeItem[OnlyStore].expr,
+                                                                  EXPR(OnlyStore->getOperand(0),
+                                                                       Physical))) {
+          // stored value will not be changed in another iteration
+          std::shared_ptr<llvmberry::TyIntroGhost> ghost
+            (new llvmberry::TyIntroGhost(storeItem[OnlyStore].expr,
+                                         REGISTER(Rstore, Ghost)));
 
-      if (ReplVal == LI)
-        llvmberry::propagateLoadInstToUse(LI, UndefVal, Rstore);
-      else {
+          if (storeItem[OnlyStore].op0 != "%")
+            mem2regCmd[llvmberry::getVariable(*OnlyStore->getOperand(0))].ghost.push_back(ghost);
+
+          INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
+                  std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsIntroGhost(ghost)));
+        } else {
+          // stored value will be changed in another iteration
+          INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
+                  llvmberry::ConsIntroGhost::make(VAR(storeItem[OnlyStore].op0, Ghost),
+                                                  REGISTER(Rstore, Ghost)));
+        }
+      } else if ((LI->getParent() == StoreBB && unsigned(StoreIndex) < LBI.getInstructionIndex(LI)) ||
+                 (LI->getParent() != StoreBB && DT.dominates(StoreBB, LI->getParent())))
         // Step1: propagate store instruction
         //        <src>                               |     <tgt>
         // %x = alloca i32                            | nop
@@ -474,9 +489,11 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // %b = load i32 %x      | %b = load i32 1
         // %c = add i32 %a, %b   | %c = add i32 %a, %b
         // ret i32 %c            | ret i32 %c
-        llvmberry::generateHintForMem2RegPropagateStore
-          (NULL, OnlyStore, LI, instrIndices[LI]);
+        llvmberry::generateHintForMem2RegPropagateStore(NULL, OnlyStore, LI, instrIndices[LI]);
 
+      if (ReplVal == LI)
+        llvmberry::propagateLoadInstToUse(LI, UndefVal, Rstore);
+      else
         // Step2: propagate load instruction
         //        <src>          |     <tgt>
         // %a = load i32 1       | nop
@@ -484,7 +501,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // %c = add i32 %a, %b   | %c = add i32 1, 1
         // ret i32 %c            | ret i32 %c
         llvmberry::propagateLoadInstToUse(LI, ReplVal, Rstore);
-      }
 
       // propagate maydiff
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
