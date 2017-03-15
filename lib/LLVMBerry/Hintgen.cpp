@@ -944,26 +944,6 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
     std::string bname = getBasicBlockIndex(SI->getParent());
     std::string predName = getBasicBlockIndex(Pred);
     // propagate instruction
-    if (llvm::isa<llvm::PHINode>(next)) {
-      PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(
-                          new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
-                        VAR(Rstore, Ghost), SRC),
-                BOUNDS(TyPosition::make(SRC, *SI, instrIndices[SI], ""),
-                       TyPosition::make_end_of_block(TGT, *Pred, termIndices[predName])));
-
-      std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
-                                                  (VAR(Rstore, Ghost),
-                                                   TyExpr::make(*(SI->getOperand(0)),
-                                                                Physical),
-                                                   TGT);
-
-      if (SI->getOperand(0)->getName()!="")
-        mem2regCmd[getVariable(*(SI->getOperand(0)))].lessdef.push_back(lessdef);
-
-      PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                BOUNDS(TyPosition::make(SRC, *SI, instrIndices[SI], ""),
-                       TyPosition::make_end_of_block(SRC, *Pred, termIndices[predName])));
-    } else {
       PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(
                           new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
                         VAR(Rstore, Ghost), SRC),
@@ -982,7 +962,6 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
       PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
                 BOUNDS(TyPosition::make(SRC, *SI, instrIndices[SI], ""),
                        TyPosition::make(SRC, *next, nextIndex, "")));
-    }
 
     if (storeItem[SI].op0 == "%" ||
         data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, 
@@ -991,30 +970,17 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
       // stored value will not be changed in another iteration
       std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(storeItem[SI].expr,
                                                            REGISTER(Rstore, Ghost)));
-
-      std::shared_ptr<TyTransitivity> transitivity(
-          new TyTransitivity(
-                INSN(std::shared_ptr<TyInstruction>(
-                  new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
-                storeItem[SI].expr,
-                VAR(Rstore, Ghost)));
-
       std::shared_ptr<TyPosition> position =
         TyPosition::make(SRC, *SI, instrIndices[SI], "");
 
       if (storeItem[SI].op0 != "%") {
         mem2regCmd[getVariable(*(SI->getOperand(0)))].ghost.push_back(ghost);
-        mem2regCmd[getVariable(*(SI->getOperand(0)))].transSrc.push_back(std::make_pair(position, transitivity));
       }
 
       INFRULE(
           position,
           std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-
-      INFRULE(
-          position,
-          std::shared_ptr<TyInfrule>(new ConsTransitivity(transitivity)));
-    } else {
+   } else {
       std::shared_ptr<TyPosition> position =
         TyPosition::make(SRC, *SI, instrIndices[SI], "");
 
@@ -1022,30 +988,6 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
       INFRULE(position,//TyPosition::make(SRC, *SI, instrIndices[SI], ""),
               ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost),
                                    REGISTER(Rstore, Ghost)));
-
-      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndices[SI], ""),
-              ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
-                                       new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
-                                     VAR(storeItem[SI].op0, Physical),
-                                     VAR(storeItem[SI].op0, Ghost)));
-
-      INFRULE(position,//TyPosition::make(SRC, *SI, instrIndices[SI], ""),
-              ConsTransitivity::make(INSN(std::shared_ptr<TyInstruction>(
-                                       new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
-                                     VAR(storeItem[SI].op0, Ghost),
-                                     VAR(Rstore, Ghost)));
-
-      std::shared_ptr<TyTransitivityTgt> transTgt(new TyTransitivityTgt(
-                                                    VAR(Rstore, Ghost),
-                                                    VAR(storeItem[SI].op0, Ghost),
-                                                    TyExpr::make(*(SI->getOperand(0)), Physical)));
-
-      INFRULE(position,
-              std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
-
-      if (SI->getOperand(0)->getName() != "")
-        mem2regCmd[getVariable(*(SI->getOperand(0)))].transTgt.push_back(transTgt);
-       
     }
   });
 }
@@ -2598,10 +2540,9 @@ void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev) 
   });
 }
 
-void propagateFromAISIPhitoLoadPhi (unsigned key, llvm::Instruction *To, llvm::Value *V, llvm::BasicBlock* prev) {
-  ValidationUnit::GetInstance()->intrude([&To, &V, &key, &prev](
+void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev) {
+  ValidationUnit::GetInstance()->intrude([&To, &key, &prev](
           Dictionary &data, CoreHint &hints) {
-    std::string Value = llvmberry::getVariable(*V);
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
@@ -2620,22 +2561,17 @@ void propagateFromAISIPhitoLoadPhi (unsigned key, llvm::Instruction *To, llvm::V
     // from doesn't matter
 
     // propagate from to   from : AI SI Phi   to : Phi LI
-    if (recentInstr[key].op0 == "llvmberry::PHI") {
-      // propagate position from is make start of block
+    if (recentInstr[key].op0 == "llvmberry::PHI") 
       // position from
       from_position = TyPosition::make_start_of_block(SRC, recentInstr[key].instrBB->getName());
-    } else {
+    else 
       from_position = recentInstr[key].instrPos;
-    }
 
-    if (Phi != NULL) {
+    if (Phi != NULL) 
       //propagate position to need prev block infromation
       to_position = TyPosition::make_end_of_block(SRC, *prev, termIndices[prev->getName()]);
-    } else {
+    else 
       to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
-    }
-
-
 
     if (llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(To)) {
       if (!(storeItem[SI].op0 == "%") &&
@@ -2652,40 +2588,11 @@ void propagateFromAISIPhitoLoadPhi (unsigned key, llvm::Instruction *To, llvm::V
         //
         //  intro ghost
         //          tmp^ = y^ = tmp^
-        INFRULE(to_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost),
-                                                  REGISTER(op1, Ghost)));
-
-        //  transitivity    load %y = tmp = tmp^
-        INFRULE(to_position,
-                ConsTransitivity::make(recentInstr[key].instrL, VAR(storeItem[SI].op0, Physical),
-                        VAR(storeItem[SI].op0, Ghost)));
-
-        //  transitivity    load %y = tmp^ = y^
-        INFRULE(to_position,
-                ConsTransitivity::make(recentInstr[key].instrL, VAR(storeItem[SI].op0, Ghost),
-                        VAR(op1, Ghost)));
-
-
-        //transi_tgt y^ = tmp^ = a    a -> replace ?
-        std::shared_ptr<TyTransitivityTgt> transTgt1 (new TyTransitivityTgt
-                                                              (VAR(op1, Ghost), VAR(storeItem[SI].op0, Ghost), 
-                                                               TyExpr::make(*(SI->getOperand(0)), Physical)));
-
-        INFRULE(to_position, std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt1)));
-        
-        if (!llvm::isa<llvm::Constant>(SI->getOperand(0))) {
-          std::string op0 = getVariable(*(SI->getOperand(0)));
-          mem2regCmd[op0].transTgt.push_back(transTgt1);
-        }
-
+        INFRULE(to_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(op1, Ghost)));
         recentInstr[key].check = true; 
-
-        return;
-      } else { 
+      } else 
         recentInstr[key].check = false;
-
-        return;
-      }
+      return;
     }
 
     PROPAGATE(LESSDEF(recentInstr[key].instrL, VAR(recentInstr[key].op1, Ghost), SRC),
@@ -2723,22 +2630,10 @@ void applyInfruleforAISI(unsigned key) {
   ValidationUnit::GetInstance()->intrude([&key](
           Dictionary &data, CoreHint &hints) {
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
-    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
 
     INFRULE(recentInstr[key].instrPos,
             ConsIntroGhost::make(recentInstr[key].instrR, REGISTER(recentInstr[key].op1, Ghost)));
-                                //^ replace
-
-    std::shared_ptr<TyTransitivity> transSrc (new TyTransitivity(recentInstr[key].instrL, 
-                                                  recentInstr[key].instrR, VAR(recentInstr[key].op1,Ghost)));
-
-    INFRULE(recentInstr[key].instrPos, std::shared_ptr<TyInfrule>(new ConsTransitivity(transSrc)));
-                                                        // ^ replace
-    if (recentInstr[key].op0 == "llvmberry::PHI")
-      mem2regCmd[recentInstr[key].op1].transSrc.push_back(std::make_pair(recentInstr[key].instrPos, transSrc));
-    else 
-      mem2regCmd[recentInstr[key].op0].transSrc.push_back(std::make_pair(recentInstr[key].instrPos, transSrc));
-  });
+   });
 }
 
 void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev) {
@@ -2746,47 +2641,18 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
           Dictionary &data, CoreHint &hints) {
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-    auto &transTgt = *(data.get<ArgForMem2Reg>()->transTgt);
+ //   auto &transTgt = *(data.get<ArgForMem2Reg>()->transTgt);
     std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *phi, 0, prev->getName());
     std::string Rphi = getVariable(*phi);
 
-    if (Rphi == recentInstr[key].op1) {
-       INFRULE(position,
-            ConsTransitivityTgt::make(VAR(recentInstr[key].op1, Ghost), VAR(recentInstr[key].op1, Previous), VAR(Rphi, Physical)));
+    if (Rphi == recentInstr[key].op1) 
       return;
-    }
 
     std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(recentInstr[key].op1, Ghost), REGISTER(Rphi, Ghost)));
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-
-    INFRULE(position,
-            ConsTransitivity::make(recentInstr[key].instrL, VAR(recentInstr[key].op1, Ghost), VAR(Rphi, Ghost)));
-
-    std::shared_ptr<TyTransitivityTgt> transTgt1 (new TyTransitivityTgt
-                                                    (VAR(recentInstr[key].op1, Ghost),
-                                                     recentInstr[key].instrR,
-                                                     VAR(Rphi, Physical)));
-
-    INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt1)));
-    
-
-    std::shared_ptr<TyTransitivityTgt> transTgt2 (new TyTransitivityTgt(VAR(Rphi, Ghost), 
-                                                  VAR(recentInstr[key].op1, Ghost), VAR(Rphi, Physical)));
-
-    INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt2)));
-                                                        // ^ replace
-   if (recentInstr[key].op0 != "") {
-    mem2regCmd[recentInstr[key].op0].transTgt.push_back(transTgt1);
-   }
-   
-    mem2regCmd[recentInstr[key].op1].transTgt.push_back(transTgt1);
-    mem2regCmd[recentInstr[key].op1].transTgt.push_back(transTgt2);
     mem2regCmd[recentInstr[key].op1].ghost.push_back(ghost);
 
-    mem2regCmd[Rphi].transTgt.push_back(transTgt1);
-    mem2regCmd[Rphi].transTgt.push_back(transTgt2);
     mem2regCmd[Rphi].ghost.push_back(ghost);
-    transTgt.push_back(transTgt1);
   });
 }
 
@@ -2815,36 +2681,11 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) 
     //transitivity %1 = load %x = X   //load variable can be replace consider that later
     std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(In, Ghost), REGISTER(Rload, Ghost)));
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-
-    std::shared_ptr<TyTransitivity> trans1 (new TyTransitivity
-                                              (VAR(Rload, Physical),
-                                               INSN(std::shared_ptr<TyInstruction>
-                                                (new ConsLoadInst(TyLoadInst::makeAlignOne(LI)))),
-                                               VAR(In, Ghost)));
-    INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivity(trans1)));
-
-    std::shared_ptr<TyTransitivity> trans2 (new TyTransitivity
-                                              (VAR(Rload, Physical),
-                                               VAR(In, Ghost),
-                                               VAR(Rload, Ghost)));
-    INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivity(trans2)));
-
-    std::shared_ptr<TyTransitivityTgt> transTgt (new TyTransitivityTgt
-                                                   (VAR(Rload, Ghost), 
-                                                    VAR(In, Ghost),
-                                                    EXPR(V, Physical)));
-    INFRULE(position, std::shared_ptr<TyInfrule>(new ConsTransitivityTgt(transTgt)));
-
     mem2regCmd[In].ghost.push_back(ghost);
-    mem2regCmd[In].transSrc.push_back(std::make_pair(position, trans1));
-    mem2regCmd[In].transSrc.push_back(std::make_pair(position, trans2));
-    mem2regCmd[In].transTgt.push_back(transTgt);
 
-    if (!llvm::isa<llvm::Constant>(V)) {                                             // ^ replace
-      std::string Rval = llvmberry::getVariable(*V);
-      
+    if (!llvm::isa<llvm::Constant>(V)) {   
+      std::string Rval = llvmberry::getVariable(*V);  
       mem2regCmd[Rval].lessdef.push_back(lessdef);
-      mem2regCmd[Rval].transTgt.push_back(transTgt); //<- this is in and changed 
     }
   });
 }

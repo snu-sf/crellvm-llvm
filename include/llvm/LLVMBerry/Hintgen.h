@@ -263,7 +263,7 @@ void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I);
 
 void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev);
 
-void propagateFromAISIPhitoLoadPhi (unsigned key, llvm::Instruction *To, llvm::Value *V, llvm::BasicBlock* prev);
+void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev);
 
 void applyInfruleforAISI(unsigned key);
 

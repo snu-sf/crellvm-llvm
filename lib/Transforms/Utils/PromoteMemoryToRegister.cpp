@@ -329,9 +329,7 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
     }
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&I]
-              (llvmberry::Dictionary &data, 
-               llvmberry::CoreHint &hints) {
+            ([&I] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       hints.appendToDescription("removeLifeTime");
       hints.setReturnCodeToAdmitted();
     });
@@ -398,7 +396,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     Value *ReplVal = OnlyStore->getOperand(0);
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AI, &OnlyStore, &LI, &ReplVal, &DT, &StoringGlobalVal]
+        ([&AI, &OnlyStore, &LI, &ReplVal, &DT, &StoringGlobalVal, &LBI, &StoreIndex, &StoreBB]
               (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       //        <src>          |     <tgt>
       // %x = alloca i32       | nop
@@ -410,6 +408,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
       // prepare variables
       auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
+      auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
       auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
@@ -423,17 +422,16 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         PROPAGATE(
             LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                       new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                    VAR(Ralloca, Ghost),
-                    SRC),
+                    VAR(Ralloca, Ghost), SRC),
         BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
         std::shared_ptr<llvmberry::TyPropagateLessdef> lessdefstore =
           llvmberry::TyPropagateLessdef::make
-            (VAR(Ralloca, Ghost),
-             EXPR(UndefVal, Physical), // this undef may be replaced to constant
-                                       // unless there exists LI before SI
-             TGT);
+            (VAR(Ralloca, Ghost), EXPR(UndefVal, Physical), TGT); 
+             // this undef may be replaced to constant
+             // unless there exists LI before SI
+             
         mem2regCmd[Ralloca].lessdef.push_back(lessdefstore);
 
         PROPAGATE(
@@ -455,34 +453,27 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         mem2regCmd[Rload].lessUndef.push_back(lessthanundef);
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                std::shared_ptr<llvmberry::TyInfrule>
-                  (new llvmberry::ConsLessthanUndef(lessthanundef)));
+                std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsLessthanUndef(lessthanundef)));
+       
+        if (storeItem[OnlyStore].op0 == "%" ||
+            data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(storeItem[OnlyStore].expr,
+                                                                  EXPR(OnlyStore->getOperand(0), Physical))) {
+          // stored value will not be changed in another iteration
+          std::shared_ptr<llvmberry::TyIntroGhost> ghost
+            (new llvmberry::TyIntroGhost(storeItem[OnlyStore].expr, REGISTER(Rstore, Ghost)));
 
-        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                llvmberry::ConsTransitivity::make(EXPR(UndefVal, Physical),
-                                                  EXPR(OnlyStore->getOperand(0), Physical),
-                                                  VAR(Ralloca, Ghost)));
+          if (storeItem[OnlyStore].op0 != "%")
+            mem2regCmd[llvmberry::getVariable(*OnlyStore->getOperand(0))].ghost.push_back(ghost);
 
-        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                                                  EXPR(UndefVal, Physical),
-                                                  VAR(Ralloca, Ghost)));
-
-        INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
-                llvmberry::ConsIntroGhost::make(EXPR(OnlyStore->getOperand(0), Physical),
-                                                REGISTER(Rstore, Ghost)));
-
-        INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
-                llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(OnlyStore)))),
-                                                  EXPR(OnlyStore->getOperand(0), Physical),
-                                                  VAR(Rstore, Ghost)));
-      }
-
-      if (ReplVal == LI)
-        llvmberry::propagateLoadInstToUse(LI, UndefVal, Rstore);
-      else {
+          INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
+                  std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsIntroGhost(ghost)));
+        } else {
+          // stored value will be changed in another iteration
+          INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
+                  llvmberry::ConsIntroGhost::make(VAR(storeItem[OnlyStore].op0, Ghost), REGISTER(Rstore, Ghost)));
+        }
+      } else if ((LI->getParent() == StoreBB && unsigned(StoreIndex) < LBI.getInstructionIndex(LI)) ||
+                 (LI->getParent() != StoreBB && DT.dominates(StoreBB, LI->getParent())))
         // Step1: propagate store instruction
         //        <src>                               |     <tgt>
         // %x = alloca i32                            | nop
@@ -491,9 +482,11 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // %b = load i32 %x      | %b = load i32 1
         // %c = add i32 %a, %b   | %c = add i32 %a, %b
         // ret i32 %c            | ret i32 %c
-        llvmberry::generateHintForMem2RegPropagateStore
-          (NULL, OnlyStore, LI, instrIndices[LI]);
+        llvmberry::generateHintForMem2RegPropagateStore(NULL, OnlyStore, LI, instrIndices[LI]);
 
+      if (ReplVal == LI)
+        llvmberry::propagateLoadInstToUse(LI, UndefVal, Rstore);
+      else        
         // Step2: propagate load instruction
         //        <src>          |     <tgt>
         // %a = load i32 1       | nop
@@ -501,16 +494,13 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // %c = add i32 %a, %b   | %c = add i32 1, 1
         // ret i32 %c            | ret i32 %c
         llvmberry::propagateLoadInstToUse(LI, ReplVal, Rstore);
-      }
 
       // propagate maydiff
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
 
       // add nop
-      hints.addNopPosition
-        (llvmberry::TyPosition::make
-          (llvmberry::Target, *LI, instrIndices[LI]-1, ""));
+      hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *LI, instrIndices[LI]-1, ""));
     });
 
     // If the replacement value is the load, this must occur in unreachable
@@ -519,8 +509,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       ReplVal = UndefValue::get(LI->getType());
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&AI, &LI, &ReplVal]
-              (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+            ([&AI, &LI, &ReplVal] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI);
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, AI);
     });
@@ -549,9 +538,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
   // add alloca and store into maydiff
   llvmberry::ValidationUnit::GetInstance()->intrude
-         ([&AI, &OnlyStore]
-            (llvmberry::Dictionary &data, 
-             llvmberry::CoreHint &hints) {
+         ([&AI, &OnlyStore] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
     std::string Ralloca = llvmberry::getVariable(*AI);
 
@@ -560,17 +547,11 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
 
     // add nop
-    hints.addNopPosition
-      (llvmberry::TyPosition::make
-        (llvmberry::Target, *AI, instrIndices[AI]-1, ""));
+    hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *AI, instrIndices[AI]-1, ""));
+    hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *OnlyStore, instrIndices[OnlyStore]-1, ""));
 
-    hints.addNopPosition
-      (llvmberry::TyPosition::make
-        (llvmberry::Target, *OnlyStore, instrIndices[OnlyStore]-1, ""));
-
-    if (LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0))) {
+    if (LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0)))
       llvmberry::eraseInstrOfUseIndices(check, OnlyStore);
-    }
   });
 
   // Remove the (now dead) store and alloca.
@@ -637,8 +618,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
     if (I == StoresByIndex.begin()) {
       llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&AI, &LI, &StoresByIndex]
-                (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+              ([&AI, &LI, &StoresByIndex] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         Value* UndefVal = UndefValue::get(LI->getType());
         // prepare variables
         auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
@@ -649,13 +629,10 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         std::shared_ptr<llvmberry::TyPropagateObject> lessdef_src =
           LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
                     new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                  VAR(Ralloca, Ghost),
-                  SRC);
+                  VAR(Ralloca, Ghost), SRC);
 
         std::shared_ptr<llvmberry::TyPropagateObject> lessdef_tgt =
-          LESSDEF(VAR(Ralloca, Ghost),
-                  EXPR(UndefVal, Physical),
-                  TGT);
+          LESSDEF(VAR(Ralloca, Ghost), EXPR(UndefVal, Physical), TGT);
 
         PROPAGATE(lessdef_src,
                   BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
@@ -665,14 +642,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                          llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical),
-                                                REGISTER(Ralloca, Ghost)));
-
-        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                llvmberry::ConsTransitivity::make(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                                                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                                                  EXPR(UndefVal, Physical),
-                                                  VAR(Ralloca, Ghost)));
+                llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical), REGISTER(Ralloca, Ghost)));
 
         // add hints per use of load
         llvmberry::propagateLoadInstToUse(LI, UndefVal, Ralloca);
@@ -680,14 +650,11 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
 
-        hints.addNopPosition
-          (llvmberry::TyPosition::make
-            (llvmberry::Target, *LI, instrIndices[LI]-1, ""));
+        hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *LI, instrIndices[LI]-1, ""));
         llvmberry::generateHintForMem2RegReplaceHint(UndefVal, LI);
 
-        if (!StoresByIndex.empty()) {
+        if (!StoresByIndex.empty()) 
           hints.appendToDescription("MEM2REG SINGLE BLOCK ALLOCA BUG FOUND BY US");
-        }
       });
 
       // If there is no store before this load, the load takes the undef value.
@@ -695,8 +662,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
     }
     else {
       llvmberry::ValidationUnit::GetInstance()->intrude
-         ([&AI, &LI, &I]
-           (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+         ([&AI, &LI, &I] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         // prepare variables
         StoreInst* SI = std::prev(I)->second;
         auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
@@ -725,9 +691,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
 
-        hints.addNopPosition
-          (llvmberry::TyPosition::make
-            (llvmberry::Target, *LI, instrIndices[LI]-1, ""));
+        hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *LI, instrIndices[LI]-1, ""));
 
         Value* ReplVal = std::prev(I)->second->getOperand(0);
         llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI);
@@ -754,14 +718,10 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
     }
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-           ([&SI]
-              (llvmberry::Dictionary &data,
-               llvmberry::CoreHint &hints) {
+           ([&SI](llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
 
-      hints.addNopPosition
-        (llvmberry::TyPosition::make
-          (llvmberry::Target, *SI, instrIndices[SI]-1, ""));
+      hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *SI, instrIndices[SI]-1, ""));
       
       if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0)))
         llvmberry::eraseInstrOfUseIndices(check, SI);
@@ -772,9 +732,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   }
 
   llvmberry::ValidationUnit::GetInstance()->intrude
-         ([&AI]
-            (llvmberry::Dictionary &data,
-             llvmberry::CoreHint &hints) {
+         ([&AI](llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
     std::string Ralloca = llvmberry::getVariable(*AI);
 
@@ -782,9 +740,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
     llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
     llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
 
-    hints.addNopPosition
-      (llvmberry::TyPosition::make
-        (llvmberry::Target, *AI, instrIndices[AI]-1, ""));
+    hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *AI, instrIndices[AI]-1, ""));
   });
 
   if (AST)
@@ -816,8 +772,7 @@ void PromoteMem2Reg::run() {
   
   llvmberry::ValidationUnit::Begin("mem2reg", &F);
   llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&F]
-            (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          ([&F] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       data.create<llvmberry::ArgForMem2Reg>();
       data.create<llvmberry::ArgForIndices>();
       llvmberry::saveInstrIndices(&F);
@@ -825,8 +780,7 @@ void PromoteMem2Reg::run() {
   });
 
   llvmberry::ValidationUnit::GetInstance()->intrude
-          ([&F, this]
-            (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          ([&F, this] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
     auto &termIndices = *(data.get<llvmberry::ArgForIndices>()->termIndices);
     auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
@@ -842,33 +796,23 @@ void PromoteMem2Reg::run() {
         std::string AIBname = llvmberry::getBasicBlockIndex(AIB);
 
         // TODO: if we can validate "call -> nop" we need this condition
-        //if (!llvmberry::hasBitcastOrGEP(AI)) { 
         if (BB == AIB) {
           PROPAGATE(UNIQUE(Ralloca, SRC),
-                    BOUNDS(llvmberry::TyPosition::make
-                            (SRC, *AItmp, instrIndices[AItmp], ""),
-                           llvmberry::TyPosition::make_end_of_block
-                            (SRC, *AIB, termIndices[AIBname])));
+                    BOUNDS(llvmberry::TyPosition::make(SRC, *AItmp, instrIndices[AItmp], ""),
+                           llvmberry::TyPosition::make_end_of_block(SRC, *AIB, termIndices[AIBname])));
 
           PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC),
-                    BOUNDS(llvmberry::TyPosition::make
-                            (SRC, *AItmp, instrIndices[AItmp], ""),
-                           llvmberry::TyPosition::make_end_of_block
-                            (SRC, *AIB, termIndices[AIBname])));
+                    BOUNDS(llvmberry::TyPosition::make(SRC, *AItmp, instrIndices[AItmp], ""),
+                           llvmberry::TyPosition::make_end_of_block(SRC, *AIB, termIndices[AIBname])));
         } else {
           PROPAGATE(UNIQUE(Ralloca, SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block
-                            (SRC, blockName),
-                           llvmberry::TyPosition::make_end_of_block
-                            (SRC, *BB, termIndices[blockName])));
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, blockName),
+                           llvmberry::TyPosition::make_end_of_block(SRC, *BB, termIndices[blockName])));
 
           PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block
-                            (SRC, blockName),
-                           llvmberry::TyPosition::make_end_of_block
-                            (SRC, *BB, termIndices[blockName])));
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, blockName),
+                           llvmberry::TyPosition::make_end_of_block(SRC, *BB, termIndices[blockName])));
         }
-        //}
       }
     }
 
@@ -912,9 +856,7 @@ void PromoteMem2Reg::run() {
     if (AI->use_empty()) {
       // hints when alloca has no use
       llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&AI]
-                (llvmberry::Dictionary &data, 
-                 llvmberry::CoreHint &hints) {
+              ([&AI] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
         std::string Ralloca = llvmberry::getVariable(*AI);
 
@@ -922,9 +864,7 @@ void PromoteMem2Reg::run() {
         llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
 
-        hints.addNopPosition
-          (llvmberry::TyPosition::make
-            (llvmberry::Target, *AI, instrIndices[AI]-1, ""));
+        hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *AI, instrIndices[AI]-1, ""));
       });
 
       // If there are no uses of the alloca, just delete it now.
@@ -1031,9 +971,7 @@ void PromoteMem2Reg::run() {
     Values[i] = UndefValue::get(Allocas[i]->getAllocatedType());
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([&i, this]
-             (llvmberry::Dictionary &data,
-              llvmberry::CoreHint &hints) {
+            ([&i, this] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       llvmberry::saveInstrInfo(Allocas[i], i, "");
     });
   }
@@ -1045,9 +983,7 @@ void PromoteMem2Reg::run() {
   RenamePassWorkList.emplace_back(F.begin(), nullptr, std::move(Values));
 
   llvmberry::ValidationUnit::GetInstance()->intrude
-          ([]
-           (llvmberry::Dictionary &data,
-            llvmberry::CoreHint &hints) {
+          ([] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
     auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
@@ -1060,9 +996,7 @@ void PromoteMem2Reg::run() {
     RPD.swap(RenamePassWorkList.back());
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-            ([]
-             (llvmberry::Dictionary &data,
-              llvmberry::CoreHint &hints) {
+            ([] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
       auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
@@ -1084,9 +1018,7 @@ void PromoteMem2Reg::run() {
     Instruction *A = Allocas[i];
 
     llvmberry::ValidationUnit::GetInstance()->intrude
-           ([&A]
-              (llvmberry::Dictionary &data,
-               llvmberry::CoreHint &hints) {
+           ([&A] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
       std::string Ralloca = llvmberry::getVariable(*A);
 
@@ -1096,9 +1028,7 @@ void PromoteMem2Reg::run() {
       llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
       llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
 
-      hints.addNopPosition
-        (llvmberry::TyPosition::make
-          (llvmberry::Target, *A, instrIndices[A]-1, ""));
+      hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *A, instrIndices[A]-1, ""));
     });
 
     // If there are any uses of the alloca instructions left, they must be in
@@ -1141,8 +1071,7 @@ void PromoteMem2Reg::run() {
           AST->deleteValue(PN);
         
         llvmberry::ValidationUnit::GetInstance()->intrude
-                        ([&PN, &V]
-                                 (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+                ([&PN, &V] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           auto &termIndices = *(data.get<llvmberry::ArgForIndices>()->termIndices);
 
           for (unsigned i = 0; i != PN->getNumIncomingValues(); ++i) {
@@ -1163,16 +1092,6 @@ void PromoteMem2Reg::run() {
                                  llvmberry::TyPosition::make_end_of_block
                                   (SRC, *Income, termIndices[llvmberry::getBasicBlockIndex(Income)])));
 
-                // transitivity at phi node X > undef > value
-                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
-                        llvmberry::ConsTransitivityTgt::make(VAR(ghost, Ghost),
-                                                             EXPR(UndefVal, Physical),
-                                                             EXPR(In, Physical)));
-
-                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
-                        llvmberry::ConsTransitivityTgt::make(VAR(Rphi, Ghost), 
-                                                            VAR(ghost, Ghost), EXPR(In, Physical)));
-
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
               // value is constInt or constFloat
                 // infrule lessthanundef target undef > const
@@ -1180,18 +1099,8 @@ void PromoteMem2Reg::run() {
                 INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
                         llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
 
-                // transitivity at phi node X > undef > const
-                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
-                        llvmberry::ConsTransitivityTgt::make(VAR(ghost, Ghost),
-                                                             EXPR(UndefVal, Physical),
-                                                             EXPR(C, Physical)));
-
-                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
-                        llvmberry::ConsTransitivityTgt::make(VAR(Rphi, Ghost), 
-                                                             VAR(ghost, Ghost), EXPR(C, Physical)));
-              } else {
-                hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT");
-              }
+              } else 
+                  hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT");
             }
           }
 
@@ -1265,8 +1174,7 @@ void PromoteMem2Reg::run() {
         SomePHI->addIncoming(UndefVal, Preds[pred]);
 
         llvmberry::ValidationUnit::GetInstance()->intrude
-               ([&Preds, &pred]
-                        (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+               ([&Preds, &pred] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
                             llvmberry::false_encoding.second, SRC),
                     BOUNDS(llvmberry::TyPosition::make_start_of_block(
@@ -1277,9 +1185,8 @@ void PromoteMem2Reg::run() {
           BasicBlock *Pre = Preds[pred] ;
 
           // find predecssor of pred and insert in worklist if it has one
-          for (auto BI = pred_begin(Pre), BE = pred_end(Pre); BI != BE; BI++) {
+          for (auto BI = pred_begin(Pre), BE = pred_end(Pre); BI != BE; BI++) 
             DeadBlockList.push_back((*BI));
-          }
 
           while(!DeadBlockList.empty()) {
             BasicBlock * L;
@@ -1294,9 +1201,8 @@ void PromoteMem2Reg::run() {
                              llvmberry::TyPosition::make_end_of_block(SRC, *L)));
 
             // find predessor of K and insert in worklist if it has one
-            for (auto BI = pred_begin(L), BE = pred_end(L); BI != BE; BI++) {
+            for (auto BI = pred_begin(L), BE = pred_end(L); BI != BE; BI++)
               DeadBlockList.push_back((*BI));
-            }
           }
         }); 
       }
@@ -1449,8 +1355,7 @@ NextIteration:
         IncomingVals[AllocaNo] = APN;
 
         llvmberry::ValidationUnit::GetInstance()->intrude
-                ([&APN, &Pred, &AllocaNo, &IncomingVals]
-                   (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+                ([&APN, &Pred, &AllocaNo] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
 
@@ -1458,7 +1363,7 @@ NextIteration:
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
 
-          llvmberry::propagateFromAISIPhitoLoadPhi(AllocaNo, APN, /*not using? */APN, Pred);
+          llvmberry::propagateFromAISIPhiToLoadPhiSI(AllocaNo, APN, Pred);
           llvmberry::saveInstrInfo(APN, AllocaNo, Pred->getName());
         });
 
@@ -1493,21 +1398,17 @@ NextIteration:
       Value *V = IncomingVals[AI->second];
 
       llvmberry::ValidationUnit::GetInstance()->intrude
-             ([&LI, &V, &AI]
-                (llvmberry::Dictionary &data,
-                 llvmberry::CoreHint &hints) {               
+             ([&LI, &V, &AI] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {               
         auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
         auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
-        hints.addNopPosition
-          (llvmberry::TyPosition::make
-            (llvmberry::Target, *LI, instrIndices[LI]-1, ""));
+        hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *LI, instrIndices[LI]-1, ""));
 
         // propagate maydiff
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
 
-        llvmberry::propagateFromAISIPhitoLoadPhi(AI->second, LI, /*not using? */LI, nullptr);
+        llvmberry::propagateFromAISIPhiToLoadPhiSI(AI->second, LI, nullptr);
 
         llvmberry::propagateLoadInstToUse(LI, V, recentInstr[AI->second].op1);
 
@@ -1531,9 +1432,8 @@ NextIteration:
         continue;
 
       llvmberry::ValidationUnit::GetInstance()->intrude
-              ([&SI, &ai]
-                (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        llvmberry::propagateFromAISIPhitoLoadPhi(ai->second, SI, /*not using? */SI->getOperand(1), NULL);
+              ([&SI, &ai] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        llvmberry::propagateFromAISIPhiToLoadPhiSI(ai->second, SI, nullptr);
         llvmberry::saveInstrInfo(SI, ai->second, "");
       });
 
@@ -1544,14 +1444,10 @@ NextIteration:
         ConvertDebugDeclareToDebugValue(DDI, SI, DIB);
 
       llvmberry::ValidationUnit::GetInstance()->intrude
-             ([&SI]
-                (llvmberry::Dictionary &data,
-                 llvmberry::CoreHint &hints) {
+             ([&SI] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
 
-        hints.addNopPosition
-          (llvmberry::TyPosition::make
-            (llvmberry::Target, *SI, instrIndices[SI]-1, ""));
+        hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *SI, instrIndices[SI]-1, ""));
 
         if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0)))
           llvmberry::eraseInstrOfUseIndices(check, SI);
@@ -1580,9 +1476,7 @@ NextIteration:
       Worklist.emplace_back(*I, Pred, IncomingVals);
 
       llvmberry::ValidationUnit::GetInstance()->intrude
-              ([]
-               (llvmberry::Dictionary &data,
-                llvmberry::CoreHint &hints) {
+              ([] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
         auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
