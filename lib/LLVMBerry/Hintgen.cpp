@@ -1388,4 +1388,56 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) 
   });
 }
 
+void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value) {
+  ValidationUnit::GetInstance()->intrude([&From, &To, &value]
+                                                 (Dictionary &data, CoreHint &hints) {
+    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+    auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
+    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
+
+    llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(From);
+    llvm::AllocaInst *AI = llvm::dyn_cast<llvm::AllocaInst>(From);
+    std::string Rghost;
+    if (AI != NULL)
+      Rghost = getVariable(*AI);
+    else if (SI != NULL)
+      Rghost = getVariable(*(SI->getOperand(1)));
+
+    std::shared_ptr<TyPosition> from_position = TyPosition::make(SRC, *From, instrIndices[From], "");
+    std::shared_ptr<TyPosition> to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
+
+    // propagate instruction
+    PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(new ConsLoadInst(TyLoadInst::makeAlignOne(From)))),
+                      VAR(Rghost, Ghost), SRC),
+              BOUNDS(from_position, to_position));
+
+    std::shared_ptr<TyPropagateLessdef> lessdef =
+            TyPropagateLessdef::make(VAR(Rghost, Ghost), TyExpr::make(*value,Physical), TGT);
+
+    PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+              BOUNDS(from_position, to_position));
+
+    if (value->getName() != "")
+      mem2regCmd[getVariable(*value)].lessdef.push_back(lessdef);
+
+    if (SI != NULL) {
+      if (storeItem[SI].op0 == "%" ||
+          data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*value, Physical))) {
+        // stored value will not be changed in another iteration
+        std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(storeItem[SI].expr,
+                                                             REGISTER(Rghost, Ghost)));
+        INFRULE(from_position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
+
+        if (storeItem[SI].op0 != "%")
+          mem2regCmd[getVariable(*(SI->getOperand(0)))].ghost.push_back(ghost);
+
+      } else
+        INFRULE(from_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(Rghost, Ghost)));
+
+    } else if (AI != NULL)
+      INFRULE(from_position, ConsIntroGhost::make(EXPR(value, Physical), REGISTER(Rghost, Ghost)));
+  });
+}
+
+
 } // llvmberry

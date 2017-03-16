@@ -241,6 +241,8 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In);
 
+void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value);
+
 }
 
 #endif
