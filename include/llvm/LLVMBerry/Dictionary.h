@@ -111,7 +111,7 @@ DEFINE_TRAITS(ArgForFindAvailableLoadedValue, FindAvailableLoadedValueArg);
 
 struct IndicesArg {
 public:
-  typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndicesObj;
+  typedef std::map<const llvm::Instruction *, unsigned> TyInstrIndicesObj;
   typedef std::shared_ptr<TyInstrIndicesObj> TyInstrIndices;
   TyInstrIndices instrIndices;
 

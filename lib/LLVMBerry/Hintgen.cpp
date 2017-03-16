@@ -1080,13 +1080,11 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
 }
 
 std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
-  (llvm::Instruction* I) {
-  std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> destSet(
-          new std::vector<std::shared_ptr<TyPosition>>());
+                                        (llvm::Instruction* I, Dictionary &data) {
+    
+    std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>>
+                    destSet(new std::vector<std::shared_ptr<TyPosition>>());
   
-  ValidationUnit::GetInstance()->intrude
-    ([&I, &destSet]
-     (Dictionary &data, CoreHint &hints) {
     auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
 
@@ -1106,7 +1104,6 @@ std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
 
           if (I == v) {
               const std::string &prev = PHI->getIncomingBlock(i)->getName();
-
               destSet->push_back(TyPosition::make(SRC, *use, useIndex, prev));
           }
         }
@@ -1114,15 +1111,11 @@ std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
         destSet->push_back(TyPosition::make(SRC, *useBB, useIndex));
       }
     }
-  });
 
   return destSet;
 }
 
-void saveInstrIndices(llvm::Function* F) {
-  ValidationUnit::GetInstance()->intrude
-    ([&F]
-     (Dictionary &data, CoreHint &hints) {
+void saveInstrIndices(llvm::Function* F, Dictionary &data) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
 
@@ -1138,13 +1131,9 @@ void saveInstrIndices(llvm::Function* F) {
         instrIndices[I] = getCommandIndex(*I);
       }
     }
-  });
 }
 
-void saveUseIndices(llvm::Function* F, unsigned opCode) {
-  ValidationUnit::GetInstance()->intrude
-    ([&F, &opCode]
-     (Dictionary &data, CoreHint &hints) {
+void saveUseIndices(llvm::Function* F, unsigned opCode, Dictionary &data) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
 
@@ -1166,13 +1155,9 @@ void saveUseIndices(llvm::Function* F, unsigned opCode) {
         }
       }
     }
-  });
 }
 
-void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I) {
-  ValidationUnit::GetInstance()->intrude
-    ([&key, &I]
-     (Dictionary &data, CoreHint &hints) {
+void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictionary &data) {
     auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
 
     for (auto UI = useIndices[key].begin(), E = useIndices[key].end(); UI != E;) {
@@ -1188,13 +1173,9 @@ void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I) {
       }
       UI++;
     }
-  });
 }
 
-void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev) {
-  ValidationUnit::GetInstance()->intrude
-    ([&I, &key, &prev]
-     (Dictionary &data, CoreHint &hints) {
+void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev, Dictionary &data) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
     auto &insn = recentInstr[key];
@@ -1234,12 +1215,9 @@ void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev) 
       insn.instrBB = PHI->getParent();
       insn.check = false;
     }
-  });
 }
 
-void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev) {
-  ValidationUnit::GetInstance()->intrude([&To, &key, &prev](
-          Dictionary &data, CoreHint &hints) {
+void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
@@ -1312,30 +1290,24 @@ void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm:
     // if store Ai same rule else if phi different rule
     // if from is not phi apply infrule here
     if ((recentInstr[key].op0 != "llvmberry::PHI") && (!recentInstr[key].check)) {
-      applyInfruleforAISI(key);
+      applyInfruleforAISI(key, data, hints);
     }
 
     // if to is phi then apply infrule here
     if (Phi != NULL) {
-      applyInfruleforPhi(key, Phi, prev);
+      applyInfruleforPhi(key, Phi, prev, data, hints);
       recentInstr[key].check = false;
     }
-  });
 }
 
-void applyInfruleforAISI(unsigned key) {
-  ValidationUnit::GetInstance()->intrude([&key](
-          Dictionary &data, CoreHint &hints) {
+void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints) {
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
 
     INFRULE(recentInstr[key].instrPos,
             ConsIntroGhost::make(recentInstr[key].instrR, REGISTER(recentInstr[key].op1, Ghost)));
-  });
 }
 
-void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev) {
-  ValidationUnit::GetInstance()->intrude([&key, &phi, &prev](
-          Dictionary &data, CoreHint &hints) {
+void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints) {
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *phi, 0, prev->getName());
@@ -1348,16 +1320,13 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
     mem2regCmd[recentInstr[key].op1].ghost.push_back(ghost);
     mem2regCmd[Rphi].ghost.push_back(ghost);
-  });
 }
 
-void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) {
-  ValidationUnit::GetInstance()->intrude([&LI, &V, &In](
-          Dictionary &data, CoreHint &hints) {
+void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
 
-    std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> destSet = saveDestSet(LI);
+    std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> destSet = saveDestSet(LI, data);
     std::string Rload = llvmberry::getVariable(*LI);
 
     //propagate LI to use set
@@ -1382,12 +1351,9 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In) 
       std::string Rval = llvmberry::getVariable(*V);  
       mem2regCmd[Rval].lessdef.push_back(lessdef);
     }
-  });
 }
 
-void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value) {
-  ValidationUnit::GetInstance()->intrude([&From, &To, &value]
-                                                 (Dictionary &data, CoreHint &hints) {
+void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
@@ -1433,7 +1399,6 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
 
     } else if (AI != NULL)
       INFRULE(from_position, ConsIntroGhost::make(EXPR(value, Physical), REGISTER(Rghost, Ghost)));
-  });
 }
 
 

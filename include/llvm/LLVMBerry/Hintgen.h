@@ -223,25 +223,25 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
 
 std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
-  (llvm::Instruction* I);
+  (llvm::Instruction* I, Dictionary &data, CoreHint &hints);
 
-void saveInstrIndices(llvm::Function* F);
+void saveInstrIndices(llvm::Function* F, Dictionary &data);
 
-void saveUseIndices(llvm::Function* F, unsigned opCode);
+void saveUseIndices(llvm::Function* F, unsigned opCode, Dictionary &data);
 
-void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I);
+void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictionary &data);
 
-void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev);
+void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev, Dictionary &data);
 
-void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev);
+void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
 
-void applyInfruleforAISI(unsigned key);
+void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints);
 
-void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev);
+void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
 
-void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In);
+void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints);
 
-void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value);
+void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints);
 
 }
 

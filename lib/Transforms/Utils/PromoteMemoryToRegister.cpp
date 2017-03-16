@@ -485,7 +485,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         llvmberry::generateHintForMem2RegPropagateStore(NULL, OnlyStore, LI, instrIndices[LI]);
 
       if (ReplVal == LI)
-        llvmberry::propagateLoadInstToUse(LI, UndefVal, Rstore);
+        llvmberry::propagateLoadInstToUse(LI, UndefVal, Rstore, data, hints);
       else        
         // Step2: propagate load instruction
         //        <src>          |     <tgt>
@@ -493,7 +493,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // %b = load i32 1       | nop
         // %c = add i32 %a, %b   | %c = add i32 1, 1
         // ret i32 %c            | ret i32 %c
-        llvmberry::propagateLoadInstToUse(LI, ReplVal, Rstore);
+        llvmberry::propagateLoadInstToUse(LI, ReplVal, Rstore, data, hints);
 
       // propagate maydiff
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
@@ -551,7 +551,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *OnlyStore, instrIndices[OnlyStore]-1, ""));
 
     if (LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0)))
-      llvmberry::eraseInstrOfUseIndices(check, OnlyStore);
+      llvmberry::eraseInstrOfUseIndices(check, OnlyStore, data);
   });
 
   // Remove the (now dead) store and alloca.
@@ -645,7 +645,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                 llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical), REGISTER(Ralloca, Ghost)));
 
         // add hints per use of load
-        llvmberry::propagateLoadInstToUse(LI, UndefVal, Ralloca);
+        llvmberry::propagateLoadInstToUse(LI, UndefVal, Ralloca, data, hints);
 
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
@@ -685,7 +685,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
           (NULL, SI, LI, instrIndices[LI]);
 
         // add hints per use of load
-        llvmberry::propagateLoadInstToUse(LI, SI->getOperand(0), Rstore);
+        llvmberry::propagateLoadInstToUse(LI, SI->getOperand(0), Rstore, data, hints);
 
         // propagate maydiff
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
@@ -724,7 +724,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
       hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *SI, instrIndices[SI]-1, ""));
       
       if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0)))
-        llvmberry::eraseInstrOfUseIndices(check, SI);
+        llvmberry::eraseInstrOfUseIndices(check, SI, data);
     });
 
     SI->eraseFromParent();
@@ -775,8 +775,8 @@ void PromoteMem2Reg::run() {
           ([&F] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       data.create<llvmberry::ArgForMem2Reg>();
       data.create<llvmberry::ArgForIndices>();
-      llvmberry::saveInstrIndices(&F);
-      llvmberry::saveUseIndices(&F, Instruction::Load);
+      llvmberry::saveInstrIndices(&F, data);
+      llvmberry::saveUseIndices(&F, Instruction::Load, data);
   });
 
   llvmberry::ValidationUnit::GetInstance()->intrude
@@ -974,7 +974,7 @@ void PromoteMem2Reg::run() {
 
     llvmberry::ValidationUnit::GetInstance()->intrude
             ([&i, this] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-      llvmberry::saveInstrInfo(Allocas[i], i, "");
+      llvmberry::saveInstrInfo(Allocas[i], i, "", data);
     });
   }
 
@@ -1359,8 +1359,8 @@ NextIteration:
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
 
-          llvmberry::propagateFromAISIPhiToLoadPhiSI(AllocaNo, APN, Pred);
-          llvmberry::saveInstrInfo(APN, AllocaNo, Pred->getName());
+          llvmberry::propagateFromAISIPhiToLoadPhiSI(AllocaNo, APN, Pred, data, hints);
+          llvmberry::saveInstrInfo(APN, AllocaNo, Pred->getName(), data);
         });
 
         // Get the next phi node.
@@ -1404,9 +1404,9 @@ NextIteration:
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
 
-        llvmberry::propagateFromAISIPhiToLoadPhiSI(AI->second, LI, nullptr);
+        llvmberry::propagateFromAISIPhiToLoadPhiSI(AI->second, LI, nullptr, data, hints);
 
-        llvmberry::propagateLoadInstToUse(LI, V, recentInstr[AI->second].op1);
+        llvmberry::propagateLoadInstToUse(LI, V, recentInstr[AI->second].op1, data, hints);
 
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
       });
@@ -1429,8 +1429,8 @@ NextIteration:
 
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&SI, &ai] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        llvmberry::propagateFromAISIPhiToLoadPhiSI(ai->second, SI, nullptr);
-        llvmberry::saveInstrInfo(SI, ai->second, "");
+        llvmberry::propagateFromAISIPhiToLoadPhiSI(ai->second, SI, nullptr, data, hints);
+        llvmberry::saveInstrInfo(SI, ai->second, "", data);
       });
 
       // what value were we writing?
@@ -1446,7 +1446,7 @@ NextIteration:
         hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *SI, instrIndices[SI]-1, ""));
 
         if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0)))
-          llvmberry::eraseInstrOfUseIndices(check, SI);
+          llvmberry::eraseInstrOfUseIndices(check, SI, data);
       });
 
       BB->getInstList().erase(SI);
