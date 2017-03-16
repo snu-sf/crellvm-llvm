@@ -917,7 +917,6 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
   ValidationUnit::GetInstance()->intrude([&Pred, &SI, &next, &nextIndex](
       Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
 
@@ -1198,44 +1197,42 @@ void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev) 
      (Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
+    auto &insn = recentInstr[key];
 
     if (llvm::AllocaInst* AI = llvm::dyn_cast<llvm::AllocaInst>(I)) {
       llvm::Value* UndefVal = llvm::UndefValue::get(AI->getAllocatedType());
 
-      recentInstr[key].instrL = INSN(std::shared_ptr<TyInstruction>
+      insn.instrL = INSN(std::shared_ptr<TyInstruction>
                                       (new ConsLoadInst (TyLoadInst::makeAlignOne(AI))));
-      recentInstr[key].instrR = EXPR(UndefVal, Physical);
-      recentInstr[key].instrVal = nullptr;
-      recentInstr[key].instrPos = TyPosition::make(SRC, *AI, instrIndices[AI], ""); 
-      recentInstr[key].op0 = "";
-      recentInstr[key].op1 = getVariable(*AI);
-      recentInstr[key].instrBB = AI->getParent();
-      recentInstr[key].check = false;
+      insn.instrR = EXPR(UndefVal, Physical);
+      insn.instrVal = nullptr;
+      insn.instrPos = TyPosition::make(SRC, *AI, instrIndices[AI], ""); 
+      insn.op0 = "";
+      insn.op1 = getVariable(*AI);
+      insn.instrBB = AI->getParent();
+      insn.check = false;
     } else if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
-      recentInstr[key].instrL = INSN(std::shared_ptr<TyInstruction>
+      insn.instrL = INSN(std::shared_ptr<TyInstruction>
                                       (new ConsLoadInst(TyLoadInst::makeAlignOne(SI))));
-      recentInstr[key].instrR = TyExpr::make(*(SI->getOperand(0)), llvmberry::Physical);
-      recentInstr[key].instrVal = TyValue::make(*(SI->getOperand(0)));
-      recentInstr[key].instrPos = TyPosition::make(SRC, *SI, instrIndices[SI], "");
+      insn.instrR = TyExpr::make(*(SI->getOperand(0)), llvmberry::Physical);
+      insn.instrVal = TyValue::make(*(SI->getOperand(0)));
+      insn.instrPos = TyPosition::make(SRC, *SI, instrIndices[SI], "");
       if (llvm::isa<llvm::Constant>(*(SI->getOperand(0))))
-        recentInstr[key].op0 = "";
+        insn.op0 = "";
       else
-        recentInstr[key].op0 = getVariable(*(SI->getOperand(0)));
-      recentInstr[key].op1 = getVariable(*(SI->getOperand(1)));
-      recentInstr[key].instrBB = SI->getParent();
-      recentInstr[key].check = recentInstr[key].check;
+        insn.op0 = getVariable(*(SI->getOperand(0)));
+      insn.op1 = getVariable(*(SI->getOperand(1)));
+      insn.instrBB = SI->getParent();
     } else if (llvm::PHINode* PHI = llvm::dyn_cast<llvm::PHINode>(I)) {
-      recentInstr[key].instrL = recentInstr[key].instrL;
-      recentInstr[key].instrR = VAR(getVariable(*PHI), Physical);
-      recentInstr[key].instrVal = nullptr;
-      recentInstr[key].instrPos = TyPosition::make(SRC, *PHI, instrIndices[PHI], prev);
-      recentInstr[key].op0 = "llvmberry::PHI"; // when phi is from postion then 
-                                               // we cannot use position above
-                                               // because it should be make_start form
-      recentInstr[key].op1 = getVariable(*PHI);
-      recentInstr[key].instrBB = PHI->getParent();
-      recentInstr[key].check = false;
-
+      insn.instrR = VAR(getVariable(*PHI), Physical);
+      insn.instrVal = nullptr;
+      insn.instrPos = TyPosition::make(SRC, *PHI, instrIndices[PHI], prev);
+      insn.op0 = "llvmberry::PHI"; // when phi is from postion then 
+                                   // we cannot use position above
+                                   // because it should be make_start form
+      insn.op1 = getVariable(*PHI);
+      insn.instrBB = PHI->getParent();
+      insn.check = false;
     }
   });
 }

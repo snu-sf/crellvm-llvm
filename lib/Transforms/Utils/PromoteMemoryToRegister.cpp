@@ -458,7 +458,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         if (storeItem[OnlyStore].op0 == "%" ||
             data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(storeItem[OnlyStore].expr,
                                                                   EXPR(OnlyStore->getOperand(0), Physical))) {
-          // stored value will not be changed in another iteration
+          // stored value is constant or not changed in another iteration yet
           std::shared_ptr<llvmberry::TyIntroGhost> ghost
             (new llvmberry::TyIntroGhost(storeItem[OnlyStore].expr, REGISTER(Rstore, Ghost)));
 
@@ -468,7 +468,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
                   std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsIntroGhost(ghost)));
         } else {
-          // stored value will be changed in another iteration
+          // stored value is changed in another iteration
           INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
                   llvmberry::ConsIntroGhost::make(VAR(storeItem[OnlyStore].op0, Ghost), REGISTER(Rstore, Ghost)));
         }
@@ -989,7 +989,6 @@ void PromoteMem2Reg::run() {
     auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
     auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
-    instrWorkList.clear();
     instrWorkList.emplace_back(recentInstr);
   });
 
@@ -1002,7 +1001,6 @@ void PromoteMem2Reg::run() {
       auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
       auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
-      recentInstr.clear();
       recentInstr.swap(instrWorkList.back());
       instrWorkList.pop_back();
     });
