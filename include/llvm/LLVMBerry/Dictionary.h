@@ -135,43 +135,6 @@ DEFINE_TRAITS(ArgForIndices, IndicesArg);
 // lib/Transforms/Utils/PromoteMemoryToRegister.cpp : Mem2RegArg
 struct Mem2RegArg {
 public:
-  typedef std::vector<llvm::AllocaInst*> TyAllocasObj;
-  typedef std::shared_ptr<TyAllocasObj> TyAllocas;
-  TyAllocas allocas;
-
-  typedef std::map<std::string, std::vector<llvm::Instruction*>> TyDiffblocksObj;
-  typedef std::shared_ptr<TyDiffblocksObj> TyDiffblocks;
-  TyDiffblocks diffBlocks;
-
-  typedef std::map<const llvm::Instruction*, unsigned> TyInstrIndexObj;
-  typedef std::shared_ptr<TyInstrIndexObj> TyInstrIndex;
-  TyInstrIndex instrIndex;
-
-  typedef std::map<std::string, unsigned> TyTermIndexObj;
-  typedef std::shared_ptr<TyTermIndexObj> TyTermIndex;
-  TyTermIndex termIndex;
-
-  typedef std::tuple<llvm::BasicBlock*, int, llvm::Instruction*> UseTupleType;
-
-  typedef std::map<llvm::Instruction*,
-                   std::vector<UseTupleType>> TyUsePileObj;
-  typedef std::shared_ptr<TyUsePileObj> TyUsePile;
-  TyUsePile usePile;
-
-  typedef std::map<std::string,
-                   std::vector<std::pair<llvm::BasicBlock*,
-                                         llvm::BasicBlock*>>> TyReachedEdgeObj;
-  typedef std::shared_ptr<TyReachedEdgeObj> TyReachedEdge;
-  TyReachedEdge reachedEdge;  
-
-  enum Tr_Type { False = 0, True, LoadStart };
-
-  typedef std::vector<std::pair<std::pair<llvm::BasicBlock*,
-                                          llvm::BasicBlock*>,
-                                Tr_Type>> TyReachedEdgeTagObj;
-  typedef std::shared_ptr<TyReachedEdgeTagObj> TyReachedEdgeTag;
-  TyReachedEdgeTag reachedEdgeTag;
-
   struct StoreTriple {
     std::shared_ptr<TyValue> value;
     std::shared_ptr<TyExpr> expr;
@@ -184,34 +147,13 @@ public:
 
   struct Tuple {
     std::vector<std::shared_ptr<TyPropagateLessdef>> lessdef;
-    std::vector<std::pair<std::shared_ptr<TyPosition>,
-                         std::shared_ptr<TyTransitivity>>> transSrc;
-    std::vector<std::shared_ptr<TyTransitivityTgt>> transTgt;
     std::vector<std::shared_ptr<TyIntroGhost>> ghost;
     std::vector<std::shared_ptr<TyLessthanUndef>> lessUndef; 
-    std::vector<std::shared_ptr<TyLessthanUndefTgt>> lessUndefTgt;
   };
 
   typedef std::map<std::string, Tuple> TyMem2RegCmdObj;
   typedef std::shared_ptr<TyMem2RegCmdObj> TyMem2RegCmd;
   TyMem2RegCmd mem2regCmd;
-
-  typedef std::vector<std::shared_ptr<TyTransitivityTgt>> TyTransTgtObj;
-  typedef std::shared_ptr<TyTransTgtObj> TyTransTgt;
-  TyTransTgt transTgt;
-
-  typedef std::vector<std::string> TyStrVecObj;
-  typedef std::shared_ptr<TyStrVecObj> TyStrVec;
-  TyStrVec strVec;
-
-  typedef std::vector<std::pair<std::string, std::string>> TyBlockPairVecObj;
-  typedef std::shared_ptr<TyBlockPairVecObj> TyBlockPairVec;
-  TyBlockPairVec blockPairVec;
-
-  typedef std::map<llvm::BasicBlock*,
-                   std::vector<llvm::BasicBlock*>> TyReachableObj;
-  typedef std::shared_ptr<TyReachableObj> TyReachable;
-  TyReachable isReachable;
 
   struct RenamePassTuple {
     std::shared_ptr<TyExpr> instrL;
@@ -235,13 +177,9 @@ public:
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
   static bool isUndef(std::shared_ptr<TyExpr> e);
-
-  void replaceTransTgtPrev();
   void replaceCmdRhs(std::string which, std::string key,
                      std::shared_ptr<TyExpr> newExpr);
   void replaceLessthanUndef(std::string key,
-                            std::shared_ptr<TyValue> newVal);
-  void replaceLessthanUndefTgt(std::string key,
                             std::shared_ptr<TyValue> newVal);
   
   Mem2RegArg();

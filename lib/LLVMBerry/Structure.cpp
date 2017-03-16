@@ -42,6 +42,22 @@ std::string toString(llvmberry::CoreHint::RETURN_CODE return_code) {
   return "";
 }
 
+std::string toString(llvmberry::CoreHint::AUTO_OPT auto_opt) {
+  switch (auto_opt) {
+  case llvmberry::CoreHint::AUTO_GVN:
+    return std::string("AUTO_GVN");
+  case llvmberry::CoreHint::AUTO_SROA:
+    return std::string("AUTO_SROA");
+  case llvmberry::CoreHint::AUTO_INSTCOMBINE:
+    return std::string("AUTO_INSTCOMBINE");
+  case llvmberry::CoreHint::AUTO_DEFAULT:
+    return std::string("AUTO_DEFAULT");
+  default:
+    assert(false && "RETURN_CODE toString");
+  }
+  return "";
+}
+
 std::string toString(llvmberry::TyScope scope) {
   switch (scope) {
   case llvmberry::Source:
@@ -3026,12 +3042,12 @@ std::shared_ptr<TyCppDebugInfo> TyCppDebugInfo::make(const char *_file_name,
 
 // core hint
 
-CoreHint::CoreHint() : return_code(CoreHint::ACTUAL) {}
+CoreHint::CoreHint() : return_code(CoreHint::ACTUAL), auto_option(CoreHint::AUTO_DEFAULT) {}
 
 CoreHint::CoreHint(std::string _module_id, std::string _function_id,
                    std::string _opt_name, std::string _description)
     : module_id(_module_id), function_id(_function_id), opt_name(_opt_name),
-      description(_description), return_code(CoreHint::ACTUAL) {}
+      description(_description), return_code(CoreHint::ACTUAL), auto_option(CoreHint::AUTO_DEFAULT){}
 
 const std::string &CoreHint::getDescription() const {
   return this->description;
@@ -3081,12 +3097,17 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(opt_name));
   archive(CEREAL_NVP(description));
   archive(cereal::make_nvp("return_code", ::toString(return_code)));
+  archive(cereal::make_nvp("auto_option", ::toString(auto_option)));
   archive(CEREAL_NVP(commands));
   archive(CEREAL_NVP(nop_positions));
 }
 
 void CoreHint::setOptimizationName(const std::string &name) {
   this->opt_name = name;
+}
+
+void CoreHint::setAutoOption(CoreHint::AUTO_OPT opt) {
+  this->auto_option = opt;
 }
 
 void intrude(std::function<void()> func) {

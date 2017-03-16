@@ -795,7 +795,8 @@ void PromoteMem2Reg::run() {
         std::string Ralloca = llvmberry::getVariable(*AItmp);
         std::string AIBname = llvmberry::getBasicBlockIndex(AIB);
 
-        // TODO: if we can validate "call -> nop" we need this condition
+        // TODO: if we can validate "call -> nop", we need below condition
+        //if (!llvmberry::hasBitcastOrGEP(AI)) { 
         if (BB == AIB) {
           PROPAGATE(UNIQUE(Ralloca, SRC),
                     BOUNDS(llvmberry::TyPosition::make(SRC, *AItmp, instrIndices[AItmp], ""),
@@ -813,6 +814,7 @@ void PromoteMem2Reg::run() {
                     BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, blockName),
                            llvmberry::TyPosition::make_end_of_block(SRC, *BB, termIndices[blockName])));
         }
+        //}
       }
     }
 
@@ -1022,8 +1024,6 @@ void PromoteMem2Reg::run() {
       auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
       std::string Ralloca = llvmberry::getVariable(*A);
 
-      data.get<llvmberry::ArgForMem2Reg>()->replaceTransTgtPrev();
-
       // propagate maydiff
       llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
       llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
@@ -1091,14 +1091,12 @@ void PromoteMem2Reg::run() {
                           BOUNDS(llvmberry::TyPosition::make(TGT, *In),
                                  llvmberry::TyPosition::make_end_of_block
                                   (SRC, *Income, termIndices[llvmberry::getBasicBlockIndex(Income)])));
-
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
               // value is constInt or constFloat
                 // infrule lessthanundef target undef > const
                 Constant *C = dyn_cast<Constant>(V);
                 INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
                         llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
-
               } else 
                   hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT");
             }
