@@ -207,50 +207,42 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
     false_encoding;
 
-void makeReachableBlockMap(llvm::BasicBlock* Src,
-                           llvm::BasicBlock* Tgt);
-
 void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
                                           llvm::StoreInst* SI,
                                           llvm::Instruction* next,
                                           int nextIndex);
 
-void generateHintForMem2RegPropagateLoad(llvm::Instruction* I,
-                                         llvm::LoadInst* LI,
-                                         llvm::BasicBlock* useBB,
-                                         int useIndex,
-                                         llvm::Instruction *use);
-
 void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal,
                                        llvm::Instruction* I);
-
-void generateHintForMem2RegPHI(llvm::BasicBlock* BB, llvm::BasicBlock* Pred,
-                               llvm::AllocaInst* AI, llvm::StoreInst* SI,
-                               llvm::BasicBlock::iterator II,
-                               llvm::DenseMap<llvm::PHINode*, unsigned> PAM,
-                               llvm::DenseMap<llvm::AllocaInst*, unsigned> AL,
-                               bool isSameBB);
-
-void generateHintForMem2RegPHIdelete(llvm::BasicBlock* BB, 
-                                     std::vector<std::pair<llvm::BasicBlock*,
-                                                           llvm::BasicBlock*>> VisitedBlock, 
-                                     llvm::AllocaInst* AI, bool ignore);
-
-llvm::Instruction* properPHI(llvm::BasicBlock* BB, std::string Target,
-                             llvm::Instruction* I, bool isInit,
-                             bool checkSI, Dictionary data,
-                             bool isLoop = false);
 
 int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
 
 bool hasBitcastOrGEP(llvm::AllocaInst* AI);
 
-int getIndexofMem2Reg(llvm::Instruction *instr, int instrIndex, int termIndex);
-
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
 
-void generateHintForMem2RegPhiUndef(llvm::PHINode *APN, llvm::BasicBlock *Pred);
+std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
+  (llvm::Instruction* I, Dictionary &data, CoreHint &hints);
+
+void saveInstrIndices(llvm::Function* F, Dictionary &data);
+
+void saveUseIndices(llvm::Function* F, unsigned opCode, Dictionary &data);
+
+void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictionary &data);
+
+void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev, Dictionary &data);
+
+void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
+
+void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints);
+
+void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
+
+void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints);
+
+void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints);
+
 }
 
 #endif
