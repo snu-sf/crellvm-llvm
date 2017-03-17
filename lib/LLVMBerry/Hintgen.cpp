@@ -948,7 +948,7 @@ void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
 
     if (storeItem[SI].op0 == "%" ||
         data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, 
-                                                   TyExpr::make(*(SI->getOperand(0)),
+                                                  TyExpr::make(*(SI->getOperand(0)),
                                                                 Physical))) {
       // stored value will not be changed in another iteration
       std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(storeItem[SI].expr,

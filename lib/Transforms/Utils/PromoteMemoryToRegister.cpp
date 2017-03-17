@@ -989,7 +989,7 @@ void PromoteMem2Reg::run() {
     auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
     auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
-    instrWorkList.emplace_back(recentInstr);
+    instrWorkList.push_back(recentInstr);
   });
 
   do {
@@ -1476,7 +1476,7 @@ NextIteration:
         auto &instrWorkList = *(data.get<llvmberry::ArgForMem2Reg>()->instrWorkList);
         auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
 
-        instrWorkList.emplace_back(recentInstr);
+        instrWorkList.push_back(recentInstr);
       });
     }
 
