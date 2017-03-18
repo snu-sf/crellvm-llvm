@@ -418,32 +418,10 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       // do this if stored object(OnlyStore->getOperand(0)) is
       // not an instruction
       if (StoringGlobalVal) {
-        // propagate stored value from alloca to load
-        PROPAGATE(
-            LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                      new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                    VAR(Ralloca, Ghost), SRC),
-        BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-               llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
-
-        std::shared_ptr<llvmberry::TyPropagateLessdef> lessdefstore =
-          llvmberry::TyPropagateLessdef::make
-            (VAR(Ralloca, Ghost), EXPR(UndefVal, Physical), TGT); 
-             // this undef may be replaced to constant
-             // unless there exists LI before SI
-             
-        mem2regCmd[Ralloca].lessdef.push_back(lessdefstore);
-
-        PROPAGATE(
-            std::shared_ptr<llvmberry::TyPropagateObject>
-              (new llvmberry::ConsLessdef(lessdefstore)),
-            BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                   llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
-
-        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                llvmberry::ConsIntroGhost::make(EXPR(OnlyStore->getOperand(0), Physical),
-                                                REGISTER(Rstore, Ghost)));
-
+        // propagate stored value from alloca to load 
+        llvmberry::propagateLoadGhostValueForm(AI, LI, ReplVal, data, hints);
+        
+        //can be remove after argument is in the function entry invariant
         std::shared_ptr<llvmberry::TyLessthanUndef> lessthanundef
           (new llvmberry::TyLessthanUndef
             (llvmberry::TyValueType::make(*LI->getType()),
@@ -454,7 +432,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                 std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsLessthanUndef(lessthanundef)));
-       
+        //below code is for SI which between AI and LI 
         if (storeItem[OnlyStore].op0 == "%" ||
             data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(storeItem[OnlyStore].expr,
                                                                   EXPR(OnlyStore->getOperand(0), Physical))) {
@@ -472,8 +450,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
                   llvmberry::ConsIntroGhost::make(VAR(storeItem[OnlyStore].op0, Ghost), REGISTER(Rstore, Ghost)));
         }
-      } else if ((LI->getParent() == StoreBB && unsigned(StoreIndex) < LBI.getInstructionIndex(LI)) ||
-                 (LI->getParent() != StoreBB && DT.dominates(StoreBB, LI->getParent())))
+      } else
+        llvmberry::propagateLoadGhostValueForm(OnlyStore, LI, ReplVal, data, hints);
         // Step1: propagate store instruction
         //        <src>                               |     <tgt>
         // %x = alloca i32                            | nop
@@ -482,7 +460,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // %b = load i32 %x      | %b = load i32 1
         // %c = add i32 %a, %b   | %c = add i32 %a, %b
         // ret i32 %c            | ret i32 %c
-        llvmberry::generateHintForMem2RegPropagateStore(NULL, OnlyStore, LI, instrIndices[LI]);
 
       if (ReplVal == LI)
         llvmberry::propagateLoadInstToUse(LI, UndefVal, Rstore, data, hints);
@@ -626,24 +603,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         std::string Rload = llvmberry::getVariable(*LI);
 
         // propagate undef from alloca to load
-        std::shared_ptr<llvmberry::TyPropagateObject> lessdef_src =
-          LESSDEF(INSN(std::shared_ptr<llvmberry::TyInstruction>(
-                    new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-                  VAR(Ralloca, Ghost), SRC);
-
-        std::shared_ptr<llvmberry::TyPropagateObject> lessdef_tgt =
-          LESSDEF(VAR(Ralloca, Ghost), EXPR(UndefVal, Physical), TGT);
-
-        PROPAGATE(lessdef_src,
-                  BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                         llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
-        PROPAGATE(lessdef_tgt,
-                  BOUNDS(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                         llvmberry::TyPosition::make(SRC, *LI, instrIndices[LI], "")));
-
-        INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-                llvmberry::ConsIntroGhost::make(EXPR(UndefVal, Physical), REGISTER(Ralloca, Ghost)));
-
+        llvmberry::propagateLoadGhostValueForm(AI, LI, UndefVal, data, hints);
+        
         // add hints per use of load
         llvmberry::propagateLoadInstToUse(LI, UndefVal, Ralloca, data, hints);
 
@@ -665,6 +626,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
          ([&AI, &LI, &I] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         // prepare variables
         StoreInst* SI = std::prev(I)->second;
+        Value* value = SI->getOperand(0);
         auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
         std::string Rstore = llvmberry::getVariable(*(SI->getOperand(1)));
         std::string Rload = llvmberry::getVariable(*LI);
@@ -681,11 +643,9 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         // store i32 3, %x        | nop
         // %c = load i32 %x       | %c = load i32 3
         // ret i32 %c             | ret i32 %c
-        llvmberry::generateHintForMem2RegPropagateStore
-          (NULL, SI, LI, instrIndices[LI]);
-
+        llvmberry::propagateLoadGhostValueForm(SI, LI, value, data, hints);
         // add hints per use of load
-        llvmberry::propagateLoadInstToUse(LI, SI->getOperand(0), Rstore, data, hints);
+        llvmberry::propagateLoadInstToUse(LI, value, Rstore, data, hints);
 
         // propagate maydiff
         llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
@@ -693,8 +653,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
         hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *LI, instrIndices[LI]-1, ""));
 
-        Value* ReplVal = std::prev(I)->second->getOperand(0);
-        llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI);
+        llvmberry::generateHintForMem2RegReplaceHint(value, LI);
       });
 
       // Otherwise, there was a store before this load, the load takes its value.
