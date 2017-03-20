@@ -158,7 +158,6 @@ public:
   struct RenamePassTuple {
     std::shared_ptr<TyExpr> instrL;
     std::shared_ptr<TyExpr> instrR;
-    std::shared_ptr<TyValue> instrVal;
     std::shared_ptr<TyPosition> instrPos;
     std::string op0;
     std::string op1;

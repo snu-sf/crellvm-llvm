@@ -1175,48 +1175,6 @@ void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictio
     }
 }
 
-void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev, Dictionary &data) {
-    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
-    auto &insn = recentInstr[key];
-
-    if (llvm::AllocaInst* AI = llvm::dyn_cast<llvm::AllocaInst>(I)) {
-      llvm::Value* UndefVal = llvm::UndefValue::get(AI->getAllocatedType());
-
-      insn.instrL = INSN(std::shared_ptr<TyInstruction>
-                                      (new ConsLoadInst (TyLoadInst::makeAlignOne(AI))));
-      insn.instrR = EXPR(UndefVal, Physical);
-      insn.instrVal = nullptr;
-      insn.instrPos = TyPosition::make(SRC, *AI, instrIndices[AI], ""); 
-      insn.op0 = "";
-      insn.op1 = getVariable(*AI);
-      insn.instrBB = AI->getParent();
-      insn.check = false;
-    } else if (llvm::StoreInst* SI = llvm::dyn_cast<llvm::StoreInst>(I)) {
-      insn.instrL = INSN(std::shared_ptr<TyInstruction>
-                                      (new ConsLoadInst(TyLoadInst::makeAlignOne(SI))));
-      insn.instrR = TyExpr::make(*(SI->getOperand(0)), llvmberry::Physical);
-      insn.instrVal = TyValue::make(*(SI->getOperand(0)));
-      insn.instrPos = TyPosition::make(SRC, *SI, instrIndices[SI], "");
-      if (llvm::isa<llvm::Constant>(*(SI->getOperand(0))))
-        insn.op0 = "";
-      else
-        insn.op0 = getVariable(*(SI->getOperand(0)));
-      insn.op1 = getVariable(*(SI->getOperand(1)));
-      insn.instrBB = SI->getParent();
-    } else if (llvm::PHINode* PHI = llvm::dyn_cast<llvm::PHINode>(I)) {
-      insn.instrR = VAR(getVariable(*PHI), Physical);
-      insn.instrVal = nullptr;
-      insn.instrPos = TyPosition::make(SRC, *PHI, instrIndices[PHI], prev);
-      insn.op0 = "llvmberry::PHI"; // when phi is from postion then 
-                                   // we cannot use position above
-                                   // because it should be make_start form
-      insn.op1 = getVariable(*PHI);
-      insn.instrBB = PHI->getParent();
-      insn.check = false;
-    }
-}
-
 void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &termIndices = *(data.get<ArgForIndices>()->termIndices);

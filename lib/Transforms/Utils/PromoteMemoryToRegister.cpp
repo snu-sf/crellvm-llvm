@@ -974,7 +974,18 @@ void PromoteMem2Reg::run() {
 
     llvmberry::ValidationUnit::GetInstance()->intrude
             ([&i, this] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-      llvmberry::saveInstrInfo(Allocas[i], i, "", data);
+      auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
+      auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
+      AllocaInst* AI = Allocas[i];
+      Value* UndefVal = llvm::UndefValue::get(AI->getAllocatedType());
+
+      recentInstr[i] = 
+        { INSN(std::shared_ptr<llvmberry::TyInstruction>
+           (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+          EXPR(UndefVal, Physical),
+          llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+          "", llvmberry::getVariable(*AI),
+          AI->getParent(), false };
     });
   }
 
@@ -1352,6 +1363,8 @@ NextIteration:
 
         llvmberry::ValidationUnit::GetInstance()->intrude
                 ([&APN, &Pred, &AllocaNo] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
+          auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
 
@@ -1360,7 +1373,13 @@ NextIteration:
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
 
           llvmberry::propagateFromAISIPhiToLoadPhiSI(AllocaNo, APN, Pred, data, hints);
-          llvmberry::saveInstrInfo(APN, AllocaNo, Pred->getName(), data);
+
+          recentInstr[AllocaNo] = 
+            { recentInstr[AllocaNo].instrL,
+              VAR(Rphi, Physical),
+              llvmberry::TyPosition::make(SRC, *APN, instrIndices[APN], prev),
+              "llvmberry::PHI", Rphi,
+              APN->getParent(), false };
         });
 
         // Get the next phi node.
@@ -1429,8 +1448,22 @@ NextIteration:
 
       llvmberry::ValidationUnit::GetInstance()->intrude
               ([&SI, &ai] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        auto &instrIndices = *(data.get<llvmberry::ArgForIndices>()->instrIndices);
+        auto &recentInstr = *(data.get<llvmberry::ArgForMem2Reg>()->recentInstr);
+
         llvmberry::propagateFromAISIPhiToLoadPhiSI(ai->second, SI, nullptr, data, hints);
-        llvmberry::saveInstrInfo(SI, ai->second, "", data);
+
+        std::string op0 = "";
+        if (!isa<Constant>(*(SI->getOperand(0))))
+          op0 = llvmberry::getVariable(*(SI->getOperand(0)));
+
+        recentInstr[ai->second] = 
+          { INSN(std::shared_ptr<llvmberry::TyInstruction>
+             (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(SI)))),
+            EXPR(SI->getOperand(0), Physical),
+            llvmberry::TyPosition::make(SRC, *SI, instrIndices[SI], ""),
+            op0, llvmberry::getVariable(*(SI->getOperand(1))),
+            SI->getParent(), recentInstr[ai->second].check };
       });
 
       // what value were we writing?

@@ -231,8 +231,6 @@ void saveUseIndices(llvm::Function* F, unsigned opCode, Dictionary &data);
 
 void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictionary &data);
 
-void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev, Dictionary &data);
-
 void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
 
 void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints);
