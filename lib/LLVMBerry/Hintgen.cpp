@@ -1284,8 +1284,8 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
 
     std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(recentInstr[key].op1, Ghost), REGISTER(Rphi, Ghost)));
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-    mem2regCmd[recentInstr[key].op1].ghost.push_back(ghost);
-    mem2regCmd[Rphi].ghost.push_back(ghost);
+    //    mem2regCmd[recentInstr[key].op1].ghost.push_back(ghost);
+    //    mem2regCmd[Rphi].ghost.push_back(ghost);
 }
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints) {
@@ -1317,7 +1317,7 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, 
     //infrule at LI index
     std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(In, Ghost), REGISTER(Rload, Ghost)));
     INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-    mem2regCmd[In].ghost.push_back(ghost);
+    //    mem2regCmd[In].ghost.push_back(ghost);
 
     if (!llvm::isa<llvm::Constant>(V)) {   
       replaceItem.push_back(std::shared_ptr<TyExpr>(val));
@@ -1331,6 +1331,8 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
+    auto &replaceTag = *(data.get<ArgForMem2Reg>()->replaceTag);
+
 
     llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(From);
     llvm::AllocaInst *AI = llvm::dyn_cast<llvm::AllocaInst>(From);
@@ -1366,13 +1368,19 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
       if (storeItem[SI].op0 == "%" ||
           data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*value, Physical))) {
         // stored value will not be changed in another iteration
-        std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(storeItem[SI].expr,
+        
+        std::shared_ptr<TyExpr> val = TyExpr::make(*(SI->getOperand(0)), Physical); //storeItem[SI].expr;
+        
+        std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(val, //storeItem[SI].expr,
                                                              REGISTER(Rghost, Ghost)));
         INFRULE(from_position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
 
-        if (storeItem[SI].op0 != "%")
-          mem2regCmd[getVariable(*(SI->getOperand(0)))].ghost.push_back(ghost);
-
+        if (storeItem[SI].op0 != "%") {
+          std::cout << "pushed in 2 " << storeItem[SI].op0 << std::endl;
+          
+          replaceTag.push_back(std::shared_ptr<TyExpr>(val));
+         //mem2regCmd[getVariable(*(SI->getOperand(0)))].ghost.push_back(ghost);
+        }
       } else
         INFRULE(from_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(Rghost, Ghost)));
 
@@ -1402,7 +1410,33 @@ void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
      tmp->replace_expr(replGhost); 
     }
   }
+}
+
+void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data) {
+  auto &replaceTag = *(data.get<ArgForMem2Reg>()->replaceTag);
+
+  std::string str = "";
+
+  if (llvm::isa<llvm::AllocaInst>(Tgt) || llvm::isa<llvm::LoadInst>(Tgt) || llvm::isa<llvm::PHINode>(Tgt))
+    str = getVariable(*Tgt);
+
+  std::cout << "inthe replace tag " << str << std::endl;
+
+  std::shared_ptr<TyExpr> tgtPhysical = ConsVar::make(str, Physical);
+
+  std::shared_ptr<TyExpr> replTag = ConsVar::make(str, tag);
+
+  for (unsigned i = 0; i < replaceTag.size(); i++) {
+    std::cout << "start!" << std::endl;
+    std::shared_ptr<TyExpr> tmp = replaceTag.at(i);
+    if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtPhysical)) {
+      tmp->replace_expr(replTag);
+      std::cout << " changed " << std::endl;
+    }
+  }
 
 }
+
+
 
 } // llvmberry

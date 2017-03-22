@@ -177,6 +177,10 @@ public:
   typedef std::shared_ptr<TyReplaceObj> TyReplace;
   TyReplace replaceItem;
 
+  typedef std::vector<std::shared_ptr<TyExpr>> TyReplaceTObj;
+  typedef std::shared_ptr<TyReplaceTObj> TyReplaceT;
+  TyReplaceT replaceTag;
+
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
   static bool isUndef(std::shared_ptr<TyExpr> e);

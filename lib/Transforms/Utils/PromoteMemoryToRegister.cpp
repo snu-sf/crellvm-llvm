@@ -415,6 +415,10 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       std::string Rload = llvmberry::getVariable(*LI);
       Value* UndefVal = UndefValue::get(LI->getType());
       
+      auto &replaceTag = *(data.get<llvmberry::ArgForMem2Reg>()->replaceTag);
+
+
+
       // do this if stored object(OnlyStore->getOperand(0)) is
       // not an instruction
       if (StoringGlobalVal) {
@@ -437,12 +441,17 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
             data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(storeItem[OnlyStore].expr,
                                                                   EXPR(OnlyStore->getOperand(0), Physical))) {
           // stored value is constant or not changed in another iteration yet
+          //insert
+          std::shared_ptr<llvmberry::TyExpr> val = llvmberry::TyExpr::make(*(OnlyStore->getOperand(0)), llvmberry::Physical);
+          
           std::shared_ptr<llvmberry::TyIntroGhost> ghost
-            (new llvmberry::TyIntroGhost(storeItem[OnlyStore].expr, REGISTER(Rstore, Ghost)));
+            (new llvmberry::TyIntroGhost(val, REGISTER(Rstore, Ghost)));
 
-          if (storeItem[OnlyStore].op0 != "%")
-            mem2regCmd[llvmberry::getVariable(*OnlyStore->getOperand(0))].ghost.push_back(ghost);
-
+          if (storeItem[OnlyStore].op0 != "%") {
+            std::cout << "pushed in 1 " << storeItem[OnlyStore].op0 << std::endl;
+            replaceTag.push_back(std::shared_ptr<llvmberry::TyExpr>(val));
+            //mem2regCmd[llvmberry::getVariable(*OnlyStore->getOperand(0))].ghost.push_back(ghost);
+          }
           INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
                   std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsIntroGhost(ghost)));
         } else {
@@ -491,9 +500,10 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, AI);
         //insert
         llvmberry::replaceExpr(AI, ReplVal, data);
+        llvmberry::replaceTag(AI, llvmberry::Ghost, data);
         //insert
         llvmberry::replaceExpr(LI, ReplVal, data);
-
+        llvmberry::replaceTag(LI, llvmberry::Ghost, data);
 
 
     });
@@ -623,7 +633,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
         //insert
         llvmberry::replaceExpr(LI, UndefVal, data);
-
+        llvmberry::replaceTag(LI, llvmberry::Ghost, data);
+          
         if (!StoresByIndex.empty()) 
           hints.appendToDescription("MEM2REG SINGLE BLOCK ALLOCA BUG FOUND BY US");
       });
@@ -666,7 +677,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         llvmberry::generateHintForMem2RegReplaceHint(value, LI);
         //insert
         llvmberry::replaceExpr(LI, value, data);
-
+        llvmberry::replaceTag(LI, llvmberry::Ghost, data);
 
       });
 
@@ -1087,7 +1098,7 @@ void PromoteMem2Reg::run() {
           llvmberry::generateHintForMem2RegReplaceHint(V, PN);
         //insert
         llvmberry::replaceExpr(PN, V, data);
-
+        llvmberry::replaceTag(PN, llvmberry::Ghost, data);
         });
 
         PN->replaceAllUsesWith(V);
@@ -1406,7 +1417,7 @@ NextIteration:
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
         //insert
         llvmberry::replaceExpr(LI, V, data);
-
+        llvmberry::replaceTag(LI, llvmberry::Ghost, data);
 
       });
 
