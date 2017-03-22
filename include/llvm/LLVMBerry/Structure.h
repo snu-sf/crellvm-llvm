@@ -1222,16 +1222,35 @@ private :
 
 // propagate expression
 
+struct TyExpr_i;
+ 
 struct TyExpr {
 public:
-  virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+  void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyExpr> make(const std::shared_ptr<TyValue> tyval);
   static std::shared_ptr<TyExpr> make(const llvm::Value &value,
                                       enum TyTag _tag = llvmberry::Physical);
+
+  TyExpr(std::shared_ptr<TyExpr_i> ei);
+
+  void replace_expr(std::shared_ptr<TyExpr> expr);
+  std::shared_ptr<TyExpr_i> get_i();
+
+private:
+  std::shared_ptr<TyExpr_i> expr_i;
 };
 
-struct ConsVar : public TyExpr {
+struct TyExpr_i {
+public:
+  virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
+
+  static std::shared_ptr<TyExpr_i> make(const std::shared_ptr<TyValue> tyval);
+  static std::shared_ptr<TyExpr_i> make(const llvm::Value &value,
+                                      enum TyTag _tag = llvmberry::Physical);
+};
+
+struct ConsVar : public TyExpr_i {
 public:
   ConsVar(std::shared_ptr<TyRegister> _register_name);
   ConsVar(std::string _name, enum TyTag _tag);
@@ -1246,7 +1265,7 @@ private:
   std::shared_ptr<TyRegister> register_name;
 };
 
-struct ConsRhs : public TyExpr {
+struct ConsRhs : public TyExpr_i {
 public:
   ConsRhs(std::shared_ptr<TyRegister> _register_name, enum TyScope _scope);
   ConsRhs(std::string _name, enum TyTag _tag, enum TyScope _scope);
@@ -1260,7 +1279,7 @@ private:
   enum TyScope scope;
 };
 
-struct ConsConst : public TyExpr {
+struct ConsConst : public TyExpr_i {
 public:
   ConsConst(std::shared_ptr<TyConstant> _constant);
 
@@ -1277,7 +1296,7 @@ private:
   std::shared_ptr<TyConstant> constant;
 };
 
-struct ConsInsn : public TyExpr {
+struct ConsInsn : public TyExpr_i {
 public:
   ConsInsn(std::shared_ptr<TyInstruction> _instruction);
   void serialize(cereal::JSONOutputArchive &archive) const;
