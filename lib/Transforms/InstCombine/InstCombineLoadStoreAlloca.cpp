@@ -1378,8 +1378,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             // make expr (ptrtoint null).
             auto ptrtoint_inst = std::shared_ptr<llvmberry::TyInstruction>(
                 llvmberry::ConsPtrToIntInst::make(CAVTy, VAL(CAV, Physical), CNewValTy));
-            casted_form_inst = std::shared_ptr<llvmberry::TyExpr>(
-                new llvmberry::ConsInsn(ptrtoint_inst));
+            casted_form_inst = llvmberry::ConsInsn::make(ptrtoint_inst);
             casted_form_val = EXPR(CNewVal, Physical);
             // Add ptrtoint nullptr >=tgt 0.
             INFRULE(LIpos, llvmberry::ConsPtrtointZero::make(CAVTy, CNewValTy));
@@ -1400,8 +1399,10 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             // make expr `bitcast CAV`
             auto bitcast_inst = std::shared_ptr<llvmberry::TyInstruction>(
                 llvmberry::ConsBitCastInst::make(CAVTy, VAL(CAV, Physical), CNewValTy));
-            casted_form_inst = std::shared_ptr<llvmberry::TyExpr>(
-                new llvmberry::ConsInsn(bitcast_inst));
+            casted_form_inst = llvmberry::ConsInsn::make(bitcast_inst);
+            // why not using make??
+              // std::shared_ptr<llvmberry::TyExpr>(
+              //   new llvmberry::ConsInsn(bitcast_inst));
             casted_form_val = EXPR(CNewVal, Physical);
             // Add `bitcast CAV >= CNewVal`.
             INFRULE(LIpos, llvmberry::ConsBitcastDoubleI64::make(
