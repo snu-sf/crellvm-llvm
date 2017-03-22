@@ -183,9 +183,6 @@ public:
 
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
-  static bool isUndef(std::shared_ptr<TyExpr> e);
-  void replaceCmdRhs(std::string which, std::string key,
-                     std::shared_ptr<TyExpr> newExpr);
   void replaceLessthanUndef(std::string key,
                             std::shared_ptr<TyValue> newVal);
   

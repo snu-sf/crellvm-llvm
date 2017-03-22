@@ -208,14 +208,6 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
     false_encoding;
 
-void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
-                                          llvm::StoreInst* SI,
-                                          llvm::Instruction* next,
-                                          int nextIndex);
-
-void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal,
-                                       llvm::Instruction* I);
-
 int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
 
 bool hasBitcastOrGEP(llvm::AllocaInst* AI);
@@ -245,6 +237,8 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
 void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data);
 
 void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data);
+
+void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal, llvm::Instruction* I, Dictionary &data);
 
 }
 

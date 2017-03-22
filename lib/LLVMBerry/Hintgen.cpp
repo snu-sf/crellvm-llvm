@@ -910,93 +910,6 @@ void generateHintForGVNDCE(llvm::Instruction &I) {
   });
 }
 
-void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
-                                          llvm::StoreInst* SI,
-                                          llvm::Instruction* next,
-                                          int nextIndex) {
-  ValidationUnit::GetInstance()->intrude([&Pred, &SI, &next, &nextIndex](
-      Dictionary &data, CoreHint &hints) {
-    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
-    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-
-    std::string Rstore = getVariable(*(SI->getOperand(1)));
-    std::string bname = getBasicBlockIndex(SI->getParent());
-    std::string predName = getBasicBlockIndex(Pred);
-    std::shared_ptr<TyPosition> positionSI =
-      TyPosition::make(SRC, *SI, instrIndices[SI], "");
-
-    // propagate instruction
-      PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(
-                          new ConsLoadInst(TyLoadInst::makeAlignOne(SI)))),
-                        VAR(Rstore, Ghost), SRC),
-                BOUNDS(positionSI,
-                       TyPosition::make(SRC, *next, nextIndex, "")));
-
-      std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make
-                                                      (VAR(Rstore, Ghost),
-                                                       TyExpr::make(*(SI->getOperand(0)),
-                                                                    Physical),
-                                                       TGT);
-
-      if (SI->getOperand(0)->getName()!="")
-        mem2regCmd[getVariable(*(SI->getOperand(0)))].lessdef.push_back(lessdef);
-    
-      PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                BOUNDS(positionSI,
-                       TyPosition::make(SRC, *next, nextIndex, "")));
-
-    if (storeItem[SI].op0 == "%" ||
-        data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, 
-                                                  TyExpr::make(*(SI->getOperand(0)),
-                                                                Physical))) {
-      // stored value will not be changed in another iteration
-      std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(storeItem[SI].expr,
-                                                           REGISTER(Rstore, Ghost)));
-
-      if (storeItem[SI].op0 != "%")
-        mem2regCmd[getVariable(*(SI->getOperand(0)))].ghost.push_back(ghost);
-
-      INFRULE(
-          positionSI,
-          std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-    } else {
-      // stored value will be changed in another iteration
-      INFRULE(positionSI,
-              ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost),
-                                   REGISTER(Rstore, Ghost)));
-    }
-  });
-}
-
-void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
-                                       llvm::Instruction *ReplInst) {
-  ValidationUnit::GetInstance()->intrude
-    ([&ReplVal, &ReplInst]
-      (Dictionary &data, CoreHint &hints) {
-    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-    std::string ReplName = "";
-
-    if (llvm::isa<llvm::AllocaInst>(ReplInst) ||
-        llvm::isa<llvm::LoadInst>(ReplInst) ||
-        llvm::isa<llvm::PHINode>(ReplInst))
-      ReplName = getVariable(*ReplInst);
-    
-    if ((ReplName == "") ||
-        (mem2regCmd.find(ReplName) == mem2regCmd.end()))
-      return;
-
-    data.get<ArgForMem2Reg>()->replaceCmdRhs("Lessdef", ReplName,
-                                    TyExpr::make(*ReplVal, Physical));
-
-    data.get<ArgForMem2Reg>()->replaceCmdRhs("IntroGhost", ReplName,
-                                    VAR(ReplName, Ghost));
-
-    data.get<ArgForMem2Reg>()->replaceLessthanUndef(ReplName,
-                                                    TyValue::make(*ReplVal));
-  });
-}
-
 int getIndexofMem2Reg(llvm::Instruction* I,
                       int instrIndex, int termIndex) {
   if (I == nullptr)
@@ -1080,190 +993,173 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
 }
 
 std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
-                                        (llvm::Instruction* I, Dictionary &data) {
-    
-    std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>>
-                    destSet(new std::vector<std::shared_ptr<TyPosition>>());
-  
-    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
-    auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
+                                      (llvm::Instruction* I, Dictionary &data) {
+  auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
+  auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
+  std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>>
+                  destSet(new std::vector<std::shared_ptr<TyPosition>>());
 
-    for (auto UI = useIndices[I].begin(), E = useIndices[I].end(); UI != E;) {
-      auto t = *(UI++);
-      llvm::BasicBlock* useBB = std::get<0>(t);
-      llvm::Instruction* use = std::get<1>(t);
-      int useIndex =
-        getIndexofMem2Reg(use, std::get<2>(t),
-                          termIndices[getBasicBlockIndex(useBB)]);
+  for (auto UI = useIndices[I].begin(), E = useIndices[I].end(); UI != E;) {
+    auto t = *(UI++);
+    llvm::BasicBlock* useBB = std::get<0>(t);
+    llvm::Instruction* use = std::get<1>(t);
+    int useIndex =
+      getIndexofMem2Reg(use, std::get<2>(t),
+                        termIndices[getBasicBlockIndex(useBB)]);
 
-      if (use != nullptr && llvm::isa<llvm::PHINode>(use)) {
-        llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(use);
+    if (use != nullptr && llvm::isa<llvm::PHINode>(use)) {
+      llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(use);
 
-        for (unsigned i = 0; i != PHI->getNumIncomingValues(); ++i) {
-          llvm::Value *v = llvm::dyn_cast<llvm::Value>(PHI->getIncomingValue(i));
+      for (unsigned i = 0; i != PHI->getNumIncomingValues(); ++i) {
+        llvm::Value *v = llvm::dyn_cast<llvm::Value>(PHI->getIncomingValue(i));
 
-          if (I == v) {
-              const std::string &prev = PHI->getIncomingBlock(i)->getName();
-              destSet->push_back(TyPosition::make(SRC, *use, useIndex, prev));
-          }
+        if (I == v) {
+            const std::string &prev = PHI->getIncomingBlock(i)->getName();
+            destSet->push_back(TyPosition::make(SRC, *use, useIndex, prev));
         }
-      } else {
-        destSet->push_back(TyPosition::make(SRC, *useBB, useIndex));
       }
+    } else {
+      destSet->push_back(TyPosition::make(SRC, *useBB, useIndex));
     }
+  }
 
   return destSet;
 }
 
 void saveInstrIndices(llvm::Function* F, Dictionary &data) {
-    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
+  auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+  auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
 
-    for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
-      llvm::BasicBlock* BB = BS++;
-      std::string blockName = getBasicBlockIndex(BB);
+  for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
+    llvm::BasicBlock* BB = BS++;
+    std::string blockName = getBasicBlockIndex(BB);
 
-      termIndices[blockName] = getTerminatorIndex(BB->getTerminator());
+    termIndices[blockName] = getTerminatorIndex(BB->getTerminator());
 
-      for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
-        llvm::Instruction* I = IS++;
+    for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
+      llvm::Instruction* I = IS++;
 
-        instrIndices[I] = getCommandIndex(*I);
-      }
+      instrIndices[I] = getCommandIndex(*I);
     }
+  }
 }
 
 void saveUseIndices(llvm::Function* F, unsigned opCode, Dictionary &data) {
-    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
+  auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+  auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
 
-    for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
-      llvm::BasicBlock* BB = BS++;
-      for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
-        llvm::Instruction* I = IS++;
+  for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
+    llvm::BasicBlock* BB = BS++;
 
-        if (I->getOpcode() == opCode) {
-          for (auto UI = I->use_begin(), E = I->use_end(); UI != E;) {
-            llvm::Use &U = *(UI++);
-            llvm::Instruction* use =
-              llvm::dyn_cast<llvm::Instruction>(U.getUser());
-            llvm::BasicBlock* useBB = use->getParent();
-            unsigned index = instrIndices[use];
+    for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
+      llvm::Instruction* I = IS++;
 
-            useIndices[I].push_back(std::make_tuple(useBB, use, index));
-          }
+      if (I->getOpcode() == opCode)
+        for (auto UI = I->use_begin(), E = I->use_end(); UI != E;) {
+          llvm::Use &U = *(UI++);
+          llvm::Instruction* use =
+            llvm::dyn_cast<llvm::Instruction>(U.getUser());
+          llvm::BasicBlock* useBB = use->getParent();
+          unsigned index = instrIndices[use];
+
+          useIndices[I].push_back(std::make_tuple(useBB, use, index));
         }
-      }
     }
+  }
 }
 
 void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictionary &data) {
-    auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
+  auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
 
-    for (auto UI = useIndices[key].begin(), E = useIndices[key].end(); UI != E;) {
-      auto t = *UI;
+  for (auto UI = useIndices[key].begin(), E = useIndices[key].end(); UI != E;) {
+    auto t = *UI;
 
-      if (std::get<1>(t) == I) {
-        auto tuple = std::make_tuple(std::get<0>(t), nullptr, std::get<2>(t));
-        int pos = std::distance(useIndices[key].begin(), UI);
+    if (std::get<1>(t) == I) {
+      auto tuple = std::make_tuple(std::get<0>(t), nullptr, std::get<2>(t));
+      int pos = std::distance(useIndices[key].begin(), UI);
 
-        useIndices[key].erase(useIndices[key].begin()+pos);
-        useIndices[key].push_back(tuple);
-        break;
-      }
-      UI++;
+      useIndices[key].erase(useIndices[key].begin()+pos);
+      useIndices[key].push_back(tuple);
+      break;
     }
+    UI++;
+  }
 }
 
 void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints) {
-    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
-    auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
-    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-    auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
-    auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
+  auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+  auto &termIndices = *(data.get<ArgForIndices>()->termIndices);
+  auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
+  auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
+  auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
 
-    // variable which store in store inst can be replace
-    // phi can be replace in prunning part
-    // consider both of them
+  // variable which store in store inst can be replace
+  // phi can be replace in prunning part
+  // consider both of them
+  std::shared_ptr<TyPosition> from_position = NULL;
+  std::shared_ptr<TyPosition> to_position = NULL;
+  llvm::PHINode* Phi = llvm::dyn_cast<llvm::PHINode>(To);
 
-    std::shared_ptr<TyPosition> from_position = NULL;
-    std::shared_ptr<TyPosition> to_position = NULL;
-    llvm::PHINode* Phi = llvm::dyn_cast<llvm::PHINode>(To);
-    // if from is phi then make start block
-    // if to is phi then need prev block infro
-    // from doesn't matter
+  // if from is phi then make start block
+  // if to is phi then need prev block infro
+  // from doesn't matter
 
-    // propagate from to   from : AI SI Phi   to : Phi LI
-    if (recentInstr[key].op0 == "llvmberry::PHI") 
-      // position from
-      from_position = TyPosition::make_start_of_block(SRC, recentInstr[key].instrBB->getName());
-    else 
-      from_position = recentInstr[key].instrPos;
+  // propagate from to   from : AI SI Phi   to : Phi LI
+  if (recentInstr[key].op0 == "llvmberry::PHI") 
+    // position from
+    from_position = TyPosition::make_start_of_block(SRC, recentInstr[key].instrBB->getName());
+  else 
+    from_position = recentInstr[key].instrPos;
 
-    if (Phi != NULL) 
-      //propagate position to need prev block infromation
-      to_position = TyPosition::make_end_of_block(SRC, *prev, termIndices[prev->getName()]);
-    else 
-      to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
+  if (Phi != NULL) 
+    //propagate position to need prev block infromation
+    to_position = TyPosition::make_end_of_block(SRC, *prev, termIndices[prev->getName()]);
+  else 
+    to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
 
-    if (llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(To)) {
-      if (!(storeItem[SI].op0 == "%") &&
-          (!data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*(SI->getOperand(0)), Physical)))) { 
-      //global -> constant or argument it won't change
- 
-        //infrule
-        std::string op1 =getVariable(*(SI->getOperand(1)));
+  if (llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(To)) {
+    if (!(storeItem[SI].op0 == "%") &&
+        (!data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*(SI->getOperand(0)), Physical)))) { 
+    //global -> constant or argument it won't change
 
-        // {tmp = tmp^ = a}
-        // store %tmp, %y
-        // [tmp = tmp^         tmp^ = a
-        //  load %y = %tmp              ]
-        //
-        //  intro ghost
-        //          tmp^ = y^ = tmp^
-        INFRULE(to_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(op1, Ghost)));
-        recentInstr[key].check = true; 
-      } else 
-        recentInstr[key].check = false;
-      return;
-    }
+      //infrule
+      std::string op1 =getVariable(*(SI->getOperand(1)));
 
-    PROPAGATE(LESSDEF(recentInstr[key].instrL, VAR(recentInstr[key].op1, Ghost), SRC),
-              BOUNDS(from_position, to_position));
-
-    std::shared_ptr<TyExpr> val = recentInstr[key].instrR;
-    PROPAGATE(LESSDEF(VAR(recentInstr[key].op1, Ghost), val, TGT),
-              BOUNDS(from_position, to_position));
-    
-    replaceItem.push_back(std::shared_ptr<TyExpr>(val));
-
-
-  //  std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make(VAR(recentInstr[key].op1, Ghost),
-   //                                                                         recentInstr[key].instrR, TGT);
-
-   // PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                                                        // ^ replace
-     //         BOUNDS(from_position, to_position));
-
-    //if (recentInstr[key].op0 == "llvmberry::PHI") 
-    //  mem2regCmd[recentInstr[key].op1].lessdef.push_back(lessdef);
-    //else 
-     // mem2regCmd[recentInstr[key].op0].lessdef.push_back(lessdef);
-
-    // Infrule function
-    // if from position is SI or AI, apply infrule  if to position is PHI, apply infrule
-    // if store Ai same rule else if phi different rule
-    // if from is not phi apply infrule here
-    if ((recentInstr[key].op0 != "llvmberry::PHI") && (!recentInstr[key].check)) {
-      applyInfruleforAISI(key, data, hints);
-    }
-
-    // if to is phi then apply infrule here
-    if (Phi != NULL) {
-      applyInfruleforPhi(key, Phi, prev, data, hints);
+      // {tmp = tmp^ = a}
+      // store %tmp, %y
+      // [tmp = tmp^         tmp^ = a
+      //  load %y = %tmp              ]
+      //
+      //  intro ghost
+      //          tmp^ = y^ = tmp^
+      INFRULE(to_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(op1, Ghost)));
+      recentInstr[key].check = true; 
+    } else 
       recentInstr[key].check = false;
-    }
+    return;
+  }
+
+  PROPAGATE(LESSDEF(recentInstr[key].instrL, VAR(recentInstr[key].op1, Ghost), SRC),
+            BOUNDS(from_position, to_position));
+
+  std::shared_ptr<TyExpr> val = recentInstr[key].instrR;
+  PROPAGATE(LESSDEF(VAR(recentInstr[key].op1, Ghost), val, TGT),
+            BOUNDS(from_position, to_position));
+  
+  replaceItem.push_back(std::shared_ptr<TyExpr>(val));
+
+  // Infrule function
+  // if from position is SI or AI, apply infrule  if to position is PHI, apply infrule
+  // if store Ai same rule else if phi different rule
+  // if from is not phi apply infrule here
+  if ((recentInstr[key].op0 != "llvmberry::PHI") && (!recentInstr[key].check))
+    applyInfruleforAISI(key, data, hints);
+
+  // if to is phi then apply infrule here
+  if (Phi != NULL) {
+    applyInfruleforPhi(key, Phi, prev, data, hints);
+    recentInstr[key].check = false;
+  }
 }
 
 void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints) {
@@ -1274,169 +1170,135 @@ void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints) {
 }
 
 void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints) {
-    auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
-    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-    std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *phi, 0, prev->getName());
-    std::string Rphi = getVariable(*phi);
+  auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
+  std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *phi, 0, prev->getName());
+  std::string Rphi = getVariable(*phi);
 
-    if (Rphi == recentInstr[key].op1) 
-      return;
+  if (Rphi == recentInstr[key].op1) 
+    return;
 
-    std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(recentInstr[key].op1, Ghost), REGISTER(Rphi, Ghost)));
-    INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-    //    mem2regCmd[recentInstr[key].op1].ghost.push_back(ghost);
-    //    mem2regCmd[Rphi].ghost.push_back(ghost);
+  std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(recentInstr[key].op1, Ghost), REGISTER(Rphi, Ghost)));
+  INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
 }
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints) {
-    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-    auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
+  auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+  auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
+  std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> destSet = saveDestSet(LI, data);
+  std::string Rload = llvmberry::getVariable(*LI);
 
+  //propagate LI to use set
+  PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
+            BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
 
-    std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> destSet = saveDestSet(LI, data);
-    std::string Rload = llvmberry::getVariable(*LI);
+  std::shared_ptr<TyExpr> val = TyExpr::make(*V, Physical);
+  PROPAGATE(LESSDEF(VAR(Rload, Ghost), val, TGT),
+            BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
 
-    //propagate LI to use set
-    PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
-              BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
+  std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *LI, instrIndices[LI], "");   
 
-    std::shared_ptr<TyExpr> val = TyExpr::make(*V, Physical);
-    PROPAGATE(LESSDEF(VAR(Rload, Ghost), val, TGT),
-              BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
+  //infrule at LI index
+  std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(In, Ghost), REGISTER(Rload, Ghost)));
+  INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
 
-//    std::shared_ptr<TyPropagateLessdef> lessdef =
-//      TyPropagateLessdef::make(VAR(Rload, Ghost), EXPR(V, Physical), TGT);
-
- //   PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
- //             BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
-    // ^ replace
-
-     std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *LI, instrIndices[LI], "");   
-
-    //infrule at LI index
-    std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(In, Ghost), REGISTER(Rload, Ghost)));
-    INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-    //    mem2regCmd[In].ghost.push_back(ghost);
-
-    if (!llvm::isa<llvm::Constant>(V)) {   
-      replaceItem.push_back(std::shared_ptr<TyExpr>(val));
-      //std::string Rval = llvmberry::getVariable(*V);  
-      //mem2regCmd[Rval].lessdef.push_back(lessdef);
-    }
+  if (!llvm::isa<llvm::Constant>(V))
+    replaceItem.push_back(std::shared_ptr<TyExpr>(val));
 }
 
 void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints) {
-    auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
-    auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
-    auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-    auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
-    auto &replaceTag = *(data.get<ArgForMem2Reg>()->replaceTag);
+  auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
+  auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
+  auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
+  auto &replaceTag = *(data.get<ArgForMem2Reg>()->replaceTag);
+  llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(From);
+  llvm::AllocaInst *AI = llvm::dyn_cast<llvm::AllocaInst>(From);
+  std::string Rghost;
 
+  if (AI != NULL)
+    Rghost = getVariable(*AI);
+  else if (SI != NULL)
+    Rghost = getVariable(*(SI->getOperand(1)));
 
-    llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(From);
-    llvm::AllocaInst *AI = llvm::dyn_cast<llvm::AllocaInst>(From);
-    std::string Rghost;
-    if (AI != NULL)
-      Rghost = getVariable(*AI);
-    else if (SI != NULL)
-      Rghost = getVariable(*(SI->getOperand(1)));
+  std::shared_ptr<TyPosition> from_position = TyPosition::make(SRC, *From, instrIndices[From], "");
+  std::shared_ptr<TyPosition> to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
 
-    std::shared_ptr<TyPosition> from_position = TyPosition::make(SRC, *From, instrIndices[From], "");
-    std::shared_ptr<TyPosition> to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
+  PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(new ConsLoadInst(TyLoadInst::makeAlignOne(From)))),
+                    VAR(Rghost, Ghost), SRC),
+            BOUNDS(from_position, to_position));
+  
+  std::shared_ptr<TyExpr> val = TyExpr::make(*value, Physical);
+  PROPAGATE(LESSDEF(VAR(Rghost, Ghost), val, TGT), BOUNDS(from_position, to_position));
 
-    // propagate instruction
-    PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(new ConsLoadInst(TyLoadInst::makeAlignOne(From)))),
-                      VAR(Rghost, Ghost), SRC),
-              BOUNDS(from_position, to_position));
-    
-    std::shared_ptr<TyExpr> val = TyExpr::make(*value, Physical);
-
-
-    //std::shared_ptr<TyPropagateLessdef> lessdef =
-    //        TyPropagateLessdef::make(VAR(Rghost, Ghost), val, TGT);
-    PROPAGATE(LESSDEF(VAR(Rghost, Ghost), val, TGT), BOUNDS(from_position, to_position));
-
-    //PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-     //         BOUNDS(from_position, to_position));
-
-    if (value->getName() != "") {
-    //  mem2regCmd[getVariable(*value)].lessdef.push_back(lessdef);
+  if (value->getName() != "")
     replaceItem.push_back(std::shared_ptr<TyExpr>(val));
-    }
-    if (SI != NULL) {
-      if (storeItem[SI].op0 == "%" ||
-          data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*value, Physical))) {
-        // stored value will not be changed in another iteration
-        
-        std::shared_ptr<TyExpr> val = TyExpr::make(*(SI->getOperand(0)), Physical); //storeItem[SI].expr;
-        
-        std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(val, //storeItem[SI].expr,
-                                                             REGISTER(Rghost, Ghost)));
-        INFRULE(from_position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
 
-        if (storeItem[SI].op0 != "%") {
-          std::cout << "pushed in 2 " << storeItem[SI].op0 << std::endl;
-          
-          replaceTag.push_back(std::shared_ptr<TyExpr>(val));
-         //mem2regCmd[getVariable(*(SI->getOperand(0)))].ghost.push_back(ghost);
-        }
-      } else
-        INFRULE(from_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(Rghost, Ghost)));
+  if (SI != NULL) {
+    if (storeItem[SI].op0 == "%" ||
+        data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*value, Physical))) {
+      std::shared_ptr<TyExpr> val = TyExpr::make(*(SI->getOperand(0)), Physical);
+      std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(val, REGISTER(Rghost, Ghost)));
+      INFRULE(from_position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
 
-    } else if (AI != NULL)
-      INFRULE(from_position, ConsIntroGhost::make(EXPR(value, Physical), REGISTER(Rghost, Ghost)));
+      if (storeItem[SI].op0 != "%")
+        replaceTag.push_back(std::shared_ptr<TyExpr>(val));
+    } else
+      INFRULE(from_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(Rghost, Ghost)));
+  } else if (AI != NULL)
+    INFRULE(from_position, ConsIntroGhost::make(EXPR(value, Physical), REGISTER(Rghost, Ghost)));
 }
 
 void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
   auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
-
   std::string str = "";
 
   if (llvm::isa<llvm::AllocaInst>(Tgt) || llvm::isa<llvm::LoadInst>(Tgt) || llvm::isa<llvm::PHINode>(Tgt))
         str = getVariable(*Tgt);
 
   std::shared_ptr<TyExpr> tgtPhysical = ConsVar::make(str, Physical);
-  std::shared_ptr<TyExpr> tgtGhost = ConsVar::make(str, Ghost);
-
   std::shared_ptr<TyExpr> replPhysical = TyExpr::make(*New, Physical);
-  std::shared_ptr<TyExpr> replGhost = TyExpr::make(*New, Ghost);
 
   for (unsigned i = 0; i < replaceItem.size(); i++) {
     std::shared_ptr<TyExpr> tmp = replaceItem.at(i);
-    if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtPhysical)) {
+
+    if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtPhysical))
      tmp->replace_expr(replPhysical); 
-    } else if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtGhost)) {
-     tmp->replace_expr(replGhost); 
-    }
   }
 }
 
 void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data) {
   auto &replaceTag = *(data.get<ArgForMem2Reg>()->replaceTag);
-
   std::string str = "";
 
   if (llvm::isa<llvm::AllocaInst>(Tgt) || llvm::isa<llvm::LoadInst>(Tgt) || llvm::isa<llvm::PHINode>(Tgt))
     str = getVariable(*Tgt);
 
-  std::cout << "inthe replace tag " << str << std::endl;
-
   std::shared_ptr<TyExpr> tgtPhysical = ConsVar::make(str, Physical);
-
   std::shared_ptr<TyExpr> replTag = ConsVar::make(str, tag);
 
   for (unsigned i = 0; i < replaceTag.size(); i++) {
-    std::cout << "start!" << std::endl;
     std::shared_ptr<TyExpr> tmp = replaceTag.at(i);
-    if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtPhysical)) {
+    if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtPhysical))
       tmp->replace_expr(replTag);
-      std::cout << " changed " << std::endl;
-    }
   }
-
 }
 
+void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
+                                       llvm::Instruction *ReplInst,
+                                       Dictionary &data) {
+  auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
+  std::string ReplName = "";
 
+  if (llvm::isa<llvm::AllocaInst>(ReplInst) ||
+      llvm::isa<llvm::LoadInst>(ReplInst) ||
+      llvm::isa<llvm::PHINode>(ReplInst))
+    ReplName = getVariable(*ReplInst);
+  
+  if ((ReplName == "") ||
+      (mem2regCmd.find(ReplName) == mem2regCmd.end()))
+    return;
+
+  data.get<ArgForMem2Reg>()->replaceLessthanUndef(ReplName,
+                                                  TyValue::make(*ReplVal));
+}
 
 } // llvmberry
