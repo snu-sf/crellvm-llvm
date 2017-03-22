@@ -489,6 +489,13 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
             ([&AI, &LI, &ReplVal] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI);
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, AI);
+        //insert
+        llvmberry::replaceExpr(AI, ReplVal, data);
+        //insert
+        llvmberry::replaceExpr(LI, ReplVal, data);
+
+
+
     });
 
     LI->replaceAllUsesWith(ReplVal);
@@ -614,6 +621,9 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *LI, instrIndices[LI]-1, ""));
         llvmberry::generateHintForMem2RegReplaceHint(UndefVal, LI);
 
+        //insert
+        llvmberry::replaceExpr(LI, UndefVal, data);
+
         if (!StoresByIndex.empty()) 
           hints.appendToDescription("MEM2REG SINGLE BLOCK ALLOCA BUG FOUND BY US");
       });
@@ -654,6 +664,10 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         hints.addNopPosition(llvmberry::TyPosition::make(llvmberry::Target, *LI, instrIndices[LI]-1, ""));
 
         llvmberry::generateHintForMem2RegReplaceHint(value, LI);
+        //insert
+        llvmberry::replaceExpr(LI, value, data);
+
+
       });
 
       // Otherwise, there was a store before this load, the load takes its value.
@@ -1071,6 +1085,9 @@ void PromoteMem2Reg::run() {
           }
 
           llvmberry::generateHintForMem2RegReplaceHint(V, PN);
+        //insert
+        llvmberry::replaceExpr(PN, V, data);
+
         });
 
         PN->replaceAllUsesWith(V);
@@ -1387,6 +1404,10 @@ NextIteration:
         llvmberry::propagateLoadInstToUse(LI, V, recentInstr[AI->second].op1, data, hints);
 
         llvmberry::generateHintForMem2RegReplaceHint(V, LI);
+        //insert
+        llvmberry::replaceExpr(LI, V, data);
+
+
       });
 
       // Anything using the load now uses the current value.

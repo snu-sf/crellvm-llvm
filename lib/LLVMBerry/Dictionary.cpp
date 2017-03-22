@@ -77,20 +77,22 @@ VisitICmpArg::VisitICmpArg() {
 
 Mem2RegArg::Mem2RegArg()
     : storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
-      recentInstr(new TyRecentInstrObj()), instrWorkList(new TyInstrWorkListObj()) {}
+      recentInstr(new TyRecentInstrObj()), instrWorkList(new TyInstrWorkListObj()), 
+      replaceItem(new TyReplaceObj()) {}
 
 bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                             std::shared_ptr<TyExpr> e2) {
-  if (ConsVar *cv1 = dynamic_cast<ConsVar *>(e1.get())) {
-    if (ConsVar *cv2 = dynamic_cast<ConsVar *>(e2.get())) {
+  if (ConsVar *cv1 = dynamic_cast<ConsVar *>(e1->get_i().get())) {
+    if (ConsVar *cv2 = dynamic_cast<ConsVar *>(e2->get_i().get())) {
       return TyRegister::isSame(cv1->getTyReg(), cv2->getTyReg());
     }
   }
+
   return false;
 }
 
 bool Mem2RegArg::isUndef(std::shared_ptr<TyExpr> e) {
-  if (ConsConst *cc = dynamic_cast<ConsConst *>(e.get()))
+  if (ConsConst *cc = dynamic_cast<ConsConst *>(e->get_i().get()))
     if (ConsConstUndef *ccu =
           dynamic_cast<ConsConstUndef *>(cc->getTyConst().get()))
       return true;
@@ -112,7 +114,7 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
       mem2regCmd->find(key)->second.lessdef;
 
     std::string phiKey = "";
-    if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr.get()))
+    if (ConsVar *cv = dynamic_cast<ConsVar *>(newExpr->get_i().get()))
       phiKey = std::string(cv->getTyReg()->getName());
 
     for(size_t i = 0; i < vec.size(); i++) {
@@ -140,6 +142,7 @@ void Mem2RegArg::replaceCmdRhs(std::string which, std::string key,
       }
     }
   }
+  return;
 }
 
 void Mem2RegArg::replaceLessthanUndef(std::string key,

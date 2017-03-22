@@ -1181,6 +1181,7 @@ void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm:
     auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
+    auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
 
     // variable which store in store inst can be replace
     // phi can be replace in prunning part
@@ -1231,17 +1232,24 @@ void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm:
     PROPAGATE(LESSDEF(recentInstr[key].instrL, VAR(recentInstr[key].op1, Ghost), SRC),
               BOUNDS(from_position, to_position));
 
-    std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make(VAR(recentInstr[key].op1, Ghost),
-                                                                            recentInstr[key].instrR, TGT);
-
-    PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-                                                        // ^ replace
+    std::shared_ptr<TyExpr> val = recentInstr[key].instrR;
+    PROPAGATE(LESSDEF(VAR(recentInstr[key].op1, Ghost), val, TGT),
               BOUNDS(from_position, to_position));
+    
+    replaceItem.push_back(std::shared_ptr<TyExpr>(val));
 
-    if (recentInstr[key].op0 == "llvmberry::PHI") 
-      mem2regCmd[recentInstr[key].op1].lessdef.push_back(lessdef);
-    else 
-      mem2regCmd[recentInstr[key].op0].lessdef.push_back(lessdef);
+
+  //  std::shared_ptr<TyPropagateLessdef> lessdef = TyPropagateLessdef::make(VAR(recentInstr[key].op1, Ghost),
+   //                                                                         recentInstr[key].instrR, TGT);
+
+   // PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+                                                        // ^ replace
+     //         BOUNDS(from_position, to_position));
+
+    //if (recentInstr[key].op0 == "llvmberry::PHI") 
+    //  mem2regCmd[recentInstr[key].op1].lessdef.push_back(lessdef);
+    //else 
+     // mem2regCmd[recentInstr[key].op0].lessdef.push_back(lessdef);
 
     // Infrule function
     // if from position is SI or AI, apply infrule  if to position is PHI, apply infrule
@@ -1283,6 +1291,8 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints) {
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
+    auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
+
 
     std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> destSet = saveDestSet(LI, data);
     std::string Rload = llvmberry::getVariable(*LI);
@@ -1291,11 +1301,15 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, 
     PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC),
               BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
 
-    std::shared_ptr<TyPropagateLessdef> lessdef =
-      TyPropagateLessdef::make(VAR(Rload, Ghost), EXPR(V, Physical), TGT);
-
-    PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+    std::shared_ptr<TyExpr> val = TyExpr::make(*V, Physical);
+    PROPAGATE(LESSDEF(VAR(Rload, Ghost), val, TGT),
               BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
+
+//    std::shared_ptr<TyPropagateLessdef> lessdef =
+//      TyPropagateLessdef::make(VAR(Rload, Ghost), EXPR(V, Physical), TGT);
+
+ //   PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+ //             BOUNDSET(TyPosition::make(SRC, *LI, instrIndices[LI], ""), destSet));
     // ^ replace
 
      std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *LI, instrIndices[LI], "");   
@@ -1306,8 +1320,9 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, 
     mem2regCmd[In].ghost.push_back(ghost);
 
     if (!llvm::isa<llvm::Constant>(V)) {   
-      std::string Rval = llvmberry::getVariable(*V);  
-      mem2regCmd[Rval].lessdef.push_back(lessdef);
+      replaceItem.push_back(std::shared_ptr<TyExpr>(val));
+      //std::string Rval = llvmberry::getVariable(*V);  
+      //mem2regCmd[Rval].lessdef.push_back(lessdef);
     }
 }
 
@@ -1315,6 +1330,7 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
+    auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
 
     llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(From);
     llvm::AllocaInst *AI = llvm::dyn_cast<llvm::AllocaInst>(From);
@@ -1331,16 +1347,21 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
     PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(new ConsLoadInst(TyLoadInst::makeAlignOne(From)))),
                       VAR(Rghost, Ghost), SRC),
               BOUNDS(from_position, to_position));
+    
+    std::shared_ptr<TyExpr> val = TyExpr::make(*value, Physical);
 
-    std::shared_ptr<TyPropagateLessdef> lessdef =
-            TyPropagateLessdef::make(VAR(Rghost, Ghost), TyExpr::make(*value,Physical), TGT);
 
-    PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
-              BOUNDS(from_position, to_position));
+    //std::shared_ptr<TyPropagateLessdef> lessdef =
+    //        TyPropagateLessdef::make(VAR(Rghost, Ghost), val, TGT);
+    PROPAGATE(LESSDEF(VAR(Rghost, Ghost), val, TGT), BOUNDS(from_position, to_position));
 
-    if (value->getName() != "")
-      mem2regCmd[getVariable(*value)].lessdef.push_back(lessdef);
+    //PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
+     //         BOUNDS(from_position, to_position));
 
+    if (value->getName() != "") {
+    //  mem2regCmd[getVariable(*value)].lessdef.push_back(lessdef);
+    replaceItem.push_back(std::shared_ptr<TyExpr>(val));
+    }
     if (SI != NULL) {
       if (storeItem[SI].op0 == "%" ||
           data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*value, Physical))) {
@@ -1359,5 +1380,29 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
       INFRULE(from_position, ConsIntroGhost::make(EXPR(value, Physical), REGISTER(Rghost, Ghost)));
 }
 
+void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
+  auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
+
+  std::string str = "";
+
+  if (llvm::isa<llvm::AllocaInst>(Tgt) || llvm::isa<llvm::LoadInst>(Tgt) || llvm::isa<llvm::PHINode>(Tgt))
+        str = getVariable(*Tgt);
+
+  std::shared_ptr<TyExpr> tgtPhysical = ConsVar::make(str, Physical);
+  std::shared_ptr<TyExpr> tgtGhost = ConsVar::make(str, Ghost);
+
+  std::shared_ptr<TyExpr> replPhysical = TyExpr::make(*New, Physical);
+  std::shared_ptr<TyExpr> replGhost = TyExpr::make(*New, Ghost);
+
+  for (unsigned i = 0; i < replaceItem.size(); i++) {
+    std::shared_ptr<TyExpr> tmp = replaceItem.at(i);
+    if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtPhysical)) {
+     tmp->replace_expr(replPhysical); 
+    } else if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtGhost)) {
+     tmp->replace_expr(replGhost); 
+    }
+  }
+
+}
 
 } // llvmberry

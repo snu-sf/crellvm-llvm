@@ -51,8 +51,9 @@
   llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define INSNWITHGHOST(x, y)                                                    \
-  std::shared_ptr<llvmberry::TyExpr>(                                          \
-      new llvmberry::ConsInsn(llvmberry::instructionWithGhostIdxs(x, y)))
+  std::shared_ptr<llvmberry::TyExpr>(new llvmberry::TyExpr(                    \
+      std::shared_ptr<llvmberry::TyExpr_i>(new llvmberry::ConsInsn(            \
+          llvmberry::instructionWithGhostIdxs(x, y)))))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
 
 // LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
@@ -241,6 +242,7 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, 
 
 void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints);
 
+void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data);
 }
 
 #endif
