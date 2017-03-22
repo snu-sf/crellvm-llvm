@@ -2595,7 +2595,7 @@ TyExpr::TyExpr(std::shared_ptr<TyExpr_i> ei) : expr_i(ei) {}
 std::shared_ptr<TyExpr_i> TyExpr::get_i() { return expr_i; }
 
 void TyExpr::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(expr_i));
+  expr_i->serialize(archive);
 }
 
 void TyExpr::replace_expr(std::shared_ptr<TyExpr> expr) {
