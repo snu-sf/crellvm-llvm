@@ -244,6 +244,7 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, 
 
 void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints);
 
+void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data);
 }
 
 #endif

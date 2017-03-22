@@ -1357,6 +1357,7 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
     auto &instrIndices = *(data.get<ArgForIndices>()->instrIndices);
     auto &storeItem = *(data.get<ArgForMem2Reg>()->storeItem);
     auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
+    auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
 
     llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(From);
     llvm::AllocaInst *AI = llvm::dyn_cast<llvm::AllocaInst>(From);
@@ -1373,16 +1374,20 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
     PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(new ConsLoadInst(TyLoadInst::makeAlignOne(From)))),
                       VAR(Rghost, Ghost), SRC),
               BOUNDS(from_position, to_position));
+    
+    std::shared_ptr<TyExpr> val = TyExpr::make(*value, Physical);
+
 
     std::shared_ptr<TyPropagateLessdef> lessdef =
-            TyPropagateLessdef::make(VAR(Rghost, Ghost), TyExpr::make(*value,Physical), TGT);
+            TyPropagateLessdef::make(VAR(Rghost, Ghost), val, TGT);
 
     PROPAGATE(std::shared_ptr<TyPropagateObject>(new ConsLessdef(lessdef)),
               BOUNDS(from_position, to_position));
 
-    if (value->getName() != "")
-      mem2regCmd[getVariable(*value)].lessdef.push_back(lessdef);
-
+    if (value->getName() != "") {
+    //  mem2regCmd[getVariable(*value)].lessdef.push_back(lessdef);
+    replaceItem.push_back(std::shared_ptr<TyExpr>(val));
+    }
     if (SI != NULL) {
       if (storeItem[SI].op0 == "%" ||
           data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*value, Physical))) {
@@ -1401,5 +1406,29 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
       INFRULE(from_position, ConsIntroGhost::make(EXPR(value, Physical), REGISTER(Rghost, Ghost)));
 }
 
+void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
+  auto &replaceItem = *(data.get<ArgForMem2Reg>()->replaceItem);
+
+  std::string str = "";
+
+  if (llvm::isa<llvm::AllocaInst>(Tgt) || llvm::isa<llvm::LoadInst>(Tgt) || llvm::isa<llvm::PHINode>(Tgt))
+        str = getVariable(*Tgt);
+
+  std::shared_ptr<TyExpr> tgtPhysical = ConsVar::make(str, Physical);
+  std::shared_ptr<TyExpr> tgtGhost = ConsVar::make(str, Ghost);
+
+  std::shared_ptr<TyExpr> replPhysical = TyExpr::make(*New, Physical);
+  std::shared_ptr<TyExpr> replGhost = TyExpr::make(*New, Ghost);
+
+  for (unsigned i = 0; i < replaceItem.length(); i++) {
+    std::shared_ptr<TyExpr> tmp = replaceItem.at(i);
+    if (*data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtPhysical)) {
+     tmp->replace_expr(replPhysical); 
+    } else if (*data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtGhost)) {
+     tmp->replace_expr(replGhost); 
+    }
+  }
+
+}
 
 } // llvmberry

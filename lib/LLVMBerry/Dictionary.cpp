@@ -77,7 +77,8 @@ VisitICmpArg::VisitICmpArg() {
 
 Mem2RegArg::Mem2RegArg()
     : storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
-      recentInstr(new TyRecentInstrObj()), instrWorkList(new TyInstrWorkListObj()) {}
+      recentInstr(new TyRecentInstrObj()), instrWorkList(new TyInstrWorkListObj()), 
+      replaceItem(new TyReplaceObj()) {}
 
 bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                             std::shared_ptr<TyExpr> e2) {
