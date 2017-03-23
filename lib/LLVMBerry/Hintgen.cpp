@@ -1153,7 +1153,7 @@ void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm:
   // if store Ai same rule else if phi different rule
   // if from is not phi apply infrule here
   if ((recentInstr[key].op0 != "llvmberry::PHI") && (!recentInstr[key].check))
-    applyInfruleforAISI(key, data, hints);
+    INFRULE(recentInstr[key].instrPos, ConsIntroGhost::make(recentInstr[key].instrR, REGISTER(recentInstr[key].op1, Ghost)));
 
   // if to is phi then apply infrule here
   if (Phi != NULL) {
@@ -1177,8 +1177,7 @@ void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev
   if (Rphi == recentInstr[key].op1) 
     return;
 
-  std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(recentInstr[key].op1, Ghost), REGISTER(Rphi, Ghost)));
-  INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
+  INFRULE(position, ConsIntroGhost::make(VAR(recentInstr[key].op1, Ghost), REGISTER(Rphi, Ghost)));
 }
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints) {
@@ -1198,8 +1197,7 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, 
   std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *LI, instrIndices[LI], "");   
 
   //infrule at LI index
-  std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(VAR(In, Ghost), REGISTER(Rload, Ghost)));
-  INFRULE(position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
+  INFRULE(position, ConsIntroGhost::make(VAR(In, Ghost), REGISTER(Rload, Ghost)));
 
   if (!llvm::isa<llvm::Constant>(V))
     replaceItem.push_back(std::shared_ptr<TyExpr>(val));
@@ -1223,7 +1221,7 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
   std::shared_ptr<TyPosition> to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
 
   PROPAGATE(LESSDEF(INSN(std::shared_ptr<TyInstruction>(new ConsLoadInst(TyLoadInst::makeAlignOne(From)))),
-                    VAR(Rghost, Ghost), SRC),
+                    VAR(Rghost, Ghost), SRC), 
             BOUNDS(from_position, to_position));
   
   std::shared_ptr<TyExpr> val = TyExpr::make(*value, Physical);
@@ -1241,6 +1239,7 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
 
       if (storeItem[SI].op0 != "%")
         replaceTag.push_back(std::shared_ptr<TyExpr>(val));
+    
     } else
       INFRULE(from_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(Rghost, Ghost)));
   } else if (AI != NULL)
@@ -1259,7 +1258,6 @@ void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
 
   for (unsigned i = 0; i < replaceItem.size(); i++) {
     std::shared_ptr<TyExpr> tmp = replaceItem.at(i);
-
     if (data.get<ArgForMem2Reg>()->equalsIfConsVar(tmp, tgtPhysical))
      tmp->replace_expr(replPhysical); 
   }

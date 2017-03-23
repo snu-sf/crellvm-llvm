@@ -411,7 +411,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       auto &storeItem = *(data.get<llvmberry::ArgForMem2Reg>()->storeItem);
       auto &mem2regCmd = *(data.get<llvmberry::ArgForMem2Reg>()->mem2regCmd);
       auto &replaceTag = *(data.get<llvmberry::ArgForMem2Reg>()->replaceTag);
-      std::string Ralloca = llvmberry::getVariable(*AI);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
       std::string Rload = llvmberry::getVariable(*LI);
       Value* UndefVal = UndefValue::get(LI->getType());
@@ -433,21 +432,20 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
         INFRULE(llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
                 std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsLessthanUndef(lessthanundef)));
+        
         //below code is for SI which between AI and LI 
         if (storeItem[OnlyStore].op0 == "%" ||
             data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(storeItem[OnlyStore].expr,
                                                                   EXPR(OnlyStore->getOperand(0), Physical))) {
           // stored value is constant or not changed in another iteration yet
           std::shared_ptr<llvmberry::TyExpr> val = llvmberry::TyExpr::make(*(OnlyStore->getOperand(0)), llvmberry::Physical);
-          
-          std::shared_ptr<llvmberry::TyIntroGhost> ghost
-            (new llvmberry::TyIntroGhost(val, REGISTER(Rstore, Ghost)));
+ 
+          INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
+                  llvmberry::ConsIntroGhost::make(val, REGISTER(Rstore, Ghost)));
 
           if (storeItem[OnlyStore].op0 != "%")
             replaceTag.push_back(std::shared_ptr<llvmberry::TyExpr>(val));
 
-          INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
-                  std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsIntroGhost(ghost)));
         } else {
           // stored value is changed in another iteration
           INFRULE(llvmberry::TyPosition::make(SRC, *OnlyStore, instrIndices[OnlyStore], ""),
@@ -767,21 +765,17 @@ void PromoteMem2Reg::run() {
         // TODO: if we can validate "call -> nop", we need below condition
         //if (!llvmberry::hasBitcastOrGEP(AI)) { 
         if (BB == AIB) {
-          PROPAGATE(UNIQUE(Ralloca, SRC),
-                    BOUNDS(llvmberry::TyPosition::make(SRC, *AItmp, instrIndices[AItmp], ""),
-                           llvmberry::TyPosition::make_end_of_block(SRC, *AIB, termIndices[AIBname])));
-
-          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC),
-                    BOUNDS(llvmberry::TyPosition::make(SRC, *AItmp, instrIndices[AItmp], ""),
-                           llvmberry::TyPosition::make_end_of_block(SRC, *AIB, termIndices[AIBname])));
+          std::shared_ptr<llvmberry::TyPosition> from_pos = llvmberry::TyPosition::make(SRC, *AItmp, instrIndices[AItmp], "");
+          std::shared_ptr<llvmberry::TyPosition> to_pos = llvmberry::TyPosition::make_end_of_block(SRC, *AIB, termIndices[AIBname]);
+          
+          PROPAGATE(UNIQUE(Ralloca, SRC), BOUNDS(from_pos, to_pos));
+          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC), BOUNDS(from_pos, to_pos));
         } else {
-          PROPAGATE(UNIQUE(Ralloca, SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, blockName),
-                           llvmberry::TyPosition::make_end_of_block(SRC, *BB, termIndices[blockName])));
+          std::shared_ptr<llvmberry::TyPosition> from_pos = llvmberry::TyPosition::make_start_of_block(SRC, blockName);
+          std::shared_ptr<llvmberry::TyPosition> to_pos = llvmberry::TyPosition::make_end_of_block(SRC, *BB, termIndices[blockName]);
 
-          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, blockName),
-                           llvmberry::TyPosition::make_end_of_block(SRC, *BB, termIndices[blockName])));
+          PROPAGATE(UNIQUE(Ralloca, SRC), BOUNDS(from_pos, to_pos));
+          PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC), BOUNDS(from_pos, to_pos));
         }
         //}
       }
@@ -949,12 +943,9 @@ void PromoteMem2Reg::run() {
       Value* UndefVal = llvm::UndefValue::get(AI->getAllocatedType());
 
       recentInstr[i] = 
-        { INSN(std::shared_ptr<llvmberry::TyInstruction>
-           (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
-          EXPR(UndefVal, Physical),
-          llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
-          "", llvmberry::getVariable(*AI),
-          AI->getParent(), false };
+        { INSN(std::shared_ptr<llvmberry::TyInstruction>(new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(AI)))),
+          EXPR(UndefVal, Physical), llvmberry::TyPosition::make(SRC, *AI, instrIndices[AI], ""),
+          "", llvmberry::getVariable(*AI), AI->getParent(), false };
     });
   }
 
@@ -1067,8 +1058,7 @@ void PromoteMem2Reg::run() {
                 // value is instr
                 // from to prpagate undef > value
                 PROPAGATE(LESSDEF(EXPR(UndefVal, Physical), VAR(llvmberry::getVariable(*In), Physical), TGT),
-                          BOUNDS(llvmberry::TyPosition::make(TGT, *In),
-                                 llvmberry::TyPosition::make_end_of_block
+                          BOUNDS(llvmberry::TyPosition::make(TGT, *In),llvmberry::TyPosition::make_end_of_block
                                   (SRC, *Income, termIndices[llvmberry::getBasicBlockIndex(Income)])));
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
                 // value is constInt or constFloat
@@ -1154,10 +1144,8 @@ void PromoteMem2Reg::run() {
 
         llvmberry::ValidationUnit::GetInstance()->intrude
                ([&Preds, &pred] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-          PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
-                            llvmberry::false_encoding.second, SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                           SRC, llvmberry::getBasicBlockIndex(Preds[pred])),
+          PROPAGATE(LESSDEF(llvmberry::false_encoding.first, llvmberry::false_encoding.second, SRC),
+                    BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(Preds[pred])),
                            llvmberry::TyPosition::make_end_of_block(SRC, *Preds[pred])));
 
           std::vector<BasicBlock *> DeadBlockList;
@@ -1168,15 +1156,12 @@ void PromoteMem2Reg::run() {
             DeadBlockList.push_back((*BI));
 
           while(!DeadBlockList.empty()) {
-            BasicBlock * L;
-            L = *DeadBlockList.rbegin();
+            BasicBlock * L = *DeadBlockList.rbegin();
             DeadBlockList.pop_back();
 
             // propagate false start to end of K.
-            PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
-                              llvmberry::false_encoding.second, SRC),
-                      BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                                    SRC, llvmberry::getBasicBlockIndex(L)),
+            PROPAGATE(LESSDEF(llvmberry::false_encoding.first, llvmberry::false_encoding.second, SRC),
+                      BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(L)),
                              llvmberry::TyPosition::make_end_of_block(SRC, *L)));
 
             // find predessor of K and insert in worklist if it has one
@@ -1347,11 +1332,9 @@ NextIteration:
           llvmberry::propagateFromAISIPhiToLoadPhiSI(AllocaNo, APN, Pred, data, hints);
 
           recentInstr[AllocaNo] = 
-            { recentInstr[AllocaNo].instrL,
-              VAR(Rphi, Physical),
+            { recentInstr[AllocaNo].instrL, VAR(Rphi, Physical),
               llvmberry::TyPosition::make(SRC, *APN, instrIndices[APN], prev),
-              "llvmberry::PHI", Rphi,
-              APN->getParent(), false };
+              "llvmberry::PHI", Rphi, APN->getParent(), false };
         });
 
         // Get the next phi node.
@@ -1432,10 +1415,8 @@ NextIteration:
           op0 = llvmberry::getVariable(*(SI->getOperand(0)));
 
         recentInstr[ai->second] = 
-          { INSN(std::shared_ptr<llvmberry::TyInstruction>
-             (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(SI)))),
-            EXPR(SI->getOperand(0), Physical),
-            llvmberry::TyPosition::make(SRC, *SI, instrIndices[SI], ""),
+          { INSN(std::shared_ptr<llvmberry::TyInstruction>(new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(SI)))),
+            EXPR(SI->getOperand(0), Physical), llvmberry::TyPosition::make(SRC, *SI, instrIndices[SI], ""),
             op0, llvmberry::getVariable(*(SI->getOperand(1))),
             SI->getParent(), recentInstr[ai->second].check };
       });
