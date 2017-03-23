@@ -1157,27 +1157,12 @@ void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm:
 
   // if to is phi then apply infrule here
   if (Phi != NULL) {
-    applyInfruleforPhi(key, Phi, prev, data, hints);
+    if (getVariable(*Phi) != recentInstr[key].op1) 
+      INFRULE(TyPosition::make(SRC, *Phi, prev->getName()),
+              ConsIntroGhost::make(VAR(recentInstr[key].op1, Ghost), REGISTER(getVariable(*Phi), Ghost))); 
+    
     recentInstr[key].check = false;
   }
-}
-
-void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints) {
-    auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
-
-    INFRULE(recentInstr[key].instrPos,
-            ConsIntroGhost::make(recentInstr[key].instrR, REGISTER(recentInstr[key].op1, Ghost)));
-}
-
-void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints) {
-  auto &recentInstr = *(data.get<ArgForMem2Reg>()->recentInstr);
-  std::shared_ptr<TyPosition> position = TyPosition::make(SRC, *phi, 0, prev->getName());
-  std::string Rphi = getVariable(*phi);
-
-  if (Rphi == recentInstr[key].op1) 
-    return;
-
-  INFRULE(position, ConsIntroGhost::make(VAR(recentInstr[key].op1, Ghost), REGISTER(Rphi, Ghost)));
 }
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints) {

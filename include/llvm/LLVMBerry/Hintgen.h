@@ -226,10 +226,6 @@ void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictio
 
 void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
 
-void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints);
-
-void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
-
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints);
 
 void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints);
