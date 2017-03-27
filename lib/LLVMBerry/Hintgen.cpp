@@ -1118,7 +1118,7 @@ void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm:
     to_position = TyPosition::make(SRC, *To, instrIndices[To], "");
 
   if (llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(To)) {
-    if (!(storeItem[SI].op0 == "%") &&
+    if (!(storeItem[SI].op0 == "") &&
         (!data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*(SI->getOperand(0)), Physical)))) { 
     //global -> constant or argument it won't change
 
@@ -1216,13 +1216,13 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
     replaceItem.push_back(std::shared_ptr<TyExpr>(val));
 
   if (SI != NULL) {
-    if (storeItem[SI].op0 == "%" ||
+    if (storeItem[SI].op0 == "" ||
         data.get<ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*value, Physical))) {
       std::shared_ptr<TyExpr> val = TyExpr::make(*(SI->getOperand(0)), Physical);
       std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(val, REGISTER(Rghost, Ghost)));
       INFRULE(from_position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
 
-      if (storeItem[SI].op0 != "%")
+      if (storeItem[SI].op0 != "")
         replaceTag.push_back(std::shared_ptr<TyExpr>(val));
     
     } else

@@ -9,6 +9,9 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/Analysis/CFG.h"
 
+#define INTRUDE(...) llvmberry::ValidationUnit::GetInstance()->intrude         \
+                      ([__VA_ARGS__] (llvmberry::Dictionary &data,             \
+                                      llvmberry::CoreHint &hints)
 #define INFRULE(pos, x)                                                        \
   hints.addCommand(llvmberry::ConsInfrule::make(pos, x),                       \
                    llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
@@ -22,6 +25,9 @@
 #define PHIPOSJustPhi(SCOPE, PN)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
+#define INDEXEDPOS(SCOPE, I, index, prev)                                      \
+                       llvmberry::TyPosition::make(SCOPE, *(I), index, prev)
+                                                                    
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
 #define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
 // Below code snippet is tu support overloading of two macro functions : 
@@ -100,6 +106,10 @@
 
 #define SRC llvmberry::Source
 #define TGT llvmberry::Target
+
+#define INDICESDICT data.get<llvmberry::ArgForIndices>()
+#define MEM2REGDICT data.get<llvmberry::ArgForMem2Reg>()
+#define DICTMAP(dict, key) dict.get()->find(key)->second
 
 namespace llvmberry {
 /* applyCommutativity(I, (A bop B), scope) :
