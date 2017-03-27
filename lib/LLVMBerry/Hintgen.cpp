@@ -1219,24 +1219,7 @@ void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To,
       expr = VAR(storeItem[SI].op0, Ghost);
 
     INFRULE(from_position, llvmberry::ConsIntroGhost::make(expr, REGISTER(Rghost, Ghost)));
-
-   
-   /* 
-    if (storeItem[SI].op0 == "" || MEM2REGDICT->equalsIfConsVar(storeItem[SI].expr, TyExpr::make(*value, Physical))) {
-      std::shared_ptr<TyExpr> val = TyExpr::make(*(SI->getOperand(0)), Physical);
-      std::shared_ptr<TyIntroGhost> ghost(new TyIntroGhost(val, REGISTER(Rghost, Ghost)));
-      INFRULE(from_position, std::shared_ptr<TyInfrule>(new ConsIntroGhost(ghost)));
-
-      if (storeItem[SI].op0 != "")
-        replaceTag.push_back(std::shared_ptr<TyExpr>(val));
-    
-    } else
-      INFRULE(from_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(Rghost, Ghost)));
-  */
-  
-  
-  
-  
+ 
   } else if (AI != NULL)
     INFRULE(from_position, ConsIntroGhost::make(EXPR(value, Physical), REGISTER(Rghost, Ghost)));
 }

@@ -60,6 +60,9 @@
   std::shared_ptr<llvmberry::TyExpr>(new llvmberry::TyExpr(                    \
       std::shared_ptr<llvmberry::TyExpr_i>(new llvmberry::ConsInsn(            \
           llvmberry::instructionWithGhostIdxs(x, y)))))
+#define INSNALIGNONE(I)                                                        \
+  llvmberry::ConsInsn::make(std::shared_ptr<llvmberry::TyInstruction>          \
+    (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(I))))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
 
 // LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
@@ -110,6 +113,9 @@
 #define INDICESDICT data.get<llvmberry::ArgForIndices>()
 #define MEM2REGDICT data.get<llvmberry::ArgForMem2Reg>()
 #define DICTMAP(dict, key) dict.get()->find(key)->second
+
+#define UNDEF(I) llvm::UndefValue::get(I->getType())
+#define UNDEFAI(I) llvm::UndefValue::get(AI->getAllocatedType())
 
 namespace llvmberry {
 /* applyCommutativity(I, (A bop B), scope) :
