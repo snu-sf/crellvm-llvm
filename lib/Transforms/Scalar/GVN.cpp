@@ -1693,43 +1693,48 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
   if (I1 != POS)
     PROPAGATE(LESSDEF(VAR(id_I1), RHS(id_I1, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
 
-  // Check swapping to make [ id(I1) >= exp(Ii) ] : TO BE REMOVED by auto
-  if (isa<CmpInst>(I1) || I1->isCommutative()) {
-    assert(numOps == 2 && "GVN same_vn: commutative but not 2 operands!");
-
+  if (isa<CmpInst>(I1) || I1->isCommutative())
     if ((!is_same_vn(VN, ops1[0], ops2[0])) &&
-        is_same_vn(VN, ops1[0], ops2[1]) &&
-        is_same_vn(VN, ops1[1], ops2[0])) {
-      if (isa<ICmpInst>(I1)) {
-        INFRULE(INSTPOS(SRC, POS),
-                llvmberry::ConsIcmpSwapOperands::make(*cast<ICmpInst>(I1)));
-      } else if (isa<FCmpInst>(I1)) {
-        INFRULE(INSTPOS(SRC, POS),
-                llvmberry::ConsFcmpSwapOperands::make(*cast<FCmpInst>(I1)));
-      } else if (BinaryOperator *BI1 = dyn_cast<BinaryOperator>(I1)) {
-        llvmberry::applyCommutativity(POS, BI1, SRC);
-      }
+        is_same_vn(VN, ops1[0], ops2[1]) && is_same_vn(VN, ops1[1], ops2[0]))
       std::swap(ops1[0], ops1[1]);
-    }
-  }
+
+  // Check swapping to make [ id(I1) >= exp(Ii) ] : TO BE REMOVED by auto
+  // if (isa<CmpInst>(I1) || I1->isCommutative()) {
+  //   assert(numOps == 2 && "GVN same_vn: commutative but not 2 operands!");
+
+  //   if ((!is_same_vn(VN, ops1[0], ops2[0])) &&
+  //       is_same_vn(VN, ops1[0], ops2[1]) &&
+  //       is_same_vn(VN, ops1[1], ops2[0])) {
+  //     if (isa<ICmpInst>(I1)) {
+  //       INFRULE(INSTPOS(SRC, POS),
+  //               llvmberry::ConsIcmpSwapOperands::make(*cast<ICmpInst>(I1)));
+  //     } else if (isa<FCmpInst>(I1)) {
+  //       INFRULE(INSTPOS(SRC, POS),
+  //               llvmberry::ConsFcmpSwapOperands::make(*cast<FCmpInst>(I1)));
+  //     } else if (BinaryOperator *BI1 = dyn_cast<BinaryOperator>(I1)) {
+  //       llvmberry::applyCommutativity(POS, BI1, SRC);
+  //     }
+  //     std::swap(ops1[0], ops1[1]);
+  //   }
+  // }
 
   // If e_I1 is gep inb and e_I2 isn't, remove inbounds : TO BE REMOVED by auto
   // to get [ gep inb .. >= gep .. ] and then
   // transitivity [ id(I1) >= gep inb .. >= gep .. ]
-  if (GetElementPtrInst *GEP_I1 = dyn_cast<GetElementPtrInst>(I1)) {
-    GetElementPtrInst *GEP_I2 = cast<GetElementPtrInst>(I2);
-    if (GEP_I1->isInBounds() && !GEP_I2->isInBounds()) {
-      INFRULE(INSTPOS(SRC, POS), llvmberry::ConsGepInboundsRemove::make(INSN(*GEP_I1)));
-      GetElementPtrInst *GEP_Ii = cast<GetElementPtrInst>(GEP_I1->clone());
-      GEP_Ii->setIsInBounds(false);
-      auto gepi_expr = INSN(*GEP_Ii);
-      delete GEP_Ii;
+  // if (GetElementPtrInst *GEP_I1 = dyn_cast<GetElementPtrInst>(I1)) {
+  //   GetElementPtrInst *GEP_I2 = cast<GetElementPtrInst>(I2);
+  //   if (GEP_I1->isInBounds() && !GEP_I2->isInBounds()) {
+  //     INFRULE(INSTPOS(SRC, POS), llvmberry::ConsGepInboundsRemove::make(INSN(*GEP_I1)));
+  //     GetElementPtrInst *GEP_Ii = cast<GetElementPtrInst>(GEP_I1->clone());
+  //     GEP_Ii->setIsInBounds(false);
+  //     auto gepi_expr = INSN(*GEP_Ii);
+  //     delete GEP_Ii;
 
-      INFRULE(INSTPOS(SRC, POS),
-              llvmberry::ConsTransitivity::make(
-                  VAR(id_I1, Physical), RHS(id_I1, Physical, SRC), gepi_expr));
-    }
-  }
+  //     INFRULE(INSTPOS(SRC, POS),
+  //             llvmberry::ConsTransitivity::make(
+  //                 VAR(id_I1, Physical), RHS(id_I1, Physical, SRC), gepi_expr));
+  //   }
+  // }
 
   // From [ id(I1) >= exp(Ii) ], produce [ id(I1) >= exp(I2) ].
   for (unsigned i = 0; i < I1->getNumOperands(); ++i) {
