@@ -328,8 +328,6 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
       }
     }
 
-    //llvmberry::ValidationUnit::GetInstance()->intrude
-    //        ([&I] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
     INTRUDE(&I) {
       hints.appendToDescription("removeLifeTime");
       hints.setReturnCodeToAdmitted();
@@ -949,8 +947,6 @@ void PromoteMem2Reg::run() {
         if (AST && PN->getType()->isPointerTy())
           AST->deleteValue(PN);
         
-        //llvmberry::ValidationUnit::GetInstance()->intrude
-        //        ([&PN, &V] (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
         INTRUDE(&PN, &V) {
           auto &termIndices = *(INDICESDICT->termIndices);
 
@@ -1049,31 +1045,7 @@ void PromoteMem2Reg::run() {
       for (unsigned pred = 0, e = Preds.size(); pred != e; ++pred) {
         SomePHI->addIncoming(UndefVal, Preds[pred]);
 
-        INTRUDE(&Preds, &pred) {
-          PROPAGATE(LESSDEF(llvmberry::false_encoding.first, llvmberry::false_encoding.second, SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(Preds[pred])),
-                           llvmberry::TyPosition::make_end_of_block(SRC, *Preds[pred])));
-
-          std::vector<BasicBlock *> DeadBlockList;
-          BasicBlock *Pre = Preds[pred] ;
-
-          // find predecssor of pred and insert in worklist if it has one
-          for (auto BI = pred_begin(Pre), BE = pred_end(Pre); BI != BE; BI++) 
-            DeadBlockList.push_back((*BI));
-
-          while(!DeadBlockList.empty()) {
-            BasicBlock * L = *DeadBlockList.rbegin();
-            DeadBlockList.pop_back();
-
-            // propagate false start to end of K.
-            PROPAGATE(LESSDEF(llvmberry::false_encoding.first, llvmberry::false_encoding.second, SRC),
-                      BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(L)), llvmberry::TyPosition::make_end_of_block(SRC, *L)));
-
-            // find predessor of K and insert in worklist if it has one
-            for (auto BI = pred_begin(L), BE = pred_end(L); BI != BE; BI++)
-              DeadBlockList.push_back((*BI));
-          }
-        }); 
+        INTRUDE(&Preds, &pred) { llvmberry::unreachableBlockPropagateFalse(Preds[pred], hints); });
       }
     }
   }

@@ -1277,4 +1277,33 @@ void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
                                                   TyValue::make(*ReplVal));
 }
 
+void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints) {
+
+  PROPAGATE(LESSDEF(false_encoding.first, false_encoding.second, SRC),
+            BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(bb)), TyPosition::make_end_of_block(SRC, *bb)));
+
+  std::vector<llvm::BasicBlock *> DeadBlockList;
+
+  // find predecssor of pred and insert in worklist if it has one
+  for (auto BI = pred_begin(bb), BE = pred_end(bb); BI != BE; BI++)
+    DeadBlockList.push_back((*BI));
+
+  while(!DeadBlockList.empty()) {
+    llvm::BasicBlock * L = *DeadBlockList.rbegin();
+    DeadBlockList.pop_back();
+
+    // propagate false start to end of K.
+    PROPAGATE(LESSDEF(false_encoding.first, false_encoding.second, SRC),
+              BOUNDS(TyPosition::make_start_of_block(SRC, getBasicBlockIndex(L)), TyPosition::make_end_of_block(SRC, *L)));
+
+    // find predessor of K and insert in worklist if it has one
+    for (auto BI = pred_begin(L), BE = pred_end(L); BI != BE; BI++)
+      DeadBlockList.push_back((*BI));
+  }
+
+}
+
+
+
+
 } // llvmberry

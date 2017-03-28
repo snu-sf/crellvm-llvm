@@ -252,6 +252,9 @@ void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data);
 
 void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal, llvm::Instruction* I, Dictionary &data);
 
+void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints);
+
+
 }
 
 #endif
