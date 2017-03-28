@@ -408,7 +408,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       // prepare variables
       auto &instrIndices = *(INDICESDICT->instrIndices);
       auto &storeItem = *(MEM2REGDICT->storeItem);
-      auto &mem2regCmd = *(MEM2REGDICT->mem2regCmd);
       auto &replaceTag = *(MEM2REGDICT->replaceTag);
       std::string Rstore = llvmberry::getVariable(*(OnlyStore->getOperand(1)));
       std::string Rload = llvmberry::getVariable(*LI);
@@ -420,6 +419,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         llvmberry::propagateLoadGhostValueForm(AI, LI, ReplVal, data, hints);
         
         // can be removed after modify function entry invariant
+        auto &mem2regCmd = *(MEM2REGDICT->mem2regCmd);
         std::shared_ptr<llvmberry::TyLessthanUndef> lessthanundef
           (new llvmberry::TyLessthanUndef
             (llvmberry::TyValueType::make(*LI->getType()),
@@ -427,10 +427,11 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
               (new llvmberry::ConsId
                 (llvmberry::TyRegister::make(Rload, llvmberry::Ghost)))));
         mem2regCmd[Rload].lessUndef.push_back(lessthanundef);
-
         INFRULE(INDEXEDPOS(SRC, AI, instrIndices[AI], ""),
                 std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsLessthanUndef(lessthanundef)));
-       
+        //remove 
+
+
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
         if (MEM2REGDICT->equalsIfConsVar(storeItem[OnlyStore].expr, expr)) {
@@ -463,8 +464,10 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       ReplVal = UndefValue::get(LI->getType());
 
     INTRUDE(&AI, &LI, &ReplVal) {
+     //removable 
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI, data);
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, AI, data);
+
       llvmberry::replaceExpr(AI, ReplVal, data);
       llvmberry::replaceTag(AI, llvmberry::Ghost, data);
       llvmberry::replaceExpr(LI, ReplVal, data);
@@ -597,6 +600,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(INDICESDICT->instrIndices, LI)-1, ""));
 
         llvmberry::generateHintForMem2RegReplaceHint(value, LI, data);
+        
         llvmberry::replaceExpr(LI, value, data);
         llvmberry::replaceTag(LI, llvmberry::Ghost, data);
     });
@@ -854,14 +858,12 @@ void PromoteMem2Reg::run() {
     Values[i] = UndefValue::get(Allocas[i]->getAllocatedType());
 
     INTRUDE(&i, this) {
-      auto &recentInstr = *(MEM2REGDICT->recentInstr);
       AllocaInst* AI = Allocas[i];
 
-      //DICTMAP(MEM2REGDICT->recentInstr, i) = 
-      recentInstr[i] =
-        { INSNALIGNONE(AI), EXPR(UNDEFAI(AI), Physical),
-          INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), ""),
-          "", llvmberry::getVariable(*AI), AI->getParent(), false };
+      MEM2REGDICT->recentInstr.get()->insert(std::pair<unsigned, LLVMBERRYRPD>
+        (i, { INSNALIGNONE(AI), EXPR(UNDEFAI(AI), Physical),
+              INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), ""),
+              "", llvmberry::getVariable(*AI), AI->getParent(), false }));
     });
   }
 
@@ -961,14 +963,12 @@ void PromoteMem2Reg::run() {
                 // value is instr
                 // from to prpagate undef > value
                 PROPAGATE(LESSDEF(EXPR(UndefVal, Physical), VAR(llvmberry::getVariable(*In), Physical), TGT),
-                          BOUNDS(INSTPOS(TGT, In),llvmberry::TyPosition::make_end_of_block
-                                  (SRC, *Income, termIndices[llvmberry::getBasicBlockIndex(Income)])));
+                          BOUNDS(INSTPOS(TGT, In),llvmberry::TyPosition::make_end_of_block(SRC, *Income, termIndices[llvmberry::getBasicBlockIndex(Income)])));
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
                 // value is constInt or constFloat
                 // infrule lessthanundef target undef > const
                 Constant *C = dyn_cast<Constant>(V);
-                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()),
-                        llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
+                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
               } else 
                   hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT");
             }
@@ -1063,8 +1063,7 @@ void PromoteMem2Reg::run() {
 
             // propagate false start to end of K.
             PROPAGATE(LESSDEF(llvmberry::false_encoding.first, llvmberry::false_encoding.second, SRC),
-                      BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(L)),
-                             llvmberry::TyPosition::make_end_of_block(SRC, *L)));
+                      BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(L)), llvmberry::TyPosition::make_end_of_block(SRC, *L)));
 
             // find predessor of K and insert in worklist if it has one
             for (auto BI = pred_begin(L), BE = pred_end(L); BI != BE; BI++)
@@ -1221,7 +1220,6 @@ NextIteration:
         IncomingVals[AllocaNo] = APN;
 
         INTRUDE(&APN, &Pred, &AllocaNo) {
-          auto &recentInstr = *(MEM2REGDICT->recentInstr);
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
 
@@ -1231,8 +1229,8 @@ NextIteration:
 
           llvmberry::propagateFromAISIPhiToLoadPhiSI(AllocaNo, APN, Pred, data, hints);
 
-          recentInstr[AllocaNo] = 
-            { recentInstr[AllocaNo].instrL, VAR(Rphi, Physical),
+          MEM2REGDICT->recentInstr.get()->at(AllocaNo) =
+            { DICTMAP(MEM2REGDICT->recentInstr, AllocaNo).instrL, VAR(Rphi, Physical),
               INDEXEDPOS(SRC, APN, DICTMAP(INDICESDICT->instrIndices, APN), prev),
               "llvmberry::PHI", Rphi, APN->getParent(), false };
         });
@@ -1299,18 +1297,17 @@ NextIteration:
         continue;
 
       INTRUDE(&SI, &ai) {
-        auto &recentInstr = *(MEM2REGDICT->recentInstr);
-
         llvmberry::propagateFromAISIPhiToLoadPhiSI(ai->second, SI, nullptr, data, hints);
 
         std::string op0 = "";
         if (!isa<Constant>(*(SI->getOperand(0))))
           op0 = llvmberry::getVariable(*(SI->getOperand(0)));
 
-        recentInstr[ai->second] = 
+        MEM2REGDICT->recentInstr.get()->at(ai->second) =
           { INSNALIGNONE(SI), EXPR(SI->getOperand(0), Physical),
             INDEXEDPOS(SRC, SI, DICTMAP(INDICESDICT->instrIndices, SI), ""), op0,
-            llvmberry::getVariable(*(SI->getOperand(1))), SI->getParent(), recentInstr[ai->second].check };
+            llvmberry::getVariable(*(SI->getOperand(1))), SI->getParent(),
+            DICTMAP(MEM2REGDICT->recentInstr, ai->second).check };
 
         hints.addNopPosition(INDEXEDPOS(TGT, SI, DICTMAP(INDICESDICT->instrIndices, SI)-1, ""));
 
