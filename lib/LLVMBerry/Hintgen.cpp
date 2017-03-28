@@ -1229,7 +1229,7 @@ void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
   std::string str = "";
 
   if (llvm::isa<llvm::AllocaInst>(Tgt) || llvm::isa<llvm::LoadInst>(Tgt) || llvm::isa<llvm::PHINode>(Tgt))
-        str = getVariable(*Tgt);
+    str = getVariable(*Tgt);
 
   std::shared_ptr<TyExpr> tgtPhysical = ConsVar::make(str, Physical);
   std::shared_ptr<TyExpr> replPhysical = TyExpr::make(*New, Physical);

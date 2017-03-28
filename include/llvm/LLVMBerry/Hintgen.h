@@ -117,6 +117,8 @@
 #define UNDEF(I) llvm::UndefValue::get(I->getType())
 #define UNDEFAI(I) llvm::UndefValue::get(AI->getAllocatedType())
 
+#define LLVMBERRYRPD llvmberry::Mem2RegArg::RenamePassTuple
+
 namespace llvmberry {
 /* applyCommutativity(I, (A bop B), scope) :
  *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the

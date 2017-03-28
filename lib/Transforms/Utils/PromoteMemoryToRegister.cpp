@@ -417,7 +417,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         llvmberry::propagateLoadGhostValueForm(AI, LI, ReplVal, data, hints);
         
         // can be removed after modify function entry invariant
-      auto &mem2regCmd = *(MEM2REGDICT->mem2regCmd);
+        auto &mem2regCmd = *(MEM2REGDICT->mem2regCmd);
         std::shared_ptr<llvmberry::TyLessthanUndef> lessthanundef
           (new llvmberry::TyLessthanUndef
             (llvmberry::TyValueType::make(*LI->getType()),
@@ -427,16 +427,14 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         mem2regCmd[Rload].lessUndef.push_back(lessthanundef);
         INFRULE(INDEXEDPOS(SRC, AI, instrIndices[AI], ""),
                 std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsLessthanUndef(lessthanundef)));
-      //remove 
-
+        //remove 
 
 
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
         if (MEM2REGDICT->equalsIfConsVar(storeItem[OnlyStore].expr, expr)) {
           replaceTag.push_back(expr);
-        } else if (storeItem[OnlyStore].op0 != "") { 
-          expr = VAR(storeItem[OnlyStore].op0, Ghost); }
+        } else if (storeItem[OnlyStore].op0 != "") { expr = VAR(storeItem[OnlyStore].op0, Ghost); }
 
         INFRULE(INDEXEDPOS(SRC, OnlyStore, instrIndices[OnlyStore], ""),
                 llvmberry::ConsIntroGhost::make(expr, REGISTER(Rstore, Ghost)));
@@ -858,14 +856,12 @@ void PromoteMem2Reg::run() {
     Values[i] = UndefValue::get(Allocas[i]->getAllocatedType());
 
     INTRUDE(&i, this) {
-      auto &recentInstr = *(MEM2REGDICT->recentInstr);
       AllocaInst* AI = Allocas[i];
 
-      //DICTMAP(MEM2REGDICT->recentInstr, i) = 
-      recentInstr[i] =
-        { INSNALIGNONE(AI), EXPR(UNDEFAI(AI), Physical),
-          INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), ""),
-          "", llvmberry::getVariable(*AI), AI->getParent(), false };
+      MEM2REGDICT->recentInstr.get()->insert(std::pair<unsigned, LLVMBERRYRPD>
+        (i, { INSNALIGNONE(AI), EXPR(UNDEFAI(AI), Physical),
+              INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), ""),
+              "", llvmberry::getVariable(*AI), AI->getParent(), false }));
     });
   }
 
@@ -1196,7 +1192,6 @@ NextIteration:
         IncomingVals[AllocaNo] = APN;
 
         INTRUDE(&APN, &Pred, &AllocaNo) {
-          auto &recentInstr = *(MEM2REGDICT->recentInstr);
           std::string Rphi = llvmberry::getVariable(*APN);
           std::string prev = llvmberry::getBasicBlockIndex(Pred);
 
@@ -1206,8 +1201,8 @@ NextIteration:
 
           llvmberry::propagateFromAISIPhiToLoadPhiSI(AllocaNo, APN, Pred, data, hints);
 
-          recentInstr[AllocaNo] = 
-            { recentInstr[AllocaNo].instrL, VAR(Rphi, Physical),
+          MEM2REGDICT->recentInstr.get()->at(AllocaNo) =
+            { DICTMAP(MEM2REGDICT->recentInstr, AllocaNo).instrL, VAR(Rphi, Physical),
               INDEXEDPOS(SRC, APN, DICTMAP(INDICESDICT->instrIndices, APN), prev),
               "llvmberry::PHI", Rphi, APN->getParent(), false };
         });
@@ -1274,18 +1269,17 @@ NextIteration:
         continue;
 
       INTRUDE(&SI, &ai) {
-        auto &recentInstr = *(MEM2REGDICT->recentInstr);
-
         llvmberry::propagateFromAISIPhiToLoadPhiSI(ai->second, SI, nullptr, data, hints);
 
         std::string op0 = "";
         if (!isa<Constant>(*(SI->getOperand(0))))
           op0 = llvmberry::getVariable(*(SI->getOperand(0)));
 
-        recentInstr[ai->second] = 
+        MEM2REGDICT->recentInstr.get()->at(ai->second) =
           { INSNALIGNONE(SI), EXPR(SI->getOperand(0), Physical),
             INDEXEDPOS(SRC, SI, DICTMAP(INDICESDICT->instrIndices, SI), ""), op0,
-            llvmberry::getVariable(*(SI->getOperand(1))), SI->getParent(), recentInstr[ai->second].check };
+            llvmberry::getVariable(*(SI->getOperand(1))), SI->getParent(),
+            DICTMAP(MEM2REGDICT->recentInstr, ai->second).check };
 
         hints.addNopPosition(INDEXEDPOS(TGT, SI, DICTMAP(INDICESDICT->instrIndices, SI)-1, ""));
 
