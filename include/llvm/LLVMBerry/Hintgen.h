@@ -26,7 +26,13 @@
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
 #define INDEXEDPOS(SCOPE, I, index, prev)                                      \
-                       llvmberry::TyPosition::make(SCOPE, *(I), index, prev)
+  llvmberry::TyPosition::make(SCOPE, *(I), index, prev)
+#define STARTPOS(SCOPE, BBname)                                                \
+  llvmberry::TyPosition::make_start_of_block(SCOPE, BBname)
+#define ENDPOSINDEXED(SCOPE, BB, index)                                        \
+  llvmberry::TyPosition::make_end_of_block(SCOPE, *(BB), index)
+#define ENDPOS(SCOPE, BB)                                                      \
+  llvmberry::TyPosition::make_end_of_block(SCOPE, *(BB))
                                                                     
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
 #define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
