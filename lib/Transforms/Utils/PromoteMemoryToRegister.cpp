@@ -1031,30 +1031,7 @@ void PromoteMem2Reg::run() {
       for (unsigned pred = 0, e = Preds.size(); pred != e; ++pred) {
         SomePHI->addIncoming(UndefVal, Preds[pred]);
 
-        INTRUDE(&Preds, &pred) {
-          PROPAGATE(LESSDEF(llvmberry::false_encoding.first, llvmberry::false_encoding.second, SRC),
-                    BOUNDS(STARTPOS(SRC, llvmberry::getBasicBlockIndex(Preds[pred])), ENDPOS(SRC, Preds[pred])));
-
-          std::vector<BasicBlock *> DeadBlockList;
-          BasicBlock *Pre = Preds[pred] ;
-
-          // find predecssor of pred and insert in worklist if it has one
-          for (auto BI = pred_begin(Pre), BE = pred_end(Pre); BI != BE; BI++) 
-            DeadBlockList.push_back((*BI));
-
-          while(!DeadBlockList.empty()) {
-            BasicBlock * L = *DeadBlockList.rbegin();
-            DeadBlockList.pop_back();
-
-            // propagate false start to end of K.
-            PROPAGATE(LESSDEF(llvmberry::false_encoding.first, llvmberry::false_encoding.second, SRC),
-                      BOUNDS(STARTPOS(SRC, llvmberry::getBasicBlockIndex(L)), ENDPOS(SRC, L)));
-
-            // find predessor of K and insert in worklist if it has one
-            for (auto BI = pred_begin(L), BE = pred_end(L); BI != BE; BI++)
-              DeadBlockList.push_back((*BI));
-          }
-        }); 
+        INTRUDE(&Preds, &pred) { llvmberry::unreachableBlockPropagateFalse(Preds[pred], hints); });
       }
     }
   }
