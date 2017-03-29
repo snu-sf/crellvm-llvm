@@ -412,7 +412,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       // not an instruction
       if (StoringGlobalVal) {
         // propagate stored value from alloca to load 
-        llvmberry::propagateLoadGhostValueForm(AI, LI, ReplVal, data, hints);
+        llvmberry::propagateLoadGhostValueForm(AI, LI, ReplVal, data, hints, true);
         
         // can be removed after modify function entry invariant
         auto &mem2regCmd = *(MEM2REGDICT->mem2regCmd);
@@ -436,7 +436,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
         INFRULE(INDEXEDPOS(SRC, OnlyStore, DICTMAP(INDICESDICT->instrIndices, OnlyStore), ""),
                 llvmberry::ConsIntroGhost::make(expr, REGISTER(Rstore, Ghost)));
-      } else { llvmberry::propagateLoadGhostValueForm(OnlyStore, LI, ReplVal, data, hints); }
+      } else { llvmberry::propagateLoadGhostValueForm(OnlyStore, LI, ReplVal, data, hints, true); }
         // Step1: propagate store instruction
         //        <src>                               |     <tgt>
         // %x = alloca i32                            | nop
@@ -446,7 +446,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // %c = add i32 %a, %b   | %c = add i32 %a, %b
         // ret i32 %c            | ret i32 %c
 
-      llvmberry::propagateLoadInstToUse(LI, ReplVal == LI? UNDEF(LI) : ReplVal, Rstore, data, hints);
+      llvmberry::propagateLoadInstToUse(LI, ReplVal == LI? UNDEF(LI) : ReplVal, Rstore, data, hints, true);
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
 
@@ -587,8 +587,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
         insn = SI;
       }
         
-      llvmberry::propagateLoadGhostValueForm(insn, LI, value, data, hints);
-      llvmberry::propagateLoadInstToUse(LI, value, llvmberry::getVariable(*AI), data, hints);
+      llvmberry::propagateLoadGhostValueForm(insn, LI, value, data, hints, true);
+      llvmberry::propagateLoadInstToUse(LI, value, llvmberry::getVariable(*AI), data, hints, true);
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
 
@@ -1230,7 +1230,7 @@ NextIteration:
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
         llvmberry::propagateFromAISIPhiToLoadPhiSI(AI->second, LI, nullptr, data, hints);
-        llvmberry::propagateLoadInstToUse(LI, V, DICTMAP(MEM2REGDICT->recentInstr, AI->second).op1, data, hints);
+        llvmberry::propagateLoadInstToUse(LI, V, DICTMAP(MEM2REGDICT->recentInstr, AI->second).op1, data, hints, true);
 
         hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(INDICESDICT->instrIndices, LI)-1, ""));
 
