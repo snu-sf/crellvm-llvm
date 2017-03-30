@@ -250,9 +250,9 @@ void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictio
 
 void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
 
-void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints);
+void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints, bool checkReplace=false);
 
-void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints);
+void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints, bool checkReplace=false);
 
 void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data);
 
