@@ -1642,8 +1642,9 @@ bool is_same_vn(ValueTable &VN, Value *V1, Value *V2) {
           (VN.lookup_VN_of_expr(V1) == VN.lookup_VN_of_expr(V2)));
 }
 
-std::string ghostSymb(uint32_t vn) {
-  std::string g_symb = "g" + std::to_string(vn);
+std::string ghostSymb(uint32_t vn, bool isSrc) {
+  std::string postfix = isSrc? "_s" : "_t";
+  std::string g_symb = "g" + std::to_string(vn) + postfix;
   return g_symb;
 }
 
@@ -1661,15 +1662,17 @@ uint32_t hintgenGhostExpr(llvmberry::CoreHint &hints, ValueTable &VN, Instructio
   std::shared_ptr<llvmberry::ConsInsn> gexp_insn;
 
   // std::shared_ptr<llvmberry::ConsInsn> gexp_insn = std::static_pointer_cast<llvmberry::ConsInsn>(gexp);
-  std::shared_ptr<llvmberry::TyExpr> gvar = VAR(ghostSymb(vn_I), Ghost);
+  std::shared_ptr<llvmberry::TyExpr> gvar = VAR(ghostSymb(vn_I, true), Ghost);
 
-  for (int i = 0; i < I->getNumOperands(); ++i) {
+  for (int i = 0; i < (int)I->getNumOperands(); ++i) {
     Value *Vop = I->getOperand(i);
     if (Instruction *Iop = dyn_cast<Instruction>(Vop)) {
       uint32_t vn_op = hintgenGhostExpr(hints, VN, Iop, true, I);
-      if (vn_op > 0) gexp_insn->replace_op(i, ID(ghostSymb(vn_op), Ghost));
+      if (vn_op > 0) gexp_insn->replace_op(i, ID(ghostSymb(vn_op, true), Ghost));
     }
   }
+
+  if (I == propUntil) return vn_I;
 
   PROPAGATE(LESSDEF(gvar, gexp, SRC), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, propUntil)));
   PROPAGATE(LESSDEF(gexp, gvar, SRC), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, propUntil)));
@@ -1682,61 +1685,230 @@ uint32_t hintgenGhostExpr(llvmberry::CoreHint &hints, ValueTable &VN, Instructio
   return vn_I;
 }
 
+typedef SmallVector<Instruction*, 4> DestVect;
+typedef SmallVector<std::pair<Value *, DestVect>, 4> ValDestVect;
+
+void checkValues(ValDestVect &vect, Instruction *&X, bool &flag,
+                 bool &exists_phi, bool &exists_nonphi) {
+  for (auto II = vect.begin(), IE = vect.end(); II != IE; ++II) {
+    if (Instruction *cur = dyn_cast<Instruction>((*II).first)) {
+      if (X == nullptr) X = cur;
+      else if (X != cur) flag = false;
+
+      if (isa<PHINode>(cur)) exists_phi = true;
+      else exists_nonphi = true;
+    } else {
+      flag = true;
+      return;
+    }
+  }
+}
+std::shared_ptr<llvmberry::ConsInsn>
+extractOps(ValueTable &VN, ValDestVect &vd,
+           SmallVector<ValDestVect, 4> &ops, bool is_src) {
+  Instruction *I_repr = nullptr;
+
+  for (auto II = vd.begin(), IE = vd.end(); II != IE; ++II) {
+    Instruction *I = cast<Instruction>((*II).first);
+    if (I_repr == nullptr) I_repr = I;
+    SmallVector<Value*, 4> tmp_ops;
+
+    for (auto OI = I->op_begin(), OE = I->op_end(); OI != OE; ++OI)
+      tmp_ops.push_back(*OI);
+
+    if (VN.lookup(tmp_ops[0]) != VN.lookup(I_repr->getOperand(0)))
+      std::swap(tmp_ops[0], tmp_ops[1]);
+
+    for (int i = 0; i < (int)tmp_ops.size(); ++i)
+      ops[i].push_back(std::make_pair(tmp_ops[i], (*II).second));
+
+    if (GetElementPtrInst *gep = dyn_cast<GetElementPtrInst>(I)) {
+      if (is_src && gep->isInBounds()) I_repr = I;
+      else if (!is_src && !gep->isInBounds()) I_repr = I;
+    }
+  }
+
+  return std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_repr));
+}
+
+bool hintgenGhostExpr2(llvmberry::CoreHint &hints, ValueTable &VN,
+                       ValDestVect &vd_s, ValDestVect &vd_t);
+
+bool unfold_phi(llvmberry::CoreHint &hints, ValueTable &VN,
+                ValDestVect &vd_s, ValDestVect &vd_t) {
+  ValDestVect vd_s_new, vd_t_new;
+  std::shared_ptr<llvmberry::TyExpr> gvar_s = VAR(ghostSymb(VN.lookup(vd_s[0].first), true), Ghost);
+  std::shared_ptr<llvmberry::TyExpr> gvar_t = VAR(ghostSymb(VN.lookup(vd_s[0].first), false), Ghost);
+
+  for (auto II = vd_s.begin(), IE = vd_s.end(); II != IE; ++II) {
+    Instruction *I = cast<Instruction>((*II).first);
+    if (PHINode *PHI = dyn_cast<PHINode>(I)) {
+      for (int i = 0; i < (int)PHI->getNumIncomingValues(); ++i) {
+        Instruction *I_in = cast<Instruction>(PHI->getIncomingValue(i));
+        std::string id_in = llvmberry::getVariable(*I_in);
+        (*II).second.push_back(I);
+        vd_s_new.push_back(std::make_pair(I_in, (*II).second));
+        PROPAGATE(LESSDEF(VAR(id_in), gvar_s, SRC), BOUNDS(INSTPOS(SRC, I_in), PHIPOSJustPhi(SRC, (*PHI))));
+      }
+    } else vd_s_new.push_back(*II);
+  }
+
+  for (auto II = vd_t.begin(), IE = vd_t.end(); II != IE; ++II) {
+    Instruction *I = cast<Instruction>((*II).first);
+    if (PHINode *PHI = dyn_cast<PHINode>(I)) {
+      for (int i = 0; i < (int)PHI->getNumIncomingValues(); ++i) {
+        Instruction *I_in = cast<Instruction>(PHI->getIncomingValue(i));
+        std::string id_in = llvmberry::getVariable(*I_in);
+        (*II).second.push_back(I);
+        vd_t_new.push_back(std::make_pair(I_in, (*II).second));
+        PROPAGATE(LESSDEF(gvar_t, VAR(id_in), SRC), BOUNDS(INSTPOS(SRC, I_in), PHIPOSJustPhi(SRC, (*PHI))));
+      }
+    } else vd_t_new.push_back(*II);
+  }
+
+  return hintgenGhostExpr2(hints, VN, vd_s_new, vd_t_new);
+}
+
+void propagate_dest(llvmberry::CoreHint &hints, std::shared_ptr<llvmberry::TyPropagateObject> prop_obj,
+                    Instruction *I_from, DestVect &dests) {
+  while (!dests.empty()) {
+    Instruction *I_to = dests.pop_back_val();
+    if (I_from != I_to)
+      PROPAGATE(prop_obj, BOUNDS(INSTPOS(SRC, I_from), INSTPOS(SRC, I_to)));
+    I_from = I_to;
+  }
+}
+
+bool hintgenGhostExpr2(llvmberry::CoreHint &hints, ValueTable &VN,
+                       ValDestVect &vd_s, ValDestVect &vd_t) {
+  Instruction *X = nullptr;
+  bool flag = true;
+  bool exists_phi = false;
+  bool exists_nonphi = false;
+
+  checkValues(vd_s, X, flag, exists_phi, exists_nonphi);
+  checkValues(vd_t, X, flag, exists_phi, exists_nonphi);
+
+  if (flag) return false;
+
+  if (exists_phi) {
+    return unfold_phi(hints, VN, vd_s, vd_t);
+  }
+
+  // Assume there's no phi. operator and num_operands should be equal.
+  int len_s = vd_s.size(), len_t = vd_t.size();
+  int num_ops = cast<Instruction>(vd_s[0].first)->getNumOperands();
+
+  SmallVector<ValDestVect, 4> ops_s;
+  SmallVector<ValDestVect, 4> ops_t;
+
+  for (int i = 0; i < num_ops; ++i) {
+    ops_s.push_back(ValDestVect());
+    ops_t.push_back(ValDestVect());
+  }
+
+  uint32_t vn = VN.lookup(vd_s[0].first);
+  std::shared_ptr<llvmberry::ConsInsn> ginsn_s = extractOps(VN, vd_s, ops_s, true);
+  std::shared_ptr<llvmberry::ConsInsn> ginsn_t = extractOps(VN, vd_t, ops_t, false);
+  std::shared_ptr<llvmberry::TyExpr> gvar_s = VAR(ghostSymb(vn, true), Ghost);
+  std::shared_ptr<llvmberry::TyExpr> gvar_t = VAR(ghostSymb(vn, false), Ghost);
+
+  for (int i = 0; i < num_ops; ++i) {
+    if (hintgenGhostExpr2(hints, VN, ops_s[i], ops_t[i])) {
+      uint32_t vn_op = VN.lookup(ops_s[i][0].first);
+      // TODO: modify op(gargs)
+      ginsn_s->replace_op(i, ID(ghostSymb(vn_op, true), Ghost));
+      ginsn_t->replace_op(i, ID(ghostSymb(vn_op, false), Ghost));
+
+      for (int j = 0; j < len_s; ++j) {
+        Instruction *I_s = cast<Instruction>(vd_s[j].first);
+        Instruction *I_op = cast<Instruction>(ops_s[i][j].first);
+        std::string id_op = llvmberry::getVariable(*I_op);
+        PROPAGATE(LESSDEF(VAR(id_op), gvar_s, SRC), BOUNDS(INSTPOS(SRC, I_op), INSTPOS(SRC, I_s)));
+      }
+      for (int j = 0; j < len_t; ++j) {
+        Instruction *I_t = cast<Instruction>(vd_t[j].first);
+        Instruction *I_op = cast<Instruction>(ops_t[i][j].first);
+        std::string id_op = llvmberry::getVariable(*I_op);
+        PROPAGATE(LESSDEF(gvar_t, VAR(id_op), SRC), BOUNDS(INSTPOS(SRC, I_op), INSTPOS(SRC, I_t)));
+      }
+    }
+  }
+
+  for (int i = 0; i < len_s; ++i) {
+    Instruction *I_s = cast<Instruction>(vd_s[i].first);
+    propagate_dest(hints, LESSDEF(gvar_s, ginsn_s, SRC), I_s, vd_s[i].second);
+    // if (I_s != vd_s[i].second)
+    //   PROPAGATE(LESSDEF(gvar_s, ginsn_s, SRC), BOUNDS(INSTPOS(SRC, I_s), INSTPOS(SRC, vd_s[i].second)));
+  }
+  for (int i = 0; i < len_t; ++i) {
+    Instruction *I_t = cast<Instruction>(vd_t[i].first);
+    propagate_dest(hints, LESSDEF(ginsn_t, gvar_t, SRC), I_t, vd_t[i].second);
+    // PROPAGATE(LESSDEF(ginsn_t, gvar_t, SRC), BOUNDS(INSTPOS(SRC, I_t), INSTPOS(SRC, vd_t[i].second)));
+  }
+
+  return true;
+}
+
 // Generate [ I1 >= I2 ] at POS if I1 and I2 have the same VN.
 // If I2 is not concrete (clonned during hintgen),
 // then just produce [ I1 >= exp(I2) ] at POS.
 bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
                      Instruction *I1, Instruction *I2, bool isI2Conc,
                      Instruction *POS) {
-  std::string id_I1 = llvmberry::getVariable(*I1), id_I2 = llvmberry::getVariable(*I2);
 
-  if (I1 == I2) return true;
+  hintgenGhostExpr(hints, VN, I1, true, I1);
+  hintgenGhostExpr(hints, VN, I2, true, I1);
 
-  if (!is_same_vn(VN, I1, I2)) {
-    hints.appendToDescription("Admitted due to load-optimization interference.");
-    hints.setReturnCodeToAdmitted();
-    return false;
-  }
+  // std::string id_I1 = llvmberry::getVariable(*I1), id_I2 = llvmberry::getVariable(*I2);
 
-  // Insts should have the same opcode. Otherwise it's PHI-related case, which
-  // is not covered yet.
+  // if (I1 == I2) return true;
 
-  if (I1->getOpcode() != I2->getOpcode()) {
-    if (isa<PHINode>(I1) || isa<PHINode>(I2)) {
-      if (PHINode *phi_I2 = dyn_cast<PHINode>(I2)) {
-        if (!generateHintForPRE(I1, phi_I2)) return false;
+  // if (!is_same_vn(VN, I1, I2)) {
+  //   hints.appendToDescription("Admitted due to load-optimization interference.");
+  //   hints.setReturnCodeToAdmitted();
+  //   return false;
+  // }
 
-        PROPAGATE(LESSDEF(RHS(id_I1, Physical, SRC), VAR(id_I2), SRC), BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(phi_I2->getParent())), INSTPOS(SRC, POS)));
-        if (I1 != POS)
-          PROPAGATE(LESSDEF(VAR(id_I1), RHS(id_I1, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
+  // // Insts should have the same opcode. Otherwise it's PHI-related case, which
+  // // is not covered yet.
 
-        INFRULE(INSTPOS(SRC, POS), llvmberry::ConsTransitivity::make(VAR(id_I1), RHS(id_I1, Physical, SRC), VAR(id_I2)));
-      }
-      return true;
-    }
-    assert(false && "GVN hintgen_same_vn: Same VN but not same Opcode. Neither is PHI.");
-  }
+  // if (I1->getOpcode() != I2->getOpcode()) {
+  //   if (isa<PHINode>(I1) || isa<PHINode>(I2)) {
+  //     if (PHINode *phi_I2 = dyn_cast<PHINode>(I2)) {
+  //       if (!generateHintForPRE(I1, phi_I2)) return false;
 
-  // Now we know I1 and I2 have the same VN.
-  assert(I1->getOpcode() == I2->getOpcode() && I1->getNumOperands() == I2->getNumOperands() &&
-         "GVN hintgen_same_vn: I1 and I2 should have same opcode and num of operands.");
+  //       PROPAGATE(LESSDEF(RHS(id_I1, Physical, SRC), VAR(id_I2), SRC), BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(phi_I2->getParent())), INSTPOS(SRC, POS)));
+  //       if (I1 != POS)
+  //         PROPAGATE(LESSDEF(VAR(id_I1), RHS(id_I1, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
 
-  SmallVector<Value *, 4> ops1, ops2;
-  int numOps = I1->getNumOperands();
+  //       INFRULE(INSTPOS(SRC, POS), llvmberry::ConsTransitivity::make(VAR(id_I1), RHS(id_I1, Physical, SRC), VAR(id_I2)));
+  //     }
+  //     return true;
+  //   }
+  //   assert(false && "GVN hintgen_same_vn: Same VN but not same Opcode. Neither is PHI.");
+  // }
 
-  for (auto OI = I1->op_begin(), OE = I1->op_end(); OI != OE; ++OI)
-    ops1.push_back(*OI);
-  for (auto OI = I2->op_begin(), OE = I2->op_end(); OI != OE; ++OI)
-    ops2.push_back(*OI);
+  // // Now we know I1 and I2 have the same VN.
+  // assert(I1->getOpcode() == I2->getOpcode() && I1->getNumOperands() == I2->getNumOperands() &&
+  //        "GVN hintgen_same_vn: I1 and I2 should have same opcode and num of operands.");
 
-  // Propagate [ id(I1) >= exp(I1) ] at POS.
-  if (I1 != POS)
-    PROPAGATE(LESSDEF(VAR(id_I1), RHS(id_I1, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
+  // SmallVector<Value *, 4> ops1, ops2;
+  // int numOps = I1->getNumOperands();
 
-  if (isa<CmpInst>(I1) || I1->isCommutative())
-    if ((!is_same_vn(VN, ops1[0], ops2[0])) &&
-        is_same_vn(VN, ops1[0], ops2[1]) && is_same_vn(VN, ops1[1], ops2[0]))
-      std::swap(ops1[0], ops1[1]);
+  // for (auto OI = I1->op_begin(), OE = I1->op_end(); OI != OE; ++OI)
+  //   ops1.push_back(*OI);
+  // for (auto OI = I2->op_begin(), OE = I2->op_end(); OI != OE; ++OI)
+  //   ops2.push_back(*OI);
+
+  // // Propagate [ id(I1) >= exp(I1) ] at POS.
+  // if (I1 != POS)
+  //   PROPAGATE(LESSDEF(VAR(id_I1), RHS(id_I1, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
+
+  // if (isa<CmpInst>(I1) || I1->isCommutative())
+  //   if ((!is_same_vn(VN, ops1[0], ops2[0])) &&
+  //       is_same_vn(VN, ops1[0], ops2[1]) && is_same_vn(VN, ops1[1], ops2[0]))
+  //     std::swap(ops1[0], ops1[1]);
 
   // Check swapping to make [ id(I1) >= exp(Ii) ] : TO BE REMOVED by auto
   // if (isa<CmpInst>(I1) || I1->isCommutative()) {
@@ -1777,19 +1949,19 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
   // }
 
   // From [ id(I1) >= exp(Ii) ], produce [ id(I1) >= exp(I2) ].
-  for (unsigned i = 0; i < I1->getNumOperands(); ++i) {
-    if (ops1[i] == ops2[i]) continue;
-    assert(isa<Instruction>(ops1[i]) && isa<Instruction>(ops2[i]) &&
-           "GVN same_vn: now ops's should be instructions");
+  // for (unsigned i = 0; i < I1->getNumOperands(); ++i) {
+  //   if (ops1[i] == ops2[i]) continue;
+  //   assert(isa<Instruction>(ops1[i]) && isa<Instruction>(ops2[i]) &&
+  //          "GVN same_vn: now ops's should be instructions");
 
-    // This generates [ id(I_ops1) >= id(I_ops2) ] at POS.
-    bool hintgen = hintgen_same_vn(hints, VN, cast<Instruction>(ops1[i]), cast<Instruction>(ops2[i]), true, POS);
-    if (!hintgen) return false;
-  }
+  //   // This generates [ id(I_ops1) >= id(I_ops2) ] at POS.
+  //   bool hintgen = hintgen_same_vn(hints, VN, cast<Instruction>(ops1[i]), cast<Instruction>(ops2[i]), true, POS);
+  //   if (!hintgen) return false;
+  // }
 
-  // PROPAGATE [ exp(I2) >= I2 ].
-  if (isI2Conc)
-    PROPAGATE(LESSDEF(RHS(id_I2, Physical, SRC), VAR(id_I2), SRC), BOUNDS(INSTPOS(SRC, I2), INSTPOS(SRC, POS)));
+  // // PROPAGATE [ exp(I2) >= I2 ].
+  // if (isI2Conc)
+  //   PROPAGATE(LESSDEF(RHS(id_I2, Physical, SRC), VAR(id_I2), SRC), BOUNDS(INSTPOS(SRC, I2), INSTPOS(SRC, POS)));
 
   return true;
 }
@@ -1994,7 +2166,8 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
   if (Instruction *I_repl = dyn_cast<Instruction>(repl)) {
     // repl is Inst, which implies that repl and I have the same VN,
     // since an Inst cannot be a leader of other VN's.
-    std::string id_I_repl = llvmberry::getVariable(*I_repl);
+    std::string id_repl = llvmberry::getVariable(*I_repl);
+    std::shared_ptr<llvmberry::TyExpr> gvar_repl = VAR(ghostSymb(VN.lookup(I_repl), false), Ghost);
 
     // This is the simplest, but most frequent case.
     // x = e1 (= op a1 b1 ..)
@@ -2004,8 +2177,16 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
     assert(VN.lookup(I) == VN.lookup(I_repl) &&
            "GVN make_repl_inv: repl and I have different value numbers!");
     // This produces [ id(I) >= I_repl ] at I.
-    bool hintgen = hintgen_same_vn(hints, VN, I, I_repl, true, I);
-    // if (!hintgen) hints.appendToDescription("GVN repl_inv: hintgen_same_vn failed.");
+    DestVect dests;
+    ValDestVect vs, vt;
+    dests.push_back(I);
+    vs.push_back(std::make_pair(I, dests));
+    vt.push_back(std::make_pair(I_repl, dests));
+    bool hintgen = hintgenGhostExpr2(hints, VN, vs, vt);
+    // bool hintgen = hintgen_same_vn(hints, VN, I, I_repl, true, I);
+    PROPAGATE(LESSDEF(gvar_repl, VAR(id_repl), SRC), BOUNDS(INSTPOS(SRC, I_repl), INSTPOS(SRC, I)));
+
+    if (!hintgen) hints.appendToDescription("GVN repl_inv: hintgen_same_vn failed.");
 
     // We admit redundant readonly call cases.
     if ((I->getOpcode() == Instruction::Call) &&
@@ -2070,8 +2251,7 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
     // hintgen_propeq generates hints to infer [ id(I) >= repl ] at I,
     // assuming [ exp(condI) = CI_cond ] at begin(BB_succ).
     // [ id(condI) = CI_cond ] is generated by the validator.
-    bool hintgen = hintgen_propeq(hints, VN, condI, CI_cond, I, repl,
-                                  BB_pred, BB_succ);
+    hintgen_propeq(hints, VN, condI, CI_cond, I, repl, BB_pred, BB_succ);
   }
 
   return LESSDEF(VAR(id_I, Physical), llvmberry::TyExpr::make(*repl), SRC);
@@ -3170,8 +3350,7 @@ static void patchAndReplaceAllUsesWith(Instruction *I, Value *Repl) {
       = make_repl_inv(hints, VN, I, Repl, SRC);
 
     // TODO: change to assert
-    if (!repl_inv)
-      return;
+    if (!repl_inv) return;
 
     // Propagate repl_inv from I to each use, and replace will be done
     // automatically
@@ -4022,101 +4201,141 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   addToLeaderTable(ValNo, Phi, CurrentBlock);
   Phi->setDebugLoc(CurInst->getDebugLoc());
 
-  // Validation hint generation for PRE
-  llvmberry::intrude([&CurInst, &Phi]() {
-    PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
+  llvmberry::intrude([&CurInst, &Phi, this]() {
     llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
-    if (PREAR->PrevPRE.size() == 0)
-      llvmberry::ValidationUnit::Begin("GVN_PRE",
-                                       CurInst->getParent()->getParent());
-    else
-      llvmberry::ValidationUnit::Begin("GVN_PRE_hard",
-                                       CurInst->getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("GVN_PRE", CurInst->getParent()->getParent());
 
-    // Somehow get [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi)
-    generateHintForPRE(CurInst, Phi);
-
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi, &PREAR](
+    llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi, this](
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
-      std::string CurInst_id = llvmberry::getVariable(*CurInst);
-      std::string Phi_id = llvmberry::getVariable(*Phi);
+      Instruction *I = CurInst;
+      std::shared_ptr<llvmberry::TyPropagateObject> repl_inv =
+          make_repl_inv(hints, VN, I, Phi, SRC);
 
-      std::vector<int> diffIdxWithoutPrevPRE;
-      Value *V = Phi->getIncomingValueForBlock(*pred_begin(Phi->getParent()));
-      if (Instruction *VI = dyn_cast<Instruction>(V)) {
-        if (!PREAR->getDiffIdxWithoutPrevPRE(CurInst, VI,
-                                             diffIdxWithoutPrevPRE))
-          assert("getDiffIdxWithoutPrevPRE failed!" && false);
-      }
-      auto CurInstObj = INSNWITHGHOST(*CurInst, diffIdxWithoutPrevPRE);
+      // TODO: change to assert
+      if (!repl_inv)
+        return;
 
-      // Propagate [ INSN(CurInst) >= Var(Phi) ] until CurInst
-      PROPAGATE(LESSDEF(CurInstObj, VAR(Phi_id, Physical), SRC),
-                BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                           llvmberry::Source,
-                           llvmberry::getBasicBlockIndex(Phi->getParent())),
-                       INSTPOS(SRC, CurInst)));
-
-      // For now, consider only this case
-      // It can && should be extended (evolving blah above), but let's do it
-      // lazy
-      if (diffIdxWithoutPrevPRE.size() == 1) {
-        int idx = diffIdxWithoutPrevPRE[0];
-        // Transitivity [ INSN(CurInst) >= CurInstObj ]
-        auto CurInstOp = CurInst->getOperand(idx);
-        auto CurInstOp_id = llvmberry::getVariable(*CurInstOp);
-        INFRULE(INSTPOS(SRC, CurInst),
-                llvmberry::ConsSubstitute::make(
-                    REGISTER(CurInstOp_id, Physical), VAL(CurInstOp, Ghost),
-                    INSN(*CurInst)));
-      }
-
-      // Transitivity [ Var(CurInst) >= INSN(CurInst) >= CurInstObj ]
-      // CurInstObj may filled with ghost
-      INFRULE(INSTPOS(SRC, CurInst),
-              llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
-                                                INSN(*CurInst), CurInstObj));
-
-      // Transitivity [ Var(CurInst) >= INSN(CurInst) >= Var(Phi) ]
-      INFRULE(INSTPOS(SRC, CurInst), llvmberry::ConsTransitivity::make(
-                                         VAR(CurInst_id, Physical), CurInstObj,
-                                         VAR(Phi_id, Physical)));
-
-      // TODO: for all uses of CurInst
-      // replace curInst -> phi
-      for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
-        if (Instruction *userI = dyn_cast<Instruction>(UI->getUser())) {
-          std::string userI_id = llvmberry::getVariable(*userI);
-
-          std::string prev_block_name = "";
-          if (isa<PHINode>(userI)) {
-            BasicBlock *bb_from =
-                dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
-            prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-          }
-
-          hints.appendToDescription("userI: " + ((*userI).getName()).str());
-          hints.appendToDescription("userI_id: " + userI_id);
-          hints.appendToDescription(
-              "userI's parent's index: " +
-              llvmberry::getBasicBlockIndex(userI->getParent()));
-          hints.appendToDescription("userI hasName: " +
-                                    std::to_string(userI->hasName()));
-
-          PROPAGATE(
-              LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
-              BOUNDS(INSTPOS(SRC, CurInst),
-                     llvmberry::TyPosition::make(llvmberry::Source, *userI,
-                                                 prev_block_name)));
-        } else {
-          hints.appendToDescription("userNotInstruction");
-          hints.setReturnCodeToFail();
-          return;
+      // Propagate repl_inv from I to each use, and replace will be done
+      // automatically
+      for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+        if (!isa<Instruction>(UI->getUser())) {
+          // let the validation fail when the user is not an instruction
+          assert(false && "User is not an instruction");
         }
+
+        Instruction *userI = dyn_cast<Instruction>(UI->getUser());
+        std::string userI_id = llvmberry::getVariable(*userI);
+
+        std::string prev_block_name = "";
+        if (isa<PHINode>(userI)) {
+          BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+          prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+        }
+
+        PROPAGATE(repl_inv,
+                  BOUNDS(INSTPOS(SRC, I),
+                         llvmberry::TyPosition::make(llvmberry::Source, *userI,
+                                                     prev_block_name)));
       }
     });
   });
+
+  // // Validation hint generation for PRE
+  // llvmberry::intrude([&CurInst, &Phi]() {
+  //   PREAnalysisResult *PREAR = new PREAnalysisResult(CurInst, Phi);
+  //   llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
+  //   if (PREAR->PrevPRE.size() == 0)
+  //     llvmberry::ValidationUnit::Begin("GVN_PRE",
+  //                                      CurInst->getParent()->getParent());
+  //   else
+  //     llvmberry::ValidationUnit::Begin("GVN_PRE_hard",
+  //                                      CurInst->getParent()->getParent());
+
+  //   // Somehow get [ INSN(CurInst) >= Var(Phi) ] in start_of_block(Phi)
+  //   generateHintForPRE(CurInst, Phi);
+
+  //   llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi, &PREAR](
+  //       llvmberry::ValidationUnit::Dictionary &data,
+  //       llvmberry::CoreHint &hints) {
+  //     std::string CurInst_id = llvmberry::getVariable(*CurInst);
+  //     std::string Phi_id = llvmberry::getVariable(*Phi);
+
+  //     std::vector<int> diffIdxWithoutPrevPRE;
+  //     Value *V = Phi->getIncomingValueForBlock(*pred_begin(Phi->getParent()));
+  //     if (Instruction *VI = dyn_cast<Instruction>(V)) {
+  //       if (!PREAR->getDiffIdxWithoutPrevPRE(CurInst, VI,
+  //                                            diffIdxWithoutPrevPRE))
+  //         assert("getDiffIdxWithoutPrevPRE failed!" && false);
+  //     }
+  //     auto CurInstObj = INSNWITHGHOST(*CurInst, diffIdxWithoutPrevPRE);
+
+  //     // Propagate [ INSN(CurInst) >= Var(Phi) ] until CurInst
+  //     PROPAGATE(LESSDEF(CurInstObj, VAR(Phi_id, Physical), SRC),
+  //               BOUNDS(llvmberry::TyPosition::make_start_of_block(
+  //                          llvmberry::Source,
+  //                          llvmberry::getBasicBlockIndex(Phi->getParent())),
+  //                      INSTPOS(SRC, CurInst)));
+
+  //     // For now, consider only this case
+  //     // It can && should be extended (evolving blah above), but let's do it
+  //     // lazy
+  //     if (diffIdxWithoutPrevPRE.size() == 1) {
+  //       int idx = diffIdxWithoutPrevPRE[0];
+  //       // Transitivity [ INSN(CurInst) >= CurInstObj ]
+  //       auto CurInstOp = CurInst->getOperand(idx);
+  //       auto CurInstOp_id = llvmberry::getVariable(*CurInstOp);
+  //       INFRULE(INSTPOS(SRC, CurInst),
+  //               llvmberry::ConsSubstitute::make(
+  //                   REGISTER(CurInstOp_id, Physical), VAL(CurInstOp, Ghost),
+  //                   INSN(*CurInst)));
+  //     }
+
+  //     // Transitivity [ Var(CurInst) >= INSN(CurInst) >= CurInstObj ]
+  //     // CurInstObj may filled with ghost
+  //     INFRULE(INSTPOS(SRC, CurInst),
+  //             llvmberry::ConsTransitivity::make(VAR(CurInst_id, Physical),
+  //                                               INSN(*CurInst), CurInstObj));
+
+  //     // Transitivity [ Var(CurInst) >= INSN(CurInst) >= Var(Phi) ]
+  //     INFRULE(INSTPOS(SRC, CurInst), llvmberry::ConsTransitivity::make(
+  //                                        VAR(CurInst_id, Physical), CurInstObj,
+  //                                        VAR(Phi_id, Physical)));
+
+  //     // TODO: for all uses of CurInst
+  //     // replace curInst -> phi
+  //     for (auto UI = CurInst->use_begin(); UI != CurInst->use_end(); ++UI) {
+  //       if (Instruction *userI = dyn_cast<Instruction>(UI->getUser())) {
+  //         std::string userI_id = llvmberry::getVariable(*userI);
+
+  //         std::string prev_block_name = "";
+  //         if (isa<PHINode>(userI)) {
+  //           BasicBlock *bb_from =
+  //               dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+  //           prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
+  //         }
+
+  //         hints.appendToDescription("userI: " + ((*userI).getName()).str());
+  //         hints.appendToDescription("userI_id: " + userI_id);
+  //         hints.appendToDescription(
+  //             "userI's parent's index: " +
+  //             llvmberry::getBasicBlockIndex(userI->getParent()));
+  //         hints.appendToDescription("userI hasName: " +
+  //                                   std::to_string(userI->hasName()));
+
+  //         PROPAGATE(
+  //             LESSDEF(VAR(CurInst_id, Physical), VAR(Phi_id, Physical), SRC),
+  //             BOUNDS(INSTPOS(SRC, CurInst),
+  //                    llvmberry::TyPosition::make(llvmberry::Source, *userI,
+  //                                                prev_block_name)));
+  //       } else {
+  //         hints.appendToDescription("userNotInstruction");
+  //         hints.setReturnCodeToFail();
+  //         return;
+  //       }
+  //     }
+  //   });
+  // });
 
   CurInst->replaceAllUsesWith(Phi);
   llvmberry::intrude([] {
