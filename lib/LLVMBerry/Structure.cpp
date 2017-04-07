@@ -2590,12 +2590,33 @@ void TyExtractValueInst::serialize(cereal::JSONOutputArchive& archive) const{
 // propagate expr
 // ConsVar or ConsConst
 
+TyExpr::TyExpr(std::shared_ptr<TyExpr_i> ei) : expr_i(ei) {}
+
+std::shared_ptr<TyExpr_i> TyExpr::get_i() { return expr_i; }
+
+void TyExpr::serialize(cereal::JSONOutputArchive &archive) const {
+  expr_i->serialize(archive);
+}
+
+void TyExpr::replace_expr(std::shared_ptr<TyExpr> expr) {
+  expr_i = expr->expr_i;
+}
+
 std::shared_ptr<TyExpr> TyExpr::make(const std::shared_ptr<TyValue> vptr) {
+  return std::shared_ptr<TyExpr>(new TyExpr(TyExpr_i::make(vptr)));
+}
+
+std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value,
+                                     enum TyTag _tag) {
+  return std::shared_ptr<TyExpr>(new TyExpr(TyExpr_i::make(value, _tag)));
+}
+
+std::shared_ptr<TyExpr_i> TyExpr_i::make(const std::shared_ptr<TyValue> vptr) {
   TyValue *v = vptr.get();
   if (ConsId *cid = dynamic_cast<ConsId *>(v)) {
-    return std::shared_ptr<TyExpr>(new ConsVar(cid->reg));
+    return std::shared_ptr<TyExpr_i>(new ConsVar(cid->reg));
   } else if (ConsConstVal *ccv = dynamic_cast<ConsConstVal *>(v)) {
-    return std::shared_ptr<TyExpr>(new ConsConst(ccv->constant));
+    return std::shared_ptr<TyExpr_i>(new ConsConst(ccv->constant));
   } else {
     assert("Unknown value type" && false);
     return nullptr;
@@ -2603,8 +2624,8 @@ std::shared_ptr<TyExpr> TyExpr::make(const std::shared_ptr<TyValue> vptr) {
   return nullptr;
 }
 
-std::shared_ptr<TyExpr> TyExpr::make(const llvm::Value &value,
-                                     enum TyTag _tag) {
+std::shared_ptr<TyExpr_i> TyExpr_i::make(const llvm::Value &value,
+                                         enum TyTag _tag) {
   return make(TyValue::make(value, _tag));
 }
 
@@ -2623,7 +2644,9 @@ void ConsVar::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 std::shared_ptr<TyExpr> ConsVar::make(std::string _name, enum TyTag _tag) {
-  return std::shared_ptr<TyExpr>(new ConsVar(_name, _tag));
+  return std::shared_ptr<TyExpr>(
+      new TyExpr(std::shared_ptr<TyExpr_i>(new ConsVar(_name, _tag))));
+  // return std::shared_ptr<TyExpr>(new ConsVar(_name, _tag));
 }
 
 std::shared_ptr<TyRegister> ConsVar::getTyReg() {
@@ -2655,7 +2678,8 @@ void ConsRhs::serialize(cereal::JSONOutputArchive &archive) const {
 
 std::shared_ptr<TyExpr> ConsRhs::make(std::string _name, enum TyTag _tag,
                                       enum TyScope _scope) {
-  return std::shared_ptr<TyExpr>(new ConsRhs(_name, _tag, _scope));
+  return std::shared_ptr<TyExpr>(
+      new TyExpr(std::shared_ptr<TyExpr_i>(new ConsRhs(_name, _tag, _scope))));
 }
 
 ConsConst::ConsConst(std::shared_ptr<TyConstant> _constant)
@@ -2676,7 +2700,8 @@ void ConsConst::serialize(cereal::JSONOutputArchive &archive) const {
 }
 
 std::shared_ptr<TyExpr> ConsConst::make(int _int_value, int _bitwidth) {
-  return std::shared_ptr<TyExpr>(new ConsConst(_int_value, _bitwidth));
+  return std::shared_ptr<TyExpr>(new TyExpr(
+      std::shared_ptr<TyExpr_i>(new ConsConst(_int_value, _bitwidth))));
 }
 
 std::shared_ptr<TyConstant> ConsConst::getTyConst() {
@@ -2686,12 +2711,13 @@ std::shared_ptr<TyConstant> ConsConst::getTyConst() {
 ConsInsn::ConsInsn(std::shared_ptr<TyInstruction> _instruction)
     : instruction(_instruction) {}
 std::shared_ptr<TyExpr> ConsInsn::make(const llvm::Instruction &i) {
-  return std::shared_ptr<TyExpr>(
-      new ConsInsn(TyInstruction::make(i)));
+  return std::shared_ptr<TyExpr>(new TyExpr(
+      std::shared_ptr<TyExpr_i>(new ConsInsn(TyInstruction::make(i)))));
 }
 std::shared_ptr<TyExpr>
 ConsInsn::make(std::shared_ptr<TyInstruction> _instruction) {
-  return std::shared_ptr<TyExpr>(new ConsInsn(_instruction));
+  return std::shared_ptr<TyExpr>(
+      new TyExpr(std::shared_ptr<TyExpr_i>(new ConsInsn(_instruction))));
 }
 
 std::shared_ptr<TyInstruction> ConsInsn::getTyInsn() {
