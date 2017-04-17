@@ -1209,10 +1209,11 @@ void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
 
   if (llvm::isa<llvm::AllocaInst>(Tgt) || llvm::isa<llvm::LoadInst>(Tgt) || llvm::isa<llvm::PHINode>(Tgt))
     str = getVariable(*Tgt);
-
+  
+  auto var = ConsVar::make(str, Physical);
   for (unsigned i = 0; i < replaceItem.size(); i++) {
     std::shared_ptr<TyExpr> tmp = replaceItem.at(i);
-    if (MEM2REGDICT->equalsIfConsVar(tmp, ConsVar::make(str, Physical)))
+    if (MEM2REGDICT->equalsIfConsVar(tmp, var))
      tmp->replace_expr(EXPR(New, Physical)); 
   }
 }
@@ -1224,9 +1225,10 @@ void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data) {
   if (llvm::isa<llvm::AllocaInst>(Tgt) || llvm::isa<llvm::LoadInst>(Tgt) || llvm::isa<llvm::PHINode>(Tgt))
     str = getVariable(*Tgt);
 
+  auto var = ConsVar::make(str, Physical);
   for (unsigned i = 0; i < replaceTag.size(); i++) {
     std::shared_ptr<TyExpr> tmp = replaceTag.at(i);
-    if (MEM2REGDICT->equalsIfConsVar(replaceTag.at(i), ConsVar::make(str, Physical)))
+    if (MEM2REGDICT->equalsIfConsVar(replaceTag.at(i), var))
         tmp->replace_expr(ConsVar::make(str, tag));
   }
 }
