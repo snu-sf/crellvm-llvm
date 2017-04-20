@@ -970,7 +970,7 @@ struct TyIcmpSwapOperands {
 public:
   TyIcmpSwapOperands(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
                 std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
-                std::shared_ptr<TyValue> _z);
+                std::shared_ptr<TyExpr> _e);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -978,14 +978,14 @@ private:
   std::shared_ptr<TyValueType> ty;
   std::shared_ptr<TyValue> x;
   std::shared_ptr<TyValue> y;
-  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyExpr> e;
 };
 
 struct TyFcmpSwapOperands {
 public:
   TyFcmpSwapOperands(enum TyFcmpPred _predicate, TyFloatType _fty,
                      std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
-                     std::shared_ptr<TyValue> _z);
+                     std::shared_ptr<TyExpr> _e);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -993,7 +993,7 @@ private:
   TyFloatType fty;
   std::shared_ptr<TyValue> x;
   std::shared_ptr<TyValue> y;
-  std::shared_ptr<TyValue> z;
+  std::shared_ptr<TyExpr> e;
 };
 
 struct TyIcmpEqSame {
