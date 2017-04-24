@@ -2718,8 +2718,8 @@ std::shared_ptr<TyValue> TyBinaryOperator::get_op(int i) {
 }
 void TyBinaryOperator::replace_op(int i, std::shared_ptr<TyValue> val) {
   switch (i) {
-  case 0: operand1 = val;
-  case 1: operand2 = val;
+  case 0: operand1 = val; break;
+  case 1: operand2 = val; break;
   }
 }
 
@@ -2732,8 +2732,8 @@ std::shared_ptr<TyValue> TyFloatBinaryOperator::get_op(int i) {
 }
 void TyFloatBinaryOperator::replace_op(int i, std::shared_ptr<TyValue> val) {
   switch (i) {
-  case 0: operand1 = val;
-  case 1: operand2 = val;
+  case 0: operand1 = val; break;
+  case 1: operand2 = val; break;
   }
 }
 
@@ -2746,8 +2746,8 @@ std::shared_ptr<TyValue> TyICmpInst::get_op(int i) {
 }
 void TyICmpInst::replace_op(int i, std::shared_ptr<TyValue> val) {
   switch (i) {
-  case 0: operand1 = val;
-  case 1: operand2 = val;
+  case 0: operand1 = val; break;
+  case 1: operand2 = val; break;
   }
 }
 
@@ -2760,8 +2760,8 @@ std::shared_ptr<TyValue> TyFCmpInst::get_op(int i) {
 }
 void TyFCmpInst::replace_op(int i, std::shared_ptr<TyValue> val) {
   switch (i) {
-  case 0: operand1 = val;
-  case 1: operand2 = val;
+  case 0: operand1 = val; break;
+  case 1: operand2 = val; break;
   }
 }
 
@@ -2775,9 +2775,9 @@ std::shared_ptr<TyValue> TySelectInst::get_op(int i) {
 }
 void TySelectInst::replace_op(int i, std::shared_ptr<TyValue> val) {
   switch (i) {
-  case 0: cond = val;
-  case 1: trueval = val;
-  case 2: falseval = val;
+  case 0: cond = val; break;
+  case 1: trueval = val; break;
+  case 2: falseval = val; break;
   }
 }
 
@@ -2898,8 +2898,8 @@ std::shared_ptr<TyValue> TyInsertValueInst::get_op(int i) {
 }
 void TyInsertValueInst::replace_op(int i, std::shared_ptr<TyValue> val) {
   switch (i) {
-  case 0: aggrv = val;
-  case 1: argv = val;
+  case 0: aggrv = val; break;
+  case 1: argv = val; break;
   }
 }
 
@@ -2911,7 +2911,7 @@ std::shared_ptr<TyValue> TyExtractValueInst::get_op(int i) {
 }
 void TyExtractValueInst::replace_op(int i, std::shared_ptr<TyValue> val) {
   switch (i) {
-  case 0: aggrv = val;
+  case 0: aggrv = val; break;
   }
 }
 
