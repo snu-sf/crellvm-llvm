@@ -1699,7 +1699,7 @@ Value *resolvePhi(ValueTable &VN, Value *V_q, Instruction *pos) {
 Instruction *hintgenPropEqTODO(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
   if (Instruction *I_repl = dyn_cast<Instruction>(repl))
     return I_repl;
-  hints.appendToDescription("GVN: propeq case. Not covered yet.");
+  // hints.appendToDescription("GVN: propeq case. Not covered yet.");
   hints.setReturnCodeToAdmitted();
   return nullptr;
 }
@@ -1799,6 +1799,13 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
     dbgs() << "worklist start ";
     GVNQuery q = worklist.back();
     dbgs() << *q.src << " " << *q.tgt << " " << *q.pos << "\n";
+
+    if ((q.src->getOpcode() == Instruction::Call) &&
+        (q.tgt->getOpcode() == Instruction::Call)) {
+      hints.setReturnCodeToAdmitted(); // We admit readonly call cases now.
+      return;
+    }
+
     worklist.pop_back();
     Instruction *pos_up = findUpper(VN, q);
     bool is_up_src = pos_up == q.src;
