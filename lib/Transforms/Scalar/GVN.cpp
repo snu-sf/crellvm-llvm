@@ -1662,14 +1662,6 @@ struct GVNQuery {
   }
 };
 
-Instruction *hintgenPropEqTODO(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
-  if (Instruction *I_repl = dyn_cast<Instruction>(repl))
-    return I_repl;
-  hints.appendToDescription("GVN: propeq case. Not covered yet.");
-  hints.setReturnCodeToAdmitted();
-  return nullptr;
-}
-
 bool isSamePos(Instruction *p1, Instruction *p2) {
   if (p1 == p2) return true;
   if (PHINode *PN1 = dyn_cast<PHINode>(p1))
@@ -1678,10 +1670,45 @@ bool isSamePos(Instruction *p1, Instruction *p2) {
   return false;
 }
 
+Value *resolvePhi(ValueTable &VN, Value *V_q, Instruction *pos) {
+  if (Instruction *I_q = dyn_cast<Instruction>(V_q)) {
+    DominatorTree *DT = VN.getDomTree();
+    if (DT->dominates(I_q, pos)) return I_q;
+    if (PHINode *PN_q = dyn_cast<PHINode>(I_q)) {
+      Value *V_inc = nullptr;
+      for (unsigned i = 0; i < PN_q->getNumIncomingValues(); ++i)
+        // if (DT->dominates(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
+        if (isSamePos(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
+          V_inc = PN_q->getIncomingValue(i);
+          break;
+        }
+      if (Instruction *I_inc = dyn_cast<Instruction>(V_inc)) {
+        if (PHINode *PN_inc = dyn_cast<PHINode>(I_inc))
+          return resolvePhi(VN, PN_inc, pos);
+        else return V_inc;
+      }
+      else {
+        assert(!V_inc && "V_inc should not be null.");
+        return V_inc;
+      }
+    }
+  }
+  return V_q;
+}
+
+Instruction *hintgenPropEqTODO(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
+  if (Instruction *I_repl = dyn_cast<Instruction>(repl))
+    return I_repl;
+  hints.appendToDescription("GVN: propeq case. Not covered yet.");
+  hints.setReturnCodeToAdmitted();
+  return nullptr;
+}
+
 void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, Instruction *pos_d, Instruction *pos_u, bool isSrc) {
   if (isSamePos(pos_d, pos_u)) return;
   dbgs() << "hoist start: " << *I_q << " " << *pos_d << " " << *pos_u << "\n";
   DominatorTree *DT = VN.getDomTree();
+
   uint32_t vn_q = VN.lookup_VN_of_expr(I_q);
   auto gvar = VAR(ghostSymb(vn_q), Ghost);
 
@@ -1694,21 +1721,28 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
   if (!isSamePos(I_q, pos_u) && !DT->dominates(I_q, pos_u)) {
     dbgs() << "hoist - dominated 2 \n";
 
-    if (PHINode *PN = dyn_cast<PHINode>(I_q))
-      I_q = cast<Instruction>(PN->getIncomingValueForBlock(pos_d->getParent()));
+    // if (PHINode *PN = dyn_cast<PHINode>(I_q))
+    //   I_q = cast<Instruction>(PN->getIncomingValueForBlock(pos_d->getParent()));
+    assert(!isa<PHINode>(I_q) && "I_q shouldn't be a phinode.");
 
     SmallVector<int, 4> ops_idxs;
+    auto ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q));
+
     for (unsigned i = 0; i < I_q->getNumOperands(); ++i)
-      if (Instruction *I_op = dyn_cast<Instruction>(I_q->getOperand(i)))
-        if (!isSamePos(I_op, pos_u) && !DT->dominates(I_op, pos_u)) ops_idxs.push_back(i);
+      if (Instruction *I_op = dyn_cast<Instruction>(I_q->getOperand(i))) {
+        Value *V_op_r = resolvePhi(VN, I_op, pos_d);
+        if (V_op_r != I_op)
+          ginsn->replace_op(i, llvmberry::TyValue::make(*V_op_r));
+        if (Instruction *I_op_r = dyn_cast<Instruction>(V_op_r))
+          if (!isSamePos(I_op_r, pos_u) && !DT->dominates(I_op_r, pos_u))
+            ops_idxs.push_back(i);
+      }
 
     for (unsigned i = 1; i < ops_idxs.size(); ++i)
       for (unsigned j = 0; j < ops_idxs.size() - i; ++j)
         if (DT->dominates(cast<Instruction>(I_q->getOperand(ops_idxs[j])),
                           cast<Instruction>(I_q->getOperand(ops_idxs[j + 1]))))
           std::swap(ops_idxs[j], ops_idxs[j+1]);
-
-    auto ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q));
 
     for (auto II = ops_idxs.begin(), EI = ops_idxs.end(); II != EI; ++II) {
       Instruction *I_op = cast<Instruction>(I_q->getOperand(ops_idxs[*II]));
@@ -1746,31 +1780,10 @@ Instruction *findUpper(ValueTable &VN, const GVNQuery &q) {
 //   if (visited.insert(q)) worklist.push_back(q);
 // }
 
-void extractOps(SmallVector<Value*, 4> &ops_src, Instruction *I_q) {
+void extractOps(ValueTable &VN, SmallVector<Value*, 4> &ops_src, Instruction *I_q, Instruction *pos) {
   for (auto OI = I_q->op_begin(), OE = I_q->op_end(); OI != OE; ++OI)
-    ops_src.push_back(*OI);
+    ops_src.push_back(resolvePhi(VN, *OI, pos));
 }
-
-Value *resolvePhi(ValueTable &VN, Instruction *I_q, Instruction *pos_up) {
-  DominatorTree *DT = VN.getDomTree();
-  if (PHINode *PN_q = dyn_cast<PHINode>(I_q)) {
-    Value *V_inc = nullptr;
-    for (unsigned i = 0; i < PN_q->getNumIncomingValues(); ++i)
-      if (DT->dominates(pos_up, PN_q->getIncomingBlock(i)->getTerminator())) {
-        V_inc = PN_q->getIncomingValue(i);
-        break;
-      }
-    if (V_inc == nullptr) return nullptr;
-    if (Instruction *I_inc = dyn_cast<Instruction>(V_inc)) {
-      if (PHINode *PN_inc = dyn_cast<PHINode>(I_inc))
-        return resolvePhi(VN, PN_inc, pos_up);
-      else return V_inc;
-    }
-    else return V_inc;
-  }
-  return I_q;
-}
-
 
 void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
   SmallVector<GVNQuery, 4> worklist;
@@ -1812,8 +1825,15 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
       // Extract and reorder operands
       SmallVector<Value*, 4> ops_src, ops_tgt;
       
-      extractOps(ops_src, cast<Instruction>(resolvePhi(VN, q.src, pos_up)));
-      extractOps(ops_tgt, cast<Instruction>(resolvePhi(VN, q.tgt, pos_up)));
+      // extractOps(ops_src, cast<Instruction>(resolvePhi(VN, q.src, pos_up)));
+      // extractOps(ops_tgt, cast<Instruction>(resolvePhi(VN, q.tgt, pos_up)));
+      // extractOps(VN, ops_src, q.src, pos_up);
+      // extractOps(VN, ops_tgt, q.tgt, pos_up);
+      // extract operands. phi-resolved at q.pos.
+      extractOps(VN, ops_src, q.src, q.pos);
+      extractOps(VN, ops_tgt, q.tgt, q.pos);
+
+
       if (VN.lookup_VN_of_expr(ops_src[0]) != VN.lookup_VN_of_expr(ops_tgt[0])) {
         // TODO: assert(q.src == icmp or comm);
         // otherwise admit

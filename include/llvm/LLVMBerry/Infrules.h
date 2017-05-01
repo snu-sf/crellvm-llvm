@@ -74,11 +74,86 @@ private:
   std::shared_ptr<TySize> sz;
 };
 
+struct TyBopCommutativeTgt {
+public:
+  TyBopCommutativeTgt(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                      std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                      std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> e;
+  TyBop bop;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyBopCommutativeRevTgt {
+public:
+  TyBopCommutativeRevTgt(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                         std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                         std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> e;
+  TyBop bop;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
 struct TyFbopCommutative {
 public:
   TyFbopCommutative(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
                     std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
                     TyFloatType _fty);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> e;
+  TyFbop fbop;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  TyFloatType fty;
+};
+
+struct TyFbopCommutativeRev {
+public:
+  TyFbopCommutativeRev(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                       std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                       TyFloatType _fty);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> e;
+  TyFbop fbop;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  TyFloatType fty;
+};
+
+struct TyFbopCommutativeTgt {
+public:
+  TyFbopCommutativeTgt(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                       std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                       TyFloatType _fty);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> e;
+  TyFbop fbop;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  TyFloatType fty;
+};
+
+struct TyFbopCommutativeRevTgt {
+public:
+  TyFbopCommutativeRevTgt(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                          std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                          TyFloatType _fty);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -981,11 +1056,101 @@ private:
   std::shared_ptr<TyExpr> e;
 };
 
+struct TyIcmpSwapOperandsRev {
+public:
+  TyIcmpSwapOperandsRev(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
+                        std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                        std::shared_ptr<TyExpr> _e);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyIcmpPred predicate;
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e;
+};
+
+struct TyIcmpSwapOperandsTgt {
+public:
+  TyIcmpSwapOperandsTgt(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
+                        std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                        std::shared_ptr<TyExpr> _e);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyIcmpPred predicate;
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e;
+};
+
+struct TyIcmpSwapOperandsRevTgt {
+public:
+  TyIcmpSwapOperandsRevTgt(enum TyIcmpPred _predicate, std::shared_ptr<TyValueType> _ty,
+                           std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                           std::shared_ptr<TyExpr> _e);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyIcmpPred predicate;
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e;
+};
+
 struct TyFcmpSwapOperands {
 public:
   TyFcmpSwapOperands(enum TyFcmpPred _predicate, TyFloatType _fty,
                      std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
                      std::shared_ptr<TyExpr> _e);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyFcmpPred predicate;
+  TyFloatType fty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e;
+};
+
+struct TyFcmpSwapOperandsRev {
+public:
+  TyFcmpSwapOperandsRev(enum TyFcmpPred _predicate, TyFloatType _fty,
+                        std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                        std::shared_ptr<TyExpr> _e);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyFcmpPred predicate;
+  TyFloatType fty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e;
+};
+
+struct TyFcmpSwapOperandsTgt {
+public:
+  TyFcmpSwapOperandsTgt(enum TyFcmpPred _predicate, TyFloatType _fty,
+                        std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                        std::shared_ptr<TyExpr> _e);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  enum TyFcmpPred predicate;
+  TyFloatType fty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TyExpr> e;
+};
+
+struct TyFcmpSwapOperandsRevTgt {
+public:
+  TyFcmpSwapOperandsRevTgt(enum TyFcmpPred _predicate, TyFloatType _fty,
+                           std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                           std::shared_ptr<TyExpr> _e);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -1164,6 +1329,34 @@ private:
   std::shared_ptr<TyBopCommutativeRev> bop_commutative_rev;
 };
 
+struct ConsBopCommutativeTgt : TyInfrule {
+public:
+  ConsBopCommutativeTgt(std::shared_ptr<TyBopCommutativeTgt> _bop_commutative_tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
+
+private:
+  std::shared_ptr<TyBopCommutativeTgt> bop_commutative_tgt;
+};
+
+struct ConsBopCommutativeRevTgt : TyInfrule {
+public:
+  ConsBopCommutativeRevTgt(std::shared_ptr<TyBopCommutativeRevTgt> _bop_commutative_rev_tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e, TyBop _bop,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
+
+private:
+  std::shared_ptr<TyBopCommutativeRevTgt> bop_commutative_rev_tgt;
+};
+
 struct ConsFbopCommutative : TyInfrule {
 public:
   ConsFbopCommutative(std::shared_ptr<TyFbopCommutative> _fbop_commutative);
@@ -1176,6 +1369,48 @@ public:
 
 private:
   std::shared_ptr<TyFbopCommutative> fbop_commutative;
+};
+
+struct ConsFbopCommutativeRev : TyInfrule {
+public:
+  ConsFbopCommutativeRev(std::shared_ptr<TyFbopCommutativeRev> _fbop_commutative_rev);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         TyFloatType _fty);
+
+private:
+  std::shared_ptr<TyFbopCommutativeRev> fbop_commutative_rev;
+};
+
+struct ConsFbopCommutativeTgt : TyInfrule {
+public:
+  ConsFbopCommutativeTgt(std::shared_ptr<TyFbopCommutativeTgt> _fbop_commutative_tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         TyFloatType _fty);
+
+private:
+  std::shared_ptr<TyFbopCommutativeTgt> fbop_commutative_tgt;
+};
+
+struct ConsFbopCommutativeRevTgt : TyInfrule {
+public:
+  ConsFbopCommutativeRevTgt(std::shared_ptr<TyFbopCommutativeRevTgt> _fbop_commutative_rev_tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
+                                         std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         TyFloatType _fty);
+
+private:
+  std::shared_ptr<TyFbopCommutativeRevTgt> fbop_commutative_rev_tgt;
 };
 
 struct ConsBitcastDoubleI64 : public TyInfrule {
@@ -1843,6 +2078,36 @@ private:
   std::shared_ptr<TyFcmpSwapOperands> fcmp_swap_operands;
 };
 
+struct ConsFcmpSwapOperandsRev : public TyInfrule {
+public:
+  ConsFcmpSwapOperandsRev(std::shared_ptr<TyFcmpSwapOperandsRev> _fcmp_swap_operands_rev);
+  static std::shared_ptr<TyInfrule> make(llvm::FCmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyFcmpSwapOperandsRev> fcmp_swap_operands_rev;
+};
+
+struct ConsFcmpSwapOperandsTgt : public TyInfrule {
+public:
+  ConsFcmpSwapOperandsTgt(std::shared_ptr<TyFcmpSwapOperandsTgt> _fcmp_swap_operands_tgt);
+  static std::shared_ptr<TyInfrule> make(llvm::FCmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyFcmpSwapOperandsTgt> fcmp_swap_operands_tgt;
+};
+
+struct ConsFcmpSwapOperandsRevTgt : public TyInfrule {
+public:
+  ConsFcmpSwapOperandsRevTgt(std::shared_ptr<TyFcmpSwapOperandsRevTgt> _fcmp_swap_operands_rev_tgt);
+  static std::shared_ptr<TyInfrule> make(llvm::FCmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyFcmpSwapOperandsRevTgt> fcmp_swap_operands_rev_tgt;
+};
+
 struct ConsIcmpEqSame : public TyInfrule {
 public:
   ConsIcmpEqSame(std::shared_ptr<TyIcmpEqSame> _icmp_eq_same);
@@ -1872,6 +2137,37 @@ public:
 private:
   std::shared_ptr<TyIcmpSwapOperands> icmp_swap_operands;
 };
+
+struct ConsIcmpSwapOperandsRev : public TyInfrule {
+public:
+  ConsIcmpSwapOperandsRev(std::shared_ptr<TyIcmpSwapOperandsRev> _icmp_swap_operands_rev);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpSwapOperandsRev> icmp_swap_operands_rev;
+};
+
+struct ConsIcmpSwapOperandsTgt : public TyInfrule {
+public:
+  ConsIcmpSwapOperandsTgt(std::shared_ptr<TyIcmpSwapOperandsTgt> _icmp_swap_operands_tgt);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpSwapOperandsTgt> icmp_swap_operands_tgt;
+};
+
+struct ConsIcmpSwapOperandsRevTgt : public TyInfrule {
+public:
+  ConsIcmpSwapOperandsRevTgt(std::shared_ptr<TyIcmpSwapOperandsRevTgt> _icmp_swap_operands_rev_tgt);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpSwapOperandsRevTgt> icmp_swap_operands_rev_tgt;
+};
+
 
 } // llvmberry
 
