@@ -1133,8 +1133,10 @@ void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm:
 
   std::shared_ptr<TyExpr> val = recentInstr[key].instrR;
   PROPAGATE(LESSDEF(VAR(recentInstr[key].op1, Ghost), val, TGT), BOUNDS(from_position, to_position));
-  
-  MEM2REGDICT->replaceItem.get()->push_back(std::shared_ptr<TyExpr>(val));
+ 
+  std::string op0 = recentInstr[key].op0;
+  if(op0 == "llvmberry::PHI" || op0.substr(0,op0.rfind(".")) != op0)
+    MEM2REGDICT->replaceItem.get()->push_back(std::shared_ptr<TyExpr>(val));
 
   // Infrule function
   // if from position is SI or AI, apply infrule  if to position is PHI, apply infrule
