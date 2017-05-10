@@ -82,8 +82,8 @@ Mem2RegArg::Mem2RegArg()
 
 bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                             std::shared_ptr<TyExpr> e2) {
-  if (ConsVar *cv1 = dynamic_cast<ConsVar *>(e1->get_i().get())) {
-    if (ConsVar *cv2 = dynamic_cast<ConsVar *>(e2->get_i().get())) {
+  if (ConsVar *cv1 = dynamic_cast<ConsVar *>(e1->get().get())) {
+    if (ConsVar *cv2 = dynamic_cast<ConsVar *>(e2->get().get())) {
       return TyRegister::isSame(cv1->getTyReg(), cv2->getTyReg());
     }
   }

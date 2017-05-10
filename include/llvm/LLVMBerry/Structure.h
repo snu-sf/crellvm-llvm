@@ -1235,7 +1235,7 @@ public:
   TyExpr(std::shared_ptr<TyExprImpl> ei);
 
   void replace_expr(std::shared_ptr<TyExpr> expr);
-  std::shared_ptr<TyExprImpl> get_i();
+  std::shared_ptr<TyExprImpl> get();
 
 private:
   std::shared_ptr<TyExprImpl> expr_i;

@@ -427,7 +427,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                 std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsLessthanUndef(lessthanundef)));
         //remove 
 
-
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
         if (MEM2REGDICT->equalsIfConsVar(storeItem[OnlyStore].expr, expr)) {

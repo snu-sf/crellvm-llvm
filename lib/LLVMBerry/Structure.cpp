@@ -2592,7 +2592,7 @@ void TyExtractValueInst::serialize(cereal::JSONOutputArchive& archive) const{
 
 TyExpr::TyExpr(std::shared_ptr<TyExprImpl> ei) : expr_i(ei) {}
 
-std::shared_ptr<TyExprImpl> TyExpr::get_i() { return expr_i; }
+std::shared_ptr<TyExprImpl> TyExpr::get() { return expr_i; }
 
 void TyExpr::serialize(cereal::JSONOutputArchive &archive) const {
   expr_i->serialize(archive);
