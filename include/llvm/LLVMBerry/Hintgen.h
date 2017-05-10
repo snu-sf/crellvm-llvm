@@ -64,7 +64,7 @@
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define INSNWITHGHOST(x, y)                                                    \
   std::shared_ptr<llvmberry::TyExpr>(new llvmberry::TyExpr(                    \
-      std::shared_ptr<llvmberry::TyExpr_i>(new llvmberry::ConsInsn(            \
+      std::shared_ptr<llvmberry::TyExprImpl>(new llvmberry::ConsInsn(            \
           llvmberry::instructionWithGhostIdxs(x, y)))))
 #define INSNALIGNONE(I)                                                        \
   llvmberry::ConsInsn::make(std::shared_ptr<llvmberry::TyInstruction>          \
