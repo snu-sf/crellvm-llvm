@@ -239,8 +239,7 @@ bool hasBitcastOrGEP(llvm::AllocaInst* AI);
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
 
-std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
-  (llvm::Instruction* I, Dictionary &data, CoreHint &hints);
+std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet (llvm::Instruction* I, Dictionary &data, CoreHint &hints);
 
 void saveInstrIndices(llvm::Function* F, Dictionary &data);
 

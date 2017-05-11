@@ -992,7 +992,7 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
   });
 }
 
-std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
+std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet
                                       (llvm::Instruction* I, Dictionary &data) {
   auto &useIndices = *(data.get<ArgForIndices>()->useIndices);
   std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>>
@@ -1160,14 +1160,14 @@ void checkSIOperand(unsigned key, llvm::StoreInst *SI, Dictionary &data, CoreHin
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints, bool checkReplace) {
   auto &instrIndices = *(INDICESDICT->instrIndices);
-  std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> destSet = saveDestSet(LI, data);
+  std::shared_ptr<std::vector<std::shared_ptr<llvmberry::TyPosition>>> useSet = saveUseSet(LI, data);
   std::string Rload = llvmberry::getVariable(*LI);
 
   //propagate LI to use set
-  PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC), BOUNDSET(INDEXEDPOS(SRC, LI, instrIndices[LI], ""), destSet));
+  PROPAGATE(LESSDEF(VAR(Rload, Physical), VAR(Rload, Ghost), SRC), BOUNDSET(INDEXEDPOS(SRC, LI, instrIndices[LI], ""), useSet));
 
   std::shared_ptr<TyExpr> val = TyExpr::make(*V, Physical);
-  PROPAGATE(LESSDEF(VAR(Rload, Ghost), val, TGT), BOUNDSET(INDEXEDPOS(SRC, LI, instrIndices[LI], ""), destSet));
+  PROPAGATE(LESSDEF(VAR(Rload, Ghost), val, TGT), BOUNDSET(INDEXEDPOS(SRC, LI, instrIndices[LI], ""), useSet));
 
   //infrule at LI index
   INFRULE(INDEXEDPOS(SRC, LI, instrIndices[LI], ""), ConsIntroGhost::make(VAR(In, Ghost), REGISTER(Rload, Ghost)));
