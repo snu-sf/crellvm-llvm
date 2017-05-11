@@ -1187,7 +1187,7 @@ NextIteration:
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
 
-          llvmberry::propagateFromAISIPhiToLoadPhiSI(AllocaNo, APN, Pred, data, hints);
+          llvmberry::propagateFromInsnToPhi(AllocaNo, APN, Pred, data, hints);
 
           MEM2REGDICT->recentInstr.get()->at(AllocaNo) =
             { DICTMAP(MEM2REGDICT->recentInstr, AllocaNo).instrL, VAR(Rphi, Physical),
@@ -1228,7 +1228,7 @@ NextIteration:
       INTRUDE(&LI, &V, &AI) {
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
-        llvmberry::propagateFromAISIPhiToLoadPhiSI(AI->second, LI, nullptr, data, hints);
+        llvmberry::propagateFromInsnToLoad(AI->second, LI, data, hints);
         llvmberry::propagateLoadInstToUse(LI, V, DICTMAP(MEM2REGDICT->recentInstr, AI->second).op1, data, hints, true);
 
         hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(INDICESDICT->instrIndices, LI)-1, ""));
@@ -1255,7 +1255,7 @@ NextIteration:
         continue;
 
       INTRUDE(&SI, &ai) {
-        llvmberry::propagateFromAISIPhiToLoadPhiSI(ai->second, SI, nullptr, data, hints);
+        llvmberry::checkSIOperand(ai->second, SI,  data, hints);
 
         std::string op0 = "";
         if (!isa<Constant>(*(SI->getOperand(0))))

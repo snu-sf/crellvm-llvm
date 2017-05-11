@@ -1081,77 +1081,81 @@ void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictio
   }
 }
 
-void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints) {
+void propagateFromToUsingKey(unsigned key, std::shared_ptr<TyPosition> from_position, std::shared_ptr<TyPosition> to_position, Dictionary &data, CoreHint &hints) {
   auto &recentInstr = *(MEM2REGDICT->recentInstr);
-  auto &storeItem = *(MEM2REGDICT->storeItem);
-
-  // variable which store in store inst can be replace
-  // phi can be replace in prunning part
-  // consider both of them
-  std::shared_ptr<TyPosition> from_position = NULL;
-  std::shared_ptr<TyPosition> to_position = NULL;
-  llvm::PHINode* Phi = llvm::dyn_cast<llvm::PHINode>(To);
-
-  // if from is phi then make start block
-  // if to is phi then need prev block infro
-  // from doesn't matter
-
-  // propagate from to   from : AI SI Phi   to : Phi LI
-  if (recentInstr[key].op0 == "llvmberry::PHI") 
-    // position from
-    from_position = STARTPOS(SRC, recentInstr[key].instrBB->getName());
-  else 
-    from_position = recentInstr[key].instrPos;
-
-  if (Phi != NULL) 
-    //propagate position to need prev block infromation
-    to_position = ENDPOSINDEXED(SRC, prev, DICTMAP(INDICESDICT->termIndices, prev->getName()));
-  else 
-    to_position = INDEXEDPOS(SRC, To, DICTMAP(INDICESDICT->instrIndices, To), "");
-
-  if (llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(To)) {
-    if (!(storeItem[SI].op0 == "") && (!MEM2REGDICT->equalsIfConsVar(storeItem[SI].expr, EXPR(SI->getOperand(0), Physical)))) { 
-    //global -> constant or argument it won't change
-      //infrule
-      std::string op1 = getVariable(*(SI->getOperand(1)));
-
-      // {tmp = tmp^ = a}
-      // store %tmp, %y
-      // [tmp = tmp^         tmp^ = a
-      //  load %y = %tmp              ]
-      //
-      //  intro ghost
-      //          tmp^ = y^ = tmp^
-      INFRULE(to_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(op1, Ghost)));
-      recentInstr[key].check = true; 
-    } else 
-      recentInstr[key].check = false;
-    return;
-  }
 
   PROPAGATE(LESSDEF(recentInstr[key].instrL, VAR(recentInstr[key].op1, Ghost), SRC), BOUNDS(from_position, to_position));
 
   std::shared_ptr<TyExpr> val = recentInstr[key].instrR;
+  
   PROPAGATE(LESSDEF(VAR(recentInstr[key].op1, Ghost), val, TGT), BOUNDS(from_position, to_position));
- 
+
   std::string op0 = recentInstr[key].op0;
   if(op0 == "llvmberry::PHI" || op0.substr(0,op0.rfind(".")) != op0)
     MEM2REGDICT->replaceItem.get()->push_back(std::shared_ptr<TyExpr>(val));
 
   // Infrule function
-  // if from position is SI or AI, apply infrule  if to position is PHI, apply infrule
-  // if store Ai same rule else if phi different rule
-  // if from is not phi apply infrule here
+  // if from position is SI or AI, apply infrule  
+  // if from position is PHI, infrule is already applied 
+  // if store operand changed before, then infrule already applied 
   if ((recentInstr[key].op0 != "llvmberry::PHI") && (!recentInstr[key].check))
     INFRULE(recentInstr[key].instrPos, ConsIntroGhost::make(recentInstr[key].instrR, REGISTER(recentInstr[key].op1, Ghost)));
+}
 
-  // if to is phi then apply infrule here
-  if (Phi != NULL) {
-    if (getVariable(*Phi) != recentInstr[key].op1) 
-      INFRULE(TyPosition::make(SRC, *Phi, prev->getName()), ConsIntroGhost::make(VAR(recentInstr[key].op1, Ghost), REGISTER(getVariable(*Phi), Ghost))); 
-    
+void propagateFromInsnToLoad(unsigned key, llvm::LoadInst *LI, Dictionary &data, CoreHint &hints) {
+  auto &recentInstr = *(MEM2REGDICT->recentInstr);
+  std::shared_ptr<TyPosition> from_position = NULL;
+
+  if (recentInstr[key].op0 == "llvmberry::PHI")
+    from_position = STARTPOS(SRC, recentInstr[key].instrBB->getName());
+  else
+    from_position = recentInstr[key].instrPos;
+
+  std::shared_ptr<TyPosition> to_position = INDEXEDPOS(SRC, LI, DICTMAP(INDICESDICT->instrIndices, LI), "");
+
+  propagateFromToUsingKey(key, from_position, to_position, data, hints);
+}
+
+void propagateFromInsnToPhi(unsigned key, llvm::PHINode *Phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints) {
+  auto &recentInstr = *(MEM2REGDICT->recentInstr);
+  std::shared_ptr<TyPosition> from_position = NULL;
+
+  if (recentInstr[key].op0 == "llvmberry::PHI")
+    from_position = STARTPOS(SRC, recentInstr[key].instrBB->getName());
+  else
+    from_position = recentInstr[key].instrPos;
+
+  std::shared_ptr<TyPosition> to_position = ENDPOSINDEXED(SRC, prev, DICTMAP(INDICESDICT->termIndices, prev->getName()));
+
+  propagateFromToUsingKey(key, from_position, to_position, data, hints);
+
+  if (getVariable(*Phi) != recentInstr[key].op1)
+    INFRULE(TyPosition::make(SRC, *Phi, prev->getName()), ConsIntroGhost::make(VAR(recentInstr[key].op1, Ghost), REGISTER(getVariable(*Phi), Ghost)));
+
+  recentInstr[key].check = false; 
+}
+
+void checkSIOperand(unsigned key, llvm::StoreInst *SI, Dictionary &data, CoreHint &hints) {
+  auto &recentInstr = *(MEM2REGDICT->recentInstr);
+  auto &storeItem = *(MEM2REGDICT->storeItem);
+
+  std::shared_ptr<TyPosition> to_position = NULL;
+  to_position = INDEXEDPOS(SRC, SI, DICTMAP(INDICESDICT->instrIndices, SI), "");
+
+  if (!(storeItem[SI].op0 == "") && (!MEM2REGDICT->equalsIfConsVar(storeItem[SI].expr, EXPR(SI->getOperand(0), Physical)))) {
+    //global -> constant or argument it won't change
+    std::string op1 = getVariable(*(SI->getOperand(1)));
+    // {tmp = tmp^ = a}
+    // store %tmp, %y
+    // [tmp = tmp^         tmp^ = a
+    //  load %y = %tmp              ]
+    //
+    //  intro ghost
+    //          tmp^ = y^ = tmp^
+    INFRULE(to_position, ConsIntroGhost::make(VAR(storeItem[SI].op0, Ghost), REGISTER(op1, Ghost)));
+    recentInstr[key].check = true;
+  } else
     recentInstr[key].check = false;
-  }
 }
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints, bool checkReplace) {
