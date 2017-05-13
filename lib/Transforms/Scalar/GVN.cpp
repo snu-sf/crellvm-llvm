@@ -1696,24 +1696,30 @@ Value *resolvePhi(ValueTable &VN, Value *V_q, Instruction *pos) {
   return V_q;
 }
 
-Instruction *hintgenPropEqTODO(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
+// Find appropriate I_p s.t. VN(I_p) = VN(I)
+Instruction *hintgenPropEq(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
   if (Instruction *I_repl = dyn_cast<Instruction>(repl))
     return I_repl;
-  // hints.appendToDescription("GVN: propeq case. Not covered yet.");
+  hints.appendToDescription("GVN: propeq case. Not covered yet.");
   hints.setReturnCodeToAdmitted();
   return nullptr;
 }
 
+void replaceConsinsn(std::shared_ptr<llvmberry::ConsInsn> ginsn, SmallVector<std::pair<uint32_t, std::shared_ptr<llvmberry::TyValue>>, 4> repl_map) {
+  for (auto II = repl_map.begin(), EI = repl_map.end(); II != EI; ++II)
+    ginsn->replace_op((*II).first, (*II).second);
+}
+
 void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, Instruction *pos_d, Instruction *pos_u, bool isSrc) {
   if (isSamePos(pos_d, pos_u)) return;
-  dbgs() << "hoist start: " << *I_q << " " << *pos_d << " " << *pos_u << "\n";
+  dbgs() << "hoist start: " << *I_q << " from " << *pos_d << " to " << *pos_u << "\n";
   DominatorTree *DT = VN.getDomTree();
 
   uint32_t vn_q = VN.lookup_VN_of_expr(I_q);
   auto gvar = VAR(ghostSymb(vn_q), Ghost);
 
   if (DT->dominates(I_q, pos_d)) {
-    dbgs() << "hoist - dominated 1 \n";
+    dbgs() << "hoist - dominated 1: prop I_q >= gvar or gvar>=I_q from I_q to pos_d \n";
     std::string id_q = llvmberry::getVariable(*I_q);
     auto prop_obj = isSrc? LESSDEF(VAR(id_q), gvar, SRC) : LESSDEF(gvar, VAR(id_q), TGT);
     PROPAGATE(prop_obj, BOUNDS(INSTPOS(SRC, I_q), INSTPOS(SRC, pos_d)));
@@ -1725,19 +1731,26 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
     //   I_q = cast<Instruction>(PN->getIncomingValueForBlock(pos_d->getParent()));
     assert(!isa<PHINode>(I_q) && "I_q shouldn't be a phinode.");
 
-    SmallVector<int, 4> ops_idxs;
-    auto ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q));
+    SmallVector<uint32_t, 4> ops_idxs;
+    SmallVector<std::pair<uint32_t, std::shared_ptr<llvmberry::TyValue>>, 4> repl_map;
 
     for (unsigned i = 0; i < I_q->getNumOperands(); ++i)
       if (Instruction *I_op = dyn_cast<Instruction>(I_q->getOperand(i))) {
         Value *V_op_r = resolvePhi(VN, I_op, pos_d);
-        if (V_op_r != I_op)
-          ginsn->replace_op(i, llvmberry::TyValue::make(*V_op_r));
+        if (V_op_r != I_op) {
+          dbgs() << "gather ops: " << *I_op << " -phi-res-> " << *V_op_r << "\n";
+          auto v_new = llvmberry::TyValue::make(*V_op_r);
+          // ginsn->replace_op(i, v_new);
+          repl_map.push_back(std::make_pair(i, v_new));
+        }
         if (Instruction *I_op_r = dyn_cast<Instruction>(V_op_r))
-          if (!isSamePos(I_op_r, pos_u) && !DT->dominates(I_op_r, pos_u))
+          if (!isSamePos(I_op_r, pos_u) && !DT->dominates(I_op_r, pos_u)) {
+            dbgs() << "pushed ops: " << *I_op_r << "\n";
             ops_idxs.push_back(i);
+          }
       }
 
+    dbgs() << "sort ops\n";
     for (unsigned i = 1; i < ops_idxs.size(); ++i)
       for (unsigned j = 0; j < ops_idxs.size() - i; ++j)
         if (DT->dominates(cast<Instruction>(I_q->getOperand(ops_idxs[j])),
@@ -1745,17 +1758,53 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
           std::swap(ops_idxs[j], ops_idxs[j+1]);
 
     for (auto II = ops_idxs.begin(), EI = ops_idxs.end(); II != EI; ++II) {
-      Instruction *I_op = cast<Instruction>(I_q->getOperand(ops_idxs[*II]));
+      // Instruction *I_op = cast<Instruction>(I_q->getOperand(ops_idxs[*II]));
+      Instruction *I_op = cast<Instruction>(I_q->getOperand(*II));
       uint32_t vn_op = VN.lookup_VN_of_expr(I_op);
+      dbgs() << "process ops " << *I_op << "\n";
+
+      std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q));
+      replaceConsinsn(ginsn, repl_map);
+
       auto prop_obj = isSrc? LESSDEF(ginsn, gvar, SRC) : LESSDEF(gvar, ginsn, TGT);
       if (DT->dominates(I_op, pos_d)) {
+        dbgs() << "dominates pos_d: prop from " << *I_op << " to " << *pos_d << "\n";
         PROPAGATE(prop_obj, BOUNDS(INSTPOS(SRC, I_op), INSTPOS(SRC, pos_d)));
         pos_d = I_op;
       }
-      ginsn->replace_op(*II, ID(ghostSymb(vn_op), Ghost));
-      dbgs() << "size: " << ops_idxs.size() << ", i= " << *II << "\n";
+      // dbgs() << "ginsn replaced by ghost\n";
+      // VNops.push_back(vn_op);
+      repl_map.push_back(std::make_pair(*II, ID(ghostSymb(vn_op), Ghost)));
+      // dbgs() << "ginsn_r before: " << ginsn_r.get() << "\n";
+      // dbgs() << "ginsn_r_tmp before: " << ginsn_r_tmp.get() << "\n";
+      // dbgs() << "ginsn_r v1 before: " << ginsn_r->get_op(0).get() << "\n";
+      // dbgs() << "ginsn_r_tmp v1 before: " << ginsn_r_tmp->get_op(0).get() << "\n";
+      // ginsn_r = std::shared_ptr<llvmberry::ConsInsn>(new llvmberry::ConsInsn(*ginsn));
+      // dbgs() << "ginsn_r mid.: " << ginsn_r.get() << "\n";
+      // dbgs() << "ginsn_r_tmp mid.: " << ginsn_r_tmp.get() << "\n";
+      // dbgs() << "ginsn_r v1 mid.: " << ginsn_r->get_op(0).get() << "\n";
+      // dbgs() << "ginsn_r_tmp v1 mid.: " << ginsn_r_tmp->get_op(0).get() << "\n";
+      // for (auto II2 = repl_map.begin(), EI2 = repl_map.end(); II2 != EI2; ++II2) {
+      //   // int j = (*II2).first;
+      //   ginsn_r->replace_op((*II2).first, (*II2).second);
+      //   // ginsn_r->replace_op(j, ID(ghostSymb(VNops[j]), Ghost));
+      // }
+
+      // dbgs() << "ginsn_r after.: " << ginsn_r.get() << "\n";
+      // dbgs() << "ginsn_r_tmp after.: " << ginsn_r_tmp.get() << "\n";
+      // dbgs() << "ginsn_r v1 after.: " << ginsn_r->get_op(0).get() << "\n";
+      // dbgs() << "ginsn_r_tmp v1 after.: " << ginsn_r_tmp->get_op(0).get() << "\n";
+
+      // ginsn = std::shared_ptr<llvmberry::ConsInsn>(new llvmberry::ConsInsn(*ginsn));
+      // ginsn->replace_op(*II, ID(ghostSymb(vn_op), Ghost));
+      // dbgs() << "size: " << ops_idxs.size() << ", i= " << *II << "\n";
+      dbgs() << "call hintgenHoist "<< *I_op <<"\n";
       hintgenHoist(hints, VN, I_op, pos_d, pos_u, isSrc);
     }
+    dbgs() << "prop rest\n";
+
+    std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q));
+    replaceConsinsn(ginsn, repl_map);
     auto prop_obj = isSrc? LESSDEF(ginsn, gvar, SRC) : LESSDEF(gvar, ginsn, TGT);
     PROPAGATE(prop_obj, BOUNDS(INSTPOS(SRC, pos_u), INSTPOS(SRC, pos_d)));
   }
@@ -1785,23 +1834,40 @@ void extractOps(ValueTable &VN, SmallVector<Value*, 4> &ops_src, Instruction *I_
     ops_src.push_back(resolvePhi(VN, *OI, pos));
 }
 
+// if this is all the functionality we require, just inline this.
+bool isTotallyDifferentInstr(Instruction *a, Instruction *b) {
+  return (!isa<PHINode>(a) && !isa<PHINode>(b) && (a->getOpcode() != b->getOpcode()));
+}
+
+bool isSwapAvailable(Instruction *I) {
+  return (I->isCommutative() || isa<ICmpInst>(I) || isa<FCmpInst>(I));
+}
+
 void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
+  dbgs() << "== hintgenGVN start: " << *I << " " << *repl << "\n";
   SmallVector<GVNQuery, 4> worklist;
   SmallSetVector<GVNQuery, 10> visited;
 
-  Instruction *I_repl = hintgenPropEqTODO(hints, VN, I, repl);
+  Instruction *I_repl = hintgenPropEq(hints, VN, I, repl);
   if (!I_repl) return;
   GVNQuery q_init(I, I_repl, I);
   worklist.push_back(q_init);
   visited.insert(q_init);
 
   while (!worklist.empty()){
-    dbgs() << "worklist start ";
     GVNQuery q = worklist.back();
-    dbgs() << *q.src << " " << *q.tgt << " " << *q.pos << "\n";
+    dbgs() << "worklist start: " << *q.src << " " << *q.tgt << " " << *q.pos << "\n";
 
-    if ((q.src->getOpcode() == Instruction::Call) &&
+    if (isTotallyDifferentInstr(q.src, q.tgt)) {
+      dbgs() << "Admit: we suspect processLoad for " << *q.src << " " << *q.tgt << "\n";
+      hints.appendToDescription("GVN: We don't process processLoad optimization now.");
+      hints.setReturnCodeToAdmitted();
+      return;
+    }
+
+    if ((q.src->getOpcode() == Instruction::Call) ||
         (q.tgt->getOpcode() == Instruction::Call)) {
+      hints.appendToDescription("GVN: Readonly calls.");
       hints.setReturnCodeToAdmitted(); // We admit readonly call cases now.
       return;
     }
@@ -1815,20 +1881,24 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
     hintgenHoist(hints, VN, q.tgt, q.pos, pos_up, false);
 
     if (PHINode *PN = dyn_cast<PHINode>(pos_up)) {
-      dbgs() << "phinode\n";
+      dbgs() << "HintgenGVN: pos_up is phinode " << *PN <<"\n";
       for (unsigned i = 0; i < PN->getNumIncomingValues(); ++i) {
-        dbgs() << "phi iter " << i <<"\n";
-        Instruction *I_op = hintgenPropEqTODO(hints, VN, I_down, PN->getIncomingValue(i));
-        if (!I_repl) return;
+        dbgs() << "  phi iter " << i <<"\n";
+        Instruction *I_op = hintgenPropEq(hints, VN, I_down, PN->getIncomingValue(i));
+        if (!I_op) {
+          dbgs() << "operator returns null\n";
+          return;
+        }
         TerminatorInst *term = PN->getIncomingBlock(i)->getTerminator();
         GVNQuery q_new(is_up_src? I_op : q.src, is_up_src? q.tgt : I_op, term);
         if (visited.insert(q_new)) {
-          dbgs() << "phi push_back \n";
+          dbgs() << "  phi push_back \n";
           worklist.push_back(q_new);
         }
       }
     } else {
-      // assert(same_vn and same_operand);
+      dbgs() << "HintgenGVN: pos_up is non-phi\n";
+      // assert(same_vn and same_operand, or icmp ~P);
       // Extract and reorder operands
       SmallVector<Value*, 4> ops_src, ops_tgt;
       
@@ -1840,23 +1910,34 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
       extractOps(VN, ops_src, q.src, q.pos);
       extractOps(VN, ops_tgt, q.tgt, q.pos);
 
-
-      if (VN.lookup_VN_of_expr(ops_src[0]) != VN.lookup_VN_of_expr(ops_tgt[0])) {
+      if (isSwapAvailable(q.src) &&
+          (VN.lookup_VN_of_expr(ops_src[0]) != VN.lookup_VN_of_expr(ops_tgt[0])) &&
+          (VN.lookup_VN_of_expr(ops_src[0]) == VN.lookup_VN_of_expr(ops_tgt[1]))) {
         // TODO: assert(q.src == icmp or comm);
         // otherwise admit
+        dbgs() << "swap\n";
         std::swap(ops_src[0], ops_src[1]);
       }
 
       // Insert each unmatched operand pair into worklist
       for (unsigned i = 0; i < ops_src.size(); ++i) {
-        assert(VN.lookup_VN_of_expr(ops_src[i]) == VN.lookup_VN_of_expr(ops_tgt[i])
-               && "VNs should be equal");
         if (ops_src[i] != ops_tgt[i]) {
-          Instruction *I_op_s = cast<Instruction>(ops_src[i]);
-          Instruction *I_op_t = cast<Instruction>(ops_tgt[i]);
+          dbgs() << "ops_src[" << i << "]: " << *ops_src[i];
+          dbgs() << "ops_tgt[" << i << "]: " << *ops_tgt[i];
+          Instruction *I_op_s = hintgenPropEq(hints, VN, dyn_cast<Instruction>(ops_tgt[i]), ops_src[i]);
+          Instruction *I_op_t = hintgenPropEq(hints, VN, dyn_cast<Instruction>(ops_src[i]), ops_tgt[i]);
+          dbgs() << "I_op_s, I_op_t : " << *I_op_s << " " << *I_op_t << "\n";
+
+          if (!I_op_s || !I_op_t) {
+            dbgs() << "hintgenPropEq returned nullptr\n";
+            return;
+          }
 
           GVNQuery q_new(I_op_s, I_op_t, pos_up);
-          if (visited.insert(q_new)) worklist.push_back(q_new);
+          if (visited.insert(q_new)) {
+            dbgs() << "insert new query\n";
+            worklist.push_back(q_new);
+          }
         }
       }
     }
