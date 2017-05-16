@@ -1678,10 +1678,12 @@ Value *resolvePhi(ValueTable &VN, Value *V_q, Instruction *pos) {
       Value *V_inc = nullptr;
       for (unsigned i = 0; i < PN_q->getNumIncomingValues(); ++i)
         // if (DT->dominates(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
-        if (isSamePos(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
+        if (isSamePos(pos, PN_q->getIncomingBlock(i)->getTerminator()) ||
+            DT->dominates(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
           V_inc = PN_q->getIncomingValue(i);
           break;
         }
+      if (!V_inc) V_inc = PN_q->getIncomingValue(0); // We guess any value is OK.
       if (Instruction *I_inc = dyn_cast<Instruction>(V_inc)) {
         if (PHINode *PN_inc = dyn_cast<PHINode>(I_inc))
           return resolvePhi(VN, PN_inc, pos);
@@ -1922,10 +1924,11 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
       // Insert each unmatched operand pair into worklist
       for (unsigned i = 0; i < ops_src.size(); ++i) {
         if (ops_src[i] != ops_tgt[i]) {
-          dbgs() << "ops_src[" << i << "]: " << *ops_src[i];
-          dbgs() << "ops_tgt[" << i << "]: " << *ops_tgt[i];
+          dbgs() << "ops_src[" << i << "]: " << *ops_src[i] << "\n";
+          dbgs() << "ops_tgt[" << i << "]: " << *ops_tgt[i] << "\n";
           Instruction *I_op_s = hintgenPropEq(hints, VN, dyn_cast<Instruction>(ops_tgt[i]), ops_src[i]);
           Instruction *I_op_t = hintgenPropEq(hints, VN, dyn_cast<Instruction>(ops_src[i]), ops_tgt[i]);
+          if (!I_op_s || !I_op_t) return;
           dbgs() << "I_op_s, I_op_t : " << *I_op_s << " " << *I_op_t << "\n";
 
           if (!I_op_s || !I_op_t) {
