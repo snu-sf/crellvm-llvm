@@ -116,10 +116,7 @@
 #define SRC llvmberry::Source
 #define TGT llvmberry::Target
 
-#define INDICESDICT data.get<llvmberry::ArgForIndices>()
-#define MEM2REGDICT data.get<llvmberry::ArgForMem2Reg>()
 #define DICTMAP(dict, key) dict.get()->find(key)->second
-
 #define UNDEF(I) llvm::UndefValue::get(I->getType())
 #define UNDEFAI(I) llvm::UndefValue::get(AI->getAllocatedType())
 
