@@ -410,23 +410,20 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
       // do this if stored object(OnlyStore->getOperand(0)) is
       // not an instruction
-      if (StoringGlobalVal) {
+      if (StoringGlobalVal && !isa<Function>(ReplVal)) {
         // propagate stored value from alloca to load 
         llvmberry::propagateLoadGhostValueForm(AI, LI, ReplVal, data, hints, true);
-        
-        // can be removed after modify function entry invariant
-        auto &mem2regCmd = *(MEM2REGDICT->mem2regCmd);
-        std::shared_ptr<llvmberry::TyLessthanUndef> lessthanundef
-          (new llvmberry::TyLessthanUndef
-            (llvmberry::TyValueType::make(*LI->getType()),
-             std::shared_ptr<llvmberry::TyValue>
-              (new llvmberry::ConsId
-                (llvmberry::TyRegister::make(Rload, llvmberry::Ghost)))));
-        mem2regCmd[Rload].lessUndef.push_back(lessthanundef);
-        INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), ""),
-                std::shared_ptr<llvmberry::TyInfrule>(new llvmberry::ConsLessthanUndef(lessthanundef)));
-        //remove 
+    
+        if (isa<GlobalValue>(ReplVal) || isa<Argument>(ReplVal))
+          PROPAGATE(LESSDEF(EXPR(UNDEF(ReplVal), Physical), EXPR(ReplVal, Physical), SRC),
+                    BOUNDS(STARTPOS(SRC, std::string(AI->getParent()->getName())), INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), "")));
 
+        if (ConstantExpr* ce = dyn_cast<ConstantExpr>(ReplVal)) {
+          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), ""),
+                  llvmberry::ConsLessthanUndefConstGEPorCast::make(TYPEOF(ce), llvmberry::TyConstant::make(*ce)));
+        } else if (Constant* c = dyn_cast<Constant>(ReplVal)) {
+          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), ""),
+                  llvmberry::ConsLessthanUndefConst::make(llvmberry::TyConstant::make(*c))); }
 
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
@@ -459,10 +456,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       ReplVal = UndefValue::get(LI->getType());
 
     INTRUDE(&AI, &LI, &ReplVal) {
-     //removable 
-      llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI, data);
-      llvmberry::generateHintForMem2RegReplaceHint(ReplVal, AI, data);
-
       llvmberry::replaceExpr(AI, ReplVal, data);
       llvmberry::replaceTag(AI, llvmberry::Ghost, data);
       llvmberry::replaceExpr(LI, ReplVal, data);
@@ -592,8 +585,6 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
 
       hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(INDICESDICT->instrIndices, LI)-1, ""));
-
-      llvmberry::generateHintForMem2RegReplaceHint(value, LI, data);
       
       llvmberry::replaceExpr(LI, value, data);
       llvmberry::replaceTag(LI, llvmberry::Ghost, data);
@@ -954,12 +945,11 @@ void PromoteMem2Reg::run() {
                 // value is constInt or constFloat
                 // infrule lessthanundef target undef > const
                 Constant *C = dyn_cast<Constant>(V);
-                INFRULE(llvmberry::TyPosition::make(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
+                INFRULE(BLOCKPOS(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
               } else { hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT"); }
             }
           }
 
-          llvmberry::generateHintForMem2RegReplaceHint(V, PN, data);
           llvmberry::replaceExpr(PN, V, data);
           llvmberry::replaceTag(PN, llvmberry::Ghost, data);
         });
@@ -1233,7 +1223,6 @@ NextIteration:
 
         hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(INDICESDICT->instrIndices, LI)-1, ""));
 
-        llvmberry::generateHintForMem2RegReplaceHint(V, LI, data);
         llvmberry::replaceExpr(LI, V, data);
         llvmberry::replaceTag(LI, llvmberry::Ghost, data);
       });

@@ -1231,22 +1231,6 @@ void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data) {
   }
 }
 
-void generateHintForMem2RegReplaceHint(llvm::Value *ReplVal,
-                                       llvm::Instruction *ReplInst,
-                                       Dictionary &data) {
-  auto &mem2regCmd = *(data.get<ArgForMem2Reg>()->mem2regCmd);
-  std::string ReplName = "";
-
-  if (llvm::isa<llvm::AllocaInst>(ReplInst) || llvm::isa<llvm::LoadInst>(ReplInst) || llvm::isa<llvm::PHINode>(ReplInst))
-    ReplName = getVariable(*ReplInst);
-  
-  if ((ReplName == "") || (mem2regCmd.find(ReplName) == mem2regCmd.end()))
-    return;
-
-  data.get<ArgForMem2Reg>()->replaceLessthanUndef(ReplName,
-                                                  TyValue::make(*ReplVal));
-}
-
 void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints) {
   PROPAGATE(LESSDEF(false_encoding.first, false_encoding.second, SRC), BOUNDS(STARTPOS(SRC, getBasicBlockIndex(bb)), ENDPOS(SRC, bb)));
   std::vector<llvm::BasicBlock *> DeadBlockList;
