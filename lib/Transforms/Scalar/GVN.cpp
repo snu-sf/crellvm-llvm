@@ -1647,13 +1647,30 @@ struct GVNQuery {
   // std::pair<Instruction*, Instruction*> q_t;
   // Instruction *pos;
   // GVNQuery(q1, q2, p) : q_s(q1), q_t(q2), pos(p) {}
-  Instruction *src;
-  Instruction *tgt;
+  uint32_t vn;
+  Value *src;
+  bool is_src_clone;
+  Value *tgt;
+  bool is_tgt_clone;
   Instruction *pos;
-  GVNQuery(Instruction *qs, Instruction *qt, Instruction *p)
-    : src(qs), tgt(qt), pos(p) {}
+  GVNQuery(uint32_t n, Value *qs, bool sc, Value *qt, bool tc, Instruction *p)
+    : vn(n), src(qs), is_src_clone(sc), tgt(qt), is_tgt_clone(tc), pos(p) {}
+  GVNQuery(uint32_t n, std::pair<Value*, bool> vps, std::pair<Value*, bool> vpt, Instruction *p)
+    : vn(n), src(vps.first), is_src_clone(vps.second),
+      tgt(vpt.first), is_tgt_clone(vpt.second), pos(p) {}
+  // GVNQuery(Instruction *qs, Instruction *qs_c, Instruction *qt, Instruction *qt_c, Instruction *p)
+  //   : src(qs), tgt(qt), pos(p), src_cl(qs_c), tgt_cl(qt_c) {}
+  // ~GVNQuery() {
+  //   if (is_src_clone) delete src;
+  //   if (is_tgt_clone) delete tgt;
+  // }
+  void clear() {
+    if (is_src_clone) delete src;
+    if (is_tgt_clone) delete tgt;
+  }
+
   bool operator==(const GVNQuery &q2) const {
-    if (src == q2.src && tgt == q2.tgt && pos == q2.pos) return true;
+    // return (vn == q2.vn && src == q2.src && tgt == q2.tgt && pos == q2.pos);
     return false;
   }
   bool operator<(const GVNQuery &q2) const {
@@ -1670,37 +1687,48 @@ bool isSamePos(Instruction *p1, Instruction *p2) {
   return false;
 }
 
-Value *resolvePhi(ValueTable &VN, Value *V_q, Instruction *pos) {
-  if (Instruction *I_q = dyn_cast<Instruction>(V_q)) {
-    DominatorTree *DT = VN.getDomTree();
-    if (DT->dominates(I_q, pos)) return I_q;
-    if (PHINode *PN_q = dyn_cast<PHINode>(I_q)) {
-      Value *V_inc = nullptr;
-      for (unsigned i = 0; i < PN_q->getNumIncomingValues(); ++i)
-        // if (DT->dominates(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
-        if (isSamePos(pos, PN_q->getIncomingBlock(i)->getTerminator()) ||
-            DT->dominates(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
-          V_inc = PN_q->getIncomingValue(i);
-          break;
-        }
-      if (!V_inc) V_inc = PN_q->getIncomingValue(0); // We guess any value is OK.
-      if (Instruction *I_inc = dyn_cast<Instruction>(V_inc)) {
-        if (PHINode *PN_inc = dyn_cast<PHINode>(I_inc))
-          return resolvePhi(VN, PN_inc, pos);
-        else return V_inc;
-      }
-      else {
-        assert(!V_inc && "V_inc should not be null.");
-        return V_inc;
-      }
+void resolvePhiArgs(Instruction *I, PHINode *PN, BasicBlock *BBpred) {
+  for (unsigned i = 0; i < I->getNumOperands(); ++i) {
+    if (PHINode *PN_op = dyn_cast<PHINode>(I->getOperand(i))) {
+      if (isSamePos(PN, PN_op))
+	I->setOperand(i, PN_op->getIncomingValueForBlock(BBpred));
     }
   }
-  return V_q;
 }
 
+// Value *resolvePhi(ValueTable &VN, Value *V_q, Instruction *pos) {
+//   if (Instruction *I_q = dyn_cast<Instruction>(V_q)) {
+//     DominatorTree *DT = VN.getDomTree();
+//     if (DT->dominates(I_q, pos)) return I_q;
+//     if (PHINode *PN_q = dyn_cast<PHINode>(I_q)) {
+//       Value *V_inc = nullptr;
+//       for (unsigned i = 0; i < PN_q->getNumIncomingValues(); ++i)
+//         // if (DT->dominates(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
+//         if (isSamePos(pos, PN_q->getIncomingBlock(i)->getTerminator()) ||
+//             DT->dominates(pos, PN_q->getIncomingBlock(i)->getTerminator())) {
+//           V_inc = PN_q->getIncomingValue(i);
+//           break;
+//         }
+//       if (!V_inc) V_inc = PN_q->getIncomingValue(0); // We guess any value is OK.
+//       if (Instruction *I_inc = dyn_cast<Instruction>(V_inc)) {
+//         if (PHINode *PN_inc = dyn_cast<PHINode>(I_inc))
+//           return resolvePhi(VN, PN_inc, pos);
+//         else return V_inc;
+//       }
+//       else {
+//         assert(!V_inc && "V_inc should not be null.");
+//         return V_inc;
+//       }
+//     }
+//   }
+//   return V_q;
+// }
+
 // Find appropriate I_p s.t. VN(I_p) = VN(I)
-Instruction *hintgenPropEq(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
-  if (Instruction *I_repl = dyn_cast<Instruction>(repl))
+// Instruction *hintgenPropEq(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
+Instruction *hintgenPropEq(llvmberry::CoreHint &hints, ValueTable &VN, bool is_src,
+			   Instruction *pos, uint32_t vn, Value *V, bool &is_clone) {
+  if (Instruction *I_repl = dyn_cast<Instruction>(V))
     return I_repl;
   hints.appendToDescription("GVN: propeq case. Not covered yet.");
   hints.setReturnCodeToAdmitted();
@@ -1736,20 +1764,31 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
     SmallVector<uint32_t, 4> ops_idxs;
     SmallVector<std::pair<uint32_t, std::shared_ptr<llvmberry::TyValue>>, 4> repl_map;
 
+    // // Resolve phi in I_q_cl
+    // for (unsigned i = 0; i < I_q_cl->getNumOperands(); ++i)
+    //   if (Instruction *I_op = dyn_cast<Instruction>(I_q_cl->getOperand(i))) {
+    //     Value *V_op_r = resolvePhi(VN, I_op, pos_d);
+    //     if (V_op_r != I_op) {
+    //       I_q_cl->setOperand(i, V_op_r);
+    //       dbgs() << "gather ops: " << *I_op << " -phi-res-> " << *V_op_r << "\n";
+
+    //       // TODO: required?
+    //       auto v_new = llvmberry::TyValue::make(*V_op_r);
+    //       // ginsn->replace_op(i, v_new);
+    //       repl_map.push_back(std::make_pair(i, v_new));
+    //     }
+    //     if (Instruction *I_op_r = dyn_cast<Instruction>(V_op_r))
+    //       if (!isSamePos(I_op_r, pos_u) && !DT->dominates(I_op_r, pos_u)) {
+    //         dbgs() << "pushed ops: " << *I_op_r << "\n";
+    //         ops_idxs.push_back(i);
+    //       }
+    //   }
     for (unsigned i = 0; i < I_q->getNumOperands(); ++i)
       if (Instruction *I_op = dyn_cast<Instruction>(I_q->getOperand(i))) {
-        Value *V_op_r = resolvePhi(VN, I_op, pos_d);
-        if (V_op_r != I_op) {
-          dbgs() << "gather ops: " << *I_op << " -phi-res-> " << *V_op_r << "\n";
-          auto v_new = llvmberry::TyValue::make(*V_op_r);
-          // ginsn->replace_op(i, v_new);
-          repl_map.push_back(std::make_pair(i, v_new));
-        }
-        if (Instruction *I_op_r = dyn_cast<Instruction>(V_op_r))
-          if (!isSamePos(I_op_r, pos_u) && !DT->dominates(I_op_r, pos_u)) {
-            dbgs() << "pushed ops: " << *I_op_r << "\n";
-            ops_idxs.push_back(i);
-          }
+	if (!isSamePos(I_op, pos_u) && !DT->dominates(I_op, pos_u)) {
+	  dbgs() << "pushed ops: " << *I_op << "\n";
+	  ops_idxs.push_back(i);
+	}
       }
 
     dbgs() << "sort ops\n";
@@ -1812,18 +1851,18 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
   }
 }
 
-Instruction *findUpper(ValueTable &VN, const GVNQuery &q) {
-  DominatorTree *DT = VN.getDomTree();
-  bool src_dom_pos = DT->dominates(q.src, q.pos),
-       tgt_dom_pos = DT->dominates(q.tgt, q.pos);
-  if (src_dom_pos && !tgt_dom_pos) return q.src;
-  else if (!src_dom_pos && tgt_dom_pos) return q.tgt;
-  else {
-    assert((src_dom_pos && tgt_dom_pos) && "GVNQuery: nobody dominates pos");
-    if (DT->dominates(q.src, q.tgt)) return q.src;
-    else return q.tgt;
-  }
-}
+// Instruction *findUpper(ValueTable &VN, const GVNQuery &q) {
+//   DominatorTree *DT = VN.getDomTree();
+//   bool src_dom_pos = DT->dominates(q.src, q.pos),
+//        tgt_dom_pos = DT->dominates(q.tgt, q.pos);
+//   if (src_dom_pos && !tgt_dom_pos) return q.src;
+//   else if (!src_dom_pos && tgt_dom_pos) return q.tgt;
+//   else {
+//     assert((src_dom_pos && tgt_dom_pos) && "GVNQuery: nobody dominates pos");
+//     if (DT->dominates(q.src, q.tgt)) return q.src;
+//     else return q.tgt;
+//   }
+// }
 
 // void checked_insert(SmallVector<GVNQuery, 4> &worklist,
 //                     SmallSetVector<GVNQuery, 10> &visited,
@@ -1833,7 +1872,8 @@ Instruction *findUpper(ValueTable &VN, const GVNQuery &q) {
 
 void extractOps(ValueTable &VN, SmallVector<Value*, 4> &ops_src, Instruction *I_q, Instruction *pos) {
   for (auto OI = I_q->op_begin(), OE = I_q->op_end(); OI != OE; ++OI)
-    ops_src.push_back(resolvePhi(VN, *OI, pos));
+    // ops_src.push_back(resolvePhi(VN, *OI, pos));
+    ops_src.push_back(*OI);
 }
 
 // if this is all the functionality we require, just inline this.
@@ -1845,58 +1885,106 @@ bool isSwapAvailable(Instruction *I) {
   return (I->isCommutative() || isa<ICmpInst>(I) || isa<FCmpInst>(I));
 }
 
+void wl_clear(SmallVector<GVNQuery, 4> worklist) {
+  while (!worklist.empty()) {
+    GVNQuery q = worklist.back();
+    q.clear();
+    worklist.pop_back();
+  }
+}
+
 void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
   dbgs() << "== hintgenGVN start: " << *I << " " << *repl << "\n";
+  DominatorTree *DT = VN.getDomTree();
+
   SmallVector<GVNQuery, 4> worklist;
   SmallSetVector<GVNQuery, 10> visited;
 
-  Instruction *I_repl = hintgenPropEq(hints, VN, I, repl);
-  if (!I_repl) return;
-  GVNQuery q_init(I, I_repl, I);
-  worklist.push_back(q_init);
-  visited.insert(q_init);
+  // Instruction *I_repl = hintgenPropEq(hints, VN, I, repl);
+  // if (!I_repl) return;
+  GVNQuery qi(VN.lookup_VN_of_expr(I), I, false, repl, false, I);
+  worklist.push_back(qi);
+  visited.insert(qi);
 
   while (!worklist.empty()){
     GVNQuery q = worklist.back();
-    dbgs() << "worklist start: " << *q.src << " " << *q.tgt << " " << *q.pos << "\n";
+    dbgs() << "worklist start: " << *q.src << " " << (q.is_src_clone? "s clone" : "")
+           << " " << *q.tgt << " " << (q.is_tgt_clone? "t clone" : "") << " "
+	   << *q.pos << "\n";
+    worklist.pop_back();
 
-    if (isTotallyDifferentInstr(q.src, q.tgt)) {
-      dbgs() << "Admit: we suspect processLoad for " << *q.src << " " << *q.tgt << "\n";
+    Instruction *Is = hintgenPropEq(hints, VN, true, q.pos, q.vn, q.src, q.is_src_clone);
+    Instruction *It = hintgenPropEq(hints, VN, false, q.pos, q.vn, q.tgt, q.is_tgt_clone);
+    q.src = Is;
+    q.tgt = It;
+
+    if (!Is || !It) {
+      dbgs() << "Admit: PropEq case\n";
+      q.clear();
+      wl_clear(worklist);
+      return;
+    }
+
+    if (isTotallyDifferentInstr(Is, It)) {
+      dbgs() << "Admit: we suspect processLoad for " << *Is << " " << *It << "\n";
       hints.appendToDescription("GVN: We don't process processLoad optimization now.");
       hints.setReturnCodeToAdmitted();
+      q.clear();
+      wl_clear(worklist);
       return;
     }
 
-    if ((q.src->getOpcode() == Instruction::Call) ||
-        (q.tgt->getOpcode() == Instruction::Call)) {
+    if ((Is->getOpcode() == Instruction::Call) ||
+        (It->getOpcode() == Instruction::Call)) {
       hints.appendToDescription("GVN: Readonly calls.");
       hints.setReturnCodeToAdmitted(); // We admit readonly call cases now.
+      q.clear();
+      wl_clear(worklist);
       return;
     }
 
-    worklist.pop_back();
-    Instruction *pos_up = findUpper(VN, q);
-    bool is_up_src = pos_up == q.src;
-    Instruction *I_down = is_up_src? q.tgt : q.src;
+    Instruction *pos_up = nullptr;
 
-    hintgenHoist(hints, VN, q.src, q.pos, pos_up, true);
-    hintgenHoist(hints, VN, q.tgt, q.pos, pos_up, false);
+    // find upper position
+    if (q.is_src_clone && q.is_tgt_clone)
+      assert(false && "Unexpected case of clone pair");
+    if (q.is_src_clone) pos_up = It;
+    else if (q.is_tgt_clone) pos_up = Is;
+    else {
+      bool src_dom_pos = DT->dominates(Is, q.pos),
+	tgt_dom_pos = DT->dominates(It, q.pos);
+      if (src_dom_pos && !tgt_dom_pos) pos_up = Is;
+      else if (!src_dom_pos && tgt_dom_pos) pos_up = It;
+      else {
+        assert((src_dom_pos && tgt_dom_pos) && "GVNQuery: nobody dominates pos");
+        if (DT->dominates(Is, It)) pos_up = Is;
+        else pos_up = It;
+      }
+    }
+
+    bool is_up_src = pos_up == Is;
+    Instruction *I_down = is_up_src? It : Is;
+
+    hintgenHoist(hints, VN, Is, q.pos, pos_up, true);
+    hintgenHoist(hints, VN, It, q.pos, pos_up, false);
 
     if (PHINode *PN = dyn_cast<PHINode>(pos_up)) {
       dbgs() << "HintgenGVN: pos_up is phinode " << *PN <<"\n";
       for (unsigned i = 0; i < PN->getNumIncomingValues(); ++i) {
         dbgs() << "  phi iter " << i <<"\n";
-        Instruction *I_op = hintgenPropEq(hints, VN, I_down, PN->getIncomingValue(i));
-        if (!I_op) {
-          dbgs() << "operator returns null\n";
-          return;
-        }
         TerminatorInst *term = PN->getIncomingBlock(i)->getTerminator();
-        GVNQuery q_new(is_up_src? I_op : q.src, is_up_src? q.tgt : I_op, term);
+
+        Instruction *cl_new = I_down->clone();
+        resolvePhiArgs(cl_new, PN, PN->getIncomingBlock(i));
+
+        std::pair<Value*, bool> v1 = std::make_pair(cl_new, true),
+          v2 = std::make_pair(PN->getIncomingValue(i), false);
+
+        GVNQuery q_new(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
         if (visited.insert(q_new)) {
-          dbgs() << "  phi push_back \n";
+          dbgs() << "  phi push back \n";
           worklist.push_back(q_new);
-        }
+        } else delete cl_new;
       }
     } else {
       dbgs() << "HintgenGVN: pos_up is non-phi\n";
@@ -1909,10 +1997,10 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
       // extractOps(VN, ops_src, q.src, pos_up);
       // extractOps(VN, ops_tgt, q.tgt, pos_up);
       // extract operands. phi-resolved at q.pos.
-      extractOps(VN, ops_src, q.src, q.pos);
-      extractOps(VN, ops_tgt, q.tgt, q.pos);
+      extractOps(VN, ops_src, Is, q.pos);
+      extractOps(VN, ops_tgt, It, q.pos);
 
-      if (isSwapAvailable(q.src) &&
+      if (isSwapAvailable(Is) &&
           (VN.lookup_VN_of_expr(ops_src[0]) != VN.lookup_VN_of_expr(ops_tgt[0])) &&
           (VN.lookup_VN_of_expr(ops_src[0]) == VN.lookup_VN_of_expr(ops_tgt[1]))) {
         // TODO: assert(q.src == icmp or comm);
@@ -1926,17 +2014,24 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
         if (ops_src[i] != ops_tgt[i]) {
           dbgs() << "ops_src[" << i << "]: " << *ops_src[i] << "\n";
           dbgs() << "ops_tgt[" << i << "]: " << *ops_tgt[i] << "\n";
-          Instruction *I_op_s = hintgenPropEq(hints, VN, dyn_cast<Instruction>(ops_tgt[i]), ops_src[i]);
-          Instruction *I_op_t = hintgenPropEq(hints, VN, dyn_cast<Instruction>(ops_src[i]), ops_tgt[i]);
-          if (!I_op_s || !I_op_t) return;
-          dbgs() << "I_op_s, I_op_t : " << *I_op_s << " " << *I_op_t << "\n";
+          // Instruction *I_op_s = hintgenPropEq(hints, VN, dyn_cast<Instruction>(ops_tgt[i]), ops_src[i]);
+          // Instruction *I_op_t = hintgenPropEq(hints, VN, dyn_cast<Instruction>(ops_src[i]), ops_tgt[i]);
+          // if (!I_op_s || !I_op_t) return;
+          // dbgs() << "I_op_s, I_op_t : " << *I_op_s << " " << *I_op_t << "\n";
 
-          if (!I_op_s || !I_op_t) {
-            dbgs() << "hintgenPropEq returned nullptr\n";
-            return;
-          }
+          // if (!I_op_s || !I_op_t) {
+          //   dbgs() << "hintgenPropEq returned nullptr\n";
+          //   return;
+          // }
+	  uint32_t vn_op = 0;
+	  if (Instruction *I_op_s = dyn_cast<Instruction>(ops_src[i]))
+	    vn_op = VN.lookup_VN_of_expr(I_op_s);
+	  else if (Instruction *I_op_t = dyn_cast<Instruction>(ops_tgt[i]))
+	    vn_op = VN.lookup_VN_of_expr(I_op_t);
+	  else
+	    assert(false && "both values are not instruction");
 
-          GVNQuery q_new(I_op_s, I_op_t, pos_up);
+          GVNQuery q_new(vn_op, ops_src[i], false, ops_tgt[i], false, pos_up);
           if (visited.insert(q_new)) {
             dbgs() << "insert new query\n";
             worklist.push_back(q_new);
@@ -1944,6 +2039,7 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
         }
       }
     }
+    q.clear();
   }
 }
 
