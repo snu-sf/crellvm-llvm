@@ -1176,37 +1176,43 @@ void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, 
     MEM2REGDICT->replaceItem.get()->push_back(std::shared_ptr<TyExpr>(val));
 }
 
-void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints, bool checkReplace) {
-  llvm::StoreInst *SI = llvm::dyn_cast<llvm::StoreInst>(From);
-  llvm::AllocaInst *AI = llvm::dyn_cast<llvm::AllocaInst>(From);
-  std::string Rghost;
+void propagateLoadGhostValueFromAIToLI(llvm::AllocaInst* AI, llvm::LoadInst* LI, llvm::Value* value, Dictionary &data, CoreHint &hints) {
+  std::string Rghost = getVariable(*AI);
 
-  if (AI != NULL)
-    Rghost = getVariable(*AI);
-  else if (SI != NULL)
-    Rghost = getVariable(*(SI->getOperand(1)));
+  std::shared_ptr<TyPosition> from_position = INDEXEDPOS(SRC, AI, DICTMAP(INDICESDICT->instrIndices, AI), "");
+  std::shared_ptr<TyPosition> to_position = INDEXEDPOS(SRC, LI, DICTMAP(INDICESDICT->instrIndices, LI), "");
 
-  std::shared_ptr<TyPosition> from_position = INDEXEDPOS(SRC, From, DICTMAP(INDICESDICT->instrIndices, From), "");
-  std::shared_ptr<TyPosition> to_position = INDEXEDPOS(SRC, To, DICTMAP(INDICESDICT->instrIndices, To), "");
+  PROPAGATE(LESSDEF(INSNALIGNONE(AI), VAR(Rghost, Ghost), SRC), BOUNDS(from_position, to_position));
 
-  PROPAGATE(LESSDEF(INSNALIGNONE(From), VAR(Rghost, Ghost), SRC), BOUNDS(from_position, to_position));
-  
   std::shared_ptr<TyExpr> val = EXPR(value, Physical);
   PROPAGATE(LESSDEF(VAR(Rghost, Ghost), val, TGT), BOUNDS(from_position, to_position));
 
   if (value->getName() != "") { MEM2REGDICT->replaceItem.get()->push_back(std::shared_ptr<TyExpr>(val)); }
+  INFRULE(from_position, ConsIntroGhost::make(val, REGISTER(Rghost, Ghost)));
+}
 
-  if (SI != NULL) {
-    std::shared_ptr<llvmberry::TyExpr> expr = EXPR(value, Physical);
+void propagateLoadGhostValueFromSIToLI(llvm::StoreInst* SI, llvm::LoadInst* LI, llvm::Value* value, Dictionary &data, CoreHint &hints, bool checkReplace) {
 
-    if (checkReplace) {
-      auto &storeItem = *(MEM2REGDICT->storeItem);
-      if (MEM2REGDICT->equalsIfConsVar(storeItem[SI].expr, expr)) { MEM2REGDICT->replaceTag.get()->push_back(expr); }
-      else if (storeItem[SI].op0 != "") { expr = VAR(storeItem[SI].op0, Ghost); }
-    }
+  std::string Rghost = getVariable(*(SI->getOperand(1)));
 
-    INFRULE(from_position, llvmberry::ConsIntroGhost::make(expr, REGISTER(Rghost, Ghost)));
-  } else if (AI != NULL) { INFRULE(from_position, ConsIntroGhost::make(EXPR(value, Physical), REGISTER(Rghost, Ghost))); }
+  std::shared_ptr<TyPosition> from_position = INDEXEDPOS(SRC, SI, DICTMAP(INDICESDICT->instrIndices, SI), "");
+  std::shared_ptr<TyPosition> to_position = INDEXEDPOS(SRC, LI, DICTMAP(INDICESDICT->instrIndices, LI), "");
+
+  PROPAGATE(LESSDEF(INSNALIGNONE(SI), VAR(Rghost, Ghost), SRC), BOUNDS(from_position, to_position));
+
+  std::shared_ptr<TyExpr> val = EXPR(value, Physical);
+  PROPAGATE(LESSDEF(VAR(Rghost, Ghost), val, TGT), BOUNDS(from_position, to_position));
+
+  if (value->getName() != "") { MEM2REGDICT->replaceItem.get()->push_back(std::shared_ptr<TyExpr>(val)); }
+  std::shared_ptr<llvmberry::TyExpr> expr = EXPR(value, Physical);
+  
+  if (checkReplace) {
+    auto &storeItem = *(MEM2REGDICT->storeItem);
+    if (MEM2REGDICT->equalsIfConsVar(storeItem[SI].expr, expr)) { MEM2REGDICT->replaceTag.get()->push_back(expr); }
+    else if (storeItem[SI].op0 != "") { expr = VAR(storeItem[SI].op0, Ghost); }
+  }
+
+  INFRULE(from_position, llvmberry::ConsIntroGhost::make(expr, REGISTER(Rghost, Ghost)));
 }
 
 void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {

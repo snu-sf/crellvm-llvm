@@ -412,7 +412,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       // not an instruction
       if (StoringGlobalVal) {
         // propagate stored value from alloca to load 
-        llvmberry::propagateLoadGhostValueForm(AI, LI, ReplVal, data, hints, true);
+        llvmberry::propagateLoadGhostValueFromAIToLI(AI, LI, ReplVal, data, hints);
         
         // can be removed after modify function entry invariant
         auto &mem2regCmd = *(MEM2REGDICT->mem2regCmd);
@@ -434,7 +434,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
         INFRULE(INDEXEDPOS(SRC, OnlyStore, DICTMAP(INDICESDICT->instrIndices, OnlyStore), ""),
                 llvmberry::ConsIntroGhost::make(expr, REGISTER(Rstore, Ghost)));
-      } else { llvmberry::propagateLoadGhostValueForm(OnlyStore, LI, ReplVal, data, hints, true); }
+      } else { llvmberry::propagateLoadGhostValueFromSIToLI(OnlyStore, LI, ReplVal, data, hints, true); }
         // Step1: propagate store instruction
         //        <src>                               |     <tgt>
         // %x = alloca i32                            | nop
@@ -571,21 +571,18 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
       // prepare variables
       std::string Rload = llvmberry::getVariable(*LI);
       Value* value;
-      Instruction* insn;
 
       if (I == StoresByIndex.begin()) { 
         value = UNDEF(LI);
-        insn = AI;
-
+        llvmberry::propagateLoadGhostValueFromAIToLI(AI, LI, value, data, hints);
         if (!StoresByIndex.empty()) 
           hints.appendToDescription("MEM2REG SINGLE BLOCK ALLOCA BUG FOUND BY US");
       } else { 
         StoreInst* SI = std::prev(I)->second;
         value = SI->getOperand(0);
-        insn = SI;
+        llvmberry::propagateLoadGhostValueFromSIToLI(SI, LI, value, data, hints, true);
       }
         
-      llvmberry::propagateLoadGhostValueForm(insn, LI, value, data, hints, true);
       llvmberry::propagateLoadInstToUse(LI, value, llvmberry::getVariable(*AI), data, hints, true);
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
       llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
