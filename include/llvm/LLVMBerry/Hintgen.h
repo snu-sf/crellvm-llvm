@@ -9,6 +9,9 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/Analysis/CFG.h"
 
+#define INTRUDE(...) llvmberry::ValidationUnit::GetInstance()->intrude         \
+                      ([__VA_ARGS__] (llvmberry::Dictionary &data,             \
+                                      llvmberry::CoreHint &hints)
 #define INFRULE(pos, x)                                                        \
   hints.addCommand(llvmberry::ConsInfrule::make(pos, x),                       \
                    llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
@@ -22,6 +25,15 @@
 #define PHIPOSJustPhi(SCOPE, PN)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
+#define INDEXEDPOS(SCOPE, I, index, prev)                                      \
+  llvmberry::TyPosition::make(SCOPE, *(I), index, prev)
+#define STARTPOS(SCOPE, BBname)                                                \
+  llvmberry::TyPosition::make_start_of_block(SCOPE, BBname)
+#define ENDPOSINDEXED(SCOPE, BB, index)                                        \
+  llvmberry::TyPosition::make_end_of_block(SCOPE, *(BB), index)
+#define ENDPOS(SCOPE, BB)                                                      \
+  llvmberry::TyPosition::make_end_of_block(SCOPE, *(BB))
+                                                                    
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
 #define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
 // Below code snippet is tu support overloading of two macro functions : 
@@ -52,8 +64,11 @@
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define INSNWITHGHOST(x, y)                                                    \
   std::shared_ptr<llvmberry::TyExpr>(new llvmberry::TyExpr(                    \
-      std::shared_ptr<llvmberry::TyExpr_i>(new llvmberry::ConsInsn(            \
+      std::shared_ptr<llvmberry::TyExprImpl>(new llvmberry::ConsInsn(            \
           llvmberry::instructionWithGhostIdxs(x, y)))))
+#define INSNALIGNONE(I)                                                        \
+  llvmberry::ConsInsn::make(std::shared_ptr<llvmberry::TyInstruction>          \
+    (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(I))))
 #define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
 
 // LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
@@ -100,6 +115,12 @@
 
 #define SRC llvmberry::Source
 #define TGT llvmberry::Target
+
+#define DICTMAP(dict, key) dict.get()->find(key)->second
+#define UNDEF(I) llvm::UndefValue::get(I->getType())
+#define UNDEFAI(I) llvm::UndefValue::get(AI->getAllocatedType())
+
+#define LLVMBERRYRPD llvmberry::Mem2RegArg::RenamePassTuple
 
 namespace llvmberry {
 /* applyCommutativity(I, (A bop B), scope) :
@@ -208,14 +229,6 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
 extern std::pair<std::shared_ptr<TyExpr>, std::shared_ptr<TyExpr>>
     false_encoding;
 
-void generateHintForMem2RegPropagateStore(llvm::BasicBlock* Pred,
-                                          llvm::StoreInst* SI,
-                                          llvm::Instruction* next,
-                                          int nextIndex);
-
-void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal,
-                                       llvm::Instruction* I);
-
 int getIndexofMem2Reg(llvm::Instruction* instr, int instrIndex, int termIndex);
 
 bool hasBitcastOrGEP(llvm::AllocaInst* AI);
@@ -223,8 +236,7 @@ bool hasBitcastOrGEP(llvm::AllocaInst* AI);
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
 
-std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
-  (llvm::Instruction* I, Dictionary &data, CoreHint &hints);
+std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet (llvm::Instruction* I, Dictionary &data, CoreHint &hints);
 
 void saveInstrIndices(llvm::Function* F, Dictionary &data);
 
@@ -232,17 +244,26 @@ void saveUseIndices(llvm::Function* F, unsigned opCode, Dictionary &data);
 
 void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictionary &data);
 
-void saveInstrInfo(llvm::Instruction* I, unsigned key, const std::string &prev, Dictionary &data);
+void propagateFromInsnToLoad (unsigned key, llvm::LoadInst *LI, Dictionary &data, CoreHint &hints);
 
-void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
+void propagateFromInsnToPhi (unsigned key, llvm::PHINode *Phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
 
-void applyInfruleforAISI(unsigned key, Dictionary &data, CoreHint &hints);
+void checkSIOperand (unsigned key, llvm::StoreInst *SI, Dictionary &data, CoreHint &hints);
 
-void applyInfruleforPhi(unsigned key, llvm::PHINode *phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
+void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints, bool checkReplace=false);
 
-void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints);
+void propagateLoadGhostValueFromSIToLI(llvm::StoreInst* SI, llvm::LoadInst* LI, llvm::Value* value, Dictionary &data, CoreHint &hints, bool checkReplace=false);
 
-void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints);
+void propagateLoadGhostValueFromAIToLI(llvm::AllocaInst* AI, llvm::LoadInst* LI, llvm::Value* value, Dictionary &data, CoreHint &hints);
+
+void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data);
+
+void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data);
+
+void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal, llvm::Instruction* I, Dictionary &data);
+
+void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints);
+
 
 }
 

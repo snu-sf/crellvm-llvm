@@ -158,7 +158,6 @@ public:
   struct RenamePassTuple {
     std::shared_ptr<TyExpr> instrL;
     std::shared_ptr<TyExpr> instrR;
-    std::shared_ptr<TyValue> instrVal;
     std::shared_ptr<TyPosition> instrPos;
     std::string op0;
     std::string op1;
@@ -174,11 +173,16 @@ public:
   typedef std::shared_ptr<TyInstrWorkListObj> TyInstrWorkList;
   TyInstrWorkList instrWorkList;
 
+  typedef std::vector<std::shared_ptr<TyExpr>> TyReplaceObj;
+  typedef std::shared_ptr<TyReplaceObj> TyReplace;
+  TyReplace replaceItem;
+
+  typedef std::vector<std::shared_ptr<TyExpr>> TyReplaceTObj;
+  typedef std::shared_ptr<TyReplaceTObj> TyReplaceT;
+  TyReplaceT replaceTag;
+
   static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
                               std::shared_ptr<TyExpr> e2);
-  static bool isUndef(std::shared_ptr<TyExpr> e);
-  void replaceCmdRhs(std::string which, std::string key,
-                     std::shared_ptr<TyExpr> newExpr);
   void replaceLessthanUndef(std::string key,
                             std::shared_ptr<TyValue> newVal);
   
