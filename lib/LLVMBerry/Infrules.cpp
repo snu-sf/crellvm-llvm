@@ -497,6 +497,32 @@ void ConsAndTrueBool::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(and_true_bool));
 }
 
+TyAndTrueBoolTgt::TyAndTrueBoolTgt(std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y)
+    : x(std::move(_x)), y(std::move(_y)) {}
+
+void TyAndTrueBoolTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsAndTrueBoolTgt::ConsAndTrueBoolTgt(std::shared_ptr<TyAndTrueBoolTgt> _and_true_bool_tgt)
+  : and_true_bool_tgt(std::move(_and_true_bool_tgt)) {}
+
+std::shared_ptr<TyInfrule> ConsAndTrueBoolTgt::make(std::shared_ptr<TyValue> _x,
+                                                    std::shared_ptr<TyValue> _y) {
+  std::shared_ptr<TyAndTrueBoolTgt> _val(
+      new TyAndTrueBoolTgt(std::move(_x), std::move(_y)));
+  return std::shared_ptr<TyInfrule>(new ConsAndTrueBoolTgt(std::move(_val)));
+}
+
+void ConsAndTrueBoolTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("AndTrueBoolTgt");
+  archive(CEREAL_NVP(and_true_bool_tgt));
+}
+
 TyAndUndef::TyAndUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
                        std::shared_ptr<TySize> _sz)
     : z(std::move(_z)), x(std::move(_x)), sz(std::move(_sz)) {}
@@ -1091,6 +1117,34 @@ void ConsOrFalse::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("OrFalse");
   archive(CEREAL_NVP(or_false));
+}
+
+TyOrFalseTgt::TyOrFalseTgt(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+                           std::shared_ptr<TySize> _sz)
+    : x(std::move(_x)), y(std::move(_y)), sz(std::move(_sz)) {}
+
+void TyOrFalseTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+  archive(CEREAL_NVP(sz));
+}
+
+ConsOrFalseTgt::ConsOrFalseTgt(std::shared_ptr<TyOrFalseTgt> _or_false_tgt)
+    : or_false_tgt(std::move(_or_false_tgt)) {}
+
+std::shared_ptr<TyInfrule> ConsOrFalseTgt::make(std::shared_ptr<TyValue> _x,
+                                                std::shared_ptr<TyValue> _y,
+                                                std::shared_ptr<TySize> _sz) {
+  std::shared_ptr<TyOrFalseTgt> _val(
+      new TyOrFalseTgt(std::move(_x), std::move(_y), std::move(_sz)));
+  return std::shared_ptr<TyInfrule>(new ConsOrFalseTgt(std::move(_val)));
+}
+
+void ConsOrFalseTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("OrFalseTgt");
+  archive(CEREAL_NVP(or_false_tgt));
 }
 
 TyOrMone::TyOrMone(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _a,
@@ -2369,6 +2423,38 @@ void ConsIcmpEqSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(icmp_eq_same));
 }
 
+TyIcmpEqSameTgt::TyIcmpEqSameTgt(std::shared_ptr<TyValueType> _ty,
+                                 std::shared_ptr<TyValue> _x,
+                                 std::shared_ptr<TyValue> _y)
+    : ty(std::move(_ty)), x(std::move(_x)), y(std::move(_y)) {}
+
+void TyIcmpEqSameTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsIcmpEqSameTgt::ConsIcmpEqSameTgt(std::shared_ptr<TyIcmpEqSameTgt> _icmp_eq_same_tgt)
+    : icmp_eq_same_tgt(_icmp_eq_same_tgt) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpEqSameTgt::make(llvm::ICmpInst &CI) {
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+  std::shared_ptr<TyIcmpEqSameTgt> _icmp_eq_same_tgt =
+      std::make_shared<TyIcmpEqSameTgt>(ty, x, y);
+
+  return std::make_shared<ConsIcmpEqSameTgt>(_icmp_eq_same_tgt);
+}
+
+void ConsIcmpEqSameTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpEqSameTgt");
+  archive(CEREAL_NVP(icmp_eq_same_tgt));
+}
+
 TyIcmpNeqSame::TyIcmpNeqSame(std::shared_ptr<TyValueType> _ty,
                              std::shared_ptr<TyValue> _x,
                              std::shared_ptr<TyValue> _y)
@@ -2400,6 +2486,39 @@ void ConsIcmpNeqSame::serialize(cereal::JSONOutputArchive &archive) const {
   archive.writeName();
   archive.saveValue("IcmpNeqSame");
   archive(CEREAL_NVP(icmp_neq_same));
+}
+
+TyIcmpNeqSameTgt::TyIcmpNeqSameTgt(std::shared_ptr<TyValueType> _ty,
+                                   std::shared_ptr<TyValue> _x,
+                                   std::shared_ptr<TyValue> _y)
+    : ty(std::move(_ty)), x(std::move(_x)), y(std::move(_y)) {}
+
+void TyIcmpNeqSameTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(x));
+  archive(CEREAL_NVP(y));
+}
+
+ConsIcmpNeqSameTgt::ConsIcmpNeqSameTgt(std::shared_ptr<TyIcmpNeqSameTgt> _icmp_neq_same_tgt)
+    : icmp_neq_same_tgt(_icmp_neq_same_tgt) {}
+
+std::shared_ptr<TyInfrule> ConsIcmpNeqSameTgt::make(llvm::ICmpInst &CI) {
+  std::shared_ptr<TyValueType> ty =
+      TyValueType::make(*CI.getOperand(0)->getType());
+  std::shared_ptr<TyValue> x = TyValue::make(*CI.getOperand(0));
+  std::shared_ptr<TyValue> y = TyValue::make(*CI.getOperand(1));
+
+  std::shared_ptr<TyIcmpNeqSameTgt> _icmp_neq_same_tgt =
+      std::make_shared<TyIcmpNeqSameTgt>(ty, x, y);
+
+  return std::make_shared<ConsIcmpNeqSameTgt>(_icmp_neq_same_tgt);
+}
+
+void ConsIcmpNeqSameTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IcmpNeqSameTgt");
+  archive(CEREAL_NVP(icmp_neq_same_tgt));
 }
 
 } // llvmberry

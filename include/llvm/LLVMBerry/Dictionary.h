@@ -245,6 +245,7 @@ public:
   GVNReplaceArg();
   bool isGVNReplace;
   const llvm::BasicBlock *BB;
+  boost::any GVNptr;
   boost::any VNptr;
 };
 DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);

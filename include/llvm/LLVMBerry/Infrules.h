@@ -236,6 +236,16 @@ private:
   std::shared_ptr<TyValue> y;
 };
 
+struct TyAndTrueBoolTgt {
+public:
+  TyAndTrueBoolTgt(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+};
+
 struct TyAndUndef {
 public:
   TyAndUndef(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _x,
@@ -547,6 +557,18 @@ struct TyOrFalse {
 public:
   TyOrFalse(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
             std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+  std::shared_ptr<TySize> sz;
+};
+
+struct TyOrFalseTgt {
+public:
+  TyOrFalseTgt(std::shared_ptr<TyValue> _x, std::shared_ptr<TyValue> _y,
+               std::shared_ptr<TySize> _sz);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -1173,10 +1195,34 @@ private:
   std::shared_ptr<TyValue> y;
 };
 
+struct TyIcmpEqSameTgt {
+public:
+  TyIcmpEqSameTgt(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x,
+                  std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+};
+
 struct TyIcmpNeqSame {
 public:
   TyIcmpNeqSame(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x,
                 std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValueType> ty;
+  std::shared_ptr<TyValue> x;
+  std::shared_ptr<TyValue> y;
+};
+
+struct TyIcmpNeqSameTgt {
+public:
+  TyIcmpNeqSameTgt(std::shared_ptr<TyValueType> _ty, std::shared_ptr<TyValue> _x,
+                   std::shared_ptr<TyValue> _y);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
@@ -1260,6 +1306,17 @@ public:
 
 private:
   std::shared_ptr<TyAndTrueBool> and_true_bool;
+};
+
+struct ConsAndTrueBoolTgt : public TyInfrule {
+public:
+  ConsAndTrueBoolTgt(std::shared_ptr<TyAndTrueBoolTgt> _and_true_bool_tgt);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyAndTrueBoolTgt> and_true_bool_tgt;
 };
 
 struct ConsAndUndef : public TyInfrule {
@@ -1663,6 +1720,18 @@ public:
 
 private:
   std::shared_ptr<TyOrFalse> or_false;
+};
+
+struct ConsOrFalseTgt : public TyInfrule {
+public:
+  ConsOrFalseTgt(std::shared_ptr<TyOrFalseTgt> _or_false_tgt);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x,
+                                         std::shared_ptr<TyValue> _y,
+                                         std::shared_ptr<TySize> _sz);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyOrFalseTgt> or_false_tgt;
 };
 
 struct ConsOrMone : public TyInfrule {
@@ -2118,6 +2187,16 @@ private:
   std::shared_ptr<TyIcmpEqSame> icmp_eq_same;
 };
 
+struct ConsIcmpEqSameTgt : public TyInfrule {
+public:
+  ConsIcmpEqSameTgt(std::shared_ptr<TyIcmpEqSameTgt> _icmp_eq_same_tgt);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpEqSameTgt> icmp_eq_same_tgt;
+};
+
 struct ConsIcmpNeqSame : public TyInfrule {
 public:
   ConsIcmpNeqSame(std::shared_ptr<TyIcmpNeqSame> _icmp_neq_same);
@@ -2126,6 +2205,16 @@ public:
 
 private:
   std::shared_ptr<TyIcmpNeqSame> icmp_neq_same;
+};
+
+struct ConsIcmpNeqSameTgt : public TyInfrule {
+public:
+  ConsIcmpNeqSameTgt(std::shared_ptr<TyIcmpNeqSameTgt> _icmp_neq_same_tgt);
+  static std::shared_ptr<TyInfrule> make(llvm::ICmpInst &CI);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIcmpNeqSameTgt> icmp_neq_same_tgt;
 };
 
 struct ConsIcmpSwapOperands : public TyInfrule {

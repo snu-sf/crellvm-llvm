@@ -653,6 +653,8 @@ namespace {
     DominatorTree &getDominatorTree() const { return *DT; }
     AliasAnalysis *getAliasAnalysis() const { return VN.getAliasAnalysis(); }
     MemoryDependenceAnalysis &getMemDep() const { return *MD; }
+    // For LLVMBerry
+    BasicBlock *getOriginBBofLeader(uint32_t num, BasicBlock *BB, Value *V);
   private:
     /// Push a new Value to the LeaderTable onto the list for its value number.
     void addToLeaderTable(uint32_t N, Value *V, const BasicBlock *BB) {
@@ -1725,13 +1727,183 @@ void resolvePhiArgs(Instruction *I, PHINode *PN, BasicBlock *BBpred) {
 // }
 
 // Find appropriate I_p s.t. VN(I_p) = VN(I)
-// Instruction *hintgenPropEq(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
-Instruction *hintgenPropEq(llvmberry::CoreHint &hints, ValueTable &VN, bool is_src,
-			   Instruction *pos, uint32_t vn, Value *V, bool &is_clone) {
-  if (Instruction *I_repl = dyn_cast<Instruction>(V))
-    return I_repl;
-  hints.appendToDescription("GVN: propeq case. Not covered yet.");
-  hints.setReturnCodeToAdmitted();
+Instruction *hintgenPropEq(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, bool is_src,
+			   Instruction *pos, uint32_t vn, Value *repl, bool &is_clone) {
+  if (Instruction *I_repl = dyn_cast<Instruction>(repl)) return I_repl;
+
+  BasicBlock *BB_succ = pass.getOriginBBofLeader(vn, pos->getParent(), repl),
+    *BB_pred = BB_succ->getSinglePredecessor();
+  TerminatorInst *TI = BB_pred->getTerminator();
+
+  auto scp = is_src? SRC : TGT;
+  auto hpos_br = llvmberry::TyPosition::make(scp, BB_succ->getName(), BB_pred->getName());
+
+  Instruction *I_cond = nullptr;
+  ConstantInt *C_cond = nullptr;
+
+  ConstantInt *VTrue = ConstantInt::getTrue(BB_succ->getContext()),
+    *VFalse = ConstantInt::getFalse(BB_succ->getContext());
+  std::shared_ptr<llvmberry::TyExpr> expr_true = llvmberry::TyExpr::make(*VTrue),
+    expr_false = llvmberry::TyExpr::make(*VFalse);
+
+  if (BranchInst *BI = dyn_cast<BranchInst>(TI)) {
+    I_cond = cast<Instruction>(BI->getCondition());
+
+    if (BI->getSuccessor(0) == BB_succ) C_cond = VTrue;
+    else if (BI->getSuccessor(1) == BB_succ) C_cond = VFalse;
+    else assert(false && "TODO:remove this assert (so straightforward)");
+  } else if (SwitchInst *SI = dyn_cast<SwitchInst>(TI)) {
+    I_cond = dyn_cast<Instruction>(SI->getCondition());
+
+    for (SwitchInst::CaseIt i = SI->case_begin(), e = SI->case_end(); i != e; ++i)
+      if (i.getCaseSuccessor() == BB_succ)
+        C_cond = i.getCaseValue();
+  } else
+    assert(false && "GVN make_repl_inv: Unexpected terminator.");
+
+  SmallVector<std::pair<Value*, Value*>, 4> worklist;
+  worklist.push_back(std::make_pair(I_cond, C_cond));
+
+  dbgs() << "=propeq repl, vn : " << *repl << " " << vn <<"\n";
+  while(!worklist.empty()) {
+    dbgs() << "propeq worklist start: ";
+    auto q = worklist.back();
+    dbgs() << *q.first << " " << *q.second << "\n";
+    worklist.pop_back();
+
+    if (isa<Instruction>(q.second)) std::swap(q.first, q.second);
+
+    if (!isa<Instruction>(q.first)) continue;
+    Instruction *I_q = cast<Instruction>(q.first);
+    std::string id_I_q = llvmberry::getVariable(*I_q);
+
+    dbgs() << "vn, I_q: " << VN.lookup_VN_of_expr(I_q) << " " << *I_q << "\n";
+
+    Instruction *cln = nullptr;
+    // if (repl != q.second) {
+    //   dbgs() <<" err " << repl << " " << *repl << "\n"
+    //          << q.second << " " <<*q.second << "\n";
+      
+    // }
+    // if (VN.lookup_VN_of_expr(I_q) != vn) {
+    //   dbgs() << VN.lookup_VN_of_expr(I_q) << " " << vn << "\n";
+    // }
+    if ((repl == q.second) && (VN.lookup_VN_of_expr(I_q) == vn)) {
+      // dbgs() << "clone..\n";
+      cln = I_q->clone();
+    }
+    else if ((repl == VTrue && q.second == VFalse) || (repl == VFalse && q.second == VTrue))
+      if (CmpInst *Cmp = dyn_cast<CmpInst>(I_q)) {
+        CmpInst *Cmp2 = cast<CmpInst>(I_q->clone());
+        Cmp2->setPredicate(Cmp2->getInversePredicate());
+        if (VN.lookup_VN_of_expr(Cmp2) == vn) {
+          cln = Cmp2;
+        }
+        else delete Cmp2;
+      }
+    
+    if (cln != nullptr) {
+      dbgs() << "propeq end\n";
+      // propagate (src: repl >= exp_I_q , tgt: exp_I_q >= repl)
+      //   from start of BB_succ to pos
+      // consinsn, repl
+      is_clone = true;
+
+      PROPAGATE(is_src? LESSDEF(VAR(id_I_q), RHS(id_I_q, Physical, SRC), SRC) :
+                LESSDEF(RHS(id_I_q, Physical, TGT), VAR(id_I_q), TGT),
+                BOUNDS(INSTPOS(SRC, I_q), hpos_br));
+      
+      PROPAGATE(is_src? LESSDEF(llvmberry::TyExpr::make(*repl), INSN(*cln), SRC) :
+                LESSDEF(INSN(*cln), llvmberry::TyExpr::make(*repl), TGT),
+                BOUNDS(hpos_br, INSTPOS(SRC, pos)));
+      return cln;
+    }
+
+    bool isTrue;
+    if (q.second == VTrue) isTrue = true;
+    else if (q.second == VFalse) isTrue = false;
+    else continue;
+
+    switch (I_q->getOpcode()) {
+    case Instruction::And:
+      if (isTrue) {
+        worklist.push_back(std::make_pair(I_q->getOperand(0), VTrue));
+        worklist.push_back(std::make_pair(I_q->getOperand(1), VTrue));
+        // TODO: insert infrule
+        PROPAGATE(LESSDEF(VAR(id_I_q), RHS(id_I_q, Physical, scp), scp), BOUNDS(INSTPOS(scp, I_q), hpos_br));
+
+        // TODO: integrate
+        if (is_src) {
+          INFRULE(hpos_br, llvmberry::ConsTransitivity::make(expr_true, VAR(id_I_q), RHS(id_I_q, Physical, scp)));
+          INFRULE(hpos_br, llvmberry::ConsAndTrueBool::make(llvmberry::TyValue::make(*I_q->getOperand(0)),
+                                                        llvmberry::TyValue::make(*I_q->getOperand(1))));
+        } else {
+          INFRULE(hpos_br, llvmberry::ConsTransitivityTgt::make(expr_true, VAR(id_I_q), RHS(id_I_q, Physical, scp)));
+          INFRULE(hpos_br, llvmberry::ConsAndTrueBoolTgt::make(llvmberry::TyValue::make(*I_q->getOperand(0)),
+                                                               llvmberry::TyValue::make(*I_q->getOperand(1))));
+        }
+      }
+      break;
+    case Instruction::Or:
+      if (!isTrue) {
+        worklist.push_back(std::make_pair(I_q->getOperand(0), VFalse));
+        worklist.push_back(std::make_pair(I_q->getOperand(1), VFalse));
+        // TODO: insert infrule
+        PROPAGATE(LESSDEF(VAR(id_I_q), RHS(id_I_q, Physical, scp), scp), BOUNDS(INSTPOS(scp, I_q), hpos_br));
+
+        // TODO: integrate
+        if (is_src) {
+          INFRULE(hpos_br, llvmberry::ConsTransitivity::make(expr_false, VAR(id_I_q), RHS(id_I_q, Physical, scp)));
+          INFRULE(hpos_br, llvmberry::ConsOrFalse::make(llvmberry::TyValue::make(*I_q->getOperand(0)),
+                                                    llvmberry::TyValue::make(*I_q->getOperand(1)),
+                                                    llvmberry::ConsSize::make(1)));
+        } else {
+          INFRULE(hpos_br, llvmberry::ConsTransitivityTgt::make(expr_false, VAR(id_I_q), RHS(id_I_q, Physical, scp)));
+          INFRULE(hpos_br, llvmberry::ConsOrFalseTgt::make(llvmberry::TyValue::make(*I_q->getOperand(0)),
+                                                    llvmberry::TyValue::make(*I_q->getOperand(1)),
+                                                    llvmberry::ConsSize::make(1)));
+        }
+      }
+      break;
+    }
+
+    if (ICmpInst *Cmp = dyn_cast<ICmpInst>(I_q)) {
+      if ((isTrue && Cmp->getPredicate() == CmpInst::ICMP_EQ) ||
+          (!isTrue && Cmp->getPredicate() == CmpInst::ICMP_NE)) {
+        worklist.push_back(std::make_pair(Cmp->getOperand(0), Cmp->getOperand(1)));
+        // TODO: infrule
+        PROPAGATE(LESSDEF(VAR(id_I_q), RHS(id_I_q, Physical, scp), scp), BOUNDS(INSTPOS(SRC, I_q), hpos_br));
+        if (is_src) {
+          INFRULE(hpos_br, llvmberry::ConsTransitivity::make(isTrue? expr_true : expr_false, VAR(id_I_q), RHS(id_I_q, Physical, scp)));
+
+          if (isTrue) INFRULE(hpos_br, llvmberry::ConsIcmpEqSame::make(*Cmp));
+          else INFRULE(hpos_br, llvmberry::ConsIcmpNeqSame::make(*Cmp));
+        } else {
+          dbgs() << "TGT version of IcmpEqSame not prepared\n";
+          INFRULE(hpos_br, llvmberry::ConsTransitivityTgt::make(isTrue? expr_true : expr_false, VAR(id_I_q), RHS(id_I_q, Physical, scp)));
+          if (isTrue) INFRULE(hpos_br, llvmberry::ConsIcmpEqSameTgt::make(*Cmp));
+          else INFRULE(hpos_br, llvmberry::ConsIcmpNeqSameTgt::make(*Cmp));
+        }
+      }
+    }
+
+    if (FCmpInst *Cmp = dyn_cast<FCmpInst>(I_q)) {
+      if ((isTrue && Cmp->getPredicate() == CmpInst::FCMP_OEQ) ||
+          (!isTrue && Cmp->getPredicate() == CmpInst::FCMP_UNE)) {
+        worklist.push_back(std::make_pair(Cmp->getOperand(0), Cmp->getOperand(1)));
+        // TODO: infrule
+        dbgs() << "FCmp not covered yet\n";
+        hints.appendToDescription("propeq FCMP case occurred.");
+      }
+    }
+    
+  }
+
+  // hints.appendToDescription("GVN: propeq case. Not covered yet.");
+  // hints.setReturnCodeToAdmitted();
+
+  // hints.appendToDescription("GVN: propeq failed.");
+  assert(false &&"propeq failed");
   return nullptr;
 }
 
@@ -1893,7 +2065,7 @@ void wl_clear(SmallVector<GVNQuery, 4> worklist) {
   }
 }
 
-void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Value *repl) {
+void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instruction *I, Value *repl) {
   dbgs() << "== hintgenGVN start: " << *I << " " << *repl << "\n";
   DominatorTree *DT = VN.getDomTree();
 
@@ -1913,8 +2085,8 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
 	   << *q.pos << "\n";
     worklist.pop_back();
 
-    Instruction *Is = hintgenPropEq(hints, VN, true, q.pos, q.vn, q.src, q.is_src_clone);
-    Instruction *It = hintgenPropEq(hints, VN, false, q.pos, q.vn, q.tgt, q.is_tgt_clone);
+    Instruction *Is = hintgenPropEq(hints, pass, VN, true, q.pos, q.vn, q.src, q.is_src_clone);
+    Instruction *It = hintgenPropEq(hints, pass, VN, false, q.pos, q.vn, q.tgt, q.is_tgt_clone);
     q.src = Is;
     q.tgt = It;
 
@@ -1952,7 +2124,7 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
     else if (q.is_tgt_clone) pos_up = Is;
     else {
       bool src_dom_pos = DT->dominates(Is, q.pos),
-	tgt_dom_pos = DT->dominates(It, q.pos);
+        tgt_dom_pos = DT->dominates(It, q.pos);
       if (src_dom_pos && !tgt_dom_pos) pos_up = Is;
       else if (!src_dom_pos && tgt_dom_pos) pos_up = It;
       else {
@@ -3132,9 +3304,10 @@ static void patchAndReplaceAllUsesWith(Instruction *I, Value *Repl) {
     }
     pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace = false;
 
+    GVN &pass = *boost::any_cast<GVN*>(pdata.get<llvmberry::ArgForGVNReplace>()->GVNptr);
     ValueTable &VN = *boost::any_cast<ValueTable*>(pdata.get<llvmberry::ArgForGVNReplace>()->VNptr);
 
-    hintgenGVN(hints, VN, I, Repl);
+    hintgenGVN(hints, pass, VN, I, Repl);
     auto gvar = VAR(ghostSymb(VN.lookup_VN_of_expr(I)), Ghost);
 
     std::shared_ptr<llvmberry::TyPropagateObject>
@@ -3403,6 +3576,28 @@ Value *GVN::findLeader(const BasicBlock *BB, uint32_t num) {
   }
 
   return Val;
+}
+
+BasicBlock *GVN::getOriginBBofLeader(uint32_t num, BasicBlock *BB, Value *V) {
+  LeaderTableEntry Vals = LeaderTable[num];
+  if (!Vals.Val) return nullptr;
+
+  const BasicBlock *BBorig = nullptr;
+  if (DT->dominates(Vals.BB, BB))
+    if (Vals.Val == V) BBorig = Vals.BB;
+
+  if (!BBorig) {
+    LeaderTableEntry* Next = Vals.Next;
+    while (Next) {
+      if (DT->dominates(Next->BB, BB))
+        if (Next->Val == V) BBorig = Next->BB;
+      Next = Next->Next;
+    }
+  }
+
+  BasicBlock *nonConstBB = const_cast<BasicBlock *>(BBorig);
+
+  return nonConstBB;
 }
 
 /// There is an edge from 'Src' to 'Dst'.  Return
@@ -3690,6 +3885,7 @@ bool GVN::processInstruction(Instruction *I) {
   llvmberry::intrude([this]() {
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.get<llvmberry::ArgForGVNReplace>()->isGVNReplace = true;
+    pdata.get<llvmberry::ArgForGVNReplace>()->GVNptr = this;
     pdata.get<llvmberry::ArgForGVNReplace>()->VNptr = &VN;
   });
   patchAndReplaceAllUsesWith(I, repl);
@@ -3992,7 +4188,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
       Instruction *I = CurInst, *Repl = Phi;
-      hintgenGVN(hints, VN, I, Phi);
+      hintgenGVN(hints, *this, VN, I, Phi);
       auto gvar = VAR(ghostSymb(VN.lookup_VN_of_expr(I)), Ghost);
 
       std::shared_ptr<llvmberry::TyPropagateObject>
