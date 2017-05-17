@@ -1228,7 +1228,7 @@ private :
 
 // propagate expression
 
-struct TyExpr_i;
+struct TyExprImpl;
  
 struct TyExpr {
 public:
@@ -1238,25 +1238,25 @@ public:
   static std::shared_ptr<TyExpr> make(const llvm::Value &value,
                                       enum TyTag _tag = llvmberry::Physical);
 
-  TyExpr(std::shared_ptr<TyExpr_i> ei);
+  TyExpr(std::shared_ptr<TyExprImpl> ei);
 
   void replace_expr(std::shared_ptr<TyExpr> expr);
-  std::shared_ptr<TyExpr_i> get_i();
+  std::shared_ptr<TyExprImpl> get();
 
 private:
-  std::shared_ptr<TyExpr_i> expr_i;
+  std::shared_ptr<TyExprImpl> expr_i;
 };
 
-struct TyExpr_i {
+struct TyExprImpl {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 
-  static std::shared_ptr<TyExpr_i> make(const std::shared_ptr<TyValue> tyval);
-  static std::shared_ptr<TyExpr_i> make(const llvm::Value &value,
+  static std::shared_ptr<TyExprImpl> make(const std::shared_ptr<TyValue> tyval);
+  static std::shared_ptr<TyExprImpl> make(const llvm::Value &value,
                                       enum TyTag _tag = llvmberry::Physical);
 };
 
-struct ConsVar : public TyExpr_i {
+struct ConsVar : public TyExprImpl {
 public:
   ConsVar(std::shared_ptr<TyRegister> _register_name);
   ConsVar(std::string _name, enum TyTag _tag);
@@ -1272,7 +1272,7 @@ private:
   std::shared_ptr<TyRegister> register_name;
 };
 
-struct ConsRhs : public TyExpr_i {
+struct ConsRhs : public TyExprImpl {
 public:
   ConsRhs(std::shared_ptr<TyRegister> _register_name, enum TyScope _scope);
   ConsRhs(std::string _name, enum TyTag _tag, enum TyScope _scope);
@@ -1286,7 +1286,7 @@ private:
   enum TyScope scope;
 };
 
-struct ConsConst : public TyExpr_i {
+struct ConsConst : public TyExprImpl {
 public:
   ConsConst(std::shared_ptr<TyConstant> _constant);
 
@@ -1303,7 +1303,7 @@ private:
   std::shared_ptr<TyConstant> constant;
 };
 
-struct ConsInsn : public TyExpr_i {
+struct ConsInsn : public TyExprImpl {
 public:
   ConsInsn(std::shared_ptr<TyInstruction> _instruction);
   void serialize(cereal::JSONOutputArchive &archive) const;
