@@ -228,27 +228,17 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
               // Y = X op C1 | Y = X op C1
               // Z = Y op C2 | Z = X op (C1 op C2)
 
-              // prepare variables
-              std::string reg0_name = llvmberry::getVariable(*(Op0->getOperand(0)));
-              std::string reg1_name = llvmberry::getVariable(*Op0);
-              std::string reg2_name = llvmberry::getVariable(I);
-
-              ConstantInt *B_const = dyn_cast<ConstantInt>(B);
-              ConstantInt *C_const = dyn_cast<ConstantInt>(C);
-              ConstantInt *V_const = dyn_cast<ConstantInt>(V);
-
               Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
-
-              unsigned b_bw = B_const->getBitWidth();
 
               llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
 
               INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopAssociative::make(
-                      REGISTER(reg0_name), REGISTER(reg1_name),
-                      REGISTER(reg2_name), llvmberry::getBop(Opcode),
-                      llvmberry::TyConstInt::make(*B_const),
-                      llvmberry::TyConstInt::make(*C_const),
-                      llvmberry::TyConstInt::make(*V_const), BITSIZE(b_bw)));
+                      REGISTER(*(Op0->getOperand(0))), REGISTER(*Op0),
+                      REGISTER(I), llvmberry::getBop(Opcode),
+                      CONSTINT(dyn_cast<ConstantInt>(B)),
+                      CONSTINT(dyn_cast<ConstantInt>(C)),
+                      CONSTINT(dyn_cast<ConstantInt>(V)),
+                      BITSIZE(*dyn_cast<ConstantInt>(B))));
             } else {
               llvmberry::ValidationUnit::GetInstance()->setIsAborted();
             }
@@ -1975,7 +1965,7 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
           }
           StoreInst *SI = dyn_cast<StoreInst>(&*Users[i]);
           llvmberry::insertTgtNopAtSrcI(hints, SI);
-          PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
+          PROPAGATE(PRIVATE(REGISTER(regname), SRC),
               BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
         }
         llvmberry::insertTgtNopAtSrcI(hints, &MI);

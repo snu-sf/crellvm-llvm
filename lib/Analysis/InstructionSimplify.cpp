@@ -1311,10 +1311,8 @@ static bool isUndefShift(Value *Amount) {
         ptr->setHintGenFunc("shift_undef1", [&hints](llvm::Instruction *I) {
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
           Value *Y = Z->getOperand(0);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          INFRULE(INSTPOS(SRC, Z),
-                  llvmberry::ConsShiftUndef1::make(
-                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftUndef1::make(
+                  VAL(Z), VAL(Y), BITSIZE(*Z)));
         });
       });
     }
@@ -1344,11 +1342,10 @@ static bool isUndefShift(Value *Amount) {
             BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
             Value *Y = Z->getOperand(0);
             ConstantInt *C = CI;
-            int bitwidth = Z->getType()->getIntegerBitWidth();
             INFRULE(INSTPOS(SRC, Z),
                     llvmberry::ConsShiftUndef2::make(
-                        VAL(Z, Physical), VAL(Y, Physical),
-                        llvmberry::TyConstInt::make(*C), BITSIZE(bitwidth)));
+                        VAL(Z), VAL(Y),
+                        llvmberry::TyConstInt::make(*C), BITSIZE(*Z)));
           });
         });
       }
@@ -1408,11 +1405,8 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
         ptr->setHintGenFunc("shift_zero1",
                             [Op0, Op1, &hints](llvm::Instruction *I) {
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          Value *Y = Z->getOperand(1);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          INFRULE(INSTPOS(SRC, Z),
-                  llvmberry::ConsShiftZero1::make(
-                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftZero1::make(
+                      VAL(Z), VAL(Z->getOperand(1)), BITSIZE(*Z)));
         });
       });
     }
@@ -1435,11 +1429,8 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
         ptr->setHintGenFunc("shift_zero2",
                             [Op0, Op1, &hints](llvm::Instruction *I) {
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          Value *Y = Z->getOperand(0);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          INFRULE(INSTPOS(SRC, Z),
-                  llvmberry::ConsShiftZero2::make(
-                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftZero2::make(
+                  VAL(Z), VAL(Z->getOperand(0)), BITSIZE(*Z)));
         });
       });
     }
@@ -1729,12 +1720,11 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         ptr->setHintGenFunc("and_undef", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
           auto zero = Constant::getNullValue(Op0->getType());
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if(isSwapped){
             llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
           }
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndUndef::make(
-                  VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
+                  VAL(Z), VAL(Op0), BITSIZE(*Z)));
         });
       });
     }
@@ -1752,9 +1742,8 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("and_same", [Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndSame::make(
-                  VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
+                  VAL(Z), VAL(Op0), BITSIZE(*Z)));
 
         });
       });
@@ -1774,11 +1763,10 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("and_zero", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if(isSwapped)
             llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndZero::make(
-                  VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
+                  VAL(Z), VAL(Op0), BITSIZE(*Z)));
 
         });
       });
@@ -1798,11 +1786,10 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("and_mone", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if(isSwapped)
             llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndMone::make(
-                  VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
+                  VAL(Z), VAL(Op0), BITSIZE(*Z)));
 
         });
       });
@@ -1828,7 +1815,6 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
           Value *X = isOp1NotOfOp0 ? Op0 : Op1;
           BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOfOp0 ? Op1 : Op0);
           assert(Y);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
 
           llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
           if(Y->getOperand(0) != X){
@@ -1838,7 +1824,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
             llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
           }
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndNot::make(
-                  VAL(Z), VAL(X), VAL(Y), BITSIZE(bitwidth)));
+                  VAL(Z), VAL(X), VAL(Y), BITSIZE(*Z)));
         });
       });
     }
@@ -2064,12 +2050,11 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
         ptr->setHintGenFunc("or_undef", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
           auto one = Constant::getAllOnesValue(Op0->getType());
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if (isSwapped) {
             llvmberry::applyCommutativity(Z, Z, SRC);
           }
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrUndef::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2087,9 +2072,8 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
         auto ptr = data.get<llvmberry::ArgForSimplifyOrInst>();
         ptr->setHintGenFunc("or_same", [Op0, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrSame::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2109,12 +2093,11 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("or_zero", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if (isSwapped) {
             llvmberry::applyCommutativity(Z, Z, SRC);
           }
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrZero::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2133,12 +2116,11 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("or_mone", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if (isSwapped) {
             llvmberry::applyCommutativity(Z, Z, SRC);
           }
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrMone::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2163,7 +2145,6 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
           Value *X = isOp1NotOp0 ? Op0 : Op1;
           BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOp0 ? Op1 : Op0);
           assert(Y && "Y must be a binary operator");
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           
           llvmberry::propagateInstruction(Y, Z, SRC);
           if (Y->getOperand(0) != X)
@@ -2171,7 +2152,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
           if ((!isSwapped && !isOp1NotOp0) || (isSwapped && isOp1NotOp0))
             llvmberry::applyCommutativity(Z, Z, SRC);
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrNot::make(
-              VAL(Z, Physical), VAL(Y, Physical), VAL(X, Physical), BITSIZE(bitwidth)));
+              VAL(Z, Physical), VAL(Y, Physical), VAL(X, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2362,12 +2343,11 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("xor_zero", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if(isSwapped){
             llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
           }
           INFRULE(INSTPOS(llvmberry::Source, Z),
-              llvmberry::ConsXorZero::make(VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+              llvmberry::ConsXorZero::make(VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2385,9 +2365,8 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("xor_same", [Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           INFRULE(INSTPOS(llvmberry::Source, Z), llvmberry::ConsXorSame::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2412,7 +2391,6 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
           Value *X = isOp1NotOfOp0 ? Op0 : Op1;
           BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOfOp0 ? Op1 : Op0);
           assert(Y);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
 
           llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
           if(Y->getOperand(0) != X)
@@ -2421,7 +2399,7 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
             llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
           INFRULE(INSTPOS(llvmberry::Source, Z),
               llvmberry::ConsXorNot::make(
-                  VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+                  VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), BITSIZE(*Z)));
         });
       });
     }

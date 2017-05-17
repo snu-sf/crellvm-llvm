@@ -222,10 +222,13 @@ private:
 
 struct TyRegister {
 public:
-  TyRegister(std::string _name, enum TyTag _tag);
+  TyRegister(const std::string &_name, enum TyTag _tag);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::shared_ptr<TyRegister> make(std::string _name, enum TyTag _tag);
+  static std::shared_ptr<TyRegister> make(const std::string &_name,
+                                          enum TyTag _tag);
+  static std::shared_ptr<TyRegister> make(const llvm::Value &_val,
+                                          enum TyTag _tag);
 
   static bool isSame(std::shared_ptr<TyRegister> r1,
                      std::shared_ptr<TyRegister> r2);
@@ -361,6 +364,9 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TySize> make(int _size);
+  // Use bitsize from ci
+  // ex) If ci's type is 64-bit integer, then make TySize(64)
+  static std::shared_ptr<TySize> make(const llvm::Value &ci);
 
 private:
   int size;
@@ -1257,6 +1263,7 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
 
   static std::shared_ptr<TyExpr> make(std::string _name, enum TyTag _tag);
+  static std::shared_ptr<TyExpr> make(const llvm::Instruction &value, enum TyTag _tag);
 
   std::shared_ptr<TyRegister> getTyReg();
   void updateTyReg(std::shared_ptr<TyRegister> newTyReg);
@@ -1449,10 +1456,10 @@ private:
 struct ConsMaydiff : public TyPropagateObject {
 public:
   ConsMaydiff(std::shared_ptr<TyRegister> _register_name);
-  ConsMaydiff(std::string _name, enum TyTag _tag);
+  ConsMaydiff(const std::string &_name, enum TyTag _tag);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
-  static std::shared_ptr<TyPropagateObject> make(std::string _name,
+  static std::shared_ptr<TyPropagateObject> make(const std::string &_name,
                                                  enum TyTag _tag);
 
 private:

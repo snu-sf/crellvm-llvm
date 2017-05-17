@@ -190,8 +190,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
                                             PN.getParent()->getName(),
                                             IncomingBlock->getName()),
                 llvmberry::ConsTransitivity::make(VAR(oldphi, Physical),
-                                                  VAR(reg, Previous),
-                                                  apr_bpr));
+                                                  VAR(reg, Previous), apr_bpr));
 
         if (NewLHS) {
 
@@ -210,13 +209,11 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
           }
 
           if (!isa<Constant>(CommonOperand)) {
-            std::string reg_common =
-                llvmberry::getVariable(*CommonOperand);
             INFRULE(llvmberry::TyPosition::make(
                         SRC, PN.getParent()->getName(),
                         IncomingBlock->getName()),
                     llvmberry::ConsSubstitute::make(
-                        REGISTER(reg_common, Previous),
+                        REGISTER(*CommonOperand, Previous),
                         VAL(CommonOperand, Physical), apr_bpr));
           }
           INFRULE(llvmberry::TyPosition::make(SRC,
@@ -294,21 +291,18 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
           }
 
           if (!isa<Constant>(CommonOperand)) {
-            std::string reg_common =
-                llvmberry::getVariable(*CommonOperand);
             INFRULE(llvmberry::TyPosition::make(
                         SRC, PN.getParent()->getName(),
                         IncomingBlock->getName()),
                     llvmberry::ConsSubstitute::make(
-                        REGISTER(reg_common, Previous),
+                        REGISTER(*CommonOperand, Previous),
                         VAL(CommonOperand, Physical), apr_bpr));
           }
 
           INFRULE(llvmberry::TyPosition::make(SRC,
                                               PN.getParent()->getName(),
                                               IncomingBlock->getName()),
-                  llvmberry::ConsTransitivity::make(
-                      VAR(oldphi, Physical), apr_bpr, aph_bpr));
+                  llvmberry::ConsTransitivity::make(VAR(oldphi), apr_bpr, aph_bpr));
 
           // introduce k >= b^ && b^ >= k in src and tgt
           INFRULE(llvmberry::TyPosition::make(SRC,
@@ -350,17 +344,14 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
           INFRULE(llvmberry::TyPosition::make(SRC,
                                               PN.getParent()->getName(),
                                               IncomingBlock->getName()),
-                  llvmberry::ConsTransitivity::make(
-                      VAR(oldphi, Physical), aph_bpr, aph_kgh));
+                  llvmberry::ConsTransitivity::make(VAR(oldphi), aph_bpr, aph_kgh));
 
           // { z >= a + K } at src after phinode
-          PROPAGATE(LESSDEF(VAR(oldphi, Physical),
-                            aph_kgh, SRC),
+          PROPAGATE(LESSDEF(VAR(oldphi), aph_kgh, SRC),
                     BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
           // { K  >= t } at tgt after phinode
-          PROPAGATE(LESSDEF(VAR("K", Ghost),
-                            VAR(newphi, Physical), TGT),
+          PROPAGATE(LESSDEF(VAR("K", Ghost), VAR(newphi), TGT),
                     BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
         }
       }//end of for
@@ -858,17 +849,16 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                                               PN.getParent()->getName(),
                                               IncomingBlock->getName()),
                   llvmberry::ConsTransitivity::make(
-                      VAR(oldphi, Physical), VAR(reg, Previous),
-                      VAR(reg, Physical)));
+                      VAR(oldphi), VAR(reg, Previous), VAR(reg)));
 
           if (BinOp) {
-            aph_bph = INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0), Physical),
-                                      VAL(BinOp->getOperand(1), Physical)));
+            aph_bph = INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), VAL(BinOp->getOperand(0)),
+                                      VAL(BinOp->getOperand(1))));
           } else if (CmpInst) {
             aph_bph = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIcmpPred(CmpInst->getPredicate()),
                                                          TYPEOF(InInst->getOperand(0)),
-                                                         VAL(CmpInst->getOperand(0), Physical),
-                                                         VAL(CmpInst->getOperand(1), Physical)));
+                                                         VAL(CmpInst->getOperand(0)),
+                                                         VAL(CmpInst->getOperand(1))));
           }
 
           // z = x -> z = a + b
@@ -876,13 +866,10 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
               llvmberry::TyPosition::make(SRC,
                                           PN.getParent()->getName(),
                                           IncomingBlock->getName()),
-              llvmberry::ConsTransitivity::make(
-                  VAR(oldphi, Physical), VAR(reg, Physical), aph_bph));
+              llvmberry::ConsTransitivity::make(VAR(oldphi), VAR(reg), aph_bph));
 
           // { z >= a + b } at src after phinode
-          PROPAGATE(
-                  LESSDEF(VAR(oldphi, Physical),
-                          RHS(reg, Physical, SRC), SRC),
+          PROPAGATE(LESSDEF(VAR(oldphi), RHS(reg, Physical, SRC), SRC),
                   BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
         }
       });
@@ -918,7 +905,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                   llvmberry::ConsGlobal::make());
 
           PROPAGATE( //from I to endofblock propagate x or y depend on edge
-                  LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC), SRC),
+                  LESSDEF(VAR(reg), RHS(reg, Physical, SRC), SRC),
                   BOUNDS(INSTPOS(SRC, InInst),
                          llvmberry::TyPosition::make_end_of_block(SRC, *(InInst->getParent()))));
 
@@ -930,8 +917,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
             if ((BB->getName() != InstructionBlock->getName()) &&
                 DT->dominates(InstructionBlock, BB)) {
               PROPAGATE(
-                  LESSDEF(VAR(reg, Physical), RHS(reg, Physical, SRC),
-                          SRC),
+                  LESSDEF(VAR(reg), RHS(reg, Physical, SRC), SRC),
                   BOUNDS(llvmberry::TyPosition::make_start_of_block(
                              SRC, (BB->getName())),
                          llvmberry::TyPosition::make_end_of_block(
@@ -946,7 +932,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
             apr_con = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIcmpPred(CmpInst->getPredicate()),
                                                          TYPEOF(SpecialOperand),
                                                          VAL(SpecialOperand, Previous),
-                                                         VAL(ConstantOp, Physical)));
+                                                         VAL(ConstantOp)));
           }
 
           // x^ >= a^+ const , z = x^ -> z >= a^ + const
@@ -954,8 +940,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
               llvmberry::TyPosition::make(SRC,
                                           PN.getParent()->getName(),
                                           IncomingBlock->getName()),
-              llvmberry::ConsTransitivity::make(
-                  VAR(oldphi, Physical), VAR(reg, Previous), apr_con));
+              llvmberry::ConsTransitivity::make(VAR(oldphi), VAR(reg, Previous), apr_con));
 
           // introduce a^ >= k && k >= a^
           INFRULE(llvmberry::TyPosition::make(SRC,
@@ -970,8 +955,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                                               PN.getParent()->getName(),
                                               IncomingBlock->getName()),
                   llvmberry::ConsTransitivityTgt::make(
-                      VAR("K", Ghost), EXPR(SpecialOperand, Previous),
-                      VAR(newphi, Physical)));
+                      VAR("K", Ghost), EXPR(SpecialOperand, Previous), VAR(newphi)));
 
           std::shared_ptr<llvmberry::TyExpr> kgh_con;
           if (BinOp) {
@@ -981,7 +965,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
             kgh_con = INSN(llvmberry::ConsICmpInst::make(llvmberry::getIcmpPred(CmpInst->getPredicate()),
                                                          TYPEOF(SpecialOperand),
                                                          ID("K",Ghost),
-                                                         VAL(ConstantOp, Physical)));
+                                                         VAL(ConstantOp)));
           }
 
           // infer z = a^ + const -> z >= K + const in src
@@ -990,17 +974,15 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
                                               IncomingBlock->getName()),
                   llvmberry::ConsReplaceRhs::make(
                       REGISTER(reg_block_special, Previous),
-                      ID("K", Ghost), VAR(oldphi, Physical), apr_con,
-                      kgh_con));
+                      ID("K", Ghost), VAR(oldphi), apr_con, kgh_con));
 
           // { z >= K + const } at src after phinode
-          PROPAGATE(LESSDEF(VAR(oldphi, Physical),
+          PROPAGATE(LESSDEF(VAR(oldphi),
                             kgh_con, SRC),
                     BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
 
           // { K  >= t } at tgt after phinode
-          PROPAGATE(LESSDEF(VAR("K", Ghost),
-                            VAR(newphi, Physical), TGT),
+          PROPAGATE(LESSDEF(VAR("K", Ghost), VAR(newphi), TGT),
                     BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
         }
      });

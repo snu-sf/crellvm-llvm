@@ -1221,13 +1221,12 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
               }
               INFRULE(INSTPOS(SRC, alloca_behind),
                   llvmberry::ConsDiffblockUnique::make(
-                      REGISTER(llvmberry::getVariable(*ptr1_alloca)),
-                      REGISTER(llvmberry::getVariable(*ptr3_alloca))));
+                      REGISTER(*ptr1_alloca), REGISTER(*ptr3_alloca)));
             } else if (GlobalVariable *ptr1_gv = llvm::dyn_cast<GlobalVariable>(ptr1src)) {
               INFRULE(INSTPOS(SRC, ptr3_alloca),
                       llvmberry::ConsDiffblockGlobalUnique::make(
                           llvmberry::ConsConstGlobalVarAddr::make(*ptr1_gv),
-                          REGISTER(llvmberry::getVariable(*ptr3_alloca))));
+                          REGISTER(*ptr3_alloca)));
               diffblock_propagate_beg_pos = INSTPOS(SRC, ptr3_alloca);
             } else {
               assert("Noalias store must be (alloca OR global) _||_ (alloca OR global)" && false);
@@ -1238,7 +1237,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
               INFRULE(INSTPOS(SRC, ptr1_alloca),
                       llvmberry::ConsDiffblockGlobalUnique::make(
                           llvmberry::ConsConstGlobalVarAddr::make(*ptr3_gv),
-                          REGISTER(llvmberry::getVariable(*ptr1_alloca))));
+                          REGISTER(*ptr1_alloca)));
               diffblock_propagate_beg_pos = INSTPOS(SRC, ptr1_alloca);
 
             } else if(GlobalVariable *ptr1_gv = llvm::dyn_cast<GlobalVariable>(ptr1src)) {
@@ -1725,7 +1724,7 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
         std::string regname = llvmberry::getVariable(*Ptr);
         AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
         llvmberry::insertTgtNopAtSrcI(hints, &SI);
-        PROPAGATE(PRIVATE(REGISTER(regname, Physical), SRC),
+        PROPAGATE(PRIVATE(REGISTER(regname), SRC),
             BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
       });
       return EraseInstFromFunction(SI);

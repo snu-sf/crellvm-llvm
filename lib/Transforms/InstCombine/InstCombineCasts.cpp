@@ -630,15 +630,14 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
       TruncInst *Z = dyn_cast<TruncInst>(&CI);
       BinaryOperator *Y = dyn_cast<BinaryOperator>(Src);
       Value *X = CI.getOperand(0);
-      int s = X->getType()->getIntegerBitWidth();
-      
+
       llvmberry::insertSrcNopAtTgtI(hints, Y);
       PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Y), llvmberry::Physical),
           llvmberry::ConsGlobal::make());
       
       llvmberry::propagateInstruction(Y, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsTruncOnebit::make(
-          VAL(Z), VAL(X), VAL(Y), BITSIZE(s)));
+          VAL(Z), VAL(X), VAL(Y), BITSIZE(*X)));
     });
     Value *Zero = Constant::getNullValue(Src->getType());
     return new ICmpInst(ICmpInst::ICMP_NE, Src, Zero);
@@ -1053,14 +1052,12 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       ZExtInst *Z = dyn_cast<ZExtInst>(&CI);
       BinaryOperator *W = dyn_cast<BinaryOperator>(Z->getOperand(0));
       Instruction *Y = dyn_cast<Instruction>(W->getOperand(0));
-      int s = X->getType()->getIntegerBitWidth();
-      int sprime = Y->getType()->getIntegerBitWidth();
-      
+
       llvmberry::propagateInstruction(Y, Z, SRC);
       llvmberry::propagateInstruction(W, Z, SRC);
       INFRULE(INSTPOS(SRC, Z), llvmberry::ConsZextTruncAnd::make(
           VAL(Z), VAL(X), VAL(Y), VAL(W),
-          llvmberry::TyConstant::make(*C), BITSIZE(s), BITSIZE(sprime)));
+          llvmberry::TyConstant::make(*C), BITSIZE(*X), BITSIZE(*Y)));
     });
     return BinaryOperator::CreateAnd(X, ConstantExpr::getZExt(C, CI.getType()));
   }
@@ -1089,20 +1086,18 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(0));
       BinaryOperator *W = dyn_cast<BinaryOperator>(And);
       TruncInst *V = dyn_cast<TruncInst>(W->getOperand(0));
-      int s = Z->getType()->getIntegerBitWidth();
-      int sprime = V->getType()->getIntegerBitWidth();
-      
+
       llvmberry::insertSrcNopAtTgtI(hints, Yprime);
       PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Yprime), llvmberry::Physical),
           llvmberry::ConsGlobal::make());
- 
+
       llvmberry::propagateInstruction(V, Z, TGT);
       llvmberry::propagateInstruction(W, Z, TGT);
       llvmberry::propagateInstruction(Y, Z, TGT);
       llvmberry::propagateInstruction(Yprime, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsZextTruncAndXor::make(
           VAL(Z), VAL(X), VAL(V), VAL(W), VAL(Y), VAL(Yprime),
-          llvmberry::TyConstant::make(*C), BITSIZE(s), BITSIZE(sprime)));
+          llvmberry::TyConstant::make(*C), BITSIZE(*Z), BITSIZE(*V)));
     });
     return BinaryOperator::CreateXor(NewAnd, ZC);
   }
@@ -1125,8 +1120,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       ZExtInst *Z = dyn_cast<ZExtInst>(&CI);
       BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(0));
       ZExtInst *Yprime = dyn_cast<ZExtInst>(New);
-      int sz = Yprime->getType()->getIntegerBitWidth();
-      
+
       llvmberry::insertSrcNopAtTgtI(hints, Yprime);
       PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Yprime), llvmberry::Physical),
           llvmberry::ConsGlobal::make());
@@ -1134,7 +1128,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       llvmberry::propagateInstruction(Y, Z, TGT);
       llvmberry::propagateInstruction(Yprime, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsZextXor::make(
-          VAL(Z), VAL(Y), VAL(Yprime), VAL(X), BITSIZE(sz)));
+          VAL(Z), VAL(Y), VAL(Yprime), VAL(X), BITSIZE(*Yprime)));
     });
     return BinaryOperator::CreateXor(New, ConstantInt::get(CI.getType(), 1));
   }

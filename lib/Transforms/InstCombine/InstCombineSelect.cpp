@@ -257,15 +257,9 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     Value *C = SI.getCondition();
     Instruction::BinaryOps bop = R->getOpcode();
 
-    std::string reg_r_name = llvmberry::getVariable(*R);
-    std::string reg_s_name = llvmberry::getVariable(*S);
-    std::string reg_tprime_name = llvmberry::getVariable(*Tprime);
-    std::string reg_t0_name = llvmberry::getVariable(*T0);
-    
     llvmberry::insertSrcNopAtTgtI(hints, Tprime);
-    hints.addCommand(llvmberry::ConsPropagate::make(
-          llvmberry::ConsMaydiff::make(reg_tprime_name, llvmberry::Physical),
-          llvmberry::ConsGlobal::make()));
+    PROPAGATE(MAYDIFF(llvmberry::getVariable(*Tprime), Physical),
+          llvmberry::ConsGlobal::make());
 
     llvmberry::propagateInstruction(R, T0, TGT);
     llvmberry::propagateInstruction(S, T0, TGT);
@@ -281,34 +275,30 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
       if(llvmberry::isFloatOpcode(bop)){
         INFRULE(INSTPOS(TGT, T0),
             llvmberry::ConsFbopDistributiveOverSelectinst2::make(
-              llvmberry::getFbop(bop), REGISTER(reg_r_name),
-              REGISTER(reg_s_name), REGISTER(reg_tprime_name),
-              REGISTER(reg_t0_name), VAL(X), VAL(Y), VAL(Z),VAL(C),
+              llvmberry::getFbop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime),
+              REGISTER(*T0), VAL(X), VAL(Y), VAL(Z),VAL(C),
               llvmberry::getFloatType(R->getType()), VALTYPE(C->getType())));
       }else{
         INFRULE(INSTPOS(TGT, T0), 
             llvmberry::ConsBopDistributiveOverSelectinst2::make(
-              llvmberry::getBop(bop), REGISTER(reg_r_name),
-              REGISTER(reg_s_name), REGISTER(reg_tprime_name),
-              REGISTER(reg_t0_name), VAL(X), VAL(Y), VAL(Z), VAL(C),
-              BITSIZE(R->getType()->getIntegerBitWidth()),
-              VALTYPE(C->getType())));
+              llvmberry::getBop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime),
+              REGISTER(*T0), VAL(X), VAL(Y), VAL(Z), VAL(C),
+              BITSIZE(*R), VALTYPE(C->getType())));
       }
     }else{
       if(llvmberry::isFloatOpcode(bop)){
         INFRULE(INSTPOS(TGT, T0),
             llvmberry::ConsFbopDistributiveOverSelectinst::make(
-              llvmberry::getFbop(bop), REGISTER(reg_r_name), REGISTER(reg_s_name),
-              REGISTER(reg_tprime_name), REGISTER(reg_t0_name), VAL(X), VAL(Y),
+              llvmberry::getFbop(bop), REGISTER(*R), REGISTER(*S),
+              REGISTER(*Tprime), REGISTER(*T0), VAL(X), VAL(Y),
               VAL(Z), VAL(C), llvmberry::getFloatType(R->getType()),
               VALTYPE(C->getType())));
       }else{
         INFRULE(INSTPOS(TGT, T0),
             llvmberry::ConsBopDistributiveOverSelectinst::make(
-              llvmberry::getBop(bop), REGISTER(reg_r_name), REGISTER(reg_s_name),
-              REGISTER(reg_tprime_name), REGISTER(reg_t0_name), VAL(X), VAL(Y),
-              VAL(Z), VAL(C), BITSIZE(R->getType()->getIntegerBitWidth()),
-              VALTYPE(C->getType())));
+              llvmberry::getBop(bop), REGISTER(*R), REGISTER(*S),
+              REGISTER(*Tprime), REGISTER(*T0), VAL(X), VAL(Y),
+              VAL(Z), VAL(C), BITSIZE(*R), VALTYPE(C->getType())));
       }
     }
   });
@@ -634,33 +624,33 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         llvmberry::ValidationUnit::GetInstance()->intrude(
             [&ICI, &SI, &CI, &AdjustedRHS, &Pred](llvmberry::Dictionary &data,
                                                   llvmberry::CoreHint &hints) {
-              auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
-              if (ptr->activated) {
-                //    <src>                   |    <tgt>
-                // Y = icmp sgt/ugt X, C      | Y = icmp slt/ult X, (C+1)
-                // Z = select Y, X, (C+1)     | Z = select Y, (C+1), X
-                //    <src>                   |    <tgt>
-                // Y = icmp slt/ult X, C      | Y = icmp sgt/ugt X, (C-1)
-                // Z = select Y, X, (C-1)     | Z = select Y, (C-1), X
-                ptr->Z = &SI;
-                ptr->Y = ICI;
-                ptr->X = ptr->Y->getOperand(0);
-                ptr->C = CI;
-                ptr->Cprime = dyn_cast<ConstantInt>(AdjustedRHS);
-                ptr->Y_org_pos = INSTPOS(SRC, ICI);
-                ptr->isGtToLt =
-                    Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_SGT;
-                ptr->isUnsigned =
-                    Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_ULT;
-                ptr->selectCommutative = SI.getOperand(1) != ICI->getOperand(0);
-                llvmberry::insertTgtNopAtSrcI(hints, ptr->Y);
-                llvmberry::propagateMaydiffGlobal(
-                    llvmberry::getVariable(*ptr->Y), llvmberry::Physical);
-                llvmberry::propagateInstruction(ptr->Y, ptr->Z, SRC);
-              } else {
-                llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-              }
-            });
+          auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
+          if (ptr->activated) {
+            //    <src>                   |    <tgt>
+            // Y = icmp sgt/ugt X, C      | Y = icmp slt/ult X, (C+1)
+            // Z = select Y, X, (C+1)     | Z = select Y, (C+1), X
+            //    <src>                   |    <tgt>
+            // Y = icmp slt/ult X, C      | Y = icmp sgt/ugt X, (C-1)
+            // Z = select Y, X, (C-1)     | Z = select Y, (C-1), X
+            ptr->Z = &SI;
+            ptr->Y = ICI;
+            ptr->X = ptr->Y->getOperand(0);
+            ptr->C = CI;
+            ptr->Cprime = dyn_cast<ConstantInt>(AdjustedRHS);
+            ptr->Y_org_pos = INSTPOS(SRC, ICI);
+            ptr->isGtToLt =
+                Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_SGT;
+            ptr->isUnsigned =
+                Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_ULT;
+            ptr->selectCommutative = SI.getOperand(1) != ICI->getOperand(0);
+            llvmberry::insertTgtNopAtSrcI(hints, ptr->Y);
+            llvmberry::propagateMaydiffGlobal(
+                llvmberry::getVariable(*ptr->Y), llvmberry::Physical);
+            llvmberry::propagateInstruction(ptr->Y, ptr->Z, SRC);
+          } else {
+            llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+          }
+        });
 
         Pred = ICmpInst::getSwappedPredicate(Pred);
         CmpRHS = AdjustedRHS;
@@ -716,8 +706,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
             llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
                 optname);
             INFRULE(INSTPOS(SRC, Z),
-                makeInfruleFunc(REGISTER(llvmberry::getVariable(*Z), Physical),
-                                VAL(Y), VAL(X),
+                makeInfruleFunc(REGISTER(*Z), VAL(Y), VAL(X),
                                 llvmberry::TyConstInt::make(*C),
                                 llvmberry::TyConstInt::make(*Cprime),
                                 select_commutative, BITSIZE(bitsize)));
@@ -789,7 +778,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
             llvmberry::propagateInstruction(Y, Z, SRC);
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpEq::make(
                        VAL(Z), VAL(Y), VAL(X), VAL(V),
-                       llvmberry::TyConstant::make(*C), VALTYPE(C->getType())));
+                       CONSTANT(C), VALTYPE(C->getType())));
           });
       SI.setOperand(1, CmpRHS);
       llvmberry::ValidationUnit::End();
@@ -816,7 +805,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
             llvmberry::propagateInstruction(Y, Z, SRC);
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpNe::make(
                        VAL(Z), VAL(Y), VAL(X), VAL(V),
-                       llvmberry::TyConstant::make(*C), VALTYPE(C->getType())));
+                       CONSTANT(C), VALTYPE(C->getType())));
           });
       SI.setOperand(2, CmpRHS);
       llvmberry::ValidationUnit::End();

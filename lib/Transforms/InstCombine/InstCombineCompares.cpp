@@ -2706,12 +2706,11 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Xor);
         Value *A = Zprime->getOperand(0);
         Value *B = Zprime->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Xor), llvmberry::Physical);
         llvmberry::propagateInstruction(Zprime, Z, TGT);
         INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpEqXorNot::make(
-             VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+             VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
       });
 
       return BinaryOperator::CreateNot(Xor);
@@ -2725,9 +2724,8 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         ICmpInst *Z = &I;
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeXor::make(
-             VAL(Z), VAL(A), VAL(B), BITSIZE(bitsize)));
+             VAL(Z), VAL(A), VAL(B), BITSIZE(*Z)));
       });
       
       return BinaryOperator::CreateXor(Op0, Op1);
@@ -2754,7 +2752,6 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Not), llvmberry::Physical);
         llvmberry::propagateInstruction(Zprime, Z, TGT);
@@ -2764,11 +2761,11 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ugt_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUgtAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ult_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUltAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         }
       });
 
@@ -2796,7 +2793,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
+
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Not), llvmberry::Physical);
         llvmberry::propagateInstruction(Zprime, Z, TGT);
@@ -2806,11 +2803,11 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sgt_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSgtAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_slt_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSltAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         }
       });
       
@@ -2838,7 +2835,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
+
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Not), llvmberry::Physical);
         llvmberry::propagateInstruction(Zprime, Z, TGT);
@@ -2848,11 +2845,11 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_uge_or_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUgeOrNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ule_or_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUleOrNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         }
       });
       return BinaryOperator::CreateOr(Not, Op1);
@@ -2879,7 +2876,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
+
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Not), llvmberry::Physical);
         llvmberry::propagateInstruction(Zprime, Z, TGT);
@@ -2889,11 +2886,11 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sge_or_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSgeOrNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sle_or_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSleOrNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         }
       });
       return BinaryOperator::CreateOr(Not, Op0);
@@ -2948,7 +2945,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
           Value *A = X->getOperand(0);
           Value *B = X->getOperand(1);
           ICmpInst *Z = dyn_cast<ICmpInst>(&I);
-          unsigned bitsize = X->getType()->getIntegerBitWidth();
+
           llvmberry::propagateInstruction(X, Z, SRC);
           if (I.getPredicate() == ICmpInst::ICMP_EQ) {
             llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
@@ -2957,7 +2954,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             // X = sub A B     | X = sub A B
             // Z = icmp eq X 0 | Z = icmp eq A B
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpEqSub::make(
-                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
+                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(*X)));
           } else if (I.getPredicate() == ICmpInst::ICMP_NE) {
             llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
                 "icmp_ne_sub");
@@ -2965,7 +2962,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             // X = sub A B     | X = sub A B
             // Z = icmp ne X 0 | Z = icmp ne A B
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSub::make(
-                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
+                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(*X)));
           } else {
             assert(false && "I.getPredicate() must be EQ or NE");
           }
@@ -3659,7 +3656,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             Value *X = W->getOperand(0);
             Value *Y = W->getOperand(1);
             ICmpInst *Z = &I;
-            unsigned bitsize = W->getType()->getIntegerBitWidth();
+
             Constant *newv = ConstantInt::getFalse(Z->getType());
             llvmberry::propagateInstruction(W, Z, llvmberry::Source);
             if (Y == Z->getOperand(0))
@@ -3667,7 +3664,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
               INFRULE(INSTPOS(SRC, Z),
                       llvmberry::ConsIcmpSwapOperands::make(*Z));
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpEqSrem::make(
-                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(bitsize)));
+                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(*W)));
             llvmberry::generateHintForReplaceAllUsesWith(Z, newv);
           });
 
@@ -3687,7 +3684,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             Value *X = W->getOperand(0);
             Value *Y = W->getOperand(1);
             ICmpInst *Z = &I;
-            unsigned bitsize = W->getType()->getIntegerBitWidth();
+
             Constant *newv = ConstantInt::getTrue(Z->getType());
             llvmberry::propagateInstruction(W, Z, llvmberry::Source);
             if (Y == Z->getOperand(0))
@@ -3695,7 +3692,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
               INFRULE(INSTPOS(SRC, Z),
                       llvmberry::ConsIcmpSwapOperands::make(*Z));
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSrem::make(
-                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(bitsize)));
+                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(*W)));
             llvmberry::generateHintForReplaceAllUsesWith(Z, newv);
           });
 

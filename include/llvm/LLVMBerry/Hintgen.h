@@ -32,7 +32,8 @@
 #define _REGISTER_X(x, ARG1, ARG2, FUNC, ...) FUNC
 #define REGISTER(...) _REGISTER_X(,##__VA_ARGS__,                              \
                                   _REGISTER(__VA_ARGS__),                      \
-                                  _REGISTER_PHYS(__VA_ARGS__))
+                                  _REGISTER_PHYS(__VA_ARGS__),                 \
+                                  NULL)
 
 #define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
 #define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
@@ -45,7 +46,8 @@
 #define _VAR_PHYS(n) llvmberry::ConsVar::make(n, llvmberry::Physical)
 #define _VAR(n, tag) llvmberry::ConsVar::make(n, llvmberry::tag)
 #define _VAR_X(x, ARG1, ARG2, FUNC, ...) FUNC
-#define VAR(...) _VAR_X(,##__VA_ARGS__,_VAR(__VA_ARGS__),_VAR_PHYS(__VA_ARGS__))
+#define VAR(...) _VAR_X(,##__VA_ARGS__,_VAR(__VA_ARGS__),                      \
+                        _VAR_PHYS(__VA_ARGS__), NULL)
 
 #define RHS(name, tag, SCOPE)                                                  \
   llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
@@ -76,9 +78,10 @@
 #define _VAL_SRC(I) llvmberry::TyValue::make(*(I), llvmberry::Physical)
 #define _VAL_TAG(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
 #define _VAL_X(x,ARG1, ARG2, FUNC, ...) FUNC
-#define VAL(...) _VAL_X(,##__VA_ARGS__,                                        \
+#define VAL(...) _VAL_X(NULL, ##__VA_ARGS__,                                   \
                                 _VAL_TAG(__VA_ARGS__),                         \
-                                _VAL_SRC(__VA_ARGS__))
+                                _VAL_SRC(__VA_ARGS__),                         \
+                                NULL)
 
 // VALTYPE, TYPEOF macros make TyValueType object
 #define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
@@ -95,8 +98,16 @@
       : BINOP(llvmberry::getBop((binop).getOpcode()), type, val1, val2)
 
 // CONSTINT make TyConstInt object
-#define CONSTINT(val, bitwidth) llvmberry::TyConstInt::make(val, bitwidth)
+#define _CONSTINT_BITSIZE(val, bitwidth)                                       \
+  llvmberry::TyConstInt::make(val, bitwidth)
+#define _CONSTINT_LLVMOBJ(obj) llvmberry::TyConstInt::make(*(obj))
+#define _CONSTINT_X(x, ARG1, ARG2, FUNC, ...) FUNC
+#define CONSTINT(...) _CONSTINT_X(,##__VA_ARGS__,                              \
+                                _CONSTINT_BITSIZE(__VA_ARGS__),                \
+                                _CONSTINT_LLVMOBJ(__VA_ARGS__),                \
+                                NULL)
 #define CONSTGLOBALADDR(val) llvmberry::ConsConstGlobalVarAddr::make(*(val))
+#define CONSTANT(val) llvmberry::TyConstant::make(*(val))
 
 #define SRC llvmberry::Source
 #define TGT llvmberry::Target
