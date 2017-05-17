@@ -1975,6 +1975,7 @@ void hintgenGVN(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I, Valu
         TerminatorInst *term = PN->getIncomingBlock(i)->getTerminator();
 
         Instruction *cl_new = I_down->clone();
+        cl_new->setMetadata(LLVMContext::MD_dbg, NULL);
         resolvePhiArgs(cl_new, PN, PN->getIncomingBlock(i));
 
         std::pair<Value*, bool> v1 = std::make_pair(cl_new, true),
