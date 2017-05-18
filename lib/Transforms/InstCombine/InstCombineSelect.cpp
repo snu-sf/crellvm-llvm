@@ -158,8 +158,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(1);
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+    INTRUDE(NOCAPTURE, {
       data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
           llvmberry::FoldSelectOpOpArg::XY_XZ;
     });
@@ -168,8 +167,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(0);
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = false;
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+    INTRUDE(NOCAPTURE, {
       data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
           llvmberry::FoldSelectOpOpArg::YX_ZX;
     });
@@ -183,9 +181,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(1);
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = true;
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints){
+    INTRUDE(NOCAPTURE, {
       data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
           llvmberry::FoldSelectOpOpArg::XY_ZX;
     });
@@ -194,8 +190,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(0);
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
+    INTRUDE(NOCAPTURE, {
       data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
           llvmberry::FoldSelectOpOpArg::YX_XZ;
     });
@@ -210,10 +205,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
   Value *NewSI = Builder->CreateSelect(SI.getCondition(), OtherOpT,
                                        OtherOpF, SI.getName()+".v");
 
-  llvmberry::ValidationUnit::GetInstance()->intrude([&SI, &TI, &FI, &MatchOp, 
-        &NewSI, &OtherOpT, &OtherOpF](
-      llvmberry::ValidationUnit::Dictionary &data,
-      llvmberry::CoreHint &hints) {
+  INTRUDE(CAPTURE(&SI, &TI, &FI, &MatchOp, &NewSI, &OtherOpT, &OtherOpF), {
     llvmberry::FoldSelectOpOpArg::OperandCases the_case = 
         data.get<llvmberry::ArgForFoldSelectOpOp>()->the_case;
     // case == "XY/XZ" : 
@@ -261,14 +253,14 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     PROPAGATE(MAYDIFF(llvmberry::getVariable(*Tprime), Physical),
           llvmberry::ConsGlobal::make());
 
-    llvmberry::propagateInstruction(R, T0, TGT);
-    llvmberry::propagateInstruction(S, T0, TGT);
-    llvmberry::propagateInstruction(Tprime, T0, TGT);
+    llvmberry::propagateInstruction(hints, R, T0, TGT);
+    llvmberry::propagateInstruction(hints, S, T0, TGT);
+    llvmberry::propagateInstruction(hints, Tprime, T0, TGT);
     
     if(the_case == llvmberry::FoldSelectOpOpArg::XY_ZX){
-      llvmberry::applyCommutativity(T0, S, TGT);
+      llvmberry::applyCommutativity(hints, T0, S, TGT);
     }else if(the_case == llvmberry::FoldSelectOpOpArg::YX_XZ){
-      llvmberry::applyCommutativity(T0, R, TGT);
+      llvmberry::applyCommutativity(hints, T0, R, TGT);
     }
 
     if(the_case == llvmberry::FoldSelectOpOpArg::YX_ZX){
@@ -559,20 +551,18 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
 
         llvmberry::ValidationUnit::Begin("select_icmp_unknown_const",
                                          SI.getParent()->getParent());
-        llvmberry::ValidationUnit::GetInstance()->intrude(
-            [](llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-              auto ptr = data.create<llvmberry::ArgForSelectIcmpConst>();
-              ptr->activated = false;
-            });
+        INTRUDE(NOCAPTURE, {
+          auto ptr = data.create<llvmberry::ArgForSelectIcmpConst>();
+          ptr->activated = false;
+        });
         // X > C ? X : C+1  -->  X < C+1 ? C+1 : X
         // X < C ? X : C-1  -->  X > C-1 ? C-1 : X
         if ((CmpLHS == TrueVal && AdjustedRHS == FalseVal) ||
             (CmpLHS == FalseVal && AdjustedRHS == TrueVal)) {
           ; // Nothing to do here. Values match without any sign/zero extension.
-          llvmberry::ValidationUnit::GetInstance()->intrude(
-              [](llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-                data.get<llvmberry::ArgForSelectIcmpConst>()->activated = true;
-              });
+          INTRUDE(NOCAPTURE, {
+            data.get<llvmberry::ArgForSelectIcmpConst>()->activated = true;
+          });
         }
 
         // Types do not match. Instead of calculating this with mixed types
@@ -621,9 +611,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
           break;
         }
 
-        llvmberry::ValidationUnit::GetInstance()->intrude(
-            [&ICI, &SI, &CI, &AdjustedRHS, &Pred](llvmberry::Dictionary &data,
-                                                  llvmberry::CoreHint &hints) {
+        INTRUDE(CAPTURE(&ICI, &SI, &CI, &AdjustedRHS, &Pred), {
           auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
           if (ptr->activated) {
             //    <src>                   |    <tgt>
@@ -644,9 +632,9 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
                 Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_ULT;
             ptr->selectCommutative = SI.getOperand(1) != ICI->getOperand(0);
             llvmberry::insertTgtNopAtSrcI(hints, ptr->Y);
-            llvmberry::propagateMaydiffGlobal(
+            llvmberry::propagateMaydiffGlobal(hints, 
                 llvmberry::getVariable(*ptr->Y), llvmberry::Physical);
-            llvmberry::propagateInstruction(ptr->Y, ptr->Z, SRC);
+            llvmberry::propagateInstruction(hints, ptr->Y, ptr->Z, SRC);
           } else {
             llvmberry::ValidationUnit::GetInstance()->setIsAborted();
           }
@@ -665,8 +653,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         // the sext/zext value may be defined after the ICI instruction uses it.
         ICI->moveBefore(&SI);
 
-        llvmberry::ValidationUnit::GetInstance()->intrude([](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        INTRUDE(NOCAPTURE, {
           auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
           if (ptr->activated) {
             unsigned int bitsize = ptr->C->getType()->getIntegerBitWidth();
@@ -760,26 +747,24 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
       // Transform (X == C) ? X : Y -> (X == C) ? C : Y
       llvmberry::ValidationUnit::Begin("select_icmp_eq",
                                        SI.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude(
-          [&SI, &ICI, &CmpRHS, &CmpLHS, &FalseVal](llvmberry::Dictionary &data,
-                                                   llvmberry::CoreHint &hints) {
-            //    <src>           |    <tgt>
-            // Y = icmp eq, X, C  | Y = icmp eq, X, C
-            // Z = select Y, X, V | Z = select Y, C, V
-            if (CmpRHS->getType()->isVectorTy()) {
-              llvmberry::ValidationUnit::Abort();
-              return;
-            }
-            SelectInst *Z = &SI;
-            ICmpInst *Y = ICI;
-            Value *X = CmpLHS;
-            Value *V = FalseVal;
-            Constant *C = dyn_cast<Constant>(CmpRHS);
-            llvmberry::propagateInstruction(Y, Z, SRC);
-            INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpEq::make(
-                       VAL(Z), VAL(Y), VAL(X), VAL(V),
-                       CONSTANT(C), VALTYPE(C->getType())));
-          });
+      INTRUDE(CAPTURE(&SI, &ICI, &CmpRHS, &CmpLHS, &FalseVal), {
+        //    <src>           |    <tgt>
+        // Y = icmp eq, X, C  | Y = icmp eq, X, C
+        // Z = select Y, X, V | Z = select Y, C, V
+        if (CmpRHS->getType()->isVectorTy()) {
+          llvmberry::ValidationUnit::Abort();
+          return;
+        }
+        SelectInst *Z = &SI;
+        ICmpInst *Y = ICI;
+        Value *X = CmpLHS;
+        Value *V = FalseVal;
+        Constant *C = dyn_cast<Constant>(CmpRHS);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpEq::make(
+                   VAL(Z), VAL(Y), VAL(X), VAL(V),
+                   CONSTANT(C), VALTYPE(C->getType())));
+      });
       SI.setOperand(1, CmpRHS);
       llvmberry::ValidationUnit::End();
       Changed = true;
@@ -787,26 +772,24 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
       // Transform (X != C) ? Y : X -> (X != C) ? Y : C
       llvmberry::ValidationUnit::Begin("select_icmp_ne",
                                        SI.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude(
-          [&SI, &ICI, &CmpRHS, &CmpLHS, &TrueVal](llvmberry::Dictionary &data,
-                                                  llvmberry::CoreHint &hints) {
-            //     <src>          |      <tgt>
-            // Y = icmp ne, X, C  | Y = icmp ne, X, C
-            // Z = select Y, V, X | Z = select Y, V, C
-            if (CmpRHS->getType()->isVectorTy()) {
-              llvmberry::ValidationUnit::Abort();
-              return;
-            }
-            SelectInst *Z = &SI;
-            ICmpInst *Y = ICI;
-            Value *X = CmpLHS;
-            Value *V = TrueVal;
-            Constant *C = dyn_cast<Constant>(CmpRHS);
-            llvmberry::propagateInstruction(Y, Z, SRC);
-            INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpNe::make(
-                       VAL(Z), VAL(Y), VAL(X), VAL(V),
-                       CONSTANT(C), VALTYPE(C->getType())));
-          });
+      INTRUDE(CAPTURE(&SI, &ICI, &CmpRHS, &CmpLHS, &TrueVal), {
+        //     <src>          |      <tgt>
+        // Y = icmp ne, X, C  | Y = icmp ne, X, C
+        // Z = select Y, V, X | Z = select Y, V, C
+        if (CmpRHS->getType()->isVectorTy()) {
+          llvmberry::ValidationUnit::Abort();
+          return;
+        }
+        SelectInst *Z = &SI;
+        ICmpInst *Y = ICI;
+        Value *X = CmpLHS;
+        Value *V = TrueVal;
+        Constant *C = dyn_cast<Constant>(CmpRHS);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpNe::make(
+                   VAL(Z), VAL(Y), VAL(X), VAL(V),
+                   CONSTANT(C), VALTYPE(C->getType())));
+      });
       SI.setOperand(2, CmpRHS);
       llvmberry::ValidationUnit::End();
       Changed = true;
@@ -858,9 +841,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         V = Builder->CreateOr(X, *Y);
 
       if (V) {
-        llvmberry::ValidationUnit::GetInstance()->intrude([&SI, &ICI, &V, &Pred,
-                                                           &TrueVal, &FalseVal](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        INTRUDE(CAPTURE(&SI, &ICI, &V, &Pred, &TrueVal, &FalseVal), {
           llvmberry::name_instructions(*SI.getParent()->getParent());
           SelectInst *Z = &SI;
           BinaryOperator *Zprime = dyn_cast<BinaryOperator>(V);
@@ -868,12 +849,12 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
           unsigned bitsize = Z->getType()->getIntegerBitWidth();
 
           llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-          llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Zprime),
+          llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Zprime),
                                             llvmberry::Physical);
-          llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Zprime),
+          llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Zprime),
                                             llvmberry::Previous);
-          llvmberry::propagateInstruction(V, Z, TGT);
-          llvmberry::propagateInstruction(Zprime, Z, TGT);
+          llvmberry::propagateInstruction(hints, V, Z, TGT);
+          llvmberry::propagateInstruction(hints, Zprime, Z, TGT);
 
           if (Pred == ICmpInst::ICMP_EQ || Pred == ICmpInst::ICMP_NE) {
             BinaryOperator *W = dyn_cast<BinaryOperator>(V->getOperand(0));
@@ -884,8 +865,8 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
             BinaryOperator *U =
                 dyn_cast<BinaryOperator>(TrueVal == X ? FalseVal : TrueVal);
 
-            llvmberry::propagateInstruction(U, Z, TGT);
-            llvmberry::propagateInstruction(W, Z, TGT);
+            llvmberry::propagateInstruction(hints, U, Z, TGT);
+            llvmberry::propagateInstruction(hints, W, Z, TGT);
 
             if (Pred == ICmpInst::ICMP_EQ) {
               if (Z->getOperand(1) == X) {
@@ -959,7 +940,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
             ConstantInt *C = dyn_cast<ConstantInt>(U->getOperand(1));
             ConstantInt *Cprime = dyn_cast<ConstantInt>(Zprime->getOperand(1));
 
-            llvmberry::propagateInstruction(U, Z, TGT);
+            llvmberry::propagateInstruction(hints, U, Z, TGT);
 
             if (Pred == ICmpInst::ICMP_SLT) {
               if (Z->getOperand(1) == U) {

@@ -9,9 +9,18 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/Analysis/CFG.h"
 
-#define INTRUDE(...) llvmberry::ValidationUnit::GetInstance()->intrude         \
-                      ([__VA_ARGS__] (llvmberry::Dictionary &data,             \
-                                      llvmberry::CoreHint &hints)
+// Meta-level function for macro overloading
+#define _CHOOSE(x, ARG1, ARG2, FUNC, ...) FUNC
+
+// Macros for shortening sentences
+#define INTRUDE(A, ...) \
+                      llvmberry::ValidationUnit::GetInstance()->intrude        \
+                      ([ A ] (llvmberry::Dictionary &data,                     \
+                                      llvmberry::CoreHint &hints)              \
+                                      { __VA_ARGS__ })
+#define CAPTURE(...) __VA_ARGS__
+#define NOCAPTURE
+
 #define INFRULE(pos, x)                                                        \
   hints.addCommand(llvmberry::ConsInfrule::make(pos, x),                       \
                    llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
@@ -41,8 +50,7 @@
 // REGISTER(str, tag) := llvmberry::TyRegister::make(str, llvmberry::tag)
 #define _REGISTER_PHYS(n) llvmberry::TyRegister::make(n, llvmberry::Physical)
 #define _REGISTER(n, tag) llvmberry::TyRegister::make(n, llvmberry::tag)
-#define _REGISTER_X(x, ARG1, ARG2, FUNC, ...) FUNC
-#define REGISTER(...) _REGISTER_X(,##__VA_ARGS__,                              \
+#define REGISTER(...) _CHOOSE(,##__VA_ARGS__,                                  \
                                   _REGISTER(__VA_ARGS__),                      \
                                   _REGISTER_PHYS(__VA_ARGS__),                 \
                                   NULL)
@@ -57,8 +65,7 @@
 // VAR(str, tag) := llvmberry::ConsVar::make(str, llvmberry::tag)
 #define _VAR_PHYS(n) llvmberry::ConsVar::make(n, llvmberry::Physical)
 #define _VAR(n, tag) llvmberry::ConsVar::make(n, llvmberry::tag)
-#define _VAR_X(x, ARG1, ARG2, FUNC, ...) FUNC
-#define VAR(...) _VAR_X(,##__VA_ARGS__,_VAR(__VA_ARGS__),                      \
+#define VAR(...) _CHOOSE(,##__VA_ARGS__,_VAR(__VA_ARGS__),                     \
                         _VAR_PHYS(__VA_ARGS__), NULL)
 
 #define RHS(name, tag, SCOPE)                                                  \
@@ -71,7 +78,11 @@
 #define INSNALIGNONE(I)                                                        \
   llvmberry::ConsInsn::make(std::shared_ptr<llvmberry::TyInstruction>          \
     (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(I))))
-#define EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
+
+#define _EXPR_PHYS(I) llvmberry::TyExpr::make(*(I), llvmberry::Physical)
+#define _EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
+#define EXPR(...) _CHOOSE(,##__VA_ARGS__,_EXPR(__VA_ARGS__), \
+                          _EXPR_PHYS(__VA_ARGS__), NULL)
 
 // LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
 // TyPropagateObject instance
@@ -92,8 +103,7 @@
 // VAL(v, tag) := llvmberry::TyValue::make(*(v), llvmberry::tag)
 #define _VAL_SRC(I) llvmberry::TyValue::make(*(I), llvmberry::Physical)
 #define _VAL_TAG(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
-#define _VAL_X(x,ARG1, ARG2, FUNC, ...) FUNC
-#define VAL(...) _VAL_X(NULL, ##__VA_ARGS__,                                   \
+#define VAL(...) _CHOOSE(NULL, ##__VA_ARGS__,                                  \
                                 _VAL_TAG(__VA_ARGS__),                         \
                                 _VAL_SRC(__VA_ARGS__),                         \
                                 NULL)
@@ -116,8 +126,7 @@
 #define _CONSTINT_BITSIZE(val, bitwidth)                                       \
   llvmberry::TyConstInt::make(val, bitwidth)
 #define _CONSTINT_LLVMOBJ(obj) llvmberry::TyConstInt::make(*(obj))
-#define _CONSTINT_X(x, ARG1, ARG2, FUNC, ...) FUNC
-#define CONSTINT(...) _CONSTINT_X(,##__VA_ARGS__,                              \
+#define CONSTINT(...) _CHOOSE(,##__VA_ARGS__,                                  \
                                 _CONSTINT_BITSIZE(__VA_ARGS__),                \
                                 _CONSTINT_LLVMOBJ(__VA_ARGS__),                \
                                 NULL)
@@ -138,19 +147,19 @@ namespace llvmberry {
  *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the
  * position I
  */
-void applyCommutativity(llvm::Instruction *position,
+void applyCommutativity(llvmberry::CoreHint &hints,llvm::Instruction *position,
                         llvm::BinaryOperator *expression, TyScope scope);
 /* applyTransitivity(I, v1, v2, v3, scope) :
  *   Applies transitivity rule (v1 >= v2 >= v3) to the position (I, scope)
  */
-void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
-                       llvm::Value *v_mid, llvm::Value *v_smallest,
-                       TyScope scope);
+void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position,
+                       llvm::Value *v_greatest, llvm::Value *v_mid,
+                       llvm::Value *v_smallest, TyScope scope);
 /* applyTransitivity(I, v1, v2, v3, scope, scopetag) :
  *   Applies transitivity rule (v1 >= v2 >= v3) to the position (I, scopetag)
  */
-void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
-                       llvm::Value *v_mid, llvm::Value *v_smallest,
+void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position,
+                       llvm::Value *v_greatest, llvm::Value *v_mid, llvm::Value *v_smallest,
                        TyScope scope, TyScope position_scopetag);
 /* propagateInstruction(I1, I2, scope, propagateEquivalence) :
  *   if propagateEquivalence == false :
@@ -159,18 +168,19 @@ void applyTransitivity(llvm::Instruction *position, llvm::Value *v_greatest,
  *   else :
  *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
  */
-void propagateInstruction(llvm::Instruction *from, llvm::Instruction *to,
+void propagateInstruction(llvmberry::CoreHint &hints, llvm::Instruction *from,
+                          llvm::Instruction *to,
                           TyScope scope, bool propagateEquivalence = false);
 /* propagateLessdef(I1, I2, v1, v2, scope) :
  *   Propagates v1 >= v2 from I1 to I2 in scope
  */
-void propagateLessdef(llvm::Instruction *from, llvm::Instruction *to,
+void propagateLessdef(llvmberry::CoreHint &hints, llvm::Instruction *from, llvm::Instruction *to,
                       const llvm::Value *lesserval,
                       const llvm::Value *greaterval, TyScope scope);
 /* propagateMaydiffGlobal(var, tag) :
  *   Propagates variable (var, tag) globally
  */
-void propagateMaydiffGlobal(std::string varname, TyTag tag);
+void propagateMaydiffGlobal(llvmberry::CoreHint &hints, std::string varname, TyTag tag);
 /* generateHintForNegValue(V, I, Scope) :
  *   If V is a BinaryOperator (V = 0 - mV), propagate (V >= 0 - mV, 0 - mV >= V)
  * from V to I in Scope

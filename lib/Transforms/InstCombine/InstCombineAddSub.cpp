@@ -1076,9 +1076,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       llvmberry::ValidationUnit::Begin("add_signbit",
                                        I.getParent()->getParent());
 
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &LHS, &RHS](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &LHS, &RHS), {
         // I = LHS + RHS --> I = LHS ^ 1
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSignbit::make(
                 REGISTER(I), VAL(LHS), VAL(RHS), BITSIZE(*LHS)));
@@ -1098,9 +1096,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         llvmberry::ValidationUnit::Begin("add_zext_bool",
                                        I.getParent()->getParent());
 
-        llvmberry::ValidationUnit::GetInstance()->intrude([&I, &ZI, &CI](
-            llvmberry::ValidationUnit::Dictionary &data,
-            llvmberry::CoreHint &hints) {
+        INTRUDE(CAPTURE(&I, &ZI, &CI), {
           BinaryOperator &Y = I;
           ZExtInst *X = ZI;
           ConstantInt *C = CI;
@@ -1118,7 +1114,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           int c_bitwidth = C->getType()->getIntegerBitWidth();
           int cprime_bitwidth = C->getType()->getIntegerBitWidth();
 
-          llvmberry::propagateInstruction(X, &Y, llvmberry::Source);
+          llvmberry::propagateInstruction(hints, X, &Y, llvmberry::Source);
 
           INFRULE(INSTPOS(SRC, &Y), llvmberry::ConsAddZextBool::make(
                   REGISTER(*X), REGISTER(Y),
@@ -1182,9 +1178,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     llvmberry::ValidationUnit::Begin("add_onebit",
                                    I.getParent()->getParent());
 
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I), {
       BinaryOperator &Z = I;
       // src : 
       // z = x + y (both are i1 type) 
@@ -1210,9 +1204,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     New->setHasNoSignedWrap(I.hasNoSignedWrap());
     New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
 
-    llvmberry::ValidationUnit::GetInstance()->intrude(
-        [&I, &LHS, &RHS](llvmberry::ValidationUnit::Dictionary &data,
-                         llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &LHS, &RHS), {
       // I = LHS + RHS
 
       // from "y = v + v", create "y = v << 1"
@@ -1232,10 +1224,8 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
                                          I.getParent()->getParent());
         
         Value *NewAdd = Builder->CreateAdd(LHSV, RHSV, "sum");
-        
-        llvmberry::ValidationUnit::GetInstance()->intrude([&LHS, &LHSV, &RHS, &RHSV, &I, &NewAdd](
-            llvmberry::ValidationUnit::Dictionary &data,
-            llvmberry::CoreHint &hints) {
+
+        INTRUDE(CAPTURE(&LHS, &LHSV, &RHS, &RHSV, &I, &NewAdd), {
           //    <src>        <tgt>
           // mx = 0 - x | mx = 0 - x
           // my = 0 - y | my = 0 - y
@@ -1250,11 +1240,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           assert(W != nullptr);
 
           // prepare variables
-          std::string reg_mx_name = llvmberry::getVariable(*MX);
-          std::string reg_z_name = llvmberry::getVariable(*Z);
           std::string reg_w_name = llvmberry::getVariable(*W);
-
-          int bitwidth = Z->getType()->getIntegerBitWidth();
 
           // propagate "mx = 0 - x"
           llvmberry::generateHintForNegValue(MX, *Z, llvmberry::Target);
@@ -1275,9 +1261,9 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
  
           // create z = x + y in tgt
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAddDistSub::make(
-                  REGISTER(reg_z_name), REGISTER(reg_mx_name),
+                  REGISTER(*Z), REGISTER(*MX),
                   VAL(MY), REGISTER(reg_w_name),
-                  VAL(X), VAL(Y), BITSIZE(bitwidth)));
+                  VAL(X), VAL(Y), BITSIZE(*Z)));
         });
 
 
@@ -1286,9 +1272,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
     llvmberry::ValidationUnit::Begin("add_comm_sub",
                                      I.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude([&LHS, &LHSV, &RHS, &I](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&LHS, &LHSV, &RHS, &I), {
       // LHS = 0   - LHSV    my = 0  - y
       //   I = LHS + RHS      z = my + x
 
@@ -1297,7 +1281,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       std::string reg_z_name = llvmberry::getVariable(I);
 
       // propagate "my = 0 - y"
-      llvmberry::propagateInstruction(dyn_cast<Instruction>(LHS), &I, SRC);
+      llvmberry::propagateInstruction(hints, dyn_cast<Instruction>(LHS), &I, SRC);
 
       // from "z = my + x", create "z = x + my"
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopCommutative::make(
@@ -1317,9 +1301,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   if (!isa<Constant>(RHS))
     if (Value *V = dyn_castNegVal(RHS)) {
       llvmberry::ValidationUnit::Begin("add_sub", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&V, &LHS, &RHS, &I](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&V, &LHS, &RHS, &I), {
         // RHS = 0   - V       my = 0 - y
         //   I = LHS + RHS      z = x + my
 
@@ -1328,7 +1310,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         std::string reg_z_name = llvmberry::getVariable(I);
 
         // propagate "my = 0 - y"
-        llvmberry::propagateInstruction(dyn_cast<Instruction>(RHS), &I, SRC);
+        llvmberry::propagateInstruction(hints, dyn_cast<Instruction>(RHS), &I, SRC);
 
         // from "z = x + my" and "my = 0 - y", create "z = x - y"
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSub::make(
@@ -1350,9 +1332,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     Value *X;
     if (match(LHS, m_Not(m_Value(X)))){ // ~X + C --> (C-1) - X
       llvmberry::ValidationUnit::Begin("add_const_not", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&CRHS, &LHS, &I, &X](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&CRHS, &LHS, &I, &X), {
         // Y = X ^ -1
         // Z = Y + C1
         Instruction *Y = dyn_cast<Instruction>(LHS);
@@ -1364,7 +1344,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
         // propagate "Y = X ^ -1"
-        llvmberry::propagateInstruction(Y, Z, SRC);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
 
         // To Z, apply add_const_not
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAddConstNot::make(
@@ -1399,10 +1379,8 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         
         // Okay, the xform is safe.  Insert the new add pronto.
         Value *NewAdd = Builder->CreateAdd(X, CRHS, LHS->getName());
-        
-        llvmberry::ValidationUnit::GetInstance()->intrude([&I, &LHS, &CRHS, &X, &C2, &NewAdd](
-            llvmberry::ValidationUnit::Dictionary &data,
-            llvmberry::CoreHint &hints) {
+
+        INTRUDE(CAPTURE(&I, &LHS, &CRHS, &X, &C2, &NewAdd), {
           //   <src>     |     <tgt>
           // Y = X & c2  | Y  = X  & c2
           // nop         | Y' = X  + c1
@@ -1420,10 +1398,10 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           int bitwidth = Z->getType()->getIntegerBitWidth();
 
           // propagate "Y = X & c2" in target
-          llvmberry::propagateInstruction(Y, Z, TGT);
+          llvmberry::propagateInstruction(hints, Y, Z, TGT);
 
           // propagate "Y' = X + c1" in target
-          llvmberry::propagateInstruction(Yprime, Z, TGT);
+          llvmberry::propagateInstruction(hints, Yprime, Z, TGT);
 
           // To Z, apply add_mask
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAddMask::make(
@@ -1431,7 +1409,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
                   CONSTINT(c1, bitwidth), CONSTINT(c2, bitwidth), BITSIZE(bitwidth)));
           
           // Propagate yp_var maydiff global
-          llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Physical);
+          llvmberry::propagateMaydiffGlobal(hints, reg_yprime_name, llvmberry::Physical);
                   
           insertSrcNopAtTgtI(hints, Yprime);
         });
@@ -1815,8 +1793,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     // Inference rule will be applied if is a constant
     llvmberry::generateHintForNegValue(Op1, I);
 
-    llvmberry::ValidationUnit::GetInstance()->intrude([&Op0, &I, &Op1, &V](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&Op0, &I, &Op1, &V), {
       //    <src>   |    <tgt>
       // my = 0 - y | my = 0 - y
       // z = x - my | z = x + y
@@ -1834,11 +1811,8 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
   if (I.getType()->isIntegerTy(1)){
     llvmberry::ValidationUnit::Begin("sub_onebit",
                                      I.getParent()->getParent());
-    
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
 
+    INTRUDE(CAPTURE(&I), {
       //   <src>          <tgt>
       // Z = X - Y  | Z = X ^ Y
       BinaryOperator *Z = &I;
@@ -1854,11 +1828,8 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
   if (match(Op0, m_AllOnes())){
     llvmberry::ValidationUnit::Begin("sub_mone",
                                      I.getParent()->getParent());
-    
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
 
+    INTRUDE(CAPTURE(&I), {
       //   <src>          <tgt>
       // Z = -1 - X  | Z = -1 ^ X
       BinaryOperator *Z = &I;
@@ -1877,10 +1848,8 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     if (match(Op1, m_Not(m_Value(X)))){
       llvmberry::ValidationUnit::Begin("sub_const_not",
                                        I.getParent()->getParent());
-    
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &C, &X](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+
+      INTRUDE(CAPTURE(&I, &C, &X), {
         //     <src>     <tgt>
         // Y = X  ^ -1 | Y = X ^ -1
         // Z = C1 -  Y | Z = X + C2
@@ -1893,7 +1862,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         int64_t c2 = c1 + 1;
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
-        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubConstNot::make(
                 REGISTER(*Z), REGISTER(*Y), VAL(X),
@@ -1915,9 +1884,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     if (match(Op1, m_Add(m_Value(X), m_Constant(C2)))){
       llvmberry::ValidationUnit::Begin("sub_const_add",
                                        I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &C2, &X, &C](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &C2, &X, &C), {
         //     <src>     <tgt>
         // Y = X  + C1 | Y = X  + C1
         // Z = C2 -  Y | Z = (C2 - C1) - X
@@ -1936,7 +1903,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         int64_t c3 = c2 - c1;
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
-        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubConstAdd::make(
                 REGISTER(*Z), REGISTER(*Y), VAL(X),
@@ -1999,22 +1966,18 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         match(Op1, m_Add(m_Value(Y), m_Specific(Op0)))) {
       llvmberry::ValidationUnit::Begin("sub_remove",
                                        I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &Op0, &Y](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &Op1, &Op0, &Y), {
         // prepare variable
-        std::string reg_z_name = llvmberry::getVariable(I);
-        std::string reg_y_name = llvmberry::getVariable(*Op1);
-
         Instruction *reg_y_instr = dyn_cast<Instruction>(Op1);
 
-        llvmberry::propagateInstruction(reg_y_instr, &I, llvmberry::Source);
+        std::string reg_y_name = llvmberry::getVariable(*Op1);
+        llvmberry::propagateInstruction(hints, reg_y_instr, &I, llvmberry::Source);
 
         INFRULE(INSTPOS(SRC, reg_y_instr), llvmberry::ConsBopCommutative::make(
                 VAR(reg_y_name), llvmberry::TyBop::BopAdd,
                 VAL(Op0), VAL(Y), BITSIZE(*Op1)));
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubRemove::make(
-                REGISTER(reg_z_name), REGISTER(reg_y_name), VAL(Op0),
+                REGISTER(I), REGISTER(reg_y_name), VAL(Op0),
                 VAL(Y), BITSIZE(*Op1)));
       });
       llvmberry::ValidationUnit::End();
@@ -2025,16 +1988,14 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     // (X-Y)-X == -Y
     if (match(Op0, m_Sub(m_Specific(Op1), m_Value(Y)))){
       llvmberry::ValidationUnit::Begin("sub_sub", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &Op0, &Y](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &Op1, &Op0, &Y), {
         //    <src>      <tgt>
         // W = X - Y | W = X - Y
         // Z = W - X | Z = 0 - Y
         BinaryOperator *W = dyn_cast<BinaryOperator>(Op0);
         assert(W);
 
-        llvmberry::propagateInstruction(W, &I, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, W, &I, llvmberry::Source);
 
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubSub::make(
                 REGISTER(llvmberry::getVariable(I)), VAL(Op1), VAL(Y),
@@ -2051,9 +2012,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         (match(Op0, m_Or(m_Specific(A), m_Specific(B))) ||
          match(Op0, m_Or(m_Specific(B), m_Specific(A))))){
       llvmberry::ValidationUnit::Begin("sub_or_xor", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &Op0, &A, &B](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &Op1, &Op0, &A, &B), {
         //    <src>      <tgt>
         // X = A | B | X = A | B
         // Y = A ^ B | Y = A ^ B
@@ -2064,10 +2023,10 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         assert(X);
         assert(Y);
 
-        llvmberry::propagateInstruction(X, Z, llvmberry::Source);
-        llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, X, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
         if(match(X, m_Or(m_Specific(B), m_Specific(A))))
-          llvmberry::applyCommutativity(Z, X, llvmberry::Source);
+          llvmberry::applyCommutativity(hints, Z, X, llvmberry::Source);
 
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubOrXor::make(
                 REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X),
@@ -2133,9 +2092,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     if (match(Op1, m_SDiv(m_Value(X), m_Constant(C))) && match(Op0, m_Zero()) &&
         C->isNotMinSignedValue() && !C->isOneValue()){
       llvmberry::ValidationUnit::Begin("sub_sdiv", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op1, &X, &C](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &Op1, &X, &C), {
         //    <src>      <tgt>
         // Y = X / C  | Y = X / C
         // Z = 0 - Y  | Z = X / C'
@@ -2147,7 +2104,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         int64_t c_val = C_ci->getSExtValue();
         int64_t cprime_val = -c_val;
 
-        llvmberry::propagateInstruction(Y, Z, SRC);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubSdiv::make(
                 REGISTER(*Z), REGISTER(*Y), VAL(X),
                 CONSTINT(c_val, bitwidth), CONSTINT(cprime_val, bitwidth),
@@ -2171,10 +2128,8 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
           Value *mX = XNeg;
           llvmberry::ValidationUnit::Begin("sub_shl", I.getParent()->getParent());
           llvmberry::generateHintForNegValue(X, I);
-          llvmberry::ValidationUnit::GetInstance()->intrude([Z, Y, X, A, mX](
-              llvmberry::ValidationUnit::Dictionary &data,
-              llvmberry::CoreHint &hints) {
-            llvmberry::propagateInstruction(Y, Z, SRC);
+          INTRUDE(CAPTURE(Z, Y, X, A, mX), {
+            llvmberry::propagateInstruction(hints, Y, Z, SRC);
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubShl::make(
                     REGISTER(*Z), VAL(X), REGISTER(*Y), VAL(mX),
                     VAL(A), BITSIZE(*Z)));

@@ -761,10 +761,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
   BasicBlock::iterator BBI = &LI;
   AAMDNodes AATags;
   llvmberry::ValidationUnit::Begin("load_load", LI.getParent()->getParent());
-  llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-    data.create<llvmberry::ArgForFindAvailableLoadedValue>();
-  });
+  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForFindAvailableLoadedValue>(); });
 
   if (Value *AvailableVal = FindAvailableLoadedValue(Op, LI.getParent(), BBI,
                                                      6, AA, &AATags)) {
@@ -783,9 +780,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
     Value *NewInst = Builder->CreateBitOrPointerCast(AvailableVal, LI.getType(),
                                                      LI.getName() + ".cast");
 
-    llvmberry::ValidationUnit::GetInstance()
-        ->intrude([&NewInst, &LI, &AvailableVal, &Op, this](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&NewInst, &LI, &AvailableVal, &Op, this), {
       if (NewInst != AvailableVal) {
         if(Instruction *inst = dyn_cast<Instruction>(NewInst))
           llvmberry::insertSrcNopAtTgtI(hints, inst);
@@ -874,12 +869,12 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
                 BOUNDS(phi1pos, LIpos));
           } else {
             assert(i2 && "ptr2src must be Instruction");
-            llvmberry::propagateInstruction(i1, v1_inst, SRC, true);
-            llvmberry::propagateInstruction(i1, &LI, SRC, true);
-            llvmberry::propagateInstruction(i2, &LI, SRC, true);
+            llvmberry::propagateInstruction(hints, i1, v1_inst, SRC, true);
+            llvmberry::propagateInstruction(hints, i1, &LI, SRC, true);
+            llvmberry::propagateInstruction(hints, i2, &LI, SRC, true);
             if (DT->dominates(i2, v1_inst))
               // Does i2 precede v1_inst?
-              llvmberry::propagateInstruction(i2, v1_inst, SRC,
+              llvmberry::propagateInstruction(hints, i2, v1_inst, SRC,
                                               true);
 
             std::string ptr1srcname = llvmberry::getVariable(*i1);
@@ -1150,8 +1145,8 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       }
       // step 1-(3). prove %ptr2 >= %ptr1 by transitivity
       // (%ptr2 >= %ptr2src >= %ptr1src >= %ptr1)
-      llvmberry::applyTransitivity(&LI, ptr2src, ptr1src, ptr1, SRC, TGT);
-      llvmberry::applyTransitivity(&LI, ptr2, ptr2src, ptr1, SRC, TGT);
+      llvmberry::applyTransitivity(hints, &LI, ptr2src, ptr1src, ptr1, SRC, TGT);
+      llvmberry::applyTransitivity(hints, &LI, ptr2, ptr2src, ptr1, SRC, TGT);
 
       // step 2. Show orthogonality
       for (auto itr = orthogonalInsns->begin(); itr != orthogonalInsns->end(); itr++) {
@@ -1719,12 +1714,10 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
   if (Ptr->hasOneUse()) {
     if (isa<AllocaInst>(Ptr)) {
       llvmberry::ValidationUnit::Begin("dead_store_elim", SI.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&SI, &Ptr](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        std::string regname = llvmberry::getVariable(*Ptr);
+      INTRUDE(CAPTURE(&SI, &Ptr), {
         AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
         llvmberry::insertTgtNopAtSrcI(hints, &SI);
-        PROPAGATE(PRIVATE(REGISTER(regname), SRC),
+        PROPAGATE(PRIVATE(REGISTER(*Ptr), SRC),
             BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
       });
       return EraseInstFromFunction(SI);

@@ -328,7 +328,7 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
       }
     }
 
-    INTRUDE(&I) {
+    INTRUDE(CAPTURE(&I), {
       hints.appendToDescription("removeLifeTime");
       hints.setReturnCodeToAdmitted();
     });
@@ -394,7 +394,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     // Otherwise, we *can* safely rewrite this load.
     Value *ReplVal = OnlyStore->getOperand(0);
 
-    INTRUDE(&AI, &OnlyStore, &LI, &ReplVal, &DT, &StoringGlobalVal, &LBI, &StoreIndex, &StoreBB) {
+    INTRUDE(CAPTURE(&AI, &OnlyStore, &LI, &ReplVal, &DT, &StoringGlobalVal, &LBI, &StoreIndex, &StoreBB), {
       //        <src>          |     <tgt>
       // %x = alloca i32       | nop
       // store i32 1, %x       | nop
@@ -448,8 +448,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         // ret i32 %c            | ret i32 %c
 
       llvmberry::propagateLoadInstToUse(LI, ReplVal == LI? UNDEF(LI) : ReplVal, Rstore, data, hints, true);
-      llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
-      llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
+      llvmberry::propagateMaydiffGlobal(hints, Rload, llvmberry::Physical);
+      llvmberry::propagateMaydiffGlobal(hints, Rload, llvmberry::Previous);
 
       hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(instrIndices, LI)-1, ""));
     });
@@ -459,7 +459,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     if (ReplVal == LI)
       ReplVal = UndefValue::get(LI->getType());
 
-    INTRUDE(&AI, &LI, &ReplVal) {
+    INTRUDE(CAPTURE(&AI, &LI, &ReplVal), {
      //removable 
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, LI, data);
       llvmberry::generateHintForMem2RegReplaceHint(ReplVal, AI, data);
@@ -493,13 +493,13 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
   }
 
   // add alloca and store into maydiff
-  INTRUDE(&AI, &OnlyStore) {
+  INTRUDE(CAPTURE(&AI, &OnlyStore), {
     std::string Ralloca = llvmberry::getVariable(*AI);
     auto instrIndices = data.get<llvmberry::ArgForIndices>()->instrIndices;
 
     // propagate maydiff
-    llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
-    llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
+    llvmberry::propagateMaydiffGlobal(hints, Ralloca, llvmberry::Physical);
+    llvmberry::propagateMaydiffGlobal(hints, Ralloca, llvmberry::Previous);
 
     // add nop
     hints.addNopPosition(INDEXEDPOS(TGT, AI, DICTMAP(instrIndices, AI)-1, ""));
@@ -571,7 +571,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                         static_cast<StoreInst *>(nullptr)),
                          less_first());
 
-    INTRUDE(&AI, &LI, &I, &StoresByIndex) {
+    INTRUDE(CAPTURE(&AI, &LI, &I, &StoresByIndex), {
       // prepare variables
       std::string Rload = llvmberry::getVariable(*LI);
       Value* value;
@@ -588,8 +588,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
       }
         
       llvmberry::propagateLoadInstToUse(LI, value, llvmberry::getVariable(*AI), data, hints, true);
-      llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Physical);
-      llvmberry::propagateMaydiffGlobal(Rload, llvmberry::Previous);
+      llvmberry::propagateMaydiffGlobal(hints, Rload, llvmberry::Physical);
+      llvmberry::propagateMaydiffGlobal(hints, Rload, llvmberry::Previous);
 
       hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(data.get<llvmberry::ArgForIndices>()->instrIndices, LI)-1, ""));
 
@@ -621,7 +621,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
       ConvertDebugDeclareToDebugValue(DDI, SI, DIB);
     }
 
-    INTRUDE(&SI) {
+    INTRUDE(CAPTURE(&SI), {
       hints.addNopPosition(INDEXEDPOS(TGT, SI, DICTMAP(data.get<llvmberry::ArgForIndices>()->instrIndices, SI)-1, ""));
       
       if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0)))
@@ -632,12 +632,12 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
     LBI.deleteValue(SI);
   }
 
-  INTRUDE(&AI) {
+  INTRUDE(CAPTURE(&AI), {
     std::string Ralloca = llvmberry::getVariable(*AI);
 
     // propagate maydiff
-    llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
-    llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
+    llvmberry::propagateMaydiffGlobal(hints, Ralloca, llvmberry::Physical);
+    llvmberry::propagateMaydiffGlobal(hints, Ralloca, llvmberry::Previous);
 
     hints.addNopPosition(INDEXEDPOS(TGT, AI, DICTMAP(data.get<llvmberry::ArgForIndices>()->instrIndices, AI)-1, ""));
   });
@@ -670,7 +670,7 @@ void PromoteMem2Reg::run() {
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::MEM2REG);
   llvmberry::ValidationUnit::Begin("mem2reg", &F);
 
-  INTRUDE(&F, this) {
+  INTRUDE(CAPTURE(&F, this), {
     data.create<llvmberry::ArgForMem2Reg>();
     data.create<llvmberry::ArgForIndices>();
     llvmberry::saveInstrIndices(&F, data);
@@ -735,12 +735,12 @@ void PromoteMem2Reg::run() {
 
     if (AI->use_empty()) {
       // hints when alloca has no use
-      INTRUDE(AI) {
+      INTRUDE(CAPTURE(AI), {
         std::string Ralloca = llvmberry::getVariable(*AI);
 
         // propagate maydiff
-        llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
-        llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
+        llvmberry::propagateMaydiffGlobal(hints, Ralloca, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(hints, Ralloca, llvmberry::Previous);
 
         hints.addNopPosition(INDEXEDPOS(TGT, AI, DICTMAP(data.get<llvmberry::ArgForIndices>()->instrIndices, AI)-1, ""));
       });
@@ -848,7 +848,7 @@ void PromoteMem2Reg::run() {
   for (unsigned i = 0, e = Allocas.size(); i != e; ++i) {
     Values[i] = UndefValue::get(Allocas[i]->getAllocatedType());
 
-    INTRUDE(&i, this) {
+    INTRUDE(CAPTURE(&i, this), {
       AllocaInst* AI = Allocas[i];
 
       data.get<llvmberry::ArgForMem2Reg>()->recentInstr.get()->insert(std::pair<unsigned, LLVMBERRYRPD>
@@ -864,7 +864,7 @@ void PromoteMem2Reg::run() {
   std::vector<RenamePassData> RenamePassWorkList;
   RenamePassWorkList.emplace_back(F.begin(), nullptr, std::move(Values));
 
-  INTRUDE() {
+  INTRUDE(NOCAPTURE, {
     auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
     auto instrWorkList = data.get<llvmberry::ArgForMem2Reg>()->instrWorkList;
     instrWorkList.get()->push_back(*(recentInstr.get())); 
@@ -875,7 +875,7 @@ void PromoteMem2Reg::run() {
     RPD.swap(RenamePassWorkList.back());
     RenamePassWorkList.pop_back();
 
-    INTRUDE() {
+    INTRUDE(NOCAPTURE, {
       auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
       auto instrWorkList = data.get<llvmberry::ArgForMem2Reg>()->instrWorkList;
       recentInstr.get()->swap(instrWorkList.get()->back());
@@ -893,12 +893,12 @@ void PromoteMem2Reg::run() {
   for (unsigned i = 0, e = Allocas.size(); i != e; ++i) {
     Instruction *A = Allocas[i];
 
-    INTRUDE(&A) {
+    INTRUDE(CAPTURE(&A), {
       std::string Ralloca = llvmberry::getVariable(*A);
 
       // propagate maydiff
-      llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Physical);
-      llvmberry::propagateMaydiffGlobal(Ralloca, llvmberry::Previous);
+      llvmberry::propagateMaydiffGlobal(hints, Ralloca, llvmberry::Physical);
+      llvmberry::propagateMaydiffGlobal(hints, Ralloca, llvmberry::Previous);
 
       hints.addNopPosition(INDEXEDPOS(TGT, A, DICTMAP(data.get<llvmberry::ArgForIndices>()->instrIndices, A)-1, ""));
     });
@@ -942,7 +942,7 @@ void PromoteMem2Reg::run() {
         if (AST && PN->getType()->isPointerTy())
           AST->deleteValue(PN);
         
-        INTRUDE(&PN, &V) {
+        INTRUDE(CAPTURE(&PN, &V), {
           for (unsigned i = 0; i != PN->getNumIncomingValues(); ++i) {
             Value *check = dyn_cast<Value>(PN->getIncomingValue(i));
 
@@ -1036,7 +1036,7 @@ void PromoteMem2Reg::run() {
       for (unsigned pred = 0, e = Preds.size(); pred != e; ++pred) {
         SomePHI->addIncoming(UndefVal, Preds[pred]);
 
-        INTRUDE(&Preds, &pred) { llvmberry::unreachableBlockPropagateFalse(Preds[pred], hints); });
+        INTRUDE(CAPTURE(&Preds, &pred), { llvmberry::unreachableBlockPropagateFalse(Preds[pred], hints); });
       }
     }
   }
@@ -1186,14 +1186,14 @@ NextIteration:
         // The currently active variable for this block is now the PHI.
         IncomingVals[AllocaNo] = APN;
 
-        INTRUDE(&APN, &Pred, &AllocaNo) {
+        INTRUDE(CAPTURE(&APN, &Pred, &AllocaNo), {
           std::string Rphi = llvmberry::getVariable(*APN);
           auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
           auto instrIndices = data.get<llvmberry::ArgForIndices>()->instrIndices;
 
           // propagate maydiff
-          llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Physical);
-          llvmberry::propagateMaydiffGlobal(Rphi, llvmberry::Previous);
+          llvmberry::propagateMaydiffGlobal(hints, Rphi, llvmberry::Physical);
+          llvmberry::propagateMaydiffGlobal(hints, Rphi, llvmberry::Previous);
 
           llvmberry::propagateFromInsnToPhi(AllocaNo, APN, Pred, data, hints);
 
@@ -1233,12 +1233,12 @@ NextIteration:
 
       Value *V = IncomingVals[AI->second];
 
-      INTRUDE(&LI, &V, &AI) {
+      INTRUDE(CAPTURE(&LI, &V, &AI), {
         auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
         auto instrIndices = data.get<llvmberry::ArgForIndices>()->instrIndices;
 
-        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Physical);
-        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*LI), llvmberry::Previous);
+        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*LI), llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*LI), llvmberry::Previous);
         llvmberry::propagateFromInsnToLoad(AI->second, LI, data, hints);
         llvmberry::propagateLoadInstToUse(LI, V, DICTMAP(recentInstr, AI->second).op1, data, hints, true);
 
@@ -1265,7 +1265,7 @@ NextIteration:
       if (ai == AllocaLookup.end())
         continue;
 
-      INTRUDE(&SI, &ai) {
+      INTRUDE(CAPTURE(&SI, &ai), {
         auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
         auto instrIndices = data.get<llvmberry::ArgForIndices>()->instrIndices;
 
@@ -1315,7 +1315,7 @@ NextIteration:
     if (VisitedSuccs.insert(*I).second) {
       Worklist.emplace_back(*I, Pred, IncomingVals);
 
-      INTRUDE() { 
+      INTRUDE(NOCAPTURE, { 
         auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
         auto instrWorkList = data.get<llvmberry::ArgForMem2Reg>()->instrWorkList;
         instrWorkList.get()->push_back(*(recentInstr.get())); });

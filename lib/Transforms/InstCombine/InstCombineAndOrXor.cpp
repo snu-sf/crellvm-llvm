@@ -184,22 +184,17 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
       // nop         | Y  = X & C2
       // Z = Y & C2  | Z  = Y ^ (C1 & C2)
 
-      llvmberry::ValidationUnit::GetInstance()->intrude([&TheAnd, &Op](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&TheAnd, &Op), {
         BinaryOperator *Z = &TheAnd;
         BinaryOperator *Ysrc = dyn_cast<BinaryOperator>(Op);
 
         // Propagate Y = X ^ C1 in Source
-        llvmberry::propagateInstruction(Ysrc, Z, SRC);
+        llvmberry::propagateInstruction(hints, Ysrc, Z, SRC);
       });
 
       And->takeName(Op);
 
-      llvmberry::ValidationUnit::GetInstance()
-          ->intrude([&TheAnd, &Op, &And, &X, &OpRHS, &AndRHS](
-                llvmberry::ValidationUnit::Dictionary &data,
-                llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&TheAnd, &Op, &And, &X, &OpRHS, &AndRHS), {
         llvmberry::name_instructions(*Op->getParent()->getParent());
 
         BinaryOperator *Z = &TheAnd;
@@ -216,14 +211,14 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
         int64_t c3 = c1 & c2;
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
-        llvmberry::propagateInstruction(Yprime, Z, TGT);
-        llvmberry::propagateInstruction(Y, Z, TGT);
+        llvmberry::propagateInstruction(hints, Yprime, Z, TGT);
+        llvmberry::propagateInstruction(hints, Y, Z, TGT);
         llvmberry::insertSrcNopAtTgtI(hints, Y);
 
-        llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Physical);
-        llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Physical);
-        llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Previous);
-        llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Previous);
+        llvmberry::propagateMaydiffGlobal(hints, reg_yprime_name, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(hints, reg_y_name, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(hints, reg_yprime_name, llvmberry::Previous);
+        llvmberry::propagateMaydiffGlobal(hints, reg_y_name, llvmberry::Previous);
 
         INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndXorConst::make(
                 REGISTER(reg_z_name), REGISTER(reg_y_name),
@@ -259,21 +254,16 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
         // Z = Y & C2  | Z  = Y  | C1
 
         // Propagate Y = X | C1 in Source
-        llvmberry::ValidationUnit::GetInstance()->intrude([&TheAnd, &Op](
-            llvmberry::ValidationUnit::Dictionary &data,
-            llvmberry::CoreHint &hints) {
+        INTRUDE(CAPTURE(&TheAnd, &Op), {
           BinaryOperator *Z = &TheAnd;
           BinaryOperator *Ysrc = dyn_cast<BinaryOperator>(Op);
 
-          llvmberry::propagateInstruction(Ysrc, Z, SRC);
+          llvmberry::propagateInstruction(hints, Ysrc, Z, SRC);
         });
 
         And->takeName(Op);
 
-        llvmberry::ValidationUnit::GetInstance()
-            ->intrude([&TheAnd, &And, &Op, &X, &OpRHS, &AndRHS](
-                  llvmberry::ValidationUnit::Dictionary &data,
-                  llvmberry::CoreHint &hints) {
+        INTRUDE(CAPTURE(&TheAnd, &And, &Op, &X, &OpRHS, &AndRHS), {
           llvmberry::name_instructions(*Op->getParent()->getParent());
 
           BinaryOperator *Z = &TheAnd;
@@ -290,14 +280,14 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
           int64_t c3 = c2 ^ c1;
           int bitwidth = Z->getType()->getIntegerBitWidth();
 
-          llvmberry::propagateInstruction(Yprime, Z, TGT);
-          llvmberry::propagateInstruction(Y, Z, TGT);
+          llvmberry::propagateInstruction(hints, Yprime, Z, TGT);
+          llvmberry::propagateInstruction(hints, Y, Z, TGT);
           llvmberry::insertSrcNopAtTgtI(hints, Y);
 
-          llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Physical);
-          llvmberry::propagateMaydiffGlobal(reg_yprime_name, llvmberry::Previous);
-          llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Physical);
-          llvmberry::propagateMaydiffGlobal(reg_y_name, llvmberry::Previous);
+          llvmberry::propagateMaydiffGlobal(hints, reg_yprime_name, llvmberry::Physical);
+          llvmberry::propagateMaydiffGlobal(hints, reg_yprime_name, llvmberry::Previous);
+          llvmberry::propagateMaydiffGlobal(hints, reg_y_name, llvmberry::Physical);
+          llvmberry::propagateMaydiffGlobal(hints, reg_y_name, llvmberry::Previous);
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndOrConst2::make(
                   REGISTER(reg_z_name), REGISTER(reg_y_name),
                   REGISTER(reg_yprime_name), VAL(X),
@@ -1324,16 +1314,10 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
 
   
   llvmberry::ValidationUnit::Begin("simplify_and_inst", I.getParent()->getParent());
-  llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::ValidationUnit::Dictionary &data,
-      llvmberry::CoreHint &hints) {
-    data.create<llvmberry::ArgForSimplifyAndInst>();
-  });
+  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyAndInst>(); });
 
   if (Value *V = SimplifyAndInst(Op0, Op1, DL, TLI, DT, AC)){
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &V), {
       auto ptr = data.get<llvmberry::ArgForSimplifyAndInst>();
       if(ptr->isActivated()){
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
@@ -1473,9 +1457,7 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
 
         Value *Or = Builder->CreateOr(Op0NotVal, Op1NotVal,
                                       I.getName()+".demorgan");
-        
-        llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &Op0NotVal, &Op1NotVal, &Or](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        INTRUDE(CAPTURE(&I, &Op0, &Op1, &Op0NotVal, &Op1NotVal, &Or), {
           //    <src>   |     <tgt>
           // X = A ^ -1 | X =  A  ^ -1
           // Y = B ^ -1 | Y =  B  ^ -1
@@ -1492,13 +1474,13 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
           Value *A = Op0NotVal;
           Value *B = Op1NotVal;
 
-          llvmberry::propagateInstruction(X, Z, TGT);
-          llvmberry::propagateInstruction(Y, Z, TGT);
+          llvmberry::propagateInstruction(hints, X, Z, TGT);
+          llvmberry::propagateInstruction(hints, Y, Z, TGT);
 
           llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-          llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Zprime), llvmberry::Physical); 
+          llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Zprime), llvmberry::Physical); 
           
-          llvmberry::propagateInstruction(Zprime, Z, TGT);
+          llvmberry::propagateInstruction(hints, Zprime, Z, TGT);
           
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndDeMorgan::make(
                   REGISTER(*Z), REGISTER(*X), REGISTER(*Y), REGISTER(*Zprime),
@@ -1564,9 +1546,7 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
       llvmberry::ValidationUnit::Begin("and_or_not1",
                                        I.getParent()->getParent());
 
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &Op0, &Op1, &A), {
         BinaryOperator *Z = &I;
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
         BinaryOperator *X;
@@ -1580,11 +1560,11 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
 
         Value *B = Op1;
 
-        llvmberry::propagateInstruction(X, Z, TGT);
-        llvmberry::propagateInstruction(Y, Z, TGT);
+        llvmberry::propagateInstruction(hints, X, Z, TGT);
+        llvmberry::propagateInstruction(hints, Y, Z, TGT);
 
         if (is_x_second)
-           llvmberry::applyCommutativity(Z, Y, TGT);
+           llvmberry::applyCommutativity(hints, Z, Y, TGT);
 
         INFRULE(INSTPOS(TGT, &I), llvmberry::ConsAndOrNot1::make(
                 REGISTER(*Z), REGISTER(*X), REGISTER(*Y), VAL(A), VAL(B), 
@@ -2371,16 +2351,12 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     return ReplaceInstUsesWith(I, V);
 
   llvmberry::ValidationUnit::Begin("simplify_or_inst", I.getParent()->getParent());
-  llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::ValidationUnit::Dictionary &data,
-      llvmberry::CoreHint &hints) {
+  INTRUDE(NOCAPTURE, {
     data.create<llvmberry::ArgForSimplifyOrInst>();
   });
 
   if (Value *V = SimplifyOrInst(Op0, Op1, DL, TLI, DT, AC)){
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &V), {
       auto ptr = data.get<llvmberry::ArgForSimplifyOrInst>();
       if(ptr->isActivated()){
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
@@ -2474,8 +2450,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   if (match(Op0, m_And(m_Not(m_Value(A)), m_Value(B))) &&
       match(Op1, m_Specific(A))){
     llvmberry::ValidationUnit::Begin("or_or", I.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &Op0, &Op1), {
       //    <src>   |   <tgt>
       // X = A ^ -1 | X = A ^ -1
       // Y = X & B  | Y = X & B
@@ -2489,11 +2464,11 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       Value *A = Op1;
       Value *B = Y->getOperand(1);
 
-      llvmberry::propagateInstruction(X, Z, SRC);
-      llvmberry::propagateInstruction(Y, Z, SRC);
+      llvmberry::propagateInstruction(hints, X, Z, SRC);
+      llvmberry::propagateInstruction(hints, Y, Z, SRC);
       if(X->getOperand(1) == A){
         // commutativity.
-        llvmberry::applyCommutativity(Z, X, SRC);
+        llvmberry::applyCommutativity(hints, Z, X, SRC);
       }
 
       INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrOr::make(
@@ -2511,9 +2486,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     Value *NotA = Builder->CreateNot(A);
 
     llvmberry::name_instructions(*I.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &NotA](
-        llvmberry::Dictionary &data,
-        llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &Op0, &Op1, &NotA), {
       //    <src>    |   <tgt>
       // X = A & B   | X = A & B
       // Y = A ^ -1  | Y = A ^ -1
@@ -2530,16 +2503,16 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       Value *B = X->getOperand(1); // not Y->getOperand(0) because Y also can be -1 ^ A!
 
       llvmberry::insertSrcNopAtTgtI(hints, Yprime);
-      llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Yprime), llvmberry::Physical);
+      llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Yprime), llvmberry::Physical);
  
-      llvmberry::propagateInstruction(X, Z, TGT);
-      llvmberry::propagateInstruction(Y, Z, TGT);
-      llvmberry::propagateInstruction(Yprime, Z, TGT);
+      llvmberry::propagateInstruction(hints, X, Z, TGT);
+      llvmberry::propagateInstruction(hints, Y, Z, TGT);
+      llvmberry::propagateInstruction(hints, Yprime, Z, TGT);
       if(Y->getOperand(1) == A)
-        llvmberry::applyCommutativity(Z, Y, TGT);
+        llvmberry::applyCommutativity(hints, Z, Y, TGT);
 
       if(Yprime->getOperand(1) == A)
-        llvmberry::applyCommutativity(Z, Yprime, TGT);
+        llvmberry::applyCommutativity(hints, Z, Yprime, TGT);
       
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsOrOr2::make(
           VAL(Z), VAL(X), VAL(Y), VAL(Yprime), VAL(A), VAL(B),
@@ -2719,20 +2692,18 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   if (match(Op1, m_Xor(m_Value(A), m_Value(B)))) {
     if (Op0 == A || Op0 == B) {
       llvmberry::ValidationUnit::Begin("or_xor3", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A, &B,
-                                                         SwappedForXor](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &Op0, &Op1, &A, &B, SwappedForXor), {
         //   <src>   |   <tgt>
         // Y = A ^ B | Y = A ^ B
         // Z = A | Y | Z = A | B
         BinaryOperator *Z = &I;
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
 
-        llvmberry::propagateInstruction(Y, Z, SRC);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
         if (Op0 == B)
-          llvmberry::applyCommutativity(Z, Y, SRC);
+          llvmberry::applyCommutativity(hints, Z, Y, SRC);
         if (SwappedForXor)
-          llvmberry::applyCommutativity(Z, Z, SRC);
+          llvmberry::applyCommutativity(hints, Z, Z, SRC);
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrXor3::make(
             VAL(Z), VAL(Y), (Op0 == B ? VAL(B) : VAL(A)),
             (Op0 == B ? VAL(A) : VAL(B)), BITSIZE(*Z)));
@@ -2749,8 +2720,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     if (match(Op0, m_And(m_Specific(A), m_Specific(B))) ||
         match(Op0, m_And(m_Specific(B), m_Specific(A)))) {
       llvmberry::ValidationUnit::Begin("or_and_xor", I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1, &A, &B, SwappedForXor](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &Op0, &Op1, &A, &B, SwappedForXor), {
         //   <src>   |   <tgt>
         // X = A & B | X = A & B
         // Y = A ^ B | Y = A ^ B
@@ -2759,12 +2729,12 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
         BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
 
-        llvmberry::propagateInstruction(Y, Z, SRC);
-        llvmberry::propagateInstruction(X, Z, SRC);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
+        llvmberry::propagateInstruction(hints, X, Z, SRC);
         if (match(Op0, m_And(m_Specific(B), m_Specific(A))))
-          llvmberry::applyCommutativity(Z, X, SRC);
+          llvmberry::applyCommutativity(hints, Z, X, SRC);
         if (SwappedForXor)
-          llvmberry::applyCommutativity(Z, Z, SRC);
+          llvmberry::applyCommutativity(hints, Z, Z, SRC);
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrAndXor::make(
             VAL(Z), VAL(X), VAL(Y), VAL(A), VAL(B), BITSIZE(*Z)));
       });
@@ -2927,14 +2897,10 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
     return ReplaceInstUsesWith(I, V);
 
   llvmberry::ValidationUnit::Begin("simplify_xor_inst", I.getParent()->getParent());
-  llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-    data.create<llvmberry::ArgForSimplifyXorInst>();
-  });
+  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyXorInst>(); });
 
   if (Value *V = SimplifyXorInst(Op0, Op1, DL, TLI, DT, AC)) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &V), {
       auto ptr = data.get<llvmberry::ArgForSimplifyXorInst>();
       if(ptr->isActivated()){
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());

@@ -117,10 +117,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
   }
 
   // ex) FirstInst x = a + b  I = a + c
-  llvmberry::ValidationUnit::GetInstance()->intrude(
-      [&PN, &NewLHS, &NewRHS, this](llvmberry::ValidationUnit::Dictionary &data,
-                                    llvmberry::CoreHint &hints) {
-
+  INTRUDE(CAPTURE(&PN, &NewLHS, &NewRHS, this), {
     std::string oldphi = llvmberry::getVariable(PN);
     std::string newphi;
     Instruction *NewPHI = nullptr;
@@ -787,9 +784,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
       llvmberry::ValidationUnit::Begin("fold_phi_bin_const",
                                    FirstInst->getParent()->getParent());
 
-    llvmberry::ValidationUnit::GetInstance()->intrude(
-            [&PN](llvmberry::ValidationUnit::Dictionary &data,
-                  llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&PN), {
       std::string oldphi = llvmberry::getVariable(PN);
       BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
       llvmberry::insertSrcNopAtTgtI(hints, InsertPos);
@@ -805,9 +800,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
     // common, so we handle it intelligently here for compile-time speed.
 
     if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([&PN, &ConstantOp, this](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&PN, &ConstantOp, this), {
         std::string oldphi = llvmberry::getVariable(PN);
         BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
 
@@ -879,11 +872,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
     delete NewPN;
   } else {
     if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) {
-      llvmberry::ValidationUnit::GetInstance()
-         ->intrude([&PN, &NewPN, &ConstantOp, this](
-               llvmberry::ValidationUnit::Dictionary &data,
-               llvmberry::CoreHint &hints) {
-
+      INTRUDE(CAPTURE(&PN, &NewPN, &ConstantOp, this), {
         std::string oldphi = llvmberry::getVariable(PN);
         BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
 

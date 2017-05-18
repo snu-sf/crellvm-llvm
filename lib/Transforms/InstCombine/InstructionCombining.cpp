@@ -219,9 +219,7 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
           I.setOperand(0, A);
           I.setOperand(1, V);
 
-          llvmberry::ValidationUnit::GetInstance()
-              ->intrude([&Op0, &I, &B, &C, &V, &Opcode](
-                    llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          INTRUDE(CAPTURE(&Op0, &I, &B, &C, &V, &Opcode), {
             if (isa<ConstantInt>(B) && isa<ConstantInt>(C) &&
                 isa<ConstantInt>(V)) {
               //    <src>    |     <tgt>
@@ -230,7 +228,7 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
               Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
 
-              llvmberry::propagateInstruction(reg1_instr, &I, llvmberry::Source);
+              llvmberry::propagateInstruction(hints, reg1_instr, &I, llvmberry::Source);
 
               INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopAssociative::make(
                       REGISTER(*(Op0->getOperand(0))), REGISTER(*Op0),
@@ -1952,8 +1950,7 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
   SmallVector<WeakVH, 64> Users;
   if (isAllocSiteRemovable(&MI, Users, TLI)) {
     llvmberry::ValidationUnit::Begin("dead_store_elim2", MI.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude([&MI, &Users](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&MI, &Users), {
       // NOTE : We only support the case when Ptr is alloca and uses are store.
       bool doAbort = false;
       if (isa<AllocaInst>(&MI)) {
@@ -1969,8 +1966,8 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
               BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
         }
         llvmberry::insertTgtNopAtSrcI(hints, &MI);
-        llvmberry::propagateMaydiffGlobal(regname, llvmberry::Physical);
-        llvmberry::propagateMaydiffGlobal(regname, llvmberry::Previous);
+        llvmberry::propagateMaydiffGlobal(hints, regname, llvmberry::Physical);
+        llvmberry::propagateMaydiffGlobal(hints, regname, llvmberry::Previous);
       } else {
         doAbort = true;
       }
@@ -3033,25 +3030,22 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
   for (auto i : myHint) {
     BranchInst *BI = i;
     bool CondVal = cast<ConstantInt>(BI->getCondition())->getZExtValue();
-    llvmberry::ValidationUnit::GetInstance()->intrude(
-        [&BI, &CondVal](llvmberry::ValidationUnit::Dictionary &data,
-                        llvmberry::CoreHint &hints) {
-          BasicBlock *UnreachableBB = BI->getSuccessor(CondVal);
-          LLVMContext &Ctx = BI->getContext();
-          ConstantInt *c1, *c2;
-          if (CondVal) {
-            c1 = ConstantInt::getTrue(Ctx);
-            c2 = ConstantInt::getFalse(Ctx);
-          } else {
-            c1 = ConstantInt::getFalse(Ctx);
-            c2 = ConstantInt::getTrue(Ctx);
-          }
-          INFRULE(llvmberry::TyPosition::make(SRC, UnreachableBB->getName(),
-                                              BI->getParent()->getName()),
-                  llvmberry::ConsImpliesFalse::make(
-                      llvmberry::TyConstant::make(*c1),
-                      llvmberry::TyConstant::make(*c2)));
-        });
+    INTRUDE(CAPTURE(&BI, &CondVal), {
+      BasicBlock *UnreachableBB = BI->getSuccessor(CondVal);
+      LLVMContext &Ctx = BI->getContext();
+      ConstantInt *c1, *c2;
+      if (CondVal) {
+        c1 = ConstantInt::getTrue(Ctx);
+        c2 = ConstantInt::getFalse(Ctx);
+      } else {
+        c1 = ConstantInt::getFalse(Ctx);
+        c2 = ConstantInt::getTrue(Ctx);
+      }
+      INFRULE(llvmberry::TyPosition::make(SRC, UnreachableBB->getName(),
+                                          BI->getParent()->getName()),
+              llvmberry::ConsImpliesFalse::make(
+                  CONSTANT(c1), CONSTANT(c2)));
+    });
   }
 
   // Do a quick scan over the function.  If we find any blocks that are
@@ -3061,17 +3055,13 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
     if (Visited.count(BB))
       continue;
 
-    llvmberry::ValidationUnit::GetInstance()->intrude(
-        [&BB](llvmberry::ValidationUnit::Dictionary &data,
-              llvmberry::CoreHint &hints) {
-
-          PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
-                            llvmberry::false_encoding.second, SRC),
-                    BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                               SRC, llvmberry::getBasicBlockIndex(BB)),
-                           llvmberry::TyPosition::make_end_of_block(SRC, *BB)));
-
-        });
+    INTRUDE(CAPTURE(&BB), {
+      PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
+                        llvmberry::false_encoding.second, SRC),
+                BOUNDS(llvmberry::TyPosition::make_start_of_block(
+                           SRC, llvmberry::getBasicBlockIndex(BB)),
+                       llvmberry::TyPosition::make_end_of_block(SRC, *BB)));
+    });
 
     // Delete the instructions backwards, as it has a reduced likelihood of
     // having to update as many def-use and use-def chains.
@@ -3091,10 +3081,7 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
         MadeIRChange = true;
       }
 
-      llvmberry::ValidationUnit::GetInstance()->intrude([&Inst](
-          llvmberry::ValidationUnit::Dictionary &data,
-          llvmberry::CoreHint &hints) {
-
+      INTRUDE(CAPTURE(&Inst), {
         insertTgtNopAtSrcI(hints, Inst);
         PROPAGATE(
             LESSDEF(llvmberry::false_encoding.first,

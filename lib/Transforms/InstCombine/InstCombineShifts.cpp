@@ -702,16 +702,12 @@ Instruction *InstCombiner::visitShl(BinaryOperator &I) {
 
   llvmberry::ValidationUnit::Begin("simplify_shift",
                                    I.getParent()->getParent());
-  llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-    data.create<llvmberry::ArgForSimplifyShiftInst>();
-  });
+  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V =
           SimplifyShlInst(I.getOperand(0), I.getOperand(1), I.hasNoSignedWrap(),
                           I.hasNoUnsignedWrap(), DL, TLI, DT, AC)) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &V), {
       auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
       if (ptr->isActivated()) {
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
@@ -766,15 +762,11 @@ Instruction *InstCombiner::visitLShr(BinaryOperator &I) {
 
   llvmberry::ValidationUnit::Begin("simplify_shift",
                                    I.getParent()->getParent());
-  llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-    data.create<llvmberry::ArgForSimplifyShiftInst>();
-  });
+  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V = SimplifyLShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
                                   DL, TLI, DT, AC)) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &V), {
       auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
       if (ptr->isActivated()) {
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
@@ -832,15 +824,11 @@ Instruction *InstCombiner::visitAShr(BinaryOperator &I) {
 
   llvmberry::ValidationUnit::Begin("simplify_shift",
                                    I.getParent()->getParent());
-  llvmberry::ValidationUnit::GetInstance()->intrude([](
-      llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-    data.create<llvmberry::ArgForSimplifyShiftInst>();
-  });
+  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V = SimplifyAShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
                                   DL, TLI, DT, AC)) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &V](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &V), {
       auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
       if (ptr->isActivated()) {
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
