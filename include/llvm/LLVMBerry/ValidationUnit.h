@@ -19,7 +19,7 @@ namespace llvmberry {
 class ValidationUnit {
 public:
   typedef llvmberry::Dictionary Dictionary;
-  enum PASS { NOTHING = 0, GVN, MEM2REG, PRE, INSTCOMBINE };
+  enum PASS { NOTHING = 0, GVN, MEM2REG, PRE, INSTCOMBINE, LICM };
 
   CoreHint &getHint();
   const std::string &getOptimizationName() const;

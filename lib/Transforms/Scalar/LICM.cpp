@@ -56,6 +56,11 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
+
 #include <algorithm>
 using namespace llvm;
 
@@ -179,6 +184,7 @@ bool LICM::runOnLoop(Loop *L, LPPassManager &LPM) {
   if (skipOptnoneFunction(L))
     return false;
 
+  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::LICM);
   Changed = false;
 
   // Get our Loop and Alias Analysis information...
@@ -286,6 +292,8 @@ bool LICM::runOnLoop(Loop *L, LPPassManager &LPM) {
     LoopToAliasSetMap[L] = CurAST;
   else
     delete CurAST;
+
+  llvmberry::ValidationUnit::EndPass();
   return Changed;
 }
 
@@ -328,7 +336,12 @@ bool llvm::sinkRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
       DEBUG(dbgs() << "LICM deleting dead inst: " << I << '\n');
       ++II;
       CurAST->deleteValue(&I);
+      llvmberry::ValidationUnit::Begin("licm.sinkregion.dce",
+                                       I.getParent()->getParent(),
+                                       true);
+      llvmberry::generateHintForTrivialDCE(I);
       I.eraseFromParent();
+      llvmberry::ValidationUnit::End();
       Changed = true;
       continue;
     }
@@ -373,6 +386,9 @@ bool llvm::hoistRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
       // Try constant folding this instruction.  If all the operands are
       // constants, it is technically hoistable, but it would be better to just
       // fold it.
+      llvmberry::ValidationUnit::Begin("licm.hoistregion.constantfold",
+                                       I.getParent()->getParent(),
+                                       true);
       if (Constant *C = ConstantFoldInstruction(
               &I, I.getModule()->getDataLayout(), TLI)) {
         DEBUG(dbgs() << "LICM folding inst: " << I << "  --> " << *C << '\n');
@@ -380,8 +396,10 @@ bool llvm::hoistRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
         CurAST->deleteValue(&I);
         I.replaceAllUsesWith(C);
         I.eraseFromParent();
+        llvmberry::ValidationUnit::End();
         continue;
       }
+      llvmberry::ValidationUnit::Abort();
 
       // Try hoisting the instruction out to the preheader.  We can only do this
       // if all of the operands of the instruction are loop invariant and if it
@@ -548,9 +566,16 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
                                                 BasicBlock &ExitBlock,
                                                 PHINode &PN,
                                                 const LoopInfo *LI) {
+  llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.clone",
+                                   ExitBlock.getParent(),
+                                   true);
   Instruction *New = I.clone();
   ExitBlock.getInstList().insert(ExitBlock.getFirstInsertionPt(), New);
   if (!I.getName().empty()) New->setName(I.getName() + ".le");
+  INTRUDE(CAPTURE(New), {
+    llvmberry::insertSrcNopAtTgtI(hints, New);
+  });
+  llvmberry::ValidationUnit::End();
 
   // Build LCSSA PHI nodes for any in-loop operands. Note that this is
   // particularly cheap because we can rip off the PHI node that we're
@@ -564,12 +589,20 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
     if (Instruction *OInst = dyn_cast<Instruction>(*OI))
       if (Loop *OLoop = LI->getLoopFor(OInst->getParent()))
         if (!OLoop->contains(&PN)) {
+          llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.phi",
+                                           ExitBlock.getParent(),
+                                           true);
           PHINode *OpPN =
               PHINode::Create(OInst->getType(), PN.getNumIncomingValues(),
                               OInst->getName() + ".lcssa", ExitBlock.begin());
           for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i)
             OpPN->addIncoming(OInst, PN.getIncomingBlock(i));
+          INTRUDE(CAPTURE(OpPN), {
+            llvmberry::insertSrcNopAtTgtI(hints, OpPN);
+          });
+          llvmberry::generateHintForReplaceAllUsesWithAtTgt(dyn_cast<Instruction>(*OI), OpPN);
           *OI = OpPN;
+          llvmberry::ValidationUnit::End();
         }
   return New;
 }
@@ -605,7 +638,11 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
     Value::user_iterator UI = I.user_begin();
     auto *User = cast<Instruction>(*UI);
     if (!DT->isReachableFromEntry(User->getParent())) {
+      llvmberry::ValidationUnit::Begin("licm.sink.makeundef1",
+                                       I.getParent()->getParent(),
+                                       true);
       User->replaceUsesOfWith(&I, UndefValue::get(I.getType()));
+      llvmberry::ValidationUnit::End();
       continue;
     }
     // The user must be a PHI node.
@@ -617,7 +654,11 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
     Use &U = UI.getUse();
     BasicBlock *BB = PN->getIncomingBlock(U);
     if (!DT->isReachableFromEntry(BB)) {
+      llvmberry::ValidationUnit::Begin("licm.sink.makeundef2",
+                                       I.getParent()->getParent(),
+                                       true);
       U = UndefValue::get(I.getType());
+      llvmberry::ValidationUnit::End();
       continue;
     }
 
@@ -633,12 +674,26 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
       New = SunkCopies[ExitBlock] =
             CloneInstructionInExitBlock(I, *ExitBlock, *PN, LI);
 
+    llvmberry::ValidationUnit::Begin("licm.sink.replaceinst",
+                                     I.getParent()->getParent(),
+                                     true);
     PN->replaceAllUsesWith(New);
+    llvmberry::ValidationUnit::End();
+    llvmberry::ValidationUnit::Begin("licm.sink.eraseoldphi",
+                                     I.getParent()->getParent(),
+                                     true);
+    llvmberry::generateHintForTrivialDCE(*PN);
     PN->eraseFromParent();
+    llvmberry::ValidationUnit::End();
   }
 
   CurAST->deleteValue(&I);
+  llvmberry::ValidationUnit::Begin("licm.sink.eraseoldinst",
+                                   I.getParent()->getParent(),
+                                   true);
+  llvmberry::generateHintForTrivialDCE(I);
   I.eraseFromParent();
+  llvmberry::ValidationUnit::End();
   return Changed;
 }
 
@@ -649,7 +704,11 @@ static bool hoist(Instruction &I, BasicBlock *Preheader) {
   DEBUG(dbgs() << "LICM hoisting to " << Preheader->getName() << ": "
         << I << "\n");
   // Move the new node to the Preheader, before its terminator.
+  llvmberry::ValidationUnit::Begin("licm.hoist",
+                                   I.getParent()->getParent(),
+                                   true);
   I.moveBefore(Preheader->getTerminator());
+  llvmberry::ValidationUnit::End();
 
   if (isa<LoadInst>(I)) ++NumMovedLoads;
   else if (isa<CallInst>(I)) ++NumMovedCalls;

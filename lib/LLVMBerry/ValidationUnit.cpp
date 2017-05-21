@@ -26,7 +26,7 @@ static llvm::cl::opt<std::string>
 static llvm::cl::opt<std::string>
     LLVMBerryPassWhiteList("llvmberry-passwhitelist",
        llvm::cl::desc("Enable hint generation for specific "
-                "passes only (instcombine|mem2reg|gvn|pre)"),
+                "passes only (instcombine|mem2reg|gvn|pre|licm)"),
        llvm::cl::value_desc("pass-names(use commas)"),
        llvm::cl::init("-"));
 
@@ -88,7 +88,7 @@ void writeModuleToFile(const llvm::Module &module,
 
 // class ValidationUnit
 // constructor
-ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func, bool rneame)
+ValidationUnit::ValidationUnit(const std::string &optname, llvm::Function *func, bool rename)
     : _filename(), _optname(optname), _srcfile_buffer(nullptr), _func(func),
       _corehint(), _data(), isAborted(false) {
   if (RuntimeOptions::IgnoreOpt(optname))
@@ -278,7 +278,10 @@ bool ValidationUnit::Exists() {
 }
 
 void ValidationUnit::Begin(const std::string &optname, llvm::Function *func, bool rename) {
-  assert(!Exists() && "ValidationUnit already exists");
+  if (Exists()) {
+    std::cout << "ValidationUnit already exists!! : " << GetInstance()->getOptimizationName() << std::endl;
+    assert(!Exists() && "ValidationUnit already exists");
+  }
   assert(func && "Function cannot be null");
   _Instance = new ValidationUnit(optname, func, rename);
 }

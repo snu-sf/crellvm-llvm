@@ -41,6 +41,11 @@
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/LLVMBerry/Hintgen.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "lcssa"
@@ -112,6 +117,11 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
     if (SSAUpdate.HasValueForBlock(ExitBB))
       continue;
 
+    if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
+      llvmberry::ValidationUnit::Begin("licm.formlcssa.newphi",
+                                       Inst.getParent()->getParent(),
+                                       true);
+    }
     PHINode *PN = PHINode::Create(Inst.getType(), PredCache.size(ExitBB),
                                   Inst.getName() + ".lcssa", ExitBB->begin());
 
@@ -126,6 +136,12 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
         UsesToRewrite.push_back(
             &PN->getOperandUse(PN->getOperandNumForIncomingValue(
                  PN->getNumIncomingValues() - 1)));
+    }
+    if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
+      INTRUDE(CAPTURE(PN), {
+        llvmberry::insertSrcNopAtTgtI(hints, PN);
+      });
+      llvmberry::ValidationUnit::End();
     }
 
     AddedPHIs.push_back(PN);
@@ -160,14 +176,32 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
 
     if (isa<PHINode>(UserBB->begin()) && isExitBlock(UserBB, ExitBlocks)) {
       // Tell the VHs that the uses changed. This updates SCEV's caches.
+      if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
+        llvmberry::ValidationUnit::Begin("licm.formlcssa.rewrite",
+                                         Inst.getParent()->getParent(),
+                                         true);
+      }
+
       if (UsesToRewrite[i]->get()->hasValueHandle())
         ValueHandleBase::ValueIsRAUWd(*UsesToRewrite[i], UserBB->begin());
       UsesToRewrite[i]->set(UserBB->begin());
+
+      if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM)
+        llvmberry::ValidationUnit::End();
       continue;
+    }
+
+    if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
+      llvmberry::ValidationUnit::Begin("licm.formlcssa.rewrite",
+                                       Inst.getParent()->getParent(),
+                                       true);
     }
 
     // Otherwise, do full PHI insertion.
     SSAUpdate.RewriteUse(*UsesToRewrite[i]);
+
+    if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM)
+      llvmberry::ValidationUnit::End();
   }
 
   // Post process PHI instructions that were inserted into another disjoint loop
@@ -191,8 +225,19 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
 
   // Remove PHI nodes that did not have any uses rewritten.
   for (unsigned i = 0, e = AddedPHIs.size(); i != e; ++i) {
-    if (AddedPHIs[i]->use_empty())
+    if (AddedPHIs[i]->use_empty()) {
+      if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
+        llvmberry::ValidationUnit::Begin("licm.formlcssa.deleteunsedphi",
+                                         Inst.getParent()->getParent(),
+                                         true);
+        llvmberry::generateHintForTrivialDCE(*AddedPHIs[i]);
+      }
+
       AddedPHIs[i]->eraseFromParent();
+
+      if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM)
+        llvmberry::ValidationUnit::End();
+    }
   }
 
   return true;
