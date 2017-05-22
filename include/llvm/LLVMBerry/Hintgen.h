@@ -19,11 +19,8 @@
   hints.addCommand(llvmberry::ConsPropagate::make(what, where),                \
                    llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
 
-#define PHIPOS(SCOPE, PN, prevI)                                               \
-  llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(),                \
-                              prevI->getParent()->getName())
-#define BLOCKPOS(SCOPE, B1name, B2name)                                        \
-  llvmberry::TyPosition::make(SCOPE, B1name, B2name)                           
+#define PHIPOS(SCOPE, PHIBlock, prevBlock)                                     \
+  llvmberry::TyPosition::make(SCOPE, PHIBlock, prevBlock)                           
 #define PHIPOSJustPhi(SCOPE, PN)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
