@@ -1790,13 +1790,16 @@ Instruction *hintgenPropEq(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN
     // }
     if ((repl == q.second) && (VN.lookup_VN_of_expr(I_q) == vn)) {
       // dbgs() << "clone..\n";
-      cln = I_q->clone();
+      cln = I_q;
     }
     else if ((repl == VTrue && q.second == VFalse) || (repl == VFalse && q.second == VTrue))
       if (CmpInst *Cmp = dyn_cast<CmpInst>(I_q)) {
         CmpInst *Cmp2 = cast<CmpInst>(I_q->clone());
         Cmp2->setPredicate(Cmp2->getInversePredicate());
         if (VN.lookup_VN_of_expr(Cmp2) == vn) {
+          is_clone = true;
+          PROPAGATE(LESSDEF(VAR(id_I_q), RHS(id_I_q, Physical, scp), scp), BOUNDS(INSTPOS(scp, I_q), hpos_br));
+          PROPAGATE(LESSDEF(RHS(id_I_q, Physical, scp), VAR(id_I_q), scp), BOUNDS(INSTPOS(scp, I_q), hpos_br));
           cln = Cmp2;
         }
         else delete Cmp2;
@@ -1807,14 +1810,14 @@ Instruction *hintgenPropEq(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN
       // propagate (src: repl >= exp_I_q , tgt: exp_I_q >= repl)
       //   from start of BB_succ to pos
       // consinsn, repl
-      is_clone = true;
 
-      PROPAGATE(is_src? LESSDEF(VAR(id_I_q), RHS(id_I_q, Physical, SRC), SRC) :
-                LESSDEF(RHS(id_I_q, Physical, TGT), VAR(id_I_q), TGT),
-                BOUNDS(INSTPOS(SRC, I_q), hpos_br));
-      
-      PROPAGATE(is_src? LESSDEF(llvmberry::TyExpr::make(*repl), INSN(*cln), SRC) :
-                LESSDEF(INSN(*cln), llvmberry::TyExpr::make(*repl), TGT),
+      // PROPAGATE(is_src? LESSDEF(VAR(id_I_q), RHS(id_I_q, Physical, SRC), SRC) :
+      //           LESSDEF(RHS(id_I_q, Physical, TGT), VAR(id_I_q), TGT),
+      //           BOUNDS(INSTPOS(SRC, I_q), hpos_br));
+      auto pe_expr = is_clone? INSN(*cln) : VAR(id_I_q);
+
+      PROPAGATE(is_src? LESSDEF(llvmberry::TyExpr::make(*repl), pe_expr, SRC) :
+                LESSDEF(pe_expr, llvmberry::TyExpr::make(*repl), TGT),
                 BOUNDS(hpos_br, INSTPOS(SRC, pos)));
       return cln;
     }
@@ -1879,7 +1882,6 @@ Instruction *hintgenPropEq(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN
           if (isTrue) INFRULE(hpos_br, llvmberry::ConsIcmpEqSame::make(*Cmp));
           else INFRULE(hpos_br, llvmberry::ConsIcmpNeqSame::make(*Cmp));
         } else {
-          dbgs() << "TGT version of IcmpEqSame not prepared\n";
           INFRULE(hpos_br, llvmberry::ConsTransitivityTgt::make(isTrue? expr_true : expr_false, VAR(id_I_q), RHS(id_I_q, Physical, scp)));
           if (isTrue) INFRULE(hpos_br, llvmberry::ConsIcmpEqSameTgt::make(*Cmp));
           else INFRULE(hpos_br, llvmberry::ConsIcmpNeqSameTgt::make(*Cmp));
@@ -2090,6 +2092,11 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
     q.src = Is;
     q.tgt = It;
 
+    if (Is == It) {
+      q.clear();
+      continue;
+    }
+
     if (!Is || !It) {
       dbgs() << "Admit: PropEq case\n";
       q.clear();
@@ -2115,51 +2122,55 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
       return;
     }
 
-    Instruction *pos_up = nullptr;
+    Instruction *pos_up = q.pos;
+    bool is_up_phi = false;
 
     // find upper position
-    if (q.is_src_clone && q.is_tgt_clone)
-      assert(false && "Unexpected case of clone pair");
-    if (q.is_src_clone) pos_up = It;
-    else if (q.is_tgt_clone) pos_up = Is;
-    else {
-      bool src_dom_pos = DT->dominates(Is, q.pos),
-        tgt_dom_pos = DT->dominates(It, q.pos);
-      if (src_dom_pos && !tgt_dom_pos) pos_up = Is;
-      else if (!src_dom_pos && tgt_dom_pos) pos_up = It;
+    if (!q.is_src_clone || !q.is_tgt_clone) {
+      // hoist required
+      if (q.is_src_clone) pos_up = It;
+      else if (q.is_tgt_clone) pos_up = Is;
       else {
-        assert((src_dom_pos && tgt_dom_pos) && "GVNQuery: nobody dominates pos");
-        if (DT->dominates(Is, It)) pos_up = Is;
-        else pos_up = It;
+        bool src_dom_pos = DT->dominates(Is, q.pos),
+          tgt_dom_pos = DT->dominates(It, q.pos);
+        if (src_dom_pos && !tgt_dom_pos) pos_up = Is;
+        else if (!src_dom_pos && tgt_dom_pos) pos_up = It;
+        else {
+          assert((src_dom_pos && tgt_dom_pos) && "GVNQuery: nobody dominates pos");
+          if (DT->dominates(Is, It)) pos_up = Is;
+          else pos_up = It;
+        }
+      }
+
+      bool is_up_src = pos_up == Is;
+      Instruction *I_down = is_up_src? It : Is;
+
+      hintgenHoist(hints, VN, Is, q.pos, pos_up, true);
+      hintgenHoist(hints, VN, It, q.pos, pos_up, false);
+
+      if (PHINode *PN = dyn_cast<PHINode>(pos_up)) {
+        dbgs() << "HintgenGVN: pos_up is phinode " << *PN <<"\n";
+        for (unsigned i = 0; i < PN->getNumIncomingValues(); ++i) {
+          dbgs() << "  phi iter " << i <<"\n";
+          TerminatorInst *term = PN->getIncomingBlock(i)->getTerminator();
+
+          Instruction *cl_new = I_down->clone();
+          cl_new->setMetadata(LLVMContext::MD_dbg, NULL);
+          resolvePhiArgs(cl_new, PN, PN->getIncomingBlock(i));
+
+          std::pair<Value*, bool> v1 = std::make_pair(cl_new, true),
+            v2 = std::make_pair(PN->getIncomingValue(i), false);
+
+          GVNQuery q_new(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
+          if (visited.insert(q_new)) {
+            dbgs() << "  phi push back \n";
+            worklist.push_back(q_new);
+          } else delete cl_new;
+        }
+        is_up_phi = true;
       }
     }
-
-    bool is_up_src = pos_up == Is;
-    Instruction *I_down = is_up_src? It : Is;
-
-    hintgenHoist(hints, VN, Is, q.pos, pos_up, true);
-    hintgenHoist(hints, VN, It, q.pos, pos_up, false);
-
-    if (PHINode *PN = dyn_cast<PHINode>(pos_up)) {
-      dbgs() << "HintgenGVN: pos_up is phinode " << *PN <<"\n";
-      for (unsigned i = 0; i < PN->getNumIncomingValues(); ++i) {
-        dbgs() << "  phi iter " << i <<"\n";
-        TerminatorInst *term = PN->getIncomingBlock(i)->getTerminator();
-
-        Instruction *cl_new = I_down->clone();
-        cl_new->setMetadata(LLVMContext::MD_dbg, NULL);
-        resolvePhiArgs(cl_new, PN, PN->getIncomingBlock(i));
-
-        std::pair<Value*, bool> v1 = std::make_pair(cl_new, true),
-          v2 = std::make_pair(PN->getIncomingValue(i), false);
-
-        GVNQuery q_new(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
-        if (visited.insert(q_new)) {
-          dbgs() << "  phi push back \n";
-          worklist.push_back(q_new);
-        } else delete cl_new;
-      }
-    } else {
+    if (!is_up_phi) {
       dbgs() << "HintgenGVN: pos_up is non-phi\n";
       // assert(same_vn and same_operand, or icmp ~P);
       // Extract and reorder operands
