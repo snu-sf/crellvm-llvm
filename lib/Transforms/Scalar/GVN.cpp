@@ -131,8 +131,6 @@ namespace {
     ValueTable() : nextValueNumber(1) { }
     uint32_t lookup_or_add(Value *V);
     uint32_t lookup(Value *V) const;
-    // Added for LLVMBerry
-    uint32_t lookup_safe(Value *V) const;
     uint32_t lookup_or_add_cmp(unsigned Opcode, CmpInst::Predicate Pred,
                                Value *LHS, Value *RHS);
     void add(Value *V, uint32_t num);
@@ -144,6 +142,8 @@ namespace {
     void setDomTree(DominatorTree* D) { DT = D; }
     uint32_t getNextUnusedValueNumber() { return nextValueNumber; }
     void verifyRemoved(const Value *) const;
+    // Added for LLVMBerry
+    uint32_t lookup_VN_of_expr(Value *V);
   };
 }
 
@@ -474,10 +474,16 @@ uint32_t ValueTable::lookup(Value *V) const {
   return VI->second;
 }
 
-uint32_t ValueTable::lookup_safe(Value *V) const {
+// For LLVMBerry
+uint32_t ValueTable::lookup_VN_of_expr(Value *V) {
   DenseMap<Value*, uint32_t>::const_iterator VI = valueNumbering.find(V);
-  if (VI == valueNumbering.end()) return 0;
-  return VI->second;
+  if (VI != valueNumbering.end()) return VI->second;
+  if (Instruction *I = dyn_cast<Instruction>(V)) {
+    uint32_t& e = expressionNumbering[create_expression(I)];
+    if (!e) e = 0;
+    return e;
+  }
+  return 0;
 }
 
 /// Returns the value number of the given comparison,
@@ -1627,43 +1633,14 @@ void GVN::dump(DenseMap<uint32_t, Value*>& d) {
 #endif
 
 // Start LLVMBerry hint generation code
-bool is_rhs_available(const Instruction *I) {
-  if (isa<CallInst>(I) || isa<PHINode>(I) ||
-      isa<TerminatorInst>(I) || isa<AllocaInst>(I))
-    // TODO: more instructions can be added
-    return false;
-  else
-    return true;
-}
 
 // Check whether two values have the same VN.
 // This is necessary for the case when we should use VN.lookup_or_add_cmp
 // instead of VN.lookup not to alter the VN table, for cmp-neg-pred case.
-bool is_same_vn(ValueTable &VN, Value *V1, Value *V2, bool isV2Conc) {
-  uint32_t vn_V2;
-
-  if (Instruction *I2 = dyn_cast<Instruction>(V2)) {
-    if (isV2Conc)
-      vn_V2 = VN.lookup_safe(I2);
-    else if (CmpInst *CI2 = dyn_cast<CmpInst>(I2))
-      vn_V2 = VN.lookup_or_add_cmp(CI2->getOpcode(), CI2->getPredicate(),
-                                   CI2->getOperand(0), CI2->getOperand(1));
-    else
-      assert(false && "GVN is_same_vn: Not concrete but not CmpInst");
-  } else
-    vn_V2 = VN.lookup_safe(V2);
-
-  return (VN.lookup_safe(V1) == vn_V2);
+bool is_same_vn(ValueTable &VN, Value *V1, Value *V2) {
+  return ((VN.lookup_VN_of_expr(V1) * VN.lookup_VN_of_expr(V2) > 0) &&
+          (VN.lookup_VN_of_expr(V1) == VN.lookup_VN_of_expr(V2)));
 }
-
-// // Compare Value Vectors' VN. If each pair has the identical VN, return true.
-// bool same_ops_vn(ValueTable &VN, SmallVector<Value *, 4> ops1,
-//                  SmallVector<Value *, 4> ops2, int numOps) {
-//   for (int i = 0; i < numOps; ++i)
-//     if (VN.lookup(ops1[i]) != VN.lookup(ops2[i]))
-//       return false;
-//   return true;
-// }
 
 // Generate [ I1 >= I2 ] at POS if I1 and I2 have the same VN.
 // If I2 is not concrete (clonned during hintgen),
@@ -1671,20 +1648,11 @@ bool is_same_vn(ValueTable &VN, Value *V1, Value *V2, bool isV2Conc) {
 bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
                      Instruction *I1, Instruction *I2, bool isI2Conc,
                      Instruction *POS) {
-  std::string id_I1 = llvmberry::getVariable(*I1),
-              id_I2 = llvmberry::getVariable(*I2);
+  std::string id_I1 = llvmberry::getVariable(*I1), id_I2 = llvmberry::getVariable(*I2);
 
-  if (I1 == I2) {
-    // TODO: Below not needed for now. Let's see if this is unnecessary.
-    // Currently just returning true is OK.
-    if (POS != I1)
-      PROPAGATE(LESSDEF(VAR(id_I1, Physical), RHS(id_I1, Physical, SRC), SRC),
-                BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
-    return true;
-  }
+  if (I1 == I2) return true;
 
-  if (!is_same_vn(VN, I1, I2, isI2Conc)) {
-    hints.appendToDescription("GVN hintgen_same_vn: is_same_vn I1 I2 failed.");
+  if (!is_same_vn(VN, I1, I2)) {
     hints.appendToDescription("Admitted due to load-optimization interference.");
     hints.setReturnCodeToAdmitted();
     return false;
@@ -1696,44 +1664,22 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
   if (I1->getOpcode() != I2->getOpcode()) {
     if (isa<PHINode>(I1) || isa<PHINode>(I2)) {
       if (PHINode *phi_I2 = dyn_cast<PHINode>(I2)) {
-        if (!generateHintForPRE(I1, phi_I2)) {
-          return false;
-        }
-        PROPAGATE(
-            LESSDEF(RHS(id_I1, Physical, SRC), VAR(id_I2, Physical), SRC),
-            BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                       SRC, llvmberry::getBasicBlockIndex(phi_I2->getParent())),
-                   INSTPOS(SRC, POS)));
+        if (!generateHintForPRE(I1, phi_I2)) return false;
+
+        PROPAGATE(LESSDEF(RHS(id_I1, Physical, SRC), VAR(id_I2), SRC), BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(phi_I2->getParent())), INSTPOS(SRC, POS)));
         if (I1 != POS)
-          PROPAGATE(LESSDEF(VAR(id_I1, Physical), RHS(id_I1, Physical, SRC), SRC),
-                    BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
+          PROPAGATE(LESSDEF(VAR(id_I1), RHS(id_I1, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
 
-        INFRULE(INSTPOS(SRC, POS),
-              llvmberry::ConsTransitivity::make(VAR(id_I1, Physical),
-                                                RHS(id_I1, Physical, SRC),
-                                                VAR(id_I2, Physical)));
+        INFRULE(INSTPOS(SRC, POS), llvmberry::ConsTransitivity::make(VAR(id_I1), RHS(id_I1, Physical, SRC), VAR(id_I2)));
       }
-
-      // hints.appendToDescription("GVN hintgen_same_vn: PRE & GVN combined case.");
-
       return true;
     }
-    assert(
-        false &&
-        "GVN hintgen_same_vn: Same VN but not same Opcode and neither is PHI?");
-  }
-
-  if (!is_rhs_available(I1) || !is_rhs_available(I2)) {
-    // hints.appendToDescription("GVN hintgen_same_vn: rhs of I1 or I2 not available");
-    return false;
+    assert(false && "GVN hintgen_same_vn: Same VN but not same Opcode. Neither is PHI.");
   }
 
   // Now we know I1 and I2 have the same VN.
-  assert(
-      I1->getOpcode() == I2->getOpcode() &&
-      I1->getNumOperands() == I2->getNumOperands() &&
-      "GVN hintgen_same_vn: Insts with same vn should have the same opcode and "
-      "num of operands!");
+  assert(I1->getOpcode() == I2->getOpcode() && I1->getNumOperands() == I2->getNumOperands() &&
+         "GVN hintgen_same_vn: I1 and I2 should have same opcode and num of operands.");
 
   SmallVector<Value *, 4> ops1, ops2;
   int numOps = I1->getNumOperands();
@@ -1745,178 +1691,96 @@ bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
 
   // Propagate [ id(I1) >= exp(I1) ] at POS.
   if (I1 != POS)
-    PROPAGATE(LESSDEF(VAR(id_I1, Physical), RHS(id_I1, Physical, SRC), SRC),
-              BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
+    PROPAGATE(LESSDEF(VAR(id_I1), RHS(id_I1, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I1), INSTPOS(SRC, POS)));
 
-  Instruction *Ii = I1->clone();
-
-  // Check swapping to make [ id(I1) >= exp(Ii) ]
-  if (isa<CmpInst>(I1) || I1->isCommutative()) {
-    assert(numOps == 2 && "GVN same_vn: commutative but not 2 operands!");
-
-    if ((!is_same_vn(VN, ops1[0], ops2[0], true)) &&
-        is_same_vn(VN, ops1[0], ops2[1], true) &&
-        is_same_vn(VN, ops1[1], ops2[0], true)) {
-
-      if (isa<ICmpInst>(I1)) {
-        INFRULE(INSTPOS(SRC, POS),
-                llvmberry::ConsIcmpSwapOperands::make(*cast<ICmpInst>(I1)));
-      } else if (isa<FCmpInst>(I1)) {
-        INFRULE(INSTPOS(SRC, POS),
-                llvmberry::ConsFcmpSwapOperands::make(*cast<FCmpInst>(I1)));
-      } else if (BinaryOperator *BI1 = dyn_cast<BinaryOperator>(I1)) {
-        llvmberry::applyCommutativity(POS, BI1, SRC);
-      }
+  if (isa<CmpInst>(I1) || I1->isCommutative())
+    if ((!is_same_vn(VN, ops1[0], ops2[0])) &&
+        is_same_vn(VN, ops1[0], ops2[1]) && is_same_vn(VN, ops1[1], ops2[0]))
       std::swap(ops1[0], ops1[1]);
-      Ii->setOperand(0, ops1[0]);
-      Ii->setOperand(1, ops1[1]);
-    }
-  }
 
-  // If e_I1 is gep inb and e_I2 isn't, remove inbounds
+  // Check swapping to make [ id(I1) >= exp(Ii) ] : TO BE REMOVED by auto
+  // if (isa<CmpInst>(I1) || I1->isCommutative()) {
+  //   assert(numOps == 2 && "GVN same_vn: commutative but not 2 operands!");
+
+  //   if ((!is_same_vn(VN, ops1[0], ops2[0])) &&
+  //       is_same_vn(VN, ops1[0], ops2[1]) &&
+  //       is_same_vn(VN, ops1[1], ops2[0])) {
+  //     if (isa<ICmpInst>(I1)) {
+  //       INFRULE(INSTPOS(SRC, POS),
+  //               llvmberry::ConsIcmpSwapOperands::make(*cast<ICmpInst>(I1)));
+  //     } else if (isa<FCmpInst>(I1)) {
+  //       INFRULE(INSTPOS(SRC, POS),
+  //               llvmberry::ConsFcmpSwapOperands::make(*cast<FCmpInst>(I1)));
+  //     } else if (BinaryOperator *BI1 = dyn_cast<BinaryOperator>(I1)) {
+  //       llvmberry::applyCommutativity(POS, BI1, SRC);
+  //     }
+  //     std::swap(ops1[0], ops1[1]);
+  //   }
+  // }
+
+  // If e_I1 is gep inb and e_I2 isn't, remove inbounds : TO BE REMOVED by auto
   // to get [ gep inb .. >= gep .. ] and then
   // transitivity [ id(I1) >= gep inb .. >= gep .. ]
-  if (GetElementPtrInst *GEP_I1 = dyn_cast<GetElementPtrInst>(I1)) {
-    GetElementPtrInst *GEP_I2 = cast<GetElementPtrInst>(I2);
-    if (GEP_I1->isInBounds() && !GEP_I2->isInBounds()) {
-      INFRULE(INSTPOS(SRC, POS),
-              llvmberry::ConsGepInboundsRemove::make(INSN(*GEP_I1)));
-      GetElementPtrInst *GEP_Ii = cast<GetElementPtrInst>(Ii);
-      GEP_Ii->setIsInBounds(false);
-      auto gepi_expr = INSN(*Ii);
+  // if (GetElementPtrInst *GEP_I1 = dyn_cast<GetElementPtrInst>(I1)) {
+  //   GetElementPtrInst *GEP_I2 = cast<GetElementPtrInst>(I2);
+  //   if (GEP_I1->isInBounds() && !GEP_I2->isInBounds()) {
+  //     INFRULE(INSTPOS(SRC, POS), llvmberry::ConsGepInboundsRemove::make(INSN(*GEP_I1)));
+  //     GetElementPtrInst *GEP_Ii = cast<GetElementPtrInst>(GEP_I1->clone());
+  //     GEP_Ii->setIsInBounds(false);
+  //     auto gepi_expr = INSN(*GEP_Ii);
+  //     delete GEP_Ii;
 
-      INFRULE(INSTPOS(SRC, POS),
-              llvmberry::ConsTransitivity::make(
-                  VAR(id_I1, Physical), RHS(id_I1, Physical, SRC), gepi_expr));
-    }
-  }
+  //     INFRULE(INSTPOS(SRC, POS),
+  //             llvmberry::ConsTransitivity::make(
+  //                 VAR(id_I1, Physical), RHS(id_I1, Physical, SRC), gepi_expr));
+  //   }
+  // }
 
   // From [ id(I1) >= exp(Ii) ], produce [ id(I1) >= exp(I2) ].
   for (unsigned i = 0; i < I1->getNumOperands(); ++i) {
     if (ops1[i] == ops2[i]) continue;
     assert(isa<Instruction>(ops1[i]) && isa<Instruction>(ops2[i]) &&
-           "GVN same_vn: I1 and I2's operands are not Instructions but "
-           "also not the same.");
+           "GVN same_vn: now ops's should be instructions");
 
-    Instruction *I_ops1 = cast<Instruction>(ops1[i]);
-    Instruction *I_ops2 = cast<Instruction>(ops2[i]);
-
-    std::string id_I_ops1 = llvmberry::getVariable(*I_ops1),
-                id_I_ops2 = llvmberry::getVariable(*I_ops2);
-
-    // if (!is_same_vn(VN, I_ops1, I_ops2, true))
-    //   hints.appendToDescription("GVN hintgen_same_vn: I_ops1 and I_ops2 have different VNs.");
-    // assert(is_same_vn(VN, I_ops1, I_ops2, true) &&
-    //        "GVN same_vn: I_ops1 and I_ops2 have different VNs.");
-
-    // This generates [ id(I_ops1) >= exp(I_ops2) ] at POS.
-    bool hintgen = hintgen_same_vn(hints, VN, I_ops1, I_ops2, true, POS);
-    if (!hintgen) {
-      // hints.appendToDescription("GVN same_vn: Failed to generate hint for operands.");
-      delete Ii;
-      return false;
-    }
-
-    // Propagate [ exp(I_ops2) >= id(I_ops2) ] until POS.
-    // And trasitivity [ id(I_ops1) >= exp(I_ops2) >= id(I_ops2) ] at POS.
-    PROPAGATE(LESSDEF(RHS(id_I_ops2, Physical, SRC), VAR(id_I_ops2, Physical), SRC),
-                BOUNDS(INSTPOS(SRC, I_ops2), INSTPOS(SRC, POS)));
-    INFRULE(INSTPOS(SRC, POS),
-            llvmberry::ConsTransitivity::make(VAR(id_I_ops1, Physical),
-                                              RHS(id_I_ops2, Physical, SRC),
-                                              VAR(id_I_ops2, Physical)));
-
-    auto prev_expr =
-        llvmberry::ConsInsn::make(llvmberry::TyInstruction::make(*Ii));
-    Ii->setOperand(i, ops2[i]);
-    auto next_expr =
-        llvmberry::ConsInsn::make(llvmberry::TyInstruction::make(*Ii));
-
-    // ReplaceRhs to get [ id(I1) >= exp(Ii_new) ]
-    INFRULE(INSTPOS(SRC, POS),
-            llvmberry::ConsReplaceRhs::make(
-                REGISTER(id_I_ops1, Physical), VAL(I_ops2, Physical),
-                VAR(id_I1, Physical), prev_expr, next_expr));
+    // This generates [ id(I_ops1) >= id(I_ops2) ] at POS.
+    bool hintgen = hintgen_same_vn(hints, VN, cast<Instruction>(ops1[i]), cast<Instruction>(ops2[i]), true, POS);
+    if (!hintgen) return false;
   }
 
-  if (isI2Conc) {
-
-    // PROPAGATE [ exp(I2) >= I2 ].
-    PROPAGATE(LESSDEF(RHS(id_I2, Physical, SRC), VAR(id_I2, Physical), SRC),
-              BOUNDS(INSTPOS(SRC, I2), INSTPOS(SRC, POS)));
-
-    // Transitivity [ I1 >= exp(I2) >= I2 ].
-    INFRULE(INSTPOS(SRC, POS),
-            llvmberry::ConsTransitivity::make(VAR(id_I1, Physical),
-                                              RHS(id_I2, Physical, SRC),
-                                              VAR(id_I2, Physical)));
-  }
-
-  delete Ii;
+  // PROPAGATE [ exp(I2) >= I2 ].
+  if (isI2Conc)
+    PROPAGATE(LESSDEF(RHS(id_I2, Physical, SRC), VAR(id_I2), SRC), BOUNDS(INSTPOS(SRC, I2), INSTPOS(SRC, POS)));
 
   return true;
 }
 
-// Generate [ I1 >= I2 ] at POS, if I1 and I2 have the same VN.
-// Return true if successful.
-// (isI2Conc = true) when I2 is concrete. (I2 exists in the IR code.)
-// Otherwise, I2 is a clone produced during hint generation.
-
-// // TODO: fill this
-// bool hintgen_same_vn(llvmberry::CoreHint &hints, ValueTable &VN,
-//                      Instruction *I1, Instruction *I2, bool isI2Conc,
-//                      Instruction *POS) {
-//   return true;
-// }
-
-// new version of hintgen_prop_eq (will replace old v)
 // Search space to generate [ I >= repl ] at I,
 // from the assumption [ A = B ] at begin(BB_succ).
 // Note that repl is never Inst in this case.
 // A is always greater than B in this lexicographic order: (Inst >= Arg >= Const) * (VN value).
 // A can be a clone produced during hint generation. In some of those cases it doesn't have a VN.
-bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
-                    Value *A,
-                        Value *B, Instruction *I, Value *repl,
-                        const BasicBlock *BB, const BasicBlock *BB_succ) {
-  // GVN::propagateEquality doesn't propagate <const> == <const>
-  if (isa<Constant>(A) && isa<Constant>(B))
-    assert(false && "GVN propeq: Both A and B are constant!");
-
-  // Check order of A and B.
-  assert((isa<Instruction>(A) || isa<Constant>(B) ||
-          (isa<Argument>(A) && isa<Argument>(B))) &&
-         "GVN propeq: Unexpected pattern of A and B.");
-
-  // But useful hint is generated only when A is Inst.
-  if (!isa<Instruction>(A))
-    return false;
+bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN, Value *A,
+                    Value *B, Instruction *I, Value *repl, const BasicBlock *BB,
+                    const BasicBlock *BB_succ) {
+  // But useful hint is generated only when A is the only Inst.
+  if (!isa<Instruction>(A) || isa<Instruction>(B)) return false;
 
   Instruction *I_A = cast<Instruction>(A);
   std::string id_I_A = llvmberry::getVariable(*I_A);
   std::string id_I = llvmberry::getVariable(*I);
 
   // Base case
-  if (B == repl && is_same_vn(VN, I, I_A, true)) {
+  if (B == repl && is_same_vn(VN, I, I_A)) {
     // // Propagate [ A >= B (=repl) ] from begin(BB_succ) to I.
     auto repl_expr = llvmberry::TyExpr::make(*repl);
-    PROPAGATE(LESSDEF(VAR(id_I_A, Physical), repl_expr, SRC),
-              BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                         SRC, llvmberry::getBasicBlockIndex(BB_succ)),
-                     INSTPOS(SRC, I)));
+    PROPAGATE(LESSDEF(VAR(id_I_A), repl_expr, SRC), BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, llvmberry::getBasicBlockIndex(BB_succ)), INSTPOS(SRC, I)));
 
     // same_vn generates [ I >= I_A ] at I.
     bool hintgen = hintgen_same_vn(hints, VN, I, I_A, true, I);
-    if (!hintgen) {
-      // hints.appendToDescription("GVN propeq: hintgen_same_vn failed.");
-      return false;
-    }
-    // assert(hintgen && "GVN propeq: Base case same_vn failed!");
+    if (!hintgen) return false;
 
     // Transitivity [ id(I) >= exp(I_A) >= exp(B) (=repl) ] at I.
-    INFRULE(INSTPOS(SRC, I),
-            llvmberry::ConsTransitivity::make(
-                VAR(id_I, Physical), VAR(id_I_A, Physical), repl_expr));
+    INFRULE(INSTPOS(SRC, I), llvmberry::ConsTransitivity::make(VAR(id_I), VAR(id_I_A), repl_expr));
 
     return true;
   }
@@ -1926,12 +1790,9 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
   ConstantInt *FalseVal = ConstantInt::getFalse(BB->getContext());
   bool Bval;
 
-  if (TrueVal == B)
-    Bval = true;
-  else if (FalseVal == B)
-    Bval = false;
-  else
-    return false;
+  if (TrueVal == B) Bval = true;
+  else if (FalseVal == B) Bval = false;
+  else return false;
 
   std::shared_ptr<llvmberry::TyPosition> pos_BB_infr =
       llvmberry::TyPosition::make(SRC, BB_succ->getName(), BB->getName());
@@ -1952,16 +1813,11 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
     // Then for each x in {X, Y},
     // - Call hintgen_propeq(x).
 
-    PROPAGATE(LESSDEF(VAR(id_I_A, Physical), RHS(id_I_A, Physical, SRC), SRC),
-              BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
+    PROPAGATE(LESSDEF(VAR(id_I_A), RHS(id_I_A, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
 
-    INFRULE(pos_BB_infr,
-            llvmberry::ConsTransitivity::make(expr_true, VAR(id_I_A, Physical),
-                                              RHS(id_I_A, Physical, SRC)));
+    INFRULE(pos_BB_infr, llvmberry::ConsTransitivity::make(expr_true, VAR(id_I_A), RHS(id_I_A, Physical, SRC)));
 
-    INFRULE(pos_BB_infr, llvmberry::ConsAndTrueBool::make(
-                             llvmberry::TyValue::make(*I_A->getOperand(0)),
-                             llvmberry::TyValue::make(*I_A->getOperand(1))));
+    INFRULE(pos_BB_infr, llvmberry::ConsAndTrueBool::make(llvmberry::TyValue::make(*I_A->getOperand(0)), llvmberry::TyValue::make(*I_A->getOperand(1))));
 
     for (int i = 0; i <= 1; ++i) {
       if (isa<Instruction>(I_A->getOperand(i)))
@@ -1980,18 +1836,11 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
     // Then for each x in {X, Y},
     // - Call hintgen_propeq(x).
 
-    PROPAGATE(LESSDEF(VAR(id_I_A, Physical), RHS(id_I_A, Physical, SRC), SRC),
-              BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
+    PROPAGATE(LESSDEF(VAR(id_I_A), RHS(id_I_A, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
 
-    INFRULE(pos_BB_infr,
-            llvmberry::ConsTransitivity::make(expr_false,
-                                              VAR(id_I_A, Physical),
-                                              RHS(id_I_A, Physical, SRC)));
+    INFRULE(pos_BB_infr, llvmberry::ConsTransitivity::make(expr_false, VAR(id_I_A), RHS(id_I_A, Physical, SRC)));
 
-    INFRULE(pos_BB_infr, llvmberry::ConsOrFalse::make(
-                             llvmberry::TyValue::make(*I_A->getOperand(0)),
-                             llvmberry::TyValue::make(*I_A->getOperand(1)),
-                             llvmberry::ConsSize::make(1)));
+    INFRULE(pos_BB_infr, llvmberry::ConsOrFalse::make(llvmberry::TyValue::make(*I_A->getOperand(0)), llvmberry::TyValue::make(*I_A->getOperand(1)), llvmberry::ConsSize::make(1)));
 
     for (int i = 0; i <= 1; ++i) {
       if (isa<Instruction>(I_A->getOperand(i)))
@@ -2014,7 +1863,7 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
       Value *X = CI_A->getOperand(0), *Y = CI_A->getOperand(1);
 
       if (isa<Instruction>(X) != isa<Instruction>(Y)) {
-        // Let X be Instruction.
+        // Only one of them is Instr. Let X be the Instruction.
         if (isa<Instruction>(Y))
           std::swap(X, Y);
 
@@ -2025,22 +1874,14 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
         // - If only one of them is instruction Z, say another one W,
         //   Call propeq(Z, W)
 
-        PROPAGATE(LESSDEF(VAR(id_I_A, Physical), RHS(id_I_A, Physical, SRC), SRC),
-                  BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
-        INFRULE(pos_BB_infr,
-                llvmberry::ConsTransitivity::make(Bval ? expr_true : expr_false,
-                                                  VAR(id_I_A, Physical),
-                                                  RHS(id_I_A, Physical, SRC)));
+        PROPAGATE(LESSDEF(VAR(id_I_A), RHS(id_I_A, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
+        INFRULE(pos_BB_infr, llvmberry::ConsTransitivity::make(Bval ? expr_true : expr_false, VAR(id_I_A), RHS(id_I_A, Physical, SRC)));
 
-        if (Bval)
-          INFRULE(pos_BB_infr,
-                  llvmberry::ConsIcmpEqSame::make(*CI_A));
-        else
-          INFRULE(pos_BB_infr,
-                  llvmberry::ConsIcmpNeqSame::make(*CI_A));
+        if (Bval) INFRULE(pos_BB_infr, llvmberry::ConsIcmpEqSame::make(*CI_A));
+        else INFRULE(pos_BB_infr, llvmberry::ConsIcmpNeqSame::make(*CI_A));
 
-        if (hintgen_propeq(hints, VN, X, Y, I, repl, BB, BB_succ))
-          return true;
+        bool ret = hintgen_propeq(hints, VN, X, Y, I, repl, BB, BB_succ);
+        if (ret) return true;
       }
     } // If this fails, do nothing. We still have to check the ~pred case.
 
@@ -2052,8 +1893,7 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
 
     // Continue if (repl = ~B) holds.
     // ConstantInt *negB = Bval ? FalseVal : TrueVal;
-    if (repl != (Bval ? FalseVal : TrueVal))
-      return false;
+    if (repl != (Bval ? FalseVal : TrueVal)) return false;
 
     CmpInst *CI_A_inv = dyn_cast<CmpInst>(CI_A->clone());
     CI_A_inv->setPredicate(CI_A->getInversePredicate());
@@ -2072,21 +1912,15 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
 
     bool success = false;
 
-    if (is_same_vn(VN, I, CI_A_inv, false)) {
+    if (is_same_vn(VN, I, CI_A_inv)) {
       auto Bval_expr = Bval ? expr_true : expr_false;
       auto repl_expr = Bval ? expr_false : expr_true;
-      PROPAGATE(LESSDEF(VAR(id_I_A, Physical), RHS(id_I_A, Physical, SRC), SRC),
-                BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
-      INFRULE(pos_BB_infr,
-              llvmberry::ConsTransitivity::make(Bval_expr,
-                                                VAR(id_I_A, Physical),
-                                                RHS(id_I_A, Physical, SRC)));
+      PROPAGATE(LESSDEF(VAR(id_I_A), RHS(id_I_A, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, I_A), pos_BB_prop));
+      INFRULE(pos_BB_infr, llvmberry::ConsTransitivity::make(Bval_expr, VAR(id_I_A), RHS(id_I_A, Physical, SRC)));
 
-      INFRULE(pos_BB_infr,
-              llvmberry::ConsIcmpInverseRhs::make(*CI_A, Bval ? 1 : 0));
+      INFRULE(pos_BB_infr, llvmberry::ConsIcmpInverseRhs::make(*CI_A, Bval ? 1 : 0));
 
-      PROPAGATE(LESSDEF(INSN(*CI_A_inv), repl_expr, SRC),
-                BOUNDS(pos_BB_infr, INSTPOS(SRC, I)));
+      PROPAGATE(LESSDEF(INSN(*CI_A_inv), repl_expr, SRC), BOUNDS(pos_BB_infr, INSTPOS(SRC, I)));
 
       bool hintgen = hintgen_same_vn(hints, VN, I, CI_A_inv, false, I);
       if (!hintgen) {
@@ -2094,10 +1928,7 @@ bool hintgen_propeq(llvmberry::CoreHint &hints, ValueTable &VN,
         success = false;
       } else {
         // assert(hintgen && "GVN propeq: Cmp neg case failed!");
-
-        INFRULE(INSTPOS(SRC, I),
-                llvmberry::ConsTransitivity::make(VAR(id_I, Physical),
-                                                  INSN(*CI_A_inv), repl_expr));
+        INFRULE(INSTPOS(SRC, I), llvmberry::ConsTransitivity::make(VAR(id_I), INSN(*CI_A_inv), repl_expr));
 
         success = true;
       }
@@ -2134,9 +1965,7 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
            "GVN make_repl_inv: repl and I have different value numbers!");
     // This produces [ id(I) >= I_repl ] at I.
     bool hintgen = hintgen_same_vn(hints, VN, I, I_repl, true, I);
-    // if (!hintgen) {
-    //   hints.appendToDescription("GVN repl_inv: hintgen_same_vn failed.");
-    // }
+    // if (!hintgen) hints.appendToDescription("GVN repl_inv: hintgen_same_vn failed.");
 
     // We admit redundant readonly call cases.
     if ((I->getOpcode() == Instruction::Call) &&
@@ -2144,15 +1973,6 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
       hints.setReturnCodeToAdmitted();
     }
     // assert(hintgen && "GVN make_repl_inv: same_vn failed!");
-
-    // // Propagate [ exp(I_repl) >= id(I_repl) ] until I.
-    // // Transitivity [ id(I) >= exp(I_repl) >= id(I_repl) ] at I.
-    // PROPAGATE(LESSDEF(RHS(id_I_repl, Physical, SRC), VAR(id_I_repl, Physical), SRC),
-    //           BOUNDS(INSTPOS(SRC, I_repl), INSTPOS(SRC, I)));
-    // INFRULE(INSTPOS(SRC, I),
-    //         llvmberry::ConsTransitivity::make(VAR(id_I, Physical),
-    //                                           RHS(id_I_repl, Physical, SRC),
-    //                                           VAR(id_I_repl, Physical)));
   } else {
     // If repl is not an instruction, then it's always from propagateEquality.
     const BasicBlock *BB_succ = llvmberry::PassDictionary::GetInstance()
@@ -2206,35 +2026,12 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
 
     // // 1. Propagate [ exp(condI) = id(condI) ] until begin(BB_succ).
     // // 2. Transitivity [ exp(condI) = CI_cond ] at begin(BB_succ).
-    // PROPAGATE(
-    //           LESSDEF(VAR(id_condI, Physical), RHS(id_condI, Physical, SRC), SRC),
-    //           BOUNDS(INSTPOS(SRC, condI),
-    //                  llvmberry::TyPosition::make_end_of_block(SRC, *BB_pred)));
-    // PROPAGATE(
-    //           LESSDEF(RHS(id_condI, Physical, SRC), VAR(id_condI, Physical), SRC),
-    //           BOUNDS(INSTPOS(SRC, condI),
-    //                  llvmberry::TyPosition::make_end_of_block(SRC, *BB_pred)));
-
-    // INFRULE(
-    //         llvmberry::TyPosition::make(SRC, BB_succ->getName(), BB_pred->getName()),
-    //         llvmberry::ConsTransitivity::make(RHS(id_condI, Physical, SRC),
-    //                                           VAR(id_condI, Physical),
-    //                                           llvmberry::TyExpr::make(*CI_cond)));
-    // INFRULE(
-    //         llvmberry::TyPosition::make(SRC, BB_succ->getName(), BB_pred->getName()),
-    //         llvmberry::ConsTransitivity::make(llvmberry::TyExpr::make(*CI_cond),
-    //                                           VAR(id_condI, Physical),
-    //                                           RHS(id_condI, Physical, SRC)));
 
     // hintgen_propeq generates hints to infer [ id(I) >= repl ] at I,
     // assuming [ exp(condI) = CI_cond ] at begin(BB_succ).
     // [ id(condI) = CI_cond ] is generated by the validator.
     bool hintgen = hintgen_propeq(hints, VN, condI, CI_cond, I, repl,
                                   BB_pred, BB_succ);
-    // assert(hintgen && "GVN make_repl_inv: hintgen_propeq failed!");
-    // if (!hintgen) {
-    //   hints.appendToDescription("GVN repl_inv: hintgen_propeq failed.");
-    // }
   }
 
   return LESSDEF(VAR(id_I, Physical), llvmberry::TyExpr::make(*repl), SRC);

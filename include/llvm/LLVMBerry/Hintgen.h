@@ -66,7 +66,7 @@
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define INSNWITHGHOST(x, y)                                                    \
   std::shared_ptr<llvmberry::TyExpr>(new llvmberry::TyExpr(                    \
-      std::shared_ptr<llvmberry::TyExpr_i>(new llvmberry::ConsInsn(            \
+      std::shared_ptr<llvmberry::TyExprImpl>(new llvmberry::ConsInsn(            \
           llvmberry::instructionWithGhostIdxs(x, y)))))
 #define INSNALIGNONE(I)                                                        \
   llvmberry::ConsInsn::make(std::shared_ptr<llvmberry::TyInstruction>          \
@@ -119,10 +119,7 @@
 #define SRC llvmberry::Source
 #define TGT llvmberry::Target
 
-#define INDICESDICT data.get<llvmberry::ArgForIndices>()
-#define MEM2REGDICT data.get<llvmberry::ArgForMem2Reg>()
 #define DICTMAP(dict, key) dict.get()->find(key)->second
-
 #define UNDEF(I) llvm::UndefValue::get(I->getType())
 #define UNDEFAI(I) llvm::UndefValue::get(AI->getAllocatedType())
 
@@ -242,8 +239,7 @@ bool hasBitcastOrGEP(llvm::AllocaInst* AI);
 void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
                                 TyScope scope);
 
-std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveDestSet
-  (llvm::Instruction* I, Dictionary &data, CoreHint &hints);
+std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet (llvm::Instruction* I, Dictionary &data, CoreHint &hints);
 
 void saveInstrIndices(llvm::Function* F, Dictionary &data);
 
@@ -251,11 +247,17 @@ void saveUseIndices(llvm::Function* F, unsigned opCode, Dictionary &data);
 
 void eraseInstrOfUseIndices(llvm::Instruction* key, llvm::Instruction* I, Dictionary &data);
 
-void propagateFromAISIPhiToLoadPhiSI (unsigned key, llvm::Instruction *To, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
+void propagateFromInsnToLoad (unsigned key, llvm::LoadInst *LI, Dictionary &data, CoreHint &hints);
+
+void propagateFromInsnToPhi (unsigned key, llvm::PHINode *Phi, llvm::BasicBlock* prev, Dictionary &data, CoreHint &hints);
+
+void checkSIOperand (unsigned key, llvm::StoreInst *SI, Dictionary &data, CoreHint &hints);
 
 void propagateLoadInstToUse(llvm::LoadInst *LI, llvm::Value *V, std::string In, Dictionary &data, CoreHint &hints, bool checkReplace=false);
 
-void propagateLoadGhostValueForm(llvm::Instruction* From, llvm::Instruction* To, llvm::Value* value, Dictionary &data, CoreHint &hints, bool checkReplace=false);
+void propagateLoadGhostValueFromSIToLI(llvm::StoreInst* SI, llvm::LoadInst* LI, llvm::Value* value, Dictionary &data, CoreHint &hints, bool checkReplace=false);
+
+void propagateLoadGhostValueFromAIToLI(llvm::AllocaInst* AI, llvm::LoadInst* LI, llvm::Value* value, Dictionary &data, CoreHint &hints);
 
 void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data);
 
