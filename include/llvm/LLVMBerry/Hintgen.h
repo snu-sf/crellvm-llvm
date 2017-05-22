@@ -19,9 +19,8 @@
   hints.addCommand(llvmberry::ConsPropagate::make(what, where),                \
                    llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
 
-#define PHIPOS(SCOPE, PN, prevI)                                               \
-  llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(),                \
-                              prevI->getParent()->getName())
+#define PHIPOS(SCOPE, PHIBlock, prevBlock)                                     \
+  llvmberry::TyPosition::make(SCOPE, PHIBlock, prevBlock)                           
 #define PHIPOSJustPhi(SCOPE, PN)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
@@ -98,6 +97,7 @@
 // VALTYPE, TYPEOF macros make TyValueType object
 #define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
 #define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
+#define TYPEOFAI(I) llvmberry::TyValueType::make(*((AI)->getAllocatedType()))
 
 // BINOP, FBINOP, BINARYINSN make TyInstruction object
 #define BINOP(bop, type, val1, val2)                                           \
@@ -260,10 +260,7 @@ void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data);
 
 void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data);
 
-void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal, llvm::Instruction* I, Dictionary &data);
-
 void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints);
-
 
 }
 
