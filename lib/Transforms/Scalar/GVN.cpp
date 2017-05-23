@@ -1673,7 +1673,8 @@ struct GVNQuery {
 
   bool operator==(const GVNQuery &q2) const {
     // return (vn == q2.vn && src == q2.src && tgt == q2.tgt && pos == q2.pos);
-    return false;
+    return (vn == q2.vn && pos == q2.pos);
+    // return false;
   }
   bool operator<(const GVNQuery &q2) const {
     return std::make_pair(std::make_pair(src, tgt), pos) <
@@ -2087,6 +2088,8 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
 	   << *q.pos << "\n";
     worklist.pop_back();
 
+    if (q.tgt == I) q.tgt = repl;
+
     Instruction *Is = hintgenPropEq(hints, pass, VN, true, q.pos, q.vn, q.src, q.is_src_clone);
     Instruction *It = hintgenPropEq(hints, pass, VN, false, q.pos, q.vn, q.tgt, q.is_tgt_clone);
     q.src = Is;
@@ -2165,7 +2168,10 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           if (visited.insert(q_new)) {
             dbgs() << "  phi push back \n";
             worklist.push_back(q_new);
-          } else delete cl_new;
+          } else {
+            dbgs() << "  visited1\n";
+            delete cl_new;
+          }
         }
         is_up_phi = true;
       }
@@ -2219,6 +2225,8 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           if (visited.insert(q_new)) {
             dbgs() << "insert new query\n";
             worklist.push_back(q_new);
+          } else {
+            dbgs() << "visited2\n";
           }
         }
       }
