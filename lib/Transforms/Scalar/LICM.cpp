@@ -605,6 +605,15 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
   if (!I.getName().empty()) New->setName(I.getName() + ".le");
 
   INTRUDE(CAPTURE(New), {
+    auto &pdic = llvmberry::PassDictionary::GetInstance();
+    if (pdic.get<llvmberry::ArgForHoistOrSinkCond>()->useAA) {
+      llvmberry::ValidationUnit::GetInstance()->setDescription(
+          "Cannot create a new instruction while sinking (LICM) "
+          "is done because alias analysis reported"
+          "that is safe.");
+      hints.setReturnCodeToAdmitted();
+      return;
+    }
     llvmberry::insertSrcNopAtTgtI(hints, New);
     llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*New), llvmberry::Physical);
   });
@@ -731,7 +740,15 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
     llvmberry::ValidationUnit::Begin("licm.sink.replaceinst",
                                      I.getParent()->getParent(),
                                      true);
-    INTRUDE(CAPTURE(&I, New, PN), {
+    INTRUDE(CAPTURE(&I, New, PN, ExitBlock), {
+      auto &pdic = llvmberry::PassDictionary::GetInstance();
+      if (pdic.get<llvmberry::ArgForHoistOrSinkCond>()->useAA) {
+        llvmberry::ValidationUnit::GetInstance()->setDescription(
+            "Cannot replace an instruction after sinking (LICM) "
+            "because alias analysis reported that is safe.");
+        hints.setReturnCodeToAdmitted();
+        return;
+      }
       /** 
        * loop:
        *   X = A + B
@@ -779,7 +796,8 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
            ++OI) {
         const Value *Aprime = OI->get();
         if (const Instruction *AprimeInst = dyn_cast<Instruction>(Aprime)) {
-          if (const PHINode *PHI_AprimeInst = dyn_cast<PHINode>(AprimeInst)) {
+          const PHINode *PHI_AprimeInst = dyn_cast<PHINode>(AprimeInst);
+          if (PHI_AprimeInst && (PHI_AprimeInst->getParent() == ExitBlock)) {
             const Value *A = PHI_AprimeInst->getIncomingValue(0);
             llvmberry::propagateLessdef(hints, PHI_AprimeInst, Y, Aprime, A, TGT);
             // Apply A >= Prev(A) >= A'
