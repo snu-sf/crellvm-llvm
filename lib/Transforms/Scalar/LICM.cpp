@@ -32,6 +32,7 @@
 
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/AliasSetTracker.h"
 #include "llvm/Analysis/ConstantFolding.h"
@@ -78,7 +79,7 @@ DisablePromotion("disable-licm-promotion", cl::Hidden,
 
 static bool inSubLoop(BasicBlock *BB, Loop *CurLoop, LoopInfo *LI);
 static bool isNotUsedInLoop(const Instruction &I, const Loop *CurLoop);
-static bool hoist(Instruction &I, BasicBlock *Preheader);
+static bool hoist(Instruction &I, BasicBlock *Preheader, const Loop *CurLoop);
 static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
                  const Loop *CurLoop, AliasSetTracker *CurAST );
 static bool isGuaranteedToExecute(const Instruction &Inst,
@@ -351,9 +352,11 @@ bool llvm::sinkRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
     // outside of the loop.  In this case, it doesn't even matter if the
     // operands of the instruction are loop invariant.
     //
+    outs() << "CHECKING sinking " << I << "\n";
     if (isNotUsedInLoop(I, CurLoop) &&
         canSinkOrHoistInst(I, AA, DT, TLI, CurLoop, CurAST, SafetyInfo)) {
       ++II;
+      outs() << "I'll sink " << I << "\n";
       Changed |= sink(I, LI, DT, CurLoop, CurAST);
     }
   }
@@ -391,6 +394,10 @@ bool llvm::hoistRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
                                        true);
       if (Constant *C = ConstantFoldInstruction(
               &I, I.getModule()->getDataLayout(), TLI)) {
+        INTRUDE(NOCAPTURE, {
+          hints.setDescription("We do not deal with ConstantFold");
+          hints.setReturnCodeToAdmitted();
+        });
         DEBUG(dbgs() << "LICM folding inst: " << I << "  --> " << *C << '\n');
         CurAST->copyValue(&I, C);
         CurAST->deleteValue(&I);
@@ -409,7 +416,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
           canSinkOrHoistInst(I, AA, DT, TLI, CurLoop, CurAST, SafetyInfo) &&
           isSafeToExecuteUnconditionally(I, DT, TLI, CurLoop, SafetyInfo,
                                  CurLoop->getLoopPreheader()->getTerminator()))
-        Changed |= hoist(I, CurLoop->getLoopPreheader());
+        Changed |= hoist(I, CurLoop->getLoopPreheader(), CurLoop);
     }
 
   const std::vector<DomTreeNode*> &Children = N->getChildren();
@@ -507,6 +514,7 @@ bool canSinkOrHoistInst(Instruction &I, AliasAnalysis *AA, DominatorTree *DT,
       !isa<InsertValueInst>(I))
     return false;
 
+  outs() << "Ok, preliminary conditions are met.. : " << I << "\n";
   // TODO: Plumb the context instruction through to make hoisting and sinking
   // more powerful. Hoisting of loads already works due to the special casing
   // above. 
@@ -569,11 +577,14 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
   llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.clone",
                                    ExitBlock.getParent(),
                                    true);
+
   Instruction *New = I.clone();
   ExitBlock.getInstList().insert(ExitBlock.getFirstInsertionPt(), New);
   if (!I.getName().empty()) New->setName(I.getName() + ".le");
+
   INTRUDE(CAPTURE(New), {
     llvmberry::insertSrcNopAtTgtI(hints, New);
+    llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*New), llvmberry::Physical);
   });
   llvmberry::ValidationUnit::End();
 
@@ -589,7 +600,7 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
     if (Instruction *OInst = dyn_cast<Instruction>(*OI))
       if (Loop *OLoop = LI->getLoopFor(OInst->getParent()))
         if (!OLoop->contains(&PN)) {
-          llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.phi",
+          llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.phicreate",
                                            ExitBlock.getParent(),
                                            true);
           PHINode *OpPN =
@@ -597,10 +608,31 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
                               OInst->getName() + ".lcssa", ExitBlock.begin());
           for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i)
             OpPN->addIncoming(OInst, PN.getIncomingBlock(i));
+
           INTRUDE(CAPTURE(OpPN), {
             llvmberry::insertSrcNopAtTgtI(hints, OpPN);
+            llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*OpPN), llvmberry::Physical);
           });
-          llvmberry::generateHintForReplaceAllUsesWithAtTgt(dyn_cast<Instruction>(*OI), OpPN);
+          llvmberry::ValidationUnit::End();
+
+          llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.phireplace",
+                                           ExitBlock.getParent(),
+                                           true);
+          INTRUDE(CAPTURE(OpPN, New, OInst), {
+            // Propagating undef >= OInst enables creation of Prev(OInst) >= Phys(OInst)
+            // and Phys(OInst) >= Prev(OInst).
+            PROPAGATE(LESSDEF(EXPR(UndefValue::get(OInst->getType())), EXPR(OInst), SRC),
+                      BOUNDS(INSTPOS(SRC, OInst), INSTPOS(SRC, New)));
+            // Phys(OpPN) >= Prev(OInst) >= Phys(OInst)
+            auto BBName = OpPN->getParent()->getName();
+            for (unsigned i = 0; i < OpPN->getNumIncomingValues(); i++) {
+              auto PrevBBName = OpPN->getIncomingBlock(i)->getName();
+              INFRULE(llvmberry::TyPosition::make(SRC, BBName, PrevBBName),
+                      llvmberry::ConsTransitivity::make(EXPR(OInst, Physical), EXPR(OInst, Previous), EXPR(OpPN)));
+            }
+          });
+          llvmberry::generateHintForReplaceAllUsesWith(OInst, OpPN, "", INSTPOS(SRC, OpPN),
+                        [&New](const llvm::Value *V) { return V == New; });
           *OI = OpPN;
           llvmberry::ValidationUnit::End();
         }
@@ -677,8 +709,72 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
     llvmberry::ValidationUnit::Begin("licm.sink.replaceinst",
                                      I.getParent()->getParent(),
                                      true);
+    INTRUDE(CAPTURE(&I, New, PN), {
+      /** 
+       * loop:
+       *   X = A + B
+       *   ...
+       * exit:
+       *   X' = PHI(X)
+       *   A' = PHI(A) // may not exist
+       *   B' = PHI(B) // may not exist
+       *   Y = A' + B'
+       *   use(X') --> use(Y)
+       *
+       * Proof strategy : show
+       * X' >= X(prev) >= A + B >= A' + B' >= Y
+       */
+      const Instruction *X = &I;
+      const PHINode *Xprime = PN;
+      const Instruction *Y = New;
+      auto XInst = llvmberry::ConsInsn::make(*X);
+      auto YInst = llvmberry::ConsInsn::make(*Y);
+      auto YPos = INSTPOS(TGT, Y);
+      // 1. X' >= Prev(X) >= X
+      //    Note that Prev(X) >= X is automatically generated by validator
+      llvmberry::propagateLessdef(hints, Xprime, Y, X, Xprime, TGT);
+      auto BBName = Xprime->getParent()->getName();
+      for (unsigned i = 0; i < Xprime->getNumIncomingValues(); i++) {
+        auto PrevBBName = Xprime->getIncomingBlock(i)->getName();
+        INFRULE(llvmberry::TyPosition::make(TGT, BBName, PrevBBName),
+                llvmberry::ConsTransitivityTgt::make(EXPR(Xprime), EXPR(X, Previous), EXPR(X)));
+      }
+      // 2. X >= A + B
+      llvmberry::propagateInstruction(hints, X, Y, TGT, true); // note : if not true, it propagates A + B >= X.
+      INFRULE(YPos, llvmberry::ConsTransitivityTgt::make(EXPR(Xprime), EXPR(X), XInst));
+      // 3. A >= Prev(A') >= A', B >= Prev(B') >= B'
+      for (User::const_op_iterator OI = Y->op_begin(), OE = Y->op_end(); OI != OE;
+           ++OI) {
+        const Value *Aprime = OI->get();
+        if (const Instruction *AprimeInst = dyn_cast<Instruction>(Aprime)) {
+          if (const PHINode *PHI_AprimeInst = dyn_cast<PHINode>(AprimeInst)) {
+            const Value *A = PHI_AprimeInst->getIncomingValue(0);
+            llvmberry::propagateLessdef(hints, PHI_AprimeInst, Y, Aprime, A, TGT);
+            // Apply A >= Prev(A) >= A'
+            //    Note that A >= Prev(A) is automatically generated by validator
+            auto BBName = PHI_AprimeInst->getParent()->getName();
+            for (unsigned i = 0; i < PHI_AprimeInst->getNumIncomingValues(); i++) {
+              auto PrevBBName = PHI_AprimeInst->getIncomingBlock(i)->getName();
+              INFRULE(llvmberry::TyPosition::make(TGT, BBName, PrevBBName),
+                      llvmberry::ConsTransitivityTgt::make(EXPR(A), EXPR(A, Previous), EXPR(Aprime)));
+            }
+          } else {
+            INFRULE(YPos, llvmberry::ConsIntroEq::make(VAL(Aprime)));
+          }
+        } else {
+          INFRULE(YPos, llvmberry::ConsIntroEq::make(VAL(Aprime)));
+        }
+      }
+      INFRULE(YPos, llvmberry::ConsTransitivityTgt::make(EXPR(Xprime), XInst, YInst));
+      // 4. A' + B' >= Y  <-- created by postcond!
+      INFRULE(YPos, llvmberry::ConsTransitivityTgt::make(EXPR(Xprime), YInst, EXPR(Y)));
+    });
+    llvmberry::generateHintForReplaceAllUsesWithAtTgt(PN, New, INSTPOS(TGT, New));
+
     PN->replaceAllUsesWith(New);
+
     llvmberry::ValidationUnit::End();
+
     llvmberry::ValidationUnit::Begin("licm.sink.eraseoldphi",
                                      I.getParent()->getParent(),
                                      true);
@@ -700,14 +796,69 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
 /// When an instruction is found to only use loop invariant operands that
 /// is safe to hoist, this instruction is called to do the dirty work.
 ///
-static bool hoist(Instruction &I, BasicBlock *Preheader) {
+static bool hoist(Instruction &I, BasicBlock *Preheader, const Loop *CurLoop) {
   DEBUG(dbgs() << "LICM hoisting to " << Preheader->getName() << ": "
         << I << "\n");
   // Move the new node to the Preheader, before its terminator.
   llvmberry::ValidationUnit::Begin("licm.hoist",
                                    I.getParent()->getParent(),
                                    true);
+  INTRUDE(CAPTURE(&I, Preheader, CurLoop), {
+    auto Iname = llvmberry::getVariable(I);
+
+    // Propagate maydiffs from header to any reachable instructions,
+    // except the instructions dominated by I.
+    SmallSet<BasicBlock*, 16> Visited;
+    SmallVector<BasicBlock*, 16> BBStack;
+    BBStack.push_back(CurLoop->getHeader());
+    Visited.insert(CurLoop->getHeader());
+    // DFS!
+    while (!BBStack.empty()) {
+      BasicBlock *CurBB = BBStack.back();
+      Visited.insert(CurBB);
+      BBStack.pop_back();
+
+      if (CurBB == I.getParent()) {
+        auto PropagateBegPos = llvmberry::TyPosition::make_start_of_block(TGT, CurBB->getName());//INSTPOS(TGT, CurBB->begin());
+        auto PropagateEndPos = INSTPOS(SRC, &I); // SRC only works. why??
+        PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(PropagateBegPos, PropagateEndPos));
+        PROPAGATE(MAYDIFF(Iname, Previous), BOUNDS(PropagateBegPos, PropagateEndPos));
+        continue;
+      } else {
+        TerminatorInst *TI = CurBB->getTerminator();
+        auto PropagateEndPos = INSTPOS(TGT, TI);
+        //for (auto preditr = pred_begin(CurBB), predied = pred_end(CurBB); preditr != predied; preditr++) {
+        //  BasicBlock *PredBB = *preditr;
+        //  if (PredBB == CurBB) continue;
+
+          //auto PropagateBegPos = INSTPOS(TGT, PredBB->getTerminator());
+          auto PropagateBegPos = llvmberry::TyPosition::make_start_of_block(TGT, CurBB->getName());
+          PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(PropagateBegPos, PropagateEndPos));
+          PROPAGATE(MAYDIFF(Iname, Previous), BOUNDS(PropagateBegPos, PropagateEndPos));
+        //}
+        for (unsigned i = 0; i < TI->getNumSuccessors(); i++) {
+          BasicBlock *NextBB = TI->getSuccessor(i);
+          if (Visited.count(NextBB) != 0)
+            continue;
+          BBStack.push_back(NextBB);
+          Visited.insert(NextBB);
+        }
+      }
+    }
+    //std::shared_ptr<llvmberry::TyPosition> PropagateEndPos = INSTPOS(SRC, &I);
+    //assert(PropagateEndPos);
+    //std::shared_ptr<llvmberry::TyPosition> PropagateBegPos = INSTPOS(TGT, CurLoop->getHeader()->begin());//INSTPOS(TGT, Preheader->getTerminator());
+
+    PROPAGATE(LESSDEF(RHS(Iname, Physical, TGT), VAR(I), TGT), BOUNDS(INSTPOS(TGT, Preheader->getTerminator()), INSTPOS(TGT, &I)));
+    //llvmberry::propagateInstruction(hints, Preheader->getTerminator(), &I, TGT);
+    insertTgtNopAtSrcI(hints, &I);
+    insertSrcNopAtTgtI(hints, Preheader->getTerminator());
+  });
   I.moveBefore(Preheader->getTerminator());
+  INTRUDE(CAPTURE(&I, Preheader, CurLoop), {
+    auto Iname = llvmberry::getVariable(I);
+    PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(INSTPOS(TGT, &I), INSTPOS(TGT, Preheader->getTerminator())));
+  });
   llvmberry::ValidationUnit::End();
 
   if (isa<LoadInst>(I)) ++NumMovedLoads;
@@ -735,7 +886,7 @@ static bool isGuaranteedToExecute(const Instruction &Inst,
                                   const DominatorTree *DT,
                                   const Loop *CurLoop,
                                   const LICMSafetyInfo * SafetyInfo) {
-
+  outs() << "isGuaranteedToExecute() : checking " << Inst << "\n";
   // We have to check to make sure that the instruction dominates all
   // of the exit blocks.  If it doesn't, then there is a path out of the loop
   // which does not execute this instruction, so we can't hoist it.
@@ -748,11 +899,13 @@ static bool isGuaranteedToExecute(const Instruction &Inst,
     // Inst.
     return !SafetyInfo->HeaderMayThrow;
 
+  outs() << "\tPassed 1\n";
   // Somewhere in this loop there is an instruction which may throw and make us
   // exit the loop.
   if (SafetyInfo->MayThrow)
     return false;
 
+  outs() << "\tPassed 2\n";
   // Get the exit blocks for the current loop.
   SmallVector<BasicBlock*, 8> ExitBlocks;
   CurLoop->getExitBlocks(ExitBlocks);
@@ -762,11 +915,13 @@ static bool isGuaranteedToExecute(const Instruction &Inst,
     if (!DT->dominates(Inst.getParent(), ExitBlocks[i]))
       return false;
 
+  outs() << "\tPassed 3\n";
   // As a degenerate case, if the loop is statically infinite then we haven't
   // proven anything since there are no exit blocks.
   if (ExitBlocks.empty())
     return false;
 
+  outs() << "\tPassed All\n";
   return true;
 }
 
@@ -1011,6 +1166,13 @@ bool llvm::promoteLoopAccessesToScalars(AliasSet &AS,
                         PointerMustAliases, ExitBlocks,
                         InsertPts, PIC, *CurAST, *LI, DL, Alignment, AATags);
 
+  llvmberry::ValidationUnit::Begin("licm.promoteloopaccessestoscalars",
+                                   Preheader->getParent(), true);
+  INTRUDE(NOCAPTURE, {
+    hints.setDescription("We do not deal with promoteLoopAccessToScalars because it uses AA");
+    hints.setReturnCodeToAdmitted();
+  });
+
   // Set up the preheader to have a definition of the value.  It is the live-out
   // value from the preheader that uses in the loop will use.
   LoadInst *PreheaderLoad =
@@ -1028,6 +1190,8 @@ bool llvm::promoteLoopAccessesToScalars(AliasSet &AS,
   // If the SSAUpdater didn't use the load in the preheader, just zap it now.
   if (PreheaderLoad->use_empty())
     PreheaderLoad->eraseFromParent();
+
+  llvmberry::ValidationUnit::End();
 
   return Changed;
 }
