@@ -423,7 +423,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
         if (ConstantExpr* ce = dyn_cast<ConstantExpr>(ReplVal)) {
           INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndefConstGEPorCast::make(TYPEOF(ce), llvmberry::TyConstant::make(*ce)));
         } else if (Constant* c = dyn_cast<Constant>(ReplVal)) {
-          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), lvmberry::ConsLessthanUndefConst::make(llvmberry::TyConstant::make(*c))); }
+          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndefConst::make(llvmberry::TyConstant::make(*c))); }
 
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
