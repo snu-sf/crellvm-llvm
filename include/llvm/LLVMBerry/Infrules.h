@@ -807,6 +807,15 @@ private:
   std::shared_ptr<TyExpr> x;
 };
 
+struct TyIntroEqTgt {
+public:
+  TyIntroEqTgt(std::shared_ptr<TyExpr> _x);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyExpr> x;
+};
+
 struct TyInttoptrPtrtoint {
 public:
   TyInttoptrPtrtoint(std::shared_ptr<TyValue> _src,
@@ -1737,6 +1746,17 @@ public:
 
 private:
   std::shared_ptr<TyIntroEq> intro_eq;
+};
+
+struct ConsIntroEqTgt : public TyInfrule {
+public:
+  ConsIntroEqTgt(std::shared_ptr<TyIntroEqTgt> _intro_eq_tgt);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValue> _x);
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyExpr> _x);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyIntroEqTgt> intro_eq_tgt;
 };
 
 struct ConsXorCommutativeTgt : public TyInfrule {

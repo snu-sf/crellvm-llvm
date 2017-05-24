@@ -33,7 +33,9 @@ enum DictKeys {
   ArgForMem2Reg,
   // GVN
   ArgForGVNReplace,
-  ArgForGVNPRE
+  ArgForGVNPRE,
+  // LICM
+  ArgForHoistOrSinkCond
 };
 
 /*
@@ -260,6 +262,15 @@ struct GVNPREArg {
   std::map<const llvm::BasicBlock *, const llvm::BasicBlock *> prevLeaderBBs;
 };
 DEFINE_TRAITS(ArgForGVNPRE, GVNPREArg);
+
+// lib/Transforms/Scalar/LICM.cpp : to record whether sinking of hoisting
+// an instruction can be validated
+struct LICMHoistOrSinkCond {
+public:
+  LICMHoistOrSinkCond();
+  bool useAA;
+};
+DEFINE_TRAITS(ArgForHoistOrSinkCond, LICMHoistOrSinkCond);
 
 class Dictionary {
 private:
