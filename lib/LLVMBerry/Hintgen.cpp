@@ -7,6 +7,7 @@
 #include "llvm/LLVMBerry/InstCombine/InfrulesCompares.h"
 #include "llvm/LLVMBerry/InstCombine/InfrulesSelect.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace llvmberry {
 // insert nop at tgt where I is at src
@@ -331,6 +332,16 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
                                             EXPR(replaceTo),
                                             VAR(user)));
         } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+          if (!TyInstruction::isSupported(*user_I)) {
+            std::string str;
+            llvm::raw_string_ostream rso(str);
+            rso << "\ngenerateHintForReplaceAllUsesWith : Unsupported instruction";
+
+            hints.appendToDescription(rso.str());
+            if (hints.getReturnCode() == CoreHint::ACTUAL)
+              hints.setReturnCodeToAdmitted();
+            return;
+          }
           INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
                   ConsSubstitute::make(REGISTER(to_rem),
                                        ID(ghostvar, Ghost), INSN(*user_I)));
@@ -389,6 +400,16 @@ void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
                                           EXPR(replaceTo, Previous),
                                           VAR(user)));
       } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+        if (!TyInstruction::isSupported(*user_I)) {
+          std::string str;
+          llvm::raw_string_ostream rso(str);
+          rso << "\ngenerateHintForReplaceAllUsesWithAtTgt : Unsupported instruction";
+
+          hints.appendToDescription(rso.str());
+          if (hints.getReturnCode() == CoreHint::ACTUAL)
+            hints.setReturnCodeToAdmitted();
+          return;
+        }
         llvm::Instruction *user_I_copy = user_I->clone();
         INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
                 ConsSubstituteTgt::make(REGISTER(I_var),

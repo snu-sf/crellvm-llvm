@@ -362,11 +362,9 @@ bool llvm::sinkRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
     // outside of the loop.  In this case, it doesn't even matter if the
     // operands of the instruction are loop invariant.
     //
-    outs() << "CHECKING sinking " << I << "\n";
     if (isNotUsedInLoop(I, CurLoop) &&
         canSinkOrHoistInst(I, AA, DT, TLI, CurLoop, CurAST, SafetyInfo)) {
       ++II;
-      outs() << "I'll sink " << I << "\n";
       Changed |= sink(I, LI, DT, CurLoop, CurAST);
     }
   }
@@ -536,7 +534,6 @@ bool canSinkOrHoistInst(Instruction &I, AliasAnalysis *AA, DominatorTree *DT,
       !isa<InsertValueInst>(I))
     return false;
 
-  outs() << "Ok, preliminary conditions are met.. : " << I << "\n";
   // TODO: Plumb the context instruction through to make hoisting and sinking
   // more powerful. Hoisting of loads already works due to the special casing
   // above. 
@@ -766,6 +763,17 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
       const Instruction *X = &I;
       const PHINode *Xprime = PN;
       const Instruction *Y = New;
+      if (!llvmberry::TyInstruction::isSupported(*X) ||
+          !llvmberry::TyInstruction::isSupported(*Y)) {
+        std::string str;
+        llvm::raw_string_ostream rso(str);
+        rso << "\nUnsupported instruction!";
+
+        hints.appendToDescription(rso.str());
+        if (hints.getReturnCode() == llvmberry::CoreHint::ACTUAL)
+          hints.setReturnCodeToAdmitted();
+        return;
+      }
       auto XInst = llvmberry::ConsInsn::make(*X);
       auto YInst = llvmberry::ConsInsn::make(*Y);
       auto YPos = INSTPOS(TGT, Y);
@@ -888,15 +896,10 @@ static bool hoist(Instruction &I, BasicBlock *Preheader, const Loop *CurLoop) {
       } else {
         TerminatorInst *TI = CurBB->getTerminator();
         auto PropagateEndPos = INSTPOS(TGT, TI);
-        //for (auto preditr = pred_begin(CurBB), predied = pred_end(CurBB); preditr != predied; preditr++) {
-        //  BasicBlock *PredBB = *preditr;
-        //  if (PredBB == CurBB) continue;
+        auto PropagateBegPos = llvmberry::TyPosition::make_start_of_block(TGT, CurBB->getName());
+        PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(PropagateBegPos, PropagateEndPos));
+        PROPAGATE(MAYDIFF(Iname, Previous), BOUNDS(PropagateBegPos, PropagateEndPos));
 
-          //auto PropagateBegPos = INSTPOS(TGT, PredBB->getTerminator());
-          auto PropagateBegPos = llvmberry::TyPosition::make_start_of_block(TGT, CurBB->getName());
-          PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(PropagateBegPos, PropagateEndPos));
-          PROPAGATE(MAYDIFF(Iname, Previous), BOUNDS(PropagateBegPos, PropagateEndPos));
-        //}
         for (unsigned i = 0; i < TI->getNumSuccessors(); i++) {
           BasicBlock *NextBB = TI->getSuccessor(i);
           if (Visited.count(NextBB) != 0)
@@ -906,12 +909,8 @@ static bool hoist(Instruction &I, BasicBlock *Preheader, const Loop *CurLoop) {
         }
       }
     }
-    //std::shared_ptr<llvmberry::TyPosition> PropagateEndPos = INSTPOS(SRC, &I);
-    //assert(PropagateEndPos);
-    //std::shared_ptr<llvmberry::TyPosition> PropagateBegPos = INSTPOS(TGT, CurLoop->getHeader()->begin());//INSTPOS(TGT, Preheader->getTerminator());
 
     PROPAGATE(LESSDEF(RHS(Iname, Physical, TGT), VAR(I), TGT), BOUNDS(INSTPOS(TGT, Preheader->getTerminator()), INSTPOS(TGT, &I)));
-    //llvmberry::propagateInstruction(hints, Preheader->getTerminator(), &I, TGT);
     insertTgtNopAtSrcI(hints, &I);
     insertSrcNopAtTgtI(hints, Preheader->getTerminator());
   });
@@ -947,7 +946,6 @@ static bool isGuaranteedToExecute(const Instruction &Inst,
                                   const DominatorTree *DT,
                                   const Loop *CurLoop,
                                   const LICMSafetyInfo * SafetyInfo) {
-  outs() << "isGuaranteedToExecute() : checking " << Inst << "\n";
   // We have to check to make sure that the instruction dominates all
   // of the exit blocks.  If it doesn't, then there is a path out of the loop
   // which does not execute this instruction, so we can't hoist it.
@@ -960,13 +958,11 @@ static bool isGuaranteedToExecute(const Instruction &Inst,
     // Inst.
     return !SafetyInfo->HeaderMayThrow;
 
-  outs() << "\tPassed 1\n";
   // Somewhere in this loop there is an instruction which may throw and make us
   // exit the loop.
   if (SafetyInfo->MayThrow)
     return false;
 
-  outs() << "\tPassed 2\n";
   // Get the exit blocks for the current loop.
   SmallVector<BasicBlock*, 8> ExitBlocks;
   CurLoop->getExitBlocks(ExitBlocks);
@@ -976,13 +972,11 @@ static bool isGuaranteedToExecute(const Instruction &Inst,
     if (!DT->dominates(Inst.getParent(), ExitBlocks[i]))
       return false;
 
-  outs() << "\tPassed 3\n";
   // As a degenerate case, if the loop is statically infinite then we haven't
   // proven anything since there are no exit blocks.
   if (ExitBlocks.empty())
     return false;
 
-  outs() << "\tPassed All\n";
   return true;
 }
 
