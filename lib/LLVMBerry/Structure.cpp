@@ -875,16 +875,21 @@ TyPosition::make_end_of_block(enum TyScope _scope, const llvm::BasicBlock &BB,
 
 // register
 
-TyRegister::TyRegister(std::string _name, enum TyTag _tag)
+TyRegister::TyRegister(const std::string &_name, enum TyTag _tag)
     : name(_name), tag(_tag) {}
 
 void TyRegister::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(name), cereal::make_nvp("tag", ::toString(tag)));
 }
 
-std::shared_ptr<TyRegister> TyRegister::make(std::string _name,
+std::shared_ptr<TyRegister> TyRegister::make(const std::string &_name,
                                              enum TyTag _tag) {
   return std::shared_ptr<TyRegister>(new TyRegister(_name, _tag));
+}
+
+std::shared_ptr<TyRegister> TyRegister::make(const llvm::Value &_val,
+                                             enum TyTag _tag) {
+  return make(getVariable(_val), _tag);
 }
 
 bool TyRegister::isSame(std::shared_ptr<TyRegister> r1,
@@ -1497,6 +1502,10 @@ void ConsSize::serialize(cereal::JSONOutputArchive &archive) const {
 
 std::shared_ptr<TySize> ConsSize::make(int _size) {
   return std::shared_ptr<TySize>(new ConsSize(_size));
+}
+
+std::shared_ptr<TySize> ConsSize::make(const llvm::Value &ci) {
+  return make(ci.getType()->getIntegerBitWidth());
 }
 
 /*
@@ -2649,6 +2658,10 @@ std::shared_ptr<TyExpr> ConsVar::make(std::string _name, enum TyTag _tag) {
   // return std::shared_ptr<TyExpr>(new ConsVar(_name, _tag));
 }
 
+std::shared_ptr<TyExpr> ConsVar::make(const llvm::Instruction &v, enum TyTag _tag) {
+  return make(llvmberry::getVariable(v), _tag);
+}
+
 std::shared_ptr<TyRegister> ConsVar::getTyReg() {
   return register_name;
 }
@@ -2897,10 +2910,10 @@ void ConsUnique::serialize(cereal::JSONOutputArchive &archive) const {
 ConsMaydiff::ConsMaydiff(std::shared_ptr<TyRegister> _register_name)
     : register_name(_register_name) {}
 
-ConsMaydiff::ConsMaydiff(std::string _name, enum TyTag _tag)
+ConsMaydiff::ConsMaydiff(const std::string &_name, enum TyTag _tag)
     : register_name(new TyRegister(_name, _tag)) {}
 
-std::shared_ptr<TyPropagateObject> ConsMaydiff::make(std::string _name,
+std::shared_ptr<TyPropagateObject> ConsMaydiff::make(const std::string &_name,
                                                      enum TyTag _tag) {
   return std::shared_ptr<TyPropagateObject>(
       new ConsMaydiff(TyRegister::make(_name, _tag)));

@@ -303,8 +303,7 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
       // the second cast (CI). CSrc will then have a good chance of being dead.
       
       llvmberry::ValidationUnit::Begin("cast_cast", CI.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &CSrc]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&CI, &CSrc), {
         //     <src>                          |    <tgt>
         // mid = <opcode1> srcty src to midty | mod = <opcode1> srcty src to midty
         // dst = <opcode2> midty mid to dstty | dst = <opcode'> srcty src to dstty
@@ -326,7 +325,7 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
             makeInfruleFunc = nullptr;
         std::string new_optname;
 
-        llvmberry::propagateInstruction(mid, dst, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, mid, dst, llvmberry::Source);
 
         if (llvm::isa<BitCastInst>(mid)) {
           if (llvm::isa<BitCastInst>(dst)) 
@@ -620,9 +619,8 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
     
     Constant *One = ConstantInt::get(Src->getType(), 1);
     Src = Builder->CreateAnd(Src, One);
-    
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &Src](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+
+    INTRUDE(CAPTURE(&CI, &Src), {
       llvmberry::name_instructions(*CI.getParent()->getParent());
       //     <src>               <tgt>
       //                   | y = and x, 1
@@ -630,15 +628,14 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
       TruncInst *Z = dyn_cast<TruncInst>(&CI);
       BinaryOperator *Y = dyn_cast<BinaryOperator>(Src);
       Value *X = CI.getOperand(0);
-      int s = X->getType()->getIntegerBitWidth();
-      
+
       llvmberry::insertSrcNopAtTgtI(hints, Y);
       PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Y), llvmberry::Physical),
           llvmberry::ConsGlobal::make());
       
-      llvmberry::propagateInstruction(Y, Z, TGT);
+      llvmberry::propagateInstruction(hints, Y, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsTruncOnebit::make(
-          VAL(Z), VAL(X), VAL(Y), BITSIZE(s)));
+          VAL(Z), VAL(X), VAL(Y), BITSIZE(*X)));
     });
     Value *Zero = Constant::getNullValue(Src->getType());
     return new ICmpInst(ICmpInst::ICMP_NE, Src, Zero);
@@ -1044,8 +1041,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       match(SrcI, m_OneUse(m_And(m_Trunc(m_Value(X)), m_Constant(C)))) &&
       X->getType() == CI.getType()) {
     llvmberry::ValidationUnit::Begin("zext_trunc_and", CI.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &X, &C](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&CI, &X, &C), {
       //        <src>        |       <tgt>
       // y = trunc s x to s' | y = trunc s x to s'
       // w = and y, c        | w = and y, c
@@ -1053,14 +1049,12 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       ZExtInst *Z = dyn_cast<ZExtInst>(&CI);
       BinaryOperator *W = dyn_cast<BinaryOperator>(Z->getOperand(0));
       Instruction *Y = dyn_cast<Instruction>(W->getOperand(0));
-      int s = X->getType()->getIntegerBitWidth();
-      int sprime = Y->getType()->getIntegerBitWidth();
-      
-      llvmberry::propagateInstruction(Y, Z, SRC);
-      llvmberry::propagateInstruction(W, Z, SRC);
+
+      llvmberry::propagateInstruction(hints, Y, Z, SRC);
+      llvmberry::propagateInstruction(hints, W, Z, SRC);
       INFRULE(INSTPOS(SRC, Z), llvmberry::ConsZextTruncAnd::make(
           VAL(Z), VAL(X), VAL(Y), VAL(W),
-          llvmberry::TyConstant::make(*C), BITSIZE(s), BITSIZE(sprime)));
+          llvmberry::TyConstant::make(*C), BITSIZE(*X), BITSIZE(*Y)));
     });
     return BinaryOperator::CreateAnd(X, ConstantExpr::getZExt(C, CI.getType()));
   }
@@ -1074,9 +1068,8 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
     
     Constant *ZC = ConstantExpr::getZExt(C, CI.getType());
     Value *NewAnd = Builder->CreateAnd(X, ZC);
-    
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &X, &And, &NewAnd, &C](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+
+    INTRUDE(CAPTURE(&CI, &X, &And, &NewAnd, &C), {
       llvmberry::name_instructions(*CI.getParent()->getParent());
       //        <src>        |       <tgt>
       // v = trunc s x to s' | v = trunc s x to s'
@@ -1089,20 +1082,18 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(0));
       BinaryOperator *W = dyn_cast<BinaryOperator>(And);
       TruncInst *V = dyn_cast<TruncInst>(W->getOperand(0));
-      int s = Z->getType()->getIntegerBitWidth();
-      int sprime = V->getType()->getIntegerBitWidth();
-      
+
       llvmberry::insertSrcNopAtTgtI(hints, Yprime);
       PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Yprime), llvmberry::Physical),
           llvmberry::ConsGlobal::make());
- 
-      llvmberry::propagateInstruction(V, Z, TGT);
-      llvmberry::propagateInstruction(W, Z, TGT);
-      llvmberry::propagateInstruction(Y, Z, TGT);
-      llvmberry::propagateInstruction(Yprime, Z, TGT);
+
+      llvmberry::propagateInstruction(hints, V, Z, TGT);
+      llvmberry::propagateInstruction(hints, W, Z, TGT);
+      llvmberry::propagateInstruction(hints, Y, Z, TGT);
+      llvmberry::propagateInstruction(hints, Yprime, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsZextTruncAndXor::make(
           VAL(Z), VAL(X), VAL(V), VAL(W), VAL(Y), VAL(Yprime),
-          llvmberry::TyConstant::make(*C), BITSIZE(s), BITSIZE(sprime)));
+          llvmberry::TyConstant::make(*C), BITSIZE(*Z), BITSIZE(*V)));
     });
     return BinaryOperator::CreateXor(NewAnd, ZC);
   }
@@ -1114,9 +1105,8 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
     llvmberry::ValidationUnit::Begin("zext_xor", CI.getParent()->getParent());
     
     Value *New = Builder->CreateZExt(X, CI.getType());
-    
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &X, &New](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+
+    INTRUDE(CAPTURE(&CI, &X, &New), {
       llvmberry::name_instructions(*CI.getParent()->getParent());
       //        <src>        |       <tgt>
       // y = xor i1 x, 1     | y = xor i1 x, 1
@@ -1125,16 +1115,15 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       ZExtInst *Z = dyn_cast<ZExtInst>(&CI);
       BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(0));
       ZExtInst *Yprime = dyn_cast<ZExtInst>(New);
-      int sz = Yprime->getType()->getIntegerBitWidth();
-      
+
       llvmberry::insertSrcNopAtTgtI(hints, Yprime);
       PROPAGATE(llvmberry::ConsMaydiff::make(llvmberry::getVariable(*Yprime), llvmberry::Physical),
           llvmberry::ConsGlobal::make());
 
-      llvmberry::propagateInstruction(Y, Z, TGT);
-      llvmberry::propagateInstruction(Yprime, Z, TGT);
+      llvmberry::propagateInstruction(hints, Y, Z, TGT);
+      llvmberry::propagateInstruction(hints, Yprime, Z, TGT);
       INFRULE(INSTPOS(TGT, Z), llvmberry::ConsZextXor::make(
-          VAL(Z), VAL(Y), VAL(Yprime), VAL(X), BITSIZE(sz)));
+          VAL(Z), VAL(Y), VAL(Yprime), VAL(X), BITSIZE(*Yprime)));
     });
     return BinaryOperator::CreateXor(New, ConstantInt::get(CI.getType(), 1));
   }
@@ -1360,9 +1349,7 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
       Value *ShAmt = ConstantInt::get(DestTy, DestBitSize-SrcBitSize);
       Value *Res = Builder->CreateShl(TI->getOperand(0), ShAmt, "sext");
 
-      llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &TI, &Res, SrcBitSize, 
-        DestBitSize, &ShAmt] 
-        (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&CI, &TI, &Res, SrcBitSize, DestBitSize, &ShAmt), {
         //   <src>              |    <tgt>
         // X = trunc t1 v to t2 | X = trunc t1 v to t2
         // <nop>                | X' = shl v (sizeof(t1) - sizeof(t2))
@@ -1376,10 +1363,10 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
         ConstantInt *i3 = dyn_cast<ConstantInt>(ShAmt);
 
         llvmberry::insertSrcNopAtTgtI(hints, Xprime);
-        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Xprime), 
+        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Xprime), 
             llvmberry::Physical);
-        llvmberry::propagateInstruction(X, Z, TGT);
-        llvmberry::propagateInstruction(Xprime, Z, TGT);
+        llvmberry::propagateInstruction(hints, X, Z, TGT);
+        llvmberry::propagateInstruction(hints, Xprime, Z, TGT);
         INFRULE(INSTPOS(TGT, Z), llvmberry::ConsSextTruncAshr::make(
             VAL(Z), VAL(X), VAL(Xprime), VAL(V), BITSIZE(s1), BITSIZE(s2), 
             llvmberry::TyConstInt::make(*i3)));
@@ -2034,8 +2021,7 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
   // be replaced by the operand.
   if (DestTy == Src->getType()) {
     llvmberry::ValidationUnit::Begin("bitcast_sametype", CI.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CI, &Src]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&CI, &Src), {
       INFRULE(INSTPOS(SRC, &CI), llvmberry::ConsBitcastSametype::make(
                   VAL(Src), VAL(&CI), VALTYPE(Src->getType())));
       llvmberry::generateHintForReplaceAllUsesWith(&CI, Src);
