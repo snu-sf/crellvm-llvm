@@ -427,7 +427,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
-        if (data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(storeItem[OnlyStore].expr, expr)) {
+        if (equalsIfConsVar(storeItem[OnlyStore].expr, expr)) {
           data.get<llvmberry::ArgForMem2Reg>()->replaceTag.get()->push_back(expr);
         } else if (storeItem[OnlyStore].op0 != "") { expr = VAR(storeItem[OnlyStore].op0, Ghost); }
 

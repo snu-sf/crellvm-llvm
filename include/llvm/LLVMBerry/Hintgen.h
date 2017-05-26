@@ -262,6 +262,9 @@ void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data);
 
 void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints);
 
+bool equalsIfConsVar(std::shared_ptr<TyExpr> e1, std::shared_ptr<TyExpr> e2); 
+
+
 }
 
 #endif
