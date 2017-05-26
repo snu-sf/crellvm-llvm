@@ -761,7 +761,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
   BasicBlock::iterator BBI = &LI;
   AAMDNodes AATags;
   llvmberry::ValidationUnit::Begin("load_load", LI.getParent()->getParent());
-  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForFindAvailableLoadedValue>(); });
+  INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForFindAvailableLoadedValue>(); });
 
   if (Value *AvailableVal = FindAvailableLoadedValue(Op, LI.getParent(), BBI,
                                                      6, AA, &AATags)) {

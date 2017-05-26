@@ -2686,7 +2686,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
   // icmp's with boolean values can always be turned into bitwise operations
   if (Ty->isIntegerTy(1)) {
     llvmberry::ValidationUnit::Begin("icmp_unnamed", I.getParent()->getParent());
-    INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForVisitICmp>(); });
+    INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForVisitICmp>(); });
     switch (I.getPredicate()) {
     default: llvm_unreachable("Invalid icmp instruction!");
     case ICmpInst::ICMP_EQ: {               // icmp eq i1 A, B -> ~(A^B)
@@ -2725,7 +2725,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       return BinaryOperator::CreateXor(Op0, Op1);
 
     case ICmpInst::ICMP_UGT:
-      INTRUDE(NOCAPTURE, {
+      INTRUDE(CAPTURE(), {
         data.get<llvmberry::ArgForVisitICmp>()->swapOps = true;
       });
       std::swap(Op0, Op1);                   // Change icmp ugt -> icmp ult
@@ -2764,7 +2764,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       return BinaryOperator::CreateAnd(Not, Op1);
     }
     case ICmpInst::ICMP_SGT:
-      INTRUDE(NOCAPTURE, { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp sgt -> icmp slt
       // FALL THROUGH
     case ICmpInst::ICMP_SLT: {               // icmp slt i1 A, B -> A & ~B
@@ -2802,7 +2802,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       return BinaryOperator::CreateAnd(Not, Op0);
     }
     case ICmpInst::ICMP_UGE:
-      INTRUDE(NOCAPTURE, { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp uge -> icmp ule
       // FALL THROUGH
     case ICmpInst::ICMP_ULE: {               //  icmp ule i1 A, B -> ~A | B
@@ -2839,7 +2839,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       return BinaryOperator::CreateOr(Not, Op1);
     }
     case ICmpInst::ICMP_SGE:
-      INTRUDE(NOCAPTURE, { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp sge -> icmp sle
       // FALL THROUGH
     case ICmpInst::ICMP_SLE: {               //  icmp sle i1 A, B -> A | ~B

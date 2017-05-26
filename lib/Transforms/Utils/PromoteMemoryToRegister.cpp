@@ -853,7 +853,7 @@ void PromoteMem2Reg::run() {
   std::vector<RenamePassData> RenamePassWorkList;
   RenamePassWorkList.emplace_back(F.begin(), nullptr, std::move(Values));
 
-  INTRUDE(NOCAPTURE, {
+  INTRUDE(CAPTURE(), {
     auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
     auto instrWorkList = data.get<llvmberry::ArgForMem2Reg>()->instrWorkList;
     instrWorkList.get()->push_back(*(recentInstr.get())); 
@@ -864,7 +864,7 @@ void PromoteMem2Reg::run() {
     RPD.swap(RenamePassWorkList.back());
     RenamePassWorkList.pop_back();
 
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
       auto instrWorkList = data.get<llvmberry::ArgForMem2Reg>()->instrWorkList;
       recentInstr.get()->swap(instrWorkList.get()->back());
@@ -1302,7 +1302,7 @@ NextIteration:
     if (VisitedSuccs.insert(*I).second) {
       Worklist.emplace_back(*I, Pred, IncomingVals);
 
-      INTRUDE(NOCAPTURE, { 
+      INTRUDE(CAPTURE(), { 
         auto recentInstr = data.get<llvmberry::ArgForMem2Reg>()->recentInstr;
         auto instrWorkList = data.get<llvmberry::ArgForMem2Reg>()->instrWorkList;
         instrWorkList.get()->push_back(*(recentInstr.get())); });

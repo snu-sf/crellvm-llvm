@@ -1298,7 +1298,7 @@ static bool isUndefShift(Value *Amount) {
   // X shift by undef -> undef because it may shift by the bitwidth.
   if (isa<UndefValue>(C)) {
     if (llvmberry_doHintGen) {
-      INTRUDE(NOCAPTURE, {
+      INTRUDE(CAPTURE(), {
         //    <src>        |  <tgt>
         // Z = X >>a undef | (Z equals undef)
         //    <src>        |  <tgt>
@@ -1436,7 +1436,7 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
     return UndefValue::get(Op0->getType());
 
   if (llvmberry_doHintGen) {
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       data.get<llvmberry::ArgForSimplifyShiftInst>()->abort();
     });
   }
@@ -1692,7 +1692,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
     if(llvmberry_doHintGen){
-      INTRUDE(NOCAPTURE, { data.get<llvmberry::ArgForSimplifyAndInst>()->isSwapped = true; });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForSimplifyAndInst>()->isSwapped = true; });
     }
   }
 
@@ -1859,7 +1859,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   }
 
   if (llvmberry_doHintGen) {
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       data.get<llvmberry::ArgForSimplifyAndInst>()->abort();
     });
   }
@@ -2003,7 +2003,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
     if (llvmberry_doHintGen) {
-      INTRUDE(NOCAPTURE, {
+      INTRUDE(CAPTURE(), {
         data.get<llvmberry::ArgForSimplifyOrInst>()->isSwapped = true;
       });
     }
@@ -2147,7 +2147,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
     return Constant::getAllOnesValue(Op0->getType());
 
   if (llvmberry_doHintGen) {
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       data.get<llvmberry::ArgForSimplifyOrInst>()->abort();
     });
   }
@@ -2257,7 +2257,7 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
     if(llvmberry_doHintGen) {
-      INTRUDE(NOCAPTURE, { data.get<llvmberry::ArgForSimplifyXorInst>()->isSwapped = true; });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForSimplifyXorInst>()->isSwapped = true; });
     }
   }
 
@@ -2352,7 +2352,7 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
   }
 
   if (llvmberry_doHintGen) {
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       data.get<llvmberry::ArgForSimplifyXorInst>()->abort();
     });
   }

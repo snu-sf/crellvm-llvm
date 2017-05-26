@@ -1314,7 +1314,7 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
 
   
   llvmberry::ValidationUnit::Begin("simplify_and_inst", I.getParent()->getParent());
-  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyAndInst>(); });
+  INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForSimplifyAndInst>(); });
 
   if (Value *V = SimplifyAndInst(Op0, Op1, DL, TLI, DT, AC)){
     INTRUDE(CAPTURE(&I, &V), {
@@ -2351,7 +2351,7 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     return ReplaceInstUsesWith(I, V);
 
   llvmberry::ValidationUnit::Begin("simplify_or_inst", I.getParent()->getParent());
-  INTRUDE(NOCAPTURE, {
+  INTRUDE(CAPTURE(), {
     data.create<llvmberry::ArgForSimplifyOrInst>();
   });
 
@@ -2897,7 +2897,7 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
     return ReplaceInstUsesWith(I, V);
 
   llvmberry::ValidationUnit::Begin("simplify_xor_inst", I.getParent()->getParent());
-  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyXorInst>(); });
+  INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForSimplifyXorInst>(); });
 
   if (Value *V = SimplifyXorInst(Op0, Op1, DL, TLI, DT, AC)) {
     INTRUDE(CAPTURE(&I, &V), {
