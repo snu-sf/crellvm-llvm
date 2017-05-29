@@ -990,11 +990,10 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
         if (!isSamePos(I_op, pos_u) && !DT->dominates(I_op, pos_u))
           ops_idxs.push_back(i);
 
-    for (unsigned i = 1; i < ops_idxs.size(); ++i)
-      for (unsigned j = 0; j < ops_idxs.size() - i; ++j)
-        if (DT->dominates(cast<Instruction>(I_q->getOperand(ops_idxs[j])),
-                          cast<Instruction>(I_q->getOperand(ops_idxs[j + 1]))))
-          std::swap(ops_idxs[j], ops_idxs[j+1]);
+    std::sort(ops_idxs.begin(), ops_idxs.end(),
+              [DT, I_q](uint32_t i, uint32_t j) -> bool {
+                DT->dominates(cast<Instruction>(I_q->getOperand(j)),
+                              cast<Instruction>(I_q->getOperand(i)));});
 
     for (auto II = ops_idxs.begin(), EI = ops_idxs.end(); II != EI; ++II) {
       Instruction *I_op = cast<Instruction>(I_q->getOperand(*II));
