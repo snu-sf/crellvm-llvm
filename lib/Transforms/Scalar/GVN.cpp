@@ -1982,7 +1982,7 @@ make_repl_inv(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I,
 
     if (!BB_pred) {
       hints.appendToDescription("YS singlepred 3");
-      return false;
+      return nullptr;
     }
     // assert(BB_pred &&
     //        "Expect it to be introduced from propagateEquality, and it checks "

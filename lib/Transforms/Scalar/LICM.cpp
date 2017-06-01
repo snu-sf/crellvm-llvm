@@ -402,7 +402,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
                                        true);
       if (Constant *C = ConstantFoldInstruction(
               &I, I.getModule()->getDataLayout(), TLI)) {
-        INTRUDE(NOCAPTURE, {
+        INTRUDE(CAPTURE(), {
           hints.setDescription("We do not deal with ConstantFold");
           hints.setReturnCodeToAdmitted();
         });
@@ -1223,7 +1223,7 @@ bool llvm::promoteLoopAccessesToScalars(AliasSet &AS,
 
   llvmberry::ValidationUnit::Begin("licm.promoteloopaccessestoscalars",
                                    Preheader->getParent(), true);
-  INTRUDE(NOCAPTURE, {
+  INTRUDE(CAPTURE(), {
     hints.setDescription("We do not deal with promoteLoopAccessToScalars because it uses AA");
     hints.setReturnCodeToAdmitted();
   });
