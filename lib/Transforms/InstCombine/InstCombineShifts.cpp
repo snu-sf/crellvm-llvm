@@ -702,7 +702,7 @@ Instruction *InstCombiner::visitShl(BinaryOperator &I) {
 
   llvmberry::ValidationUnit::Begin("simplify_shift",
                                    I.getParent()->getParent());
-  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
+  INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V =
           SimplifyShlInst(I.getOperand(0), I.getOperand(1), I.hasNoSignedWrap(),
@@ -762,7 +762,7 @@ Instruction *InstCombiner::visitLShr(BinaryOperator &I) {
 
   llvmberry::ValidationUnit::Begin("simplify_shift",
                                    I.getParent()->getParent());
-  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
+  INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V = SimplifyLShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
                                   DL, TLI, DT, AC)) {
@@ -824,7 +824,7 @@ Instruction *InstCombiner::visitAShr(BinaryOperator &I) {
 
   llvmberry::ValidationUnit::Begin("simplify_shift",
                                    I.getParent()->getParent());
-  INTRUDE(NOCAPTURE, { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
+  INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V = SimplifyAShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
                                   DL, TLI, DT, AC)) {

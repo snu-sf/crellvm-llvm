@@ -10,16 +10,24 @@
 #include "llvm/Analysis/CFG.h"
 
 // Meta-level function for macro overloading
+// This is not intended to be used outside Hintgen.h.
+// See VAR(), EXPR() for its usage.
+
 #define _CHOOSE(x, ARG1, ARG2, FUNC, ...) FUNC
 
 // Macros for shortening sentences
+// Usage : 
+//   INTRUDE(CAPTURE(X, Y), {
+//     // Lambda function you want to execute
+//     std::cout << X << Y;
+//   });
+// or
 #define INTRUDE(A, ...) \
                       llvmberry::ValidationUnit::GetInstance()->intrude        \
                       ([ A ] (llvmberry::Dictionary &data,                     \
                                       llvmberry::CoreHint &hints)              \
                                       { __VA_ARGS__ })
 #define CAPTURE(...) __VA_ARGS__
-#define NOCAPTURE
 
 #define INFRULE(pos, x)                                                        \
   hints.addCommand(llvmberry::ConsInfrule::make(pos, x),                       \
@@ -28,9 +36,8 @@
   hints.addCommand(llvmberry::ConsPropagate::make(what, where),                \
                    llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
 
-#define PHIPOS(SCOPE, PN, prevI)                                               \
-  llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(),                \
-                              prevI->getParent()->getName())
+#define PHIPOS(SCOPE, PHIBlock, prevBlock)                                     \
+  llvmberry::TyPosition::make(SCOPE, PHIBlock, prevBlock)                           
 #define PHIPOSJustPhi(SCOPE, PN)                                               \
   llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
 #define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
@@ -45,9 +52,15 @@
                                                                     
 #define POINTER(v) llvmberry::TyPointer::make(*(v))
 #define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
-// Below code snippet is tu support overloading of two macro functions : 
+
+// REGISTER() supports overloading of two macro functions : 
 // REGISTER(str) := llvmberry::TyRegister::make(str, llvmberry::Physical)
 // REGISTER(str, tag) := llvmberry::TyRegister::make(str, llvmberry::tag)
+// How it works : 
+//     REGISTER(A, B) is evaluated into _CHOOSE(, A, B, _REGISTER(A, B),
+//     _REGISTER_PHYS(A, B), NULL), which becomes _REGISTER(A, B).
+//     Similariy, REGISTER(A) is evaluated into _CHOOSE(, A, _REGISTER(A),
+//     _REGISTER_PHYS(A), NULL), which becomes _REGISTER_PHYS(A).
 #define _REGISTER_PHYS(n) llvmberry::TyRegister::make(n, llvmberry::Physical)
 #define _REGISTER(n, tag) llvmberry::TyRegister::make(n, llvmberry::tag)
 #define REGISTER(...) _CHOOSE(,##__VA_ARGS__,                                  \
@@ -59,17 +72,24 @@
 #define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
 #define BOUNDSET(from, to_set) llvmberry::ConsBoundSet::make(from, to_set)
 
-// EXPR, VAR, RHS, INSN macros make TyExpr object
-// Below code snippet is tu support overloading of two macro functions : 
+// VAR supports overloading of two macro functions : 
 // VAR(str) := llvmberry::ConsVar::make(str, llvmberry::Physical)
 // VAR(str, tag) := llvmberry::ConsVar::make(str, llvmberry::tag)
+// How it works : 
+//     VAR(A, B) is evaluated into _CHOOSE(, A, B, _VAR(A, B),
+//     _VAR_PHYS(A, B), NULL), which becomes _VAR(A, B).
+//     Similariy, VAR(A) is evaluated into _CHOOSE(, A, _VAR(A),
+//     _VAR_PHYS(A), NULL), which becomes _VAR_PHYS(A).
+// NOTE : VAR macro makes TyExpr object
 #define _VAR_PHYS(n) llvmberry::ConsVar::make(n, llvmberry::Physical)
 #define _VAR(n, tag) llvmberry::ConsVar::make(n, llvmberry::tag)
 #define VAR(...) _CHOOSE(,##__VA_ARGS__,_VAR(__VA_ARGS__),                     \
                         _VAR_PHYS(__VA_ARGS__), NULL)
 
+// NOTE : RHS macro makes TyExpr object
 #define RHS(name, tag, SCOPE)                                                  \
   llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
+// NOTE : INSN macro makes TyExpr object
 #define INSN(x) llvmberry::ConsInsn::make((x))
 #define INSNWITHGHOST(x, y)                                                    \
   std::shared_ptr<llvmberry::TyExpr>(new llvmberry::TyExpr(                    \
@@ -111,6 +131,7 @@
 // VALTYPE, TYPEOF macros make TyValueType object
 #define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
 #define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
+#define TYPEOFAI(I) llvmberry::TyValueType::make(*((AI)->getAllocatedType()))
 
 // BINOP, FBINOP, BINARYINSN make TyInstruction object
 #define BINOP(bop, type, val1, val2)                                           \
@@ -285,10 +306,7 @@ void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data);
 
 void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data);
 
-void generateHintForMem2RegReplaceHint(llvm::Value* ReplVal, llvm::Instruction* I, Dictionary &data);
-
 void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints);
-
 
 }
 

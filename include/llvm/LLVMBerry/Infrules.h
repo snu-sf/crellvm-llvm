@@ -418,12 +418,32 @@ private:
   std::shared_ptr<TyValue> v;
 };
 
+struct TyLessthanUndefConst {
+public:
+  TyLessthanUndefConst(std::shared_ptr<TyConstant> _c);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyConstant> c;
+};
+
 struct TyLessthanUndefConstTgt {
 public:
   TyLessthanUndefConstTgt(std::shared_ptr<TyConstant> _c);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
 private:
+  std::shared_ptr<TyConstant> c;
+};
+
+struct TyLessthanUndefConstGEPorCast {
+public:
+  TyLessthanUndefConstGEPorCast(std::shared_ptr<TyValueType> _ty,
+                                std::shared_ptr<TyConstant> _c);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+private:
+  std::shared_ptr<TyValueType> ty;
   std::shared_ptr<TyConstant> c;
 };
 
@@ -1376,6 +1396,17 @@ private:
   std::shared_ptr<TyLessthanUndefTgt> lessthan_undef_tgt;
 };
 
+struct ConsLessthanUndefConst : TyInfrule {
+public:
+  ConsLessthanUndefConst(std::shared_ptr<TyLessthanUndefConst> _lessthan_undef_const_tgt);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyConstant> _c);
+
+private:
+  std::shared_ptr<TyLessthanUndefConst> lessthan_undef_const;
+};
+
 struct ConsLessthanUndefConstTgt : TyInfrule {
 public:
   ConsLessthanUndefConstTgt(std::shared_ptr<TyLessthanUndefConstTgt> _lessthan_undef_const_tgt);
@@ -1385,6 +1416,18 @@ public:
 
 private:
   std::shared_ptr<TyLessthanUndefConstTgt> lessthan_undef_const_tgt;
+};
+
+struct ConsLessthanUndefConstGEPorCast : TyInfrule {
+public:
+  ConsLessthanUndefConstGEPorCast(std::shared_ptr<TyLessthanUndefConstGEPorCast> _lessthan_undef_const_gep_or_cast);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+
+  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyValueType> _ty,
+                                         std::shared_ptr<TyConstant> _c);
+
+private:
+  std::shared_ptr<TyLessthanUndefConstGEPorCast> lessthan_undef_const_gep_or_cast;
 };
 
 struct ConsNegVal : TyInfrule {

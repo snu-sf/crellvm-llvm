@@ -386,14 +386,14 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
     if (match(Op0, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op1, Y);
       ShlNSW = cast<ShlOperator>(Op0)->hasNoSignedWrap();
-      INTRUDE(NOCAPTURE, {
+      INTRUDE(CAPTURE(), {
         data.create<llvmberry::ArgForVisitMul>();
         data.get<llvmberry::ArgForVisitMul>()->needsTransitivity = false;
       });
     } else if (match(Op1, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op0, Y);
       ShlNSW = cast<ShlOperator>(Op1)->hasNoSignedWrap();
-      INTRUDE(NOCAPTURE, {
+      INTRUDE(CAPTURE(), {
         data.create<llvmberry::ArgForVisitMul>();
         data.get<llvmberry::ArgForVisitMul>()->needsTransitivity = true;
       });

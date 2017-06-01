@@ -790,6 +790,32 @@ void ConsLessthanUndefTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(lessthan_undef_tgt));
 }
 
+TyLessthanUndefConst::TyLessthanUndefConst(std::shared_ptr<TyConstant> _c)
+    : c(_c) {}
+
+void TyLessthanUndefConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(c));
+}
+
+ConsLessthanUndefConst::ConsLessthanUndefConst(
+    std::shared_ptr<TyLessthanUndefConst> _lessthan_undef_const)
+    : lessthan_undef_const(_lessthan_undef_const) {}
+
+std::shared_ptr<TyInfrule>
+ConsLessthanUndefConst::make(std::shared_ptr<TyConstant> _c) {
+  std::shared_ptr<TyLessthanUndefConst> _val(
+      new TyLessthanUndefConst(_c));
+
+  return std::shared_ptr<TyInfrule>(new ConsLessthanUndefConst(_val));
+}
+
+void ConsLessthanUndefConst::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("LessthanUndefConst");
+  archive(CEREAL_NVP(lessthan_undef_const));
+}
+
 TyLessthanUndefConstTgt::TyLessthanUndefConstTgt(std::shared_ptr<TyConstant> _c)
     : c(_c) {}
 
@@ -814,6 +840,35 @@ void ConsLessthanUndefConstTgt::serialize(cereal::JSONOutputArchive &archive) co
   archive.writeName();
   archive.saveValue("LessthanUndefConstTgt");
   archive(CEREAL_NVP(lessthan_undef_const_tgt));
+}
+
+TyLessthanUndefConstGEPorCast::TyLessthanUndefConstGEPorCast(std::shared_ptr<TyValueType> _ty,
+                                                 std::shared_ptr<TyConstant> _c)
+    : ty(_ty), c(_c) {}
+
+void TyLessthanUndefConstGEPorCast::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(ty));
+  archive(CEREAL_NVP(c));
+}
+
+ConsLessthanUndefConstGEPorCast::ConsLessthanUndefConstGEPorCast(
+    std::shared_ptr<TyLessthanUndefConstGEPorCast> _lessthan_undef_const_gep_or_cast)
+    : lessthan_undef_const_gep_or_cast(_lessthan_undef_const_gep_or_cast) {}
+
+std::shared_ptr<TyInfrule>
+ConsLessthanUndefConstGEPorCast::make(std::shared_ptr<TyValueType> _ty,
+                                std::shared_ptr<TyConstant> _c) {
+  std::shared_ptr<TyLessthanUndefConstGEPorCast> _val(
+      new TyLessthanUndefConstGEPorCast(_ty, _c));
+
+  return std::shared_ptr<TyInfrule>(new ConsLessthanUndefConstGEPorCast(_val));
+}
+
+void ConsLessthanUndefConstGEPorCast::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("LessthanUndefConstGEPorCast");
+  archive(CEREAL_NVP(lessthan_undef_const_gep_or_cast));
 }
 
 TyNegVal::TyNegVal(std::shared_ptr<TyConstInt> _c1,

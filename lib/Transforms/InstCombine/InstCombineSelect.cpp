@@ -158,7 +158,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(1);
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
           llvmberry::FoldSelectOpOpArg::XY_XZ;
     });
@@ -167,7 +167,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(0);
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = false;
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
           llvmberry::FoldSelectOpOpArg::YX_ZX;
     });
@@ -181,7 +181,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(1);
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = true;
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
           llvmberry::FoldSelectOpOpArg::XY_ZX;
     });
@@ -190,7 +190,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(0);
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
-    INTRUDE(NOCAPTURE, {
+    INTRUDE(CAPTURE(), {
       data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = 
           llvmberry::FoldSelectOpOpArg::YX_XZ;
     });
@@ -551,7 +551,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
 
         llvmberry::ValidationUnit::Begin("select_icmp_unknown_const",
                                          SI.getParent()->getParent());
-        INTRUDE(NOCAPTURE, {
+        INTRUDE(CAPTURE(), {
           auto ptr = data.create<llvmberry::ArgForSelectIcmpConst>();
           ptr->activated = false;
         });
@@ -560,7 +560,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         if ((CmpLHS == TrueVal && AdjustedRHS == FalseVal) ||
             (CmpLHS == FalseVal && AdjustedRHS == TrueVal)) {
           ; // Nothing to do here. Values match without any sign/zero extension.
-          INTRUDE(NOCAPTURE, {
+          INTRUDE(CAPTURE(), {
             data.get<llvmberry::ArgForSelectIcmpConst>()->activated = true;
           });
         }
@@ -653,7 +653,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         // the sext/zext value may be defined after the ICI instruction uses it.
         ICI->moveBefore(&SI);
 
-        INTRUDE(NOCAPTURE, {
+        INTRUDE(CAPTURE(), {
           auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
           if (ptr->activated) {
             unsigned int bitsize = ptr->C->getType()->getIntegerBitWidth();
