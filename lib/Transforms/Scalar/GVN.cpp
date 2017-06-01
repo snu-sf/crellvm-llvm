@@ -992,7 +992,7 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
 
     std::sort(ops_idxs.begin(), ops_idxs.end(),
               [DT, I_q](uint32_t i, uint32_t j) -> bool {
-                DT->dominates(cast<Instruction>(I_q->getOperand(j)),
+                return DT->dominates(cast<Instruction>(I_q->getOperand(j)),
                               cast<Instruction>(I_q->getOperand(i)));});
 
     for (auto II = ops_idxs.begin(), EI = ops_idxs.end(); II != EI; ++II) {
@@ -3076,6 +3076,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         llvmberry::ValidationUnit::Dictionary &data,
         llvmberry::CoreHint &hints) {
       Instruction *I = CurInst, *Repl = Phi;
+      std::string id_I = llvmberry::getVariable(*I);
       hintgenGVN(hints, *this, VN, I, Phi);
       auto gvar = VAR(ghostSymb(VN.lookup_VN_of_expr(I)), Ghost);
 
@@ -3096,11 +3097,13 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         PROPAGATE(prop_src, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(llvmberry::Source, *userI, prev_block_name)));
         PROPAGATE(prop_tgt, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(llvmberry::Source, *userI, prev_block_name)));
       }
+      llvmberry::insertTgtNopAtSrcI(hints, I);
+      llvmberry::propagateMaydiffGlobal(id_I, llvmberry::Physical); // id
+      llvmberry::propagateMaydiffGlobal(id_I, llvmberry::Previous); // id
     });
   });
 
   CurInst->replaceAllUsesWith(Phi);
-  llvmberry::intrude([] { llvmberry::ValidationUnit::End(); });
 
   if (Phi->getType()->getScalarType()->isPointerTy()) {
     // Because we have added a PHI-use of the pointer value, it has now
@@ -3121,11 +3124,8 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   if (MD)
     MD->removeInstruction(CurInst);
   DEBUG(verifyRemoved(CurInst));
-  llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
-  llvmberry::ValidationUnit::Begin("GVN_dead_code_elim3", CurInst->getParent()->getParent());
-  llvmberry::generateHintForGVNDCE(*CurInst);
   CurInst->eraseFromParent();
-  llvmberry::ValidationUnit::End();
+  llvmberry::intrude([] { llvmberry::ValidationUnit::End(); });
   ++NumGVNInstr;
   
   return true;
