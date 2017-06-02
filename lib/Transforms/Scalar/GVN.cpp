@@ -1,4 +1,3 @@
-
 //===- GVN.cpp - Eliminate redundant values and loads ---------------------===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -776,7 +775,7 @@ void GVN::dump(DenseMap<uint32_t, Value*>& d) {
 #endif
 
 // LLVMBerry hint generation code
-std::string ghostSymb(uint32_t vn) {
+static inline std::string ghostSymb(uint32_t vn) {
   return ("g" + std::to_string(vn));
 }
 
