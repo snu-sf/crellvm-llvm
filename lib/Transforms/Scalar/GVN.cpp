@@ -1036,13 +1036,13 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
   SmallVector<GVNQuery, 4> worklist;
   SmallSetVector<std::pair<uint32_t, Instruction*>, 10> visited;
 
-  GVNQuery qi(VN.lookup_VN_of_expr(I), I, false, repl, false, I);
-  worklist.push_back(qi);
+  // GVNQuery qi(VN.lookup_VN_of_expr(I), I, false, repl, false, I);
+  worklist.emplace_back(VN.lookup_VN_of_expr(I), I, false, repl, false, I);
   visited.insert(std::make_pair(VN.lookup_VN_of_expr(I), I));
 
   while (!worklist.empty()){
     GVNQuery q = worklist.back();
-    worklist.pop_back();
+    worklist.pop_back(); // TODO: defer
 
     if (q.tgt == I) q.tgt = repl;
     Instruction *Is = hintgenPropEq(hints, pass, VN, true, q.pos, q.vn, q.src, q.is_src_clone);
@@ -1118,8 +1118,9 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           std::pair<Value*, bool> v1 = std::make_pair(cl_new, true),
             v2 = std::make_pair(PN->getIncomingValue(i), false);
 
-          GVNQuery q_new(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
-          if (visited.insert(std::make_pair(q.vn, term))) worklist.push_back(q_new);
+          // GVNQuery q_new(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
+          if (visited.insert(std::make_pair(q.vn, term)))
+            worklist.emplace_back(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
           else delete cl_new;
         }
         is_up_phi = true;
@@ -1146,8 +1147,9 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
             vn_op = VN.lookup_VN_of_expr(I_op_t);
           else assert(false && "both values are not instruction");
 
-          GVNQuery q_new(vn_op, ops_src[i], false, ops_tgt[i], false, pos_up);
-          if (visited.insert(std::make_pair(vn_op, pos_up))) worklist.push_back(q_new);
+          // GVNQuery q_new(vn_op, ops_src[i], false, ops_tgt[i], false, pos_up);
+          if (visited.insert(std::make_pair(vn_op, pos_up)))
+            worklist.emplace_back(vn_op, ops_src[i], false, ops_tgt[i], false, pos_up);
         }
     }
     q.clear();
