@@ -779,28 +779,39 @@ static inline std::string ghostSymb(uint32_t vn) {
   return ("g" + std::to_string(vn));
 }
 
+struct GQValueRef {
+  Value *val;
+  bool is_clone;
+  GQValueRef(Value* v) : val(v), is_clone(false) {}
+  GQValueRef(Value* v, bool cln) : val(v), is_clone(cln) {}
+  GQValueRef(const GQValueRef &vr) : is_clone(vr.is_clone) {
+    if (vr.is_clone) val = cast<Instruction>(vr.val)->clone();
+    else val = vr.val;
+  }
+  ~GQValueRef() { if (is_clone) delete val; }
+  // Value* operator->() { return &val; }
+};
+
 struct GVNQuery {
   uint32_t vn;
-  Value *src;
-  bool is_src_clone;
-  Value *tgt;
-  bool is_tgt_clone;
+  GQValueRef val_s;
+  GQValueRef val_t;
+  // Value *src;
+  // bool is_src_clone;
+  // Value *tgt;
+  // bool is_tgt_clone;
   Instruction *pos;
-  GVNQuery(uint32_t n, Value *qs, bool sc, Value *qt, bool tc, Instruction *p)
-    : vn(n), src(qs), is_src_clone(sc), tgt(qt), is_tgt_clone(tc), pos(p) {}
-  GVNQuery(uint32_t n, std::pair<Value*, bool> vps, std::pair<Value*, bool> vpt, Instruction *p)
-    : vn(n), src(vps.first), is_src_clone(vps.second),
-      tgt(vpt.first), is_tgt_clone(vpt.second), pos(p) {}
-  void clear() {
-    if (is_src_clone) delete src;
-    if (is_tgt_clone) delete tgt;
-  }
+  GVNQuery(uint32_t n, Value *qs, Value *qt, Instruction *p)
+    : vn(n), val_s(qs, false), val_t(qt, false), pos(p) {}
+  // GVNQuery(uint32_t n, std::pair<Value*, bool> vps, std::pair<Value*, bool> vpt, Instruction *p)
+  GVNQuery(uint32_t n, GQValueRef &vr_s, GQValueRef &vr_t, Instruction *p)
+    : vn(n), val_s(vr_s), val_t(vr_t), pos(p) {}
   // bool operator==(const GVNQuery &q2) const {
   //   return (vn == q2.vn && pos == q2.pos);
   // }
   bool operator<(const GVNQuery &q2) const {
-    return std::make_pair(std::make_pair(src, tgt), pos) <
-      std::make_pair(std::make_pair(q2.src, q2.tgt), q2.pos);
+    return std::make_pair(std::make_pair(val_s.val, val_t.val), pos) <
+      std::make_pair(std::make_pair(q2.val_s.val, q2.val_t.val), q2.pos);
   }
 };
 
@@ -1022,13 +1033,13 @@ void extractOps(ValueTable &VN, SmallVector<Value*, 4> &ops_src, Instruction *I_
     ops_src.push_back(*OI);
 }
 
-void wl_clear(SmallVector<GVNQuery, 4> worklist) {
-  while (!worklist.empty()) {
-    GVNQuery q = worklist.back();
-    q.clear();
-    worklist.pop_back();
-  }
-}
+// void wl_clear(SmallVector<GVNQuery, 4> worklist) {
+//   while (!worklist.empty()) {
+//     GVNQuery q = worklist.back();
+//     q.clear();
+//     worklist.pop_back();
+//   }
+// }
 
 void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instruction *I, Value *repl) {
   DominatorTree *DT = VN.getDomTree();
@@ -1036,33 +1047,34 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
   SmallVector<GVNQuery, 4> worklist;
   SmallSetVector<std::pair<uint32_t, Instruction*>, 10> visited;
 
-  worklist.emplace_back(VN.lookup_VN_of_expr(I), I, false, repl, false, I);
+  worklist.emplace_back(VN.lookup_VN_of_expr(I), I, repl, I);
   visited.insert(std::make_pair(VN.lookup_VN_of_expr(I), I));
 
   while (!worklist.empty()){
     GVNQuery q = worklist.back();
     worklist.pop_back();
 
-    if (q.tgt == I) q.tgt = repl;
-    Instruction *Is = hintgenPropEq(hints, pass, VN, true, q.pos, q.vn, q.src, q.is_src_clone);
-    Instruction *It = hintgenPropEq(hints, pass, VN, false, q.pos, q.vn, q.tgt, q.is_tgt_clone);
-    q.src = Is;
-    q.tgt = It;
+    if (q.val_t.val == I) q.val_t.val = repl;
+    Instruction *Is = hintgenPropEq(hints, pass, VN, true, q.pos, q.vn, q.val_s.val, q.val_s.is_clone);
+    Instruction *It = hintgenPropEq(hints, pass, VN, false, q.pos, q.vn, q.val_t.val, q.val_t.is_clone);
+    q.val_s.val = Is;
+    q.val_t.val = It;
 
     if (Is == It) {
-      q.clear();
+      // q.clear();
       continue;
     }
     if (!Is || !It) {
-      q.clear();
-      wl_clear(worklist);
+      // q.clear();
+      // wl_clear(worklist);
+      hints.appendToDescription("GVN: HintgenPropeq Failed.");
       return;
     }
     if ((!isa<PHINode>(Is) && !isa<PHINode>(It) && (Is->getOpcode() != It->getOpcode()))) {
       hints.appendToDescription("GVN: We don't process processLoad optimization now.");
       hints.setReturnCodeToAdmitted();
-      q.clear();
-      wl_clear(worklist);
+      // q.clear();
+      // wl_clear(worklist);
       return;
     }
 
@@ -1070,8 +1082,8 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
         (It->getOpcode() == Instruction::Call)) {
       hints.appendToDescription("GVN: Readonly calls.");
       hints.setReturnCodeToAdmitted(); // We admit readonly call cases now.
-      q.clear();
-      wl_clear(worklist);
+      // q.clear();
+      // wl_clear(worklist);
       return;
     }
 
@@ -1084,10 +1096,10 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
     bool is_up_phi = false;
 
     // find upper position
-    if (!q.is_src_clone || !q.is_tgt_clone) {
+    if (!q.val_s.is_clone || !q.val_t.is_clone) {
       // hoist required
-      if (q.is_src_clone) pos_up = It;
-      else if (q.is_tgt_clone) pos_up = Is;
+      if (q.val_s.is_clone) pos_up = It;
+      else if (q.val_t.is_clone) pos_up = Is;
       else {
         bool src_dom_pos = DT->dominates(Is, q.pos),
           tgt_dom_pos = DT->dominates(It, q.pos);
@@ -1114,8 +1126,9 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           cl_new->setMetadata(LLVMContext::MD_dbg, NULL);
           resolvePhiArgs(cl_new, PN, PN->getIncomingBlock(i));
 
-          std::pair<Value*, bool> v1 = std::make_pair(cl_new, true),
-            v2 = std::make_pair(PN->getIncomingValue(i), false);
+          GQValueRef v1(cl_new, true), v2(PN->getIncomingValue(i));
+          // std::pair<Value*, bool> v1 = std::make_pair(cl_new, true),
+          //   v2 = std::make_pair(PN->getIncomingValue(i), false);
 
           if (visited.insert(std::make_pair(q.vn, term)))
             worklist.emplace_back(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
@@ -1146,10 +1159,10 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           else assert(false && "both values are not instruction");
 
           if (visited.insert(std::make_pair(vn_op, pos_up)))
-            worklist.emplace_back(vn_op, ops_src[i], false, ops_tgt[i], false, pos_up);
+            worklist.emplace_back(vn_op, ops_src[i], ops_tgt[i], pos_up);
         }
     }
-    q.clear();
+    // q.clear();
   }
 } // End LLVMBerry
 
