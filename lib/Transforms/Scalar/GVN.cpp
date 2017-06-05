@@ -795,9 +795,9 @@ struct GVNQuery {
     if (is_src_clone) delete src;
     if (is_tgt_clone) delete tgt;
   }
-  bool operator==(const GVNQuery &q2) const {
-    return (vn == q2.vn && pos == q2.pos);
-  }
+  // bool operator==(const GVNQuery &q2) const {
+  //   return (vn == q2.vn && pos == q2.pos);
+  // }
   bool operator<(const GVNQuery &q2) const {
     return std::make_pair(std::make_pair(src, tgt), pos) <
       std::make_pair(std::make_pair(q2.src, q2.tgt), q2.pos);
@@ -1034,11 +1034,11 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
   DominatorTree *DT = VN.getDomTree();
 
   SmallVector<GVNQuery, 4> worklist;
-  SmallSetVector<GVNQuery, 10> visited;
+  SmallSetVector<std::pair<uint32_t, Instruction*>, 10> visited;
 
   GVNQuery qi(VN.lookup_VN_of_expr(I), I, false, repl, false, I);
   worklist.push_back(qi);
-  visited.insert(qi);
+  visited.insert(std::make_pair(VN.lookup_VN_of_expr(I), I));
 
   while (!worklist.empty()){
     GVNQuery q = worklist.back();
@@ -1119,7 +1119,7 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
             v2 = std::make_pair(PN->getIncomingValue(i), false);
 
           GVNQuery q_new(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
-          if (visited.insert(q_new)) worklist.push_back(q_new);
+          if (visited.insert(std::make_pair(q.vn, term))) worklist.push_back(q_new);
           else delete cl_new;
         }
         is_up_phi = true;
@@ -1147,7 +1147,7 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           else assert(false && "both values are not instruction");
 
           GVNQuery q_new(vn_op, ops_src[i], false, ops_tgt[i], false, pos_up);
-          if (visited.insert(q_new)) worklist.push_back(q_new);
+          if (visited.insert(std::make_pair(vn_op, pos_up))) worklist.push_back(q_new);
         }
     }
     q.clear();
