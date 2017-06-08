@@ -789,26 +789,27 @@ struct GQValueRef {
     else val = vr.val;
   }
   ~GQValueRef() { if (is_clone) delete val; }
-  // Value* operator->() { return &val; }
 };
 
+/* GVN Hint Generation Query Data
+   GVNQuery(vn, val_s, val_t, pos) denotes:
+   - at the position 'pos', we require val_s >= ghost(vn) in SRC,
+   - and also ghost(vn) >= val_t in TGT.
+
+   - If val_s dominates pos, it denotes VAR(val_s).
+   - Otherwise, it denotes RHS(val_s), in which each operand that doesn't
+   - dominate pos is replaced with the corresponding ghost variable. */
 struct GVNQuery {
   uint32_t vn;
   GQValueRef val_s;
   GQValueRef val_t;
-  // Value *src;
-  // bool is_src_clone;
-  // Value *tgt;
-  // bool is_tgt_clone;
   Instruction *pos;
+
   GVNQuery(uint32_t n, Value *qs, Value *qt, Instruction *p)
     : vn(n), val_s(qs, false), val_t(qt, false), pos(p) {}
-  // GVNQuery(uint32_t n, std::pair<Value*, bool> vps, std::pair<Value*, bool> vpt, Instruction *p)
-  GVNQuery(uint32_t n, GQValueRef &vr_s, GQValueRef &vr_t, Instruction *p)
+  GVNQuery(uint32_t n, const GQValueRef &vr_s, const GQValueRef &vr_t, Instruction *p)
     : vn(n), val_s(vr_s), val_t(vr_t), pos(p) {}
-  // bool operator==(const GVNQuery &q2) const {
-  //   return (vn == q2.vn && pos == q2.pos);
-  // }
+
   bool operator<(const GVNQuery &q2) const {
     return std::make_pair(std::make_pair(val_s.val, val_t.val), pos) <
       std::make_pair(std::make_pair(q2.val_s.val, q2.val_t.val), q2.pos);
@@ -1033,14 +1034,6 @@ void extractOps(ValueTable &VN, SmallVector<Value*, 4> &ops_src, Instruction *I_
     ops_src.push_back(*OI);
 }
 
-// void wl_clear(SmallVector<GVNQuery, 4> worklist) {
-//   while (!worklist.empty()) {
-//     GVNQuery q = worklist.back();
-//     q.clear();
-//     worklist.pop_back();
-//   }
-// }
-
 void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instruction *I, Value *repl) {
   DominatorTree *DT = VN.getDomTree();
 
@@ -1051,7 +1044,7 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
   visited.insert(std::make_pair(VN.lookup_VN_of_expr(I), I));
 
   while (!worklist.empty()){
-    GVNQuery q = worklist.back();
+    GVNQuery q(worklist.back());
     worklist.pop_back();
 
     if (q.val_t.val == I) q.val_t.val = repl;
@@ -1060,21 +1053,14 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
     q.val_s.val = Is;
     q.val_t.val = It;
 
-    if (Is == It) {
-      // q.clear();
-      continue;
-    }
+    if (Is == It) continue;
     if (!Is || !It) {
-      // q.clear();
-      // wl_clear(worklist);
       hints.appendToDescription("GVN: HintgenPropeq Failed.");
       return;
     }
     if ((!isa<PHINode>(Is) && !isa<PHINode>(It) && (Is->getOpcode() != It->getOpcode()))) {
       hints.appendToDescription("GVN: We don't process processLoad optimization now.");
       hints.setReturnCodeToAdmitted();
-      // q.clear();
-      // wl_clear(worklist);
       return;
     }
 
@@ -1082,8 +1068,6 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
         (It->getOpcode() == Instruction::Call)) {
       hints.appendToDescription("GVN: Readonly calls.");
       hints.setReturnCodeToAdmitted(); // We admit readonly call cases now.
-      // q.clear();
-      // wl_clear(worklist);
       return;
     }
 
@@ -1127,12 +1111,9 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           resolvePhiArgs(cl_new, PN, PN->getIncomingBlock(i));
 
           GQValueRef v1(cl_new, true), v2(PN->getIncomingValue(i));
-          // std::pair<Value*, bool> v1 = std::make_pair(cl_new, true),
-          //   v2 = std::make_pair(PN->getIncomingValue(i), false);
 
           if (visited.insert(std::make_pair(q.vn, term)))
             worklist.emplace_back(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
-          else delete cl_new;
         }
         is_up_phi = true;
       }
@@ -1162,7 +1143,6 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
             worklist.emplace_back(vn_op, ops_src[i], ops_tgt[i], pos_up);
         }
     }
-    // q.clear();
   }
 } // End LLVMBerry
 
