@@ -5,6 +5,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
@@ -269,6 +270,7 @@ struct LICMHoistOrSinkCond {
 public:
   LICMHoistOrSinkCond();
   bool useAA;
+  const llvm::Loop *CurLoop;
 };
 DEFINE_TRAITS(ArgForHoistOrSinkCond, LICMHoistOrSinkCond);
 

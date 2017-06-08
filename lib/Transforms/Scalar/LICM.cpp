@@ -81,7 +81,7 @@ DisablePromotion("disable-licm-promotion", cl::Hidden,
 
 static bool inSubLoop(BasicBlock *BB, Loop *CurLoop, LoopInfo *LI);
 static bool isNotUsedInLoop(const Instruction &I, const Loop *CurLoop);
-static bool hoist(Instruction &I, BasicBlock *Preheader, const Loop *CurLoop);
+static bool hoist(Instruction &I, BasicBlock *Preheader);
 static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
                  const Loop *CurLoop, AliasSetTracker *CurAST );
 static bool isGuaranteedToExecute(const Instruction &Inst,
@@ -221,6 +221,10 @@ bool LICM::runOnLoop(Loop *L, LPPassManager &LPM) {
   }
 
   CurLoop = L;
+  llvmberry::intrude([this]() {
+    llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+    pdata.get<llvmberry::ArgForHoistOrSinkCond>()->CurLoop = this->CurLoop;
+  });
 
   // Get the preheader block to move instructions into...
   Preheader = L->getLoopPreheader();
@@ -424,7 +428,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
           canSinkOrHoistInst(I, AA, DT, TLI, CurLoop, CurAST, SafetyInfo) &&
           isSafeToExecuteUnconditionally(I, DT, TLI, CurLoop, SafetyInfo,
                                  CurLoop->getLoopPreheader()->getTerminator()))
-        Changed |= hoist(I, CurLoop->getLoopPreheader(), CurLoop);
+        Changed |= hoist(I, CurLoop->getLoopPreheader());
     }
 
   const std::vector<DomTreeNode*> &Children = N->getChildren();
@@ -856,14 +860,14 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
 /// When an instruction is found to only use loop invariant operands that
 /// is safe to hoist, this instruction is called to do the dirty work.
 ///
-static bool hoist(Instruction &I, BasicBlock *Preheader, const Loop *CurLoop) {
+static bool hoist(Instruction &I, BasicBlock *Preheader) {
   DEBUG(dbgs() << "LICM hoisting to " << Preheader->getName() << ": "
         << I << "\n");
   // Move the new node to the Preheader, before its terminator.
   llvmberry::ValidationUnit::Begin("licm.hoist",
                                    I.getParent()->getParent(),
                                    true);
-  INTRUDE(CAPTURE(&I, Preheader, CurLoop), {
+  INTRUDE(CAPTURE(&I, Preheader), {
 
     auto &pdic = llvmberry::PassDictionary::GetInstance();
     if (pdic.get<llvmberry::ArgForHoistOrSinkCond>()->useAA) {
@@ -873,6 +877,7 @@ static bool hoist(Instruction &I, BasicBlock *Preheader, const Loop *CurLoop) {
       hints.setReturnCodeToAdmitted();
       return;
     }
+    auto CurLoop = pdic.get<llvmberry::ArgForHoistOrSinkCond>()->CurLoop;
     auto Iname = llvmberry::getVariable(I);
 
     // Propagate maydiffs from header to any reachable instructions,
@@ -915,7 +920,7 @@ static bool hoist(Instruction &I, BasicBlock *Preheader, const Loop *CurLoop) {
     insertSrcNopAtTgtI(hints, Preheader->getTerminator());
   });
   I.moveBefore(Preheader->getTerminator());
-  INTRUDE(CAPTURE(&I, Preheader, CurLoop), {
+  INTRUDE(CAPTURE(&I, Preheader), {
     auto Iname = llvmberry::getVariable(I);
     PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(INSTPOS(TGT, &I), INSTPOS(TGT, Preheader->getTerminator())));
   });

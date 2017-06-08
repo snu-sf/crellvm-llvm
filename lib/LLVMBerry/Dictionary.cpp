@@ -127,6 +127,7 @@ GVNReplaceArg::GVNReplaceArg() {
 
 LICMHoistOrSinkCond::LICMHoistOrSinkCond() {
   useAA = false;
+  CurLoop = nullptr;
 }
 
 PassDictionary *PassDictionary::_Instance = nullptr;
