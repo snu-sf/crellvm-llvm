@@ -1010,10 +1010,11 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
       Instruction *I_op = cast<Instruction>(I_q->getOperand(*II));
       uint32_t vn_op = VN.lookup_VN_of_expr(I_op);
 
-      std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q));
+      std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q)->get());
       replaceConsinsn(ginsn, repl_map);
+      std::shared_ptr<llvmberry::TyExpr> ginsn_e(new llvmberry::TyExpr(ginsn));
 
-      auto prop_obj = isSrc? LESSDEF(ginsn, gvar, SRC) : LESSDEF(gvar, ginsn, TGT);
+      auto prop_obj = isSrc? LESSDEF(ginsn_e, gvar, SRC) : LESSDEF(gvar, ginsn_e, TGT);
       if (DT->dominates(I_op, pos_d)) {
         PROPAGATE(prop_obj, BOUNDS(INSTPOS(SRC, I_op), INSTPOS(SRC, pos_d)));
         pos_d = I_op;
@@ -1022,9 +1023,10 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
       hintgenHoist(hints, VN, I_op, pos_d, pos_u, isSrc);
     }
 
-    std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q));
+    std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I_q)->get());
     replaceConsinsn(ginsn, repl_map);
-    auto prop_obj = isSrc? LESSDEF(ginsn, gvar, SRC) : LESSDEF(gvar, ginsn, TGT);
+    std::shared_ptr<llvmberry::TyExpr> ginsn_e(new llvmberry::TyExpr(ginsn));
+    auto prop_obj = isSrc? LESSDEF(ginsn_e, gvar, SRC) : LESSDEF(gvar, ginsn_e, TGT);
     PROPAGATE(prop_obj, BOUNDS(INSTPOS(SRC, pos_u), INSTPOS(SRC, pos_d)));
   }
 }
@@ -3089,8 +3091,8 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
         PROPAGATE(prop_tgt, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(llvmberry::Source, *userI, prev_block_name)));
       }
       llvmberry::insertTgtNopAtSrcI(hints, I);
-      llvmberry::propagateMaydiffGlobal(id_I, llvmberry::Physical); // id
-      llvmberry::propagateMaydiffGlobal(id_I, llvmberry::Previous); // id
+      llvmberry::propagateMaydiffGlobal(hints, id_I, llvmberry::Physical); // id
+      llvmberry::propagateMaydiffGlobal(hints, id_I, llvmberry::Previous); // id
     });
   });
 
