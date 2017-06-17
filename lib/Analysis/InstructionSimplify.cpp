@@ -1298,8 +1298,7 @@ static bool isUndefShift(Value *Amount) {
   // X shift by undef -> undef because it may shift by the bitwidth.
   if (isa<UndefValue>(C)) {
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(), {
         //    <src>        |  <tgt>
         // Z = X >>a undef | (Z equals undef)
         //    <src>        |  <tgt>
@@ -1311,10 +1310,8 @@ static bool isUndefShift(Value *Amount) {
         ptr->setHintGenFunc("shift_undef1", [&hints](llvm::Instruction *I) {
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
           Value *Y = Z->getOperand(0);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          INFRULE(INSTPOS(SRC, Z),
-                  llvmberry::ConsShiftUndef1::make(
-                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftUndef1::make(
+                  VAL(Z), VAL(Y), BITSIZE(*Z)));
         });
       });
     }
@@ -1326,8 +1323,7 @@ static bool isUndefShift(Value *Amount) {
     if (CI->getValue().getLimitedValue() >=
         CI->getType()->getScalarSizeInBits()) {
       if (llvmberry_doHintGen) {
-        llvmberry::ValidationUnit::GetInstance()->intrude([CI](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        INTRUDE(CAPTURE(CI), {
           //    <src>    |  <tgt>
           // Z = X >>a C | (Z equals undef)
           //   (C is not smaller than size of bit)
@@ -1344,11 +1340,10 @@ static bool isUndefShift(Value *Amount) {
             BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
             Value *Y = Z->getOperand(0);
             ConstantInt *C = CI;
-            int bitwidth = Z->getType()->getIntegerBitWidth();
             INFRULE(INSTPOS(SRC, Z),
                     llvmberry::ConsShiftUndef2::make(
-                        VAL(Z, Physical), VAL(Y, Physical),
-                        llvmberry::TyConstInt::make(*C), BITSIZE(bitwidth)));
+                        VAL(Z), VAL(Y),
+                        llvmberry::TyConstInt::make(*C), BITSIZE(*Z)));
           });
         });
       }
@@ -1382,21 +1377,18 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
   }
 
   if (llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-      if (Op0->getType()->isVectorTy()) {
+    INTRUDE(CAPTURE(Op0, Op1), {
+      if (Op0->getType()->isVectorTy())
         data.get<llvmberry::ArgForSimplifyShiftInst>()->abort();
-      } else if (!Op0->getType()->isIntegerTy()) {
+      else if (!Op0->getType()->isIntegerTy())
         assert(false && "Op0 must be integer or vector ty");
-      }
     });
   }
 
   // 0 shift by X -> 0
   if (match(Op0, m_Zero())) {
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>    |  <tgt>
         // Z = 0 >>a X | (Z equals 0)
         //    <src>    |  <tgt>
@@ -1408,11 +1400,8 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
         ptr->setHintGenFunc("shift_zero1",
                             [Op0, Op1, &hints](llvm::Instruction *I) {
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          Value *Y = Z->getOperand(1);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          INFRULE(INSTPOS(SRC, Z),
-                  llvmberry::ConsShiftZero1::make(
-                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftZero1::make(
+                      VAL(Z), VAL(Z->getOperand(1)), BITSIZE(*Z)));
         });
       });
     }
@@ -1422,8 +1411,7 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
   // X shift by 0 -> X
   if (match(Op1, m_Zero())) {
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>    |  <tgt>
         // Z = X >>a 0 | (Z equals X)
         //    <src>    |  <tgt>
@@ -1435,11 +1423,8 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
         ptr->setHintGenFunc("shift_zero2",
                             [Op0, Op1, &hints](llvm::Instruction *I) {
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          Value *Y = Z->getOperand(0);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          INFRULE(INSTPOS(SRC, Z),
-                  llvmberry::ConsShiftZero2::make(
-                      VAL(Z, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftZero2::make(
+                  VAL(Z), VAL(Z->getOperand(0)), BITSIZE(*Z)));
         });
       });
     }
@@ -1451,8 +1436,7 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
     return UndefValue::get(Op0->getType());
 
   if (llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(), {
       data.get<llvmberry::ArgForSimplifyShiftInst>()->abort();
     });
   }
@@ -1689,8 +1673,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   bool llvmberry_doHintGen = llvmberry::ValidationUnit::Exists() &&
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_and_inst";
   if(llvmberry_doHintGen){
-    llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(Op0, Op1), {
       data.get<llvmberry::ArgForSimplifyAndInst>()->isSwapped = false;
       if (Op0->getType()->isVectorTy()) {
         data.get<llvmberry::ArgForSimplifyAndInst>()->abort();
@@ -1709,18 +1692,14 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        data.get<llvmberry::ArgForSimplifyAndInst>()->isSwapped = true;
-      });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForSimplifyAndInst>()->isSwapped = true; });
     }
   }
 
   // X & undef -> 0
   if (match(Op1, m_Undef())){
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>      |  <tgt>
         // Z = X & undef | (Z equals 0)
         auto ptr = data.get<llvmberry::ArgForSimplifyAndInst>();
@@ -1728,13 +1707,10 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("and_undef", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          auto zero = Constant::getNullValue(Op0->getType());
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          if(isSwapped){
-            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
-          }
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndUndef::make(
-                  VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
+          // auto zero = Constant::getNullValue(Op0->getType());
+          if(isSwapped)
+            llvmberry::applyCommutativity(hints, Z, Z, llvmberry::Source);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndUndef::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
         });
       });
     }
@@ -1744,17 +1720,15 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   // X & X = X
   if (Op0 == Op1){
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>  |  <tgt>
         // Z = X & X | (Z equals X)
         auto ptr = data.get<llvmberry::ArgForSimplifyAndInst>();
         
         ptr->setHintGenFunc("and_same", [Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndSame::make(
-                  VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
+                  VAL(Z), VAL(Op0), BITSIZE(*Z)));
 
         });
       });
@@ -1765,8 +1739,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   // X & 0 = 0
   if (match(Op1, m_Zero())){
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>  |  <tgt>
         // Z = X & 0 | (Z equals 0)
         auto ptr = data.get<llvmberry::ArgForSimplifyAndInst>();
@@ -1774,11 +1747,9 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("and_zero", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if(isSwapped)
-            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndZero::make(
-                  VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
+            llvmberry::applyCommutativity(hints, Z, Z, SRC);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndZero::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
 
         });
       });
@@ -1789,8 +1760,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   // X & -1 = X
   if (match(Op1, m_AllOnes())){
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>   |  <tgt>
         // Z = X & -1 | (Z equals X)
         auto ptr = data.get<llvmberry::ArgForSimplifyAndInst>();
@@ -1798,11 +1768,9 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("and_mone", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           if(isSwapped)
-            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndMone::make(
-                  VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
+            llvmberry::applyCommutativity(hints, Z, Z, SRC);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndMone::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
 
         });
       });
@@ -1814,8 +1782,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   if (match(Op0, m_Not(m_Specific(Op1))) ||
       match(Op1, m_Not(m_Specific(Op0)))){
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>   |  <tgt>
         // Y = X ^ -1 | Y = X ^ -1
         // Z = X & Y  | (Z equals 0)
@@ -1828,17 +1795,13 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
           Value *X = isOp1NotOfOp0 ? Op0 : Op1;
           BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOfOp0 ? Op1 : Op0);
           assert(Y);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
 
-          llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
-          if(Y->getOperand(0) != X){
-            llvmberry::applyCommutativity(Z, Y, llvmberry::Source);
-          }
-          if((isSwapped && isOp1NotOfOp0) || (!isSwapped && !isOp1NotOfOp0)){
-            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
-          }
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndNot::make(
-                  VAL(Z), VAL(X), VAL(Y), BITSIZE(bitwidth)));
+          llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
+          if(Y->getOperand(0) != X)
+            llvmberry::applyCommutativity(hints, Z, Y, SRC);
+          if((isSwapped && isOp1NotOfOp0) || (!isSwapped && !isOp1NotOfOp0))
+            llvmberry::applyCommutativity(hints, Z, Z, SRC);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndNot::make(VAL(Z), VAL(X), VAL(Y), BITSIZE(*Z)));
         });
       });
     }
@@ -1850,8 +1813,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   if (match(Op0, m_Or(m_Value(A), m_Value(B))) &&
       (A == Op1 || B == Op1)){
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>  |   <tgt>
         // Y = X | A | Y = X | A
         // Z = X & Y | (Z equals X)
@@ -1876,8 +1838,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   if (match(Op1, m_Or(m_Value(A), m_Value(B))) &&
       (A == Op0 || B == Op0)){
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>  |   <tgt>
         // Y = X | A | Y = X | A
         // Z = X & Y | (Z equals X)
@@ -1898,8 +1859,7 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   }
 
   if (llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(), {
       data.get<llvmberry::ArgForSimplifyAndInst>()->abort();
     });
   }
@@ -2023,8 +1983,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   bool llvmberry_doHintGen = llvmberry::ValidationUnit::Exists() &&
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_or_inst";
   if (llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([Op0](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(Op0), {
       data.create<llvmberry::ArgForSimplifyOrInst>()->isSwapped = false;
       if (Op0->getType()->isVectorTy()) {
         data.get<llvmberry::ArgForSimplifyOrInst>()->abort();
@@ -2044,8 +2003,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(), {
         data.get<llvmberry::ArgForSimplifyOrInst>()->isSwapped = true;
       });
     }
@@ -2054,8 +2012,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   // X | undef -> -1
   if (match(Op1, m_Undef())) {
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>      |  <tgt>
         // Z = X | undef | (Z equals -1)
         auto ptr = data.get<llvmberry::ArgForSimplifyOrInst>();
@@ -2063,13 +2020,10 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("or_undef", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          auto one = Constant::getAllOnesValue(Op0->getType());
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          if (isSwapped) {
-            llvmberry::applyCommutativity(Z, Z, SRC);
-          }
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrUndef::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+          // auto one = Constant::getAllOnesValue(Op0->getType());
+          if (isSwapped)
+            llvmberry::applyCommutativity(hints, Z, Z, SRC);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrUndef::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
         });
       });
     }
@@ -2080,16 +2034,14 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   // X | X = X
   if (Op0 == Op1) {
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0), {
         //    <src>  |  <tgt>
         // Z = X | X | (Z equals X)
         auto ptr = data.get<llvmberry::ArgForSimplifyOrInst>();
         ptr->setHintGenFunc("or_same", [Op0, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrSame::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2100,8 +2052,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   // X | 0 = X
   if (match(Op1, m_Zero())) {
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>  |  <tgt>
         // Z = X | 0 | (Z equals X)
         auto ptr = data.get<llvmberry::ArgForSimplifyOrInst>();
@@ -2109,12 +2060,9 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("or_zero", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          if (isSwapped) {
-            llvmberry::applyCommutativity(Z, Z, SRC);
-          }
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrZero::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+          if (isSwapped)
+            llvmberry::applyCommutativity(hints, Z, Z, SRC);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrZero::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
         });
       });
     }
@@ -2124,8 +2072,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   // X | -1 = -1
   if (match(Op1, m_AllOnes())) {
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>   |  <tgt>
         // Z = X | -1 | (Z equals -1)
         auto ptr = data.get<llvmberry::ArgForSimplifyOrInst>();
@@ -2133,12 +2080,9 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("or_mone", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          if (isSwapped) {
-            llvmberry::applyCommutativity(Z, Z, SRC);
-          }
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrMone::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+          if (isSwapped)
+            llvmberry::applyCommutativity(hints, Z, Z, SRC);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrMone::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
         });
       });
     }
@@ -2149,8 +2093,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   if (match(Op0, m_Not(m_Specific(Op1))) ||
       match(Op1, m_Not(m_Specific(Op0)))) {
     if (llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>   |  <tgt>
         // Y = X ^ -1 | Y = X ^ -1
         // Z = X | Y  | (Z equals -1)
@@ -2163,15 +2106,13 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
           Value *X = isOp1NotOp0 ? Op0 : Op1;
           BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOp0 ? Op1 : Op0);
           assert(Y && "Y must be a binary operator");
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           
-          llvmberry::propagateInstruction(Y, Z, SRC);
+          llvmberry::propagateInstruction(hints, Y, Z, SRC);
           if (Y->getOperand(0) != X)
-            llvmberry::applyCommutativity(Z, Y, SRC);
+            llvmberry::applyCommutativity(hints, Z, Y, SRC);
           if ((!isSwapped && !isOp1NotOp0) || (isSwapped && isOp1NotOp0))
-            llvmberry::applyCommutativity(Z, Z, SRC);
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrNot::make(
-              VAL(Z, Physical), VAL(Y, Physical), VAL(X, Physical), BITSIZE(bitwidth)));
+            llvmberry::applyCommutativity(hints, Z, Z, SRC);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsOrNot::make(VAL(Z), VAL(Y), VAL(X), BITSIZE(*Z)));
         });
       });
     }
@@ -2206,8 +2147,7 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
     return Constant::getAllOnesValue(Op0->getType());
 
   if (llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(), {
       data.get<llvmberry::ArgForSimplifyOrInst>()->abort();
     });
   }
@@ -2298,8 +2238,7 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
   bool llvmberry_doHintGen = llvmberry::ValidationUnit::Exists() &&
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_xor_inst";
   if(llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([Op0](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(Op0), {
       data.get<llvmberry::ArgForSimplifyXorInst>()->isSwapped = false;
       if (Op0->getType()->isVectorTy()) {
         data.get<llvmberry::ArgForSimplifyXorInst>()->abort();
@@ -2318,18 +2257,14 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
     // Canonicalize the constant to the RHS.
     std::swap(Op0, Op1);
     if(llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        data.get<llvmberry::ArgForSimplifyXorInst>()->isSwapped = true;
-      });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForSimplifyXorInst>()->isSwapped = true; });
     }
   }
 
   // A ^ undef -> undef
   if (match(Op1, m_Undef())) {
     if(llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>      |  <tgt>
         // Z = X ^ undef | (Z equals 0)
         auto ptr = data.get<llvmberry::ArgForSimplifyXorInst>();
@@ -2337,13 +2272,11 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("xor_undef", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          auto zero = Constant::getNullValue(Op0->getType());
+          // auto zero = Constant::getNullValue(Op0->getType());
           int bitwidth = Z->getType()->getIntegerBitWidth();
-          if(isSwapped){
-            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
-          }
-          INFRULE(INSTPOS(llvmberry::Source, Z),
-              llvmberry::ConsXorUndef::make(VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+          if(isSwapped)
+            llvmberry::applyCommutativity(hints, Z, Z, llvmberry::Source);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsXorUndef::make(VAL(Z), VAL(Op0), BITSIZE(bitwidth)));
         });
       });
     }
@@ -2353,8 +2286,7 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
   // A ^ 0 = A
   if (match(Op1, m_Zero())) {
     if(llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>  |  <tgt>
         // Z = X ^ 0 | (Z equals 0)
         auto ptr = data.get<llvmberry::ArgForSimplifyXorInst>();
@@ -2362,12 +2294,9 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
         
         ptr->setHintGenFunc("xor_zero", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          if(isSwapped){
-            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
-          }
-          INFRULE(INSTPOS(llvmberry::Source, Z),
-              llvmberry::ConsXorZero::make(VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+          if(isSwapped)
+            llvmberry::applyCommutativity(hints, Z, Z, llvmberry::Source);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsXorZero::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
         });
       });
     }
@@ -2377,17 +2306,15 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
   // A ^ A = 0
   if (Op0 == Op1) {
     if(llvmberry_doHintGen) {
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>  |  <tgt>
         // Z = X ^ X | (Z equals X)
         auto ptr = data.get<llvmberry::ArgForSimplifyXorInst>();
         
         ptr->setHintGenFunc("xor_same", [Op0, Op1, &hints](llvm::Instruction *I){
           BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
           INFRULE(INSTPOS(llvmberry::Source, Z), llvmberry::ConsXorSame::make(
-              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(bitwidth)));
+              VAL(Z, Physical), VAL(Op0, Physical), BITSIZE(*Z)));
         });
       });
     }
@@ -2398,8 +2325,7 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
   if (match(Op0, m_Not(m_Specific(Op1))) ||
       match(Op1, m_Not(m_Specific(Op0)))) {
     if(llvmberry_doHintGen){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Op0, Op1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(Op0, Op1), {
         //    <src>   |  <tgt>
         // Y = X ^ -1 | Y = X ^ -1
         // Z = X ^ Y  | (Z equals -1)
@@ -2412,16 +2338,13 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
           Value *X = isOp1NotOfOp0 ? Op0 : Op1;
           BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOfOp0 ? Op1 : Op0);
           assert(Y);
-          int bitwidth = Z->getType()->getIntegerBitWidth();
 
-          llvmberry::propagateInstruction(Y, Z, llvmberry::Source);
+          llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
           if(Y->getOperand(0) != X)
-            llvmberry::applyCommutativity(Z, Y, llvmberry::Source);
+            llvmberry::applyCommutativity(hints, Z, Y, llvmberry::Source);
           if((isSwapped && isOp1NotOfOp0) || (!isSwapped && !isOp1NotOfOp0))
-            llvmberry::applyCommutativity(Z, Z, llvmberry::Source);
-          INFRULE(INSTPOS(llvmberry::Source, Z),
-              llvmberry::ConsXorNot::make(
-                  VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical), BITSIZE(bitwidth)));
+            llvmberry::applyCommutativity(hints, Z, Z, llvmberry::Source);
+          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsXorNot::make(VAL(Z), VAL(X), VAL(Y), BITSIZE(*Z)));
         });
       });
     }
@@ -2429,8 +2352,7 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
   }
 
   if (llvmberry_doHintGen) {
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(), {
       data.get<llvmberry::ArgForSimplifyXorInst>()->abort();
     });
   }

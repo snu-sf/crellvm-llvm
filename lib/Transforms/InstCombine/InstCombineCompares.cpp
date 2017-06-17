@@ -2647,8 +2647,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         (Op0Cplxity == Op1Cplxity &&
          swapMayExposeCSEOpportunities(Op0, Op1))) {
     llvmberry::ValidationUnit::Begin("icmp_swap", I.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &Op1]
-        (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+    INTRUDE(CAPTURE(&I, &Op0, &Op1), {
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsIcmpSwapOperands::make(I));
     });
 
@@ -2687,17 +2686,13 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
   // icmp's with boolean values can always be turned into bitwise operations
   if (Ty->isIntegerTy(1)) {
     llvmberry::ValidationUnit::Begin("icmp_unnamed", I.getParent()->getParent());
-    llvmberry::ValidationUnit::GetInstance()->intrude([]
-        (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-      data.create<llvmberry::ArgForVisitICmp>();
-    });
+    INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForVisitICmp>(); });
     switch (I.getPredicate()) {
     default: llvm_unreachable("Invalid icmp instruction!");
     case ICmpInst::ICMP_EQ: {               // icmp eq i1 A, B -> ~(A^B)
       Value *Xor = Builder->CreateXor(Op0, Op1, I.getName()+"tmp");
-      
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Xor]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+
+      INTRUDE(CAPTURE(&I, &Xor), {
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_eq_xor_not");
         //        <src>        |      <tgt>
         // <nop>               | Z' = xor A, B
@@ -2706,44 +2701,39 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Xor);
         Value *A = Zprime->getOperand(0);
         Value *B = Zprime->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Xor), llvmberry::Physical);
-        llvmberry::propagateInstruction(Zprime, Z, TGT);
+        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Xor), llvmberry::Physical);
+        llvmberry::propagateInstruction(hints, Zprime, Z, TGT);
         INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpEqXorNot::make(
-             VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+             VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
       });
 
       return BinaryOperator::CreateNot(Xor);
     }
     case ICmpInst::ICMP_NE:                  // icmp eq i1 A, B -> A^B
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I), {
         llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ne_xor");
         //        <src>        |      <tgt>
         // Z = icmp ne i1 A, B | Z  = xor A, B
         ICmpInst *Z = &I;
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeXor::make(
-             VAL(Z), VAL(A), VAL(B), BITSIZE(bitsize)));
+             VAL(Z), VAL(A), VAL(B), BITSIZE(*Z)));
       });
       
       return BinaryOperator::CreateXor(Op0, Op1);
 
     case ICmpInst::ICMP_UGT:
-      llvmberry::ValidationUnit::GetInstance()->intrude([]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(), {
         data.get<llvmberry::ArgForVisitICmp>()->swapOps = true;
       });
       std::swap(Op0, Op1);                   // Change icmp ugt -> icmp ult
       // FALL THROUGH
     case ICmpInst::ICMP_ULT:{               // icmp ult i1 A, B -> ~A & B
       Value *Not = Builder->CreateNot(Op0, I.getName()+"tmp");
-      
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Not, &Op0, &Op1]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+
+      INTRUDE(CAPTURE(&I, &Not, &Op0, &Op1), {
         //        <src>         |      <tgt>
         // <nop>                | Z' = xor -1, A
         // Z = icmp ult i1 A, B | Z  = and Z', B
@@ -2754,38 +2744,33 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Not), llvmberry::Physical);
-        llvmberry::propagateInstruction(Zprime, Z, TGT);
+        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Not), llvmberry::Physical);
+        llvmberry::propagateInstruction(hints, Zprime, Z, TGT);
         if(Zprime->getOperand(0) == Op0)
-          llvmberry::applyCommutativity(Z, Zprime, TGT);
+          llvmberry::applyCommutativity(hints, Z, Zprime, TGT);
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ugt_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUgtAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ult_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUltAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         }
       });
 
       return BinaryOperator::CreateAnd(Not, Op1);
     }
     case ICmpInst::ICMP_SGT:
-      llvmberry::ValidationUnit::GetInstance()->intrude([]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        data.get<llvmberry::ArgForVisitICmp>()->swapOps = true;
-      });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp sgt -> icmp slt
       // FALL THROUGH
     case ICmpInst::ICMP_SLT: {               // icmp slt i1 A, B -> A & ~B
       Value *Not = Builder->CreateNot(Op1, I.getName()+"tmp");
-      
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Not, &Op0, &Op1]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+
+      INTRUDE(CAPTURE(&I, &Not, &Op0, &Op1), {
         //        <src>         |      <tgt>
         // <nop>                | Z' = xor -1, B
         // Z = icmp slt i1 A, B | Z  = and Z', A
@@ -2796,38 +2781,34 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
+
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Not), llvmberry::Physical);
-        llvmberry::propagateInstruction(Zprime, Z, TGT);
+        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Not), llvmberry::Physical);
+        llvmberry::propagateInstruction(hints, Zprime, Z, TGT);
         if(Zprime->getOperand(0) == Op1)
-          llvmberry::applyCommutativity(Z, Zprime, TGT);
+          llvmberry::applyCommutativity(hints, Z, Zprime, TGT);
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sgt_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSgtAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_slt_and_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSltAndNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         }
       });
       
       return BinaryOperator::CreateAnd(Not, Op0);
     }
     case ICmpInst::ICMP_UGE:
-      llvmberry::ValidationUnit::GetInstance()->intrude([]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        data.get<llvmberry::ArgForVisitICmp>()->swapOps = true;
-      });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp uge -> icmp ule
       // FALL THROUGH
     case ICmpInst::ICMP_ULE: {               //  icmp ule i1 A, B -> ~A | B
       Value *Not = Builder->CreateNot(Op0, I.getName()+"tmp");
-      
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Not, &Op0, &Op1]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+
+      INTRUDE(CAPTURE(&I, &Not, &Op0, &Op1), {
         //        <src>         |      <tgt>
         // <nop>                | Z' = xor -1, A
         // Z = icmp ule i1 A, B | Z  = or  Z', B
@@ -2838,37 +2819,33 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
+
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Not), llvmberry::Physical);
-        llvmberry::propagateInstruction(Zprime, Z, TGT);
+        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Not), llvmberry::Physical);
+        llvmberry::propagateInstruction(hints, Zprime, Z, TGT);
         if(Zprime->getOperand(0) == Op0)
-          llvmberry::applyCommutativity(Z, Zprime, TGT);
+          llvmberry::applyCommutativity(hints, Z, Zprime, TGT);
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_uge_or_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUgeOrNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ule_or_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpUleOrNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         }
       });
       return BinaryOperator::CreateOr(Not, Op1);
     }
     case ICmpInst::ICMP_SGE:
-      llvmberry::ValidationUnit::GetInstance()->intrude([]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
-        data.get<llvmberry::ArgForVisitICmp>()->swapOps = true;
-      });
+      INTRUDE(CAPTURE(), { data.get<llvmberry::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp sge -> icmp sle
       // FALL THROUGH
     case ICmpInst::ICMP_SLE: {               //  icmp sle i1 A, B -> A | ~B
       Value *Not = Builder->CreateNot(Op1, I.getName()+"tmp");
-      
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Not, &Op0, &Op1]
-          (llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+
+      INTRUDE(CAPTURE(&I, &Not, &Op0, &Op1), {
         //        <src>         |      <tgt>
         // <nop>                | Z' = xor -1, B
         // Z = icmp sle i1 A, B | Z  = or  Z', A
@@ -2879,21 +2856,21 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
         Value *A = Z->getOperand(0);
         Value *B = Z->getOperand(1);
-        unsigned bitsize = Z->getType()->getIntegerBitWidth();
+
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
-        llvmberry::propagateMaydiffGlobal(llvmberry::getVariable(*Not), llvmberry::Physical);
-        llvmberry::propagateInstruction(Zprime, Z, TGT);
+        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Not), llvmberry::Physical);
+        llvmberry::propagateInstruction(hints, Zprime, Z, TGT);
         if(Zprime->getOperand(0) == Op1)
-          llvmberry::applyCommutativity(Z, Zprime, TGT);
+          llvmberry::applyCommutativity(hints, Z, Zprime, TGT);
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sge_or_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSgeOrNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         } else {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sle_or_not");
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsIcmpSleOrNot::make(
-                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(bitsize)));
+                VAL(Z), VAL(Zprime), VAL(A), VAL(B), BITSIZE(*Z)));
         }
       });
       return BinaryOperator::CreateOr(Not, Op0);
@@ -2942,14 +2919,13 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
           match(Op0, m_Sub(m_Value(A), m_Value(B)))) {
         llvmberry::ValidationUnit::Begin("icmp_unknown_sub",
                                          I.getParent()->getParent());
-        llvmberry::ValidationUnit::GetInstance()->intrude([&I, &Op0, &A, &B](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+        INTRUDE(CAPTURE(&I, &Op0, &A, &B), {
           BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
           Value *A = X->getOperand(0);
           Value *B = X->getOperand(1);
           ICmpInst *Z = dyn_cast<ICmpInst>(&I);
-          unsigned bitsize = X->getType()->getIntegerBitWidth();
-          llvmberry::propagateInstruction(X, Z, SRC);
+
+          llvmberry::propagateInstruction(hints, X, Z, SRC);
           if (I.getPredicate() == ICmpInst::ICMP_EQ) {
             llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
                 "icmp_eq_sub");
@@ -2957,7 +2933,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             // X = sub A B     | X = sub A B
             // Z = icmp eq X 0 | Z = icmp eq A B
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpEqSub::make(
-                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
+                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(*X)));
           } else if (I.getPredicate() == ICmpInst::ICMP_NE) {
             llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
                 "icmp_ne_sub");
@@ -2965,7 +2941,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             // X = sub A B     | X = sub A B
             // Z = icmp ne X 0 | Z = icmp ne A B
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSub::make(
-                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(bitsize)));
+                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(*X)));
           } else {
             assert(false && "I.getPredicate() must be EQ or NE");
           }
@@ -3506,8 +3482,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       }
       llvmberry::ValidationUnit::Begin("icmp_eq_bop",
                                        I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &BO0, &BO1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &BO0, &BO1), {
         //       <src>      |      <tgt>
         // W = A + X        | W = A + X
         // Y = B + X        | Y = B + X
@@ -3596,8 +3571,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         BO0->hasOneUse() && BO1->hasOneUse()) {
       llvmberry::ValidationUnit::Begin("icmp_eq_bop",
                                        I.getParent()->getParent());
-      llvmberry::ValidationUnit::GetInstance()->intrude([&I, &BO0, &BO1](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+      INTRUDE(CAPTURE(&I, &BO0, &BO1), {
         //       <src>      |      <tgt>
         // W = A - X        | W = A - X
         // Y = B - X        | Y = B - X
@@ -3647,8 +3621,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         case ICmpInst::ICMP_EQ:
           llvmberry::ValidationUnit::Begin("icmp_eq_srem",
                                            I.getParent()->getParent());
-          llvmberry::ValidationUnit::GetInstance()->intrude([&SRem, &I](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          INTRUDE(CAPTURE(&SRem, &I), {
             // W = X % Y        | W = X % Y
             // Z = icmp eq W, Y | Z = icmp eq W, Y
             //                  | (Replace uses of Z with false)
@@ -3659,15 +3632,15 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             Value *X = W->getOperand(0);
             Value *Y = W->getOperand(1);
             ICmpInst *Z = &I;
-            unsigned bitsize = W->getType()->getIntegerBitWidth();
+
             Constant *newv = ConstantInt::getFalse(Z->getType());
-            llvmberry::propagateInstruction(W, Z, llvmberry::Source);
+            llvmberry::propagateInstruction(hints, W, Z, llvmberry::Source);
             if (Y == Z->getOperand(0))
               // Needs to swap icmp operands
               INFRULE(INSTPOS(SRC, Z),
                       llvmberry::ConsIcmpSwapOperands::make(*Z));
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpEqSrem::make(
-                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(bitsize)));
+                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(*W)));
             llvmberry::generateHintForReplaceAllUsesWith(Z, newv);
           });
 
@@ -3675,8 +3648,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         case ICmpInst::ICMP_NE:
           llvmberry::ValidationUnit::Begin("icmp_ne_srem",
                                            I.getParent()->getParent());
-          llvmberry::ValidationUnit::GetInstance()->intrude([&SRem, &I](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          INTRUDE(CAPTURE(&SRem, &I), {
             // W = X % Y        | W = X % Y
             // Z = icmp ne W, Y | Z = icmp ne W, Y
             //                  | (Replace uses of Z with true)
@@ -3687,15 +3659,15 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
             Value *X = W->getOperand(0);
             Value *Y = W->getOperand(1);
             ICmpInst *Z = &I;
-            unsigned bitsize = W->getType()->getIntegerBitWidth();
+
             Constant *newv = ConstantInt::getTrue(Z->getType());
-            llvmberry::propagateInstruction(W, Z, llvmberry::Source);
+            llvmberry::propagateInstruction(hints, W, Z, llvmberry::Source);
             if (Y == Z->getOperand(0))
               // Needs to swap icmp operands
               INFRULE(INSTPOS(SRC, Z),
                       llvmberry::ConsIcmpSwapOperands::make(*Z));
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsIcmpNeSrem::make(
-                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(bitsize)));
+                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(*W)));
             llvmberry::generateHintForReplaceAllUsesWith(Z, newv);
           });
 
@@ -3722,8 +3694,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         if (I.isEquality()) { // a+x icmp eq/ne b+x --> a icmp b
           llvmberry::ValidationUnit::Begin("icmp_eq_bop",
                                            I.getParent()->getParent());
-          llvmberry::ValidationUnit::GetInstance()->intrude([&I, &BO0, &BO1](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints) {
+          INTRUDE(CAPTURE(&I, &BO0, &BO1), {
             //       <src>      |      <tgt>
             // W = A + X        | W = A + X
             // Y = B + X        | Y = B + X

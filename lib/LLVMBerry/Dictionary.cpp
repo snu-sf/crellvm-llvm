@@ -96,7 +96,7 @@ void PassDictionary::Destroy() {
 
 GVNReplaceArg::GVNReplaceArg() {
   isGVNReplace = false;
-  BB = nullptr;
+  GVNptr = nullptr;
   VNptr = nullptr;
 }
 
