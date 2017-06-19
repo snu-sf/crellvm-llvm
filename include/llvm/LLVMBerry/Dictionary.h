@@ -179,11 +179,6 @@ public:
   typedef std::vector<std::shared_ptr<TyExpr>> TyReplaceTObj;
   typedef std::shared_ptr<TyReplaceTObj> TyReplaceT;
   TyReplaceT replaceTag;
-
-  static bool equalsIfConsVar(std::shared_ptr<TyExpr> e1,
-                              std::shared_ptr<TyExpr> e2);
-  void replaceLessthanUndef(std::string key,
-                            std::shared_ptr<TyValue> newVal);
   
   Mem2RegArg();
 };
