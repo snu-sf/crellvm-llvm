@@ -699,6 +699,8 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
       llvmberry::ValidationUnit::Begin("licm.sink.makeundef1",
                                        I.getParent()->getParent(),
                                        true);
+      // LLVMBerry: This optimization never happens in Python, SPECCPU2006,
+      // GNU-projects, and LNT!
       User->replaceUsesOfWith(&I, UndefValue::get(I.getType()));
       llvmberry::ValidationUnit::End();
       continue;
@@ -715,6 +717,8 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
       llvmberry::ValidationUnit::Begin("licm.sink.makeundef2",
                                        I.getParent()->getParent(),
                                        true);
+      // LLVMBerry: This optimization never happens in Python, SPECCPU2006,
+      // GNU-projects, and LNT!
       U = UndefValue::get(I.getType());
       llvmberry::ValidationUnit::End();
       continue;
