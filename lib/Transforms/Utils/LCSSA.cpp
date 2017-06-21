@@ -201,8 +201,6 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
             PROPAGATE(LESSDEF(EXPR(UndefValue::get(Inst.getType())), EXPR(&Inst), SRC),
                       BOUNDS(INSTPOS(SRC, &Inst),
                       llvmberry::TyPosition::make(SRC, BBName, PrevBBName)));
-            INFRULE(llvmberry::TyPosition::make(SRC, BBName, PrevBBName),
-                    llvmberry::ConsTransitivity::make(EXPR(&Inst), EXPR(&Inst, Previous), EXPR(X)));
           }
         });
         llvmberry::generateHintForReplaceAllUsesWith(&Inst, UserBB->begin(), "", INSTPOS(SRC, UserBB->begin()),
