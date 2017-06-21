@@ -1111,7 +1111,7 @@ void checkSIOperand(unsigned key, llvm::StoreInst *SI, Dictionary &data, CoreHin
   std::shared_ptr<TyPosition> to_position = NULL;
   to_position = INDEXEDPOS(SRC, SI, DICTMAP(data.get<llvmberry::ArgForIndices>()->instrIndices, SI), "");
 
-  if (!(storeItem[SI].op0 == "") && (!data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(storeItem[SI].expr, EXPR(SI->getOperand(0), Physical)))) {
+  if (!(storeItem[SI].op0 == "") && (!equalsIfConsVar(storeItem[SI].expr, EXPR(SI->getOperand(0), Physical)))) {
     //global -> constant or argument it won't change
     std::string op1 = getVariable(*(SI->getOperand(1)));
     // {tmp = tmp^ = a}
@@ -1181,12 +1181,22 @@ void propagateLoadGhostValueFromSIToLI(llvm::StoreInst* SI, llvm::LoadInst* LI, 
   
   if (checkReplace) {
     auto &storeItem = *(ArgForMem2Reg->storeItem);
-    if (ArgForMem2Reg->equalsIfConsVar(storeItem[SI].expr, expr)) { ArgForMem2Reg->replaceTag.get()->push_back(expr); }
+    if (equalsIfConsVar(storeItem[SI].expr, expr)) { ArgForMem2Reg->replaceTag.get()->push_back(expr); }
     else if (storeItem[SI].op0 != "") { expr = VAR(storeItem[SI].op0, Ghost); }
   }
 
   INFRULE(from_position, llvmberry::ConsIntroGhost::make(expr, REGISTER(Rghost, Ghost)));
 }
+
+bool equalsIfConsVar(std::shared_ptr<TyExpr> e1, std::shared_ptr<TyExpr> e2) {
+  if (ConsVar *cv1 = dynamic_cast<ConsVar *>(e1->get().get())) {
+    if (ConsVar *cv2 = dynamic_cast<ConsVar *>(e2->get().get())) {
+      return TyRegister::isSame(cv1->getTyReg(), cv2->getTyReg());
+    }  
+  }
+  return false;
+}
+
 
 void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
   auto &replaceItem = *(data.get<llvmberry::ArgForMem2Reg>()->replaceItem);
@@ -1198,7 +1208,7 @@ void replaceExpr(llvm::Instruction *Tgt, llvm::Value *New, Dictionary &data) {
   auto var = ConsVar::make(str, Physical);
   for (unsigned i = 0; i < replaceItem.size(); i++) {
     std::shared_ptr<TyExpr> tmp = replaceItem.at(i);
-    if (data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(tmp, var))
+    if (equalsIfConsVar(tmp, var))
      tmp->replace_expr(EXPR(New, Physical)); 
   }
 }
@@ -1213,7 +1223,7 @@ void replaceTag(llvm::Instruction *Tgt, TyTag tag, Dictionary &data) {
   auto var = ConsVar::make(str, Physical);
   for (unsigned i = 0; i < replaceTag.size(); i++) {
     std::shared_ptr<TyExpr> tmp = replaceTag.at(i);
-    if (data.get<llvmberry::ArgForMem2Reg>()->equalsIfConsVar(replaceTag.at(i), var))
+    if (equalsIfConsVar(replaceTag.at(i), var))
         tmp->replace_expr(ConsVar::make(str, tag));
   }
 }

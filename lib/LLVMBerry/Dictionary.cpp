@@ -79,31 +79,6 @@ Mem2RegArg::Mem2RegArg()
     : storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
       recentInstr(new TyRecentInstrObj()), instrWorkList(new TyInstrWorkListObj()), 
       replaceItem(new TyReplaceObj()), replaceTag(new TyReplaceTObj()) {}
-
-bool Mem2RegArg::equalsIfConsVar(std::shared_ptr<TyExpr> e1,
-                            std::shared_ptr<TyExpr> e2) {
-  if (ConsVar *cv1 = dynamic_cast<ConsVar *>(e1->get().get())) {
-    if (ConsVar *cv2 = dynamic_cast<ConsVar *>(e2->get().get())) {
-      return TyRegister::isSame(cv1->getTyReg(), cv2->getTyReg());
-    }
-  }
-
-  return false;
-}
-
-void Mem2RegArg::replaceLessthanUndef(std::string key,
-                                      std::shared_ptr<TyValue> newVal) {
-  if (mem2regCmd->find(key) == mem2regCmd->end())
-    return;
-
-  std::vector<std::shared_ptr<TyLessthanUndef>> &vec =
-      mem2regCmd->find(key)->second.lessUndef;
-
-  for(size_t i = 0; i < vec.size(); i++) {
-    vec[i]->updateRhs(newVal);
-  }
-}
-
 // PassDictionary
 
 void PassDictionary::Create() {
@@ -121,7 +96,7 @@ void PassDictionary::Destroy() {
 
 GVNReplaceArg::GVNReplaceArg() {
   isGVNReplace = false;
-  BB = nullptr;
+  GVNptr = nullptr;
   VNptr = nullptr;
 }
 

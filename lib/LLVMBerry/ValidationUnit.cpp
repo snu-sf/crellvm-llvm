@@ -150,6 +150,8 @@ static CoreHint::AUTO_OPT getAutoOptOf(ValidationUnit::PASS pass) {
     return CoreHint::AUTO_SROA;
   case ValidationUnit::INSTCOMBINE:
     return CoreHint::AUTO_INSTCOMBINE;
+  case ValidationUnit::LICM:
+    return CoreHint::AUTO_LICM;
   default:
     return CoreHint::AUTO_DEFAULT;
   }

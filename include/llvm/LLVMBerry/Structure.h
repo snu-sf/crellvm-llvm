@@ -695,6 +695,8 @@ public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
   static std::shared_ptr<TyInstruction> make(const llvm::Instruction &inst);
   static bool isSupported(const llvm::Instruction &inst);
+  virtual std::shared_ptr<TyValue> get_op(int i) = 0;
+  virtual void replace_op(int i, std::shared_ptr<TyValue> val) = 0;
 };
 
 struct TyBinaryOperator {
@@ -705,6 +707,8 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyBinaryOperator>
   make(const llvm::BinaryOperator &bop);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   TyBop opcode;
@@ -722,6 +726,8 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyFloatBinaryOperator>
   make(const llvm::BinaryOperator &bop);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   TyFbop opcode;
@@ -737,6 +743,8 @@ public:
              std::shared_ptr<TyValue> _operand2);
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyICmpInst> make(const llvm::ICmpInst &iCmpInst);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   TyIcmpPred predicate;
@@ -752,6 +760,8 @@ public:
              std::shared_ptr<TyValue> _operand2);
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyFCmpInst> make(const llvm::FCmpInst &fCmpInst);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   TyFcmpPred predicate;
@@ -770,6 +780,8 @@ public:
   static std::shared_ptr<TyLoadInst> make(const llvm::LoadInst &li);
   static std::shared_ptr<TyLoadInst> make(const llvm::StoreInst &si);
   static std::shared_ptr<TyLoadInst> makeAlignOne(llvm::Instruction *i);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
   std::shared_ptr<TyValue> getPtrValue();
 private:
@@ -784,6 +796,8 @@ public :
   TySelectInst(std::shared_ptr<TyValue> _cond, std::shared_ptr<TyValueType> _valty, std::shared_ptr<TyValue> _trueval, std::shared_ptr<TyValue> _falseval);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TySelectInst> make(const llvm::SelectInst &si);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValue> cond;
@@ -799,6 +813,8 @@ public:
                 std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyBitCastInst> make(const llvm::BitCastInst &li);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyValueType> fromty;
@@ -813,6 +829,8 @@ public:
                  std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyIntToPtrInst> make(const llvm::IntToPtrInst &li);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyValueType> fromty;
@@ -827,6 +845,8 @@ public:
                  std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyPtrToIntInst> make(const llvm::PtrToIntInst &li);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyValueType> fromty;
@@ -845,6 +865,8 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyGetElementPtrInst>
   make(const llvm::GetElementPtrInst &li);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyValueType> ty;
@@ -860,6 +882,8 @@ public :
   TyFpextInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyFpextInst> make(const llvm::FPExtInst &fpti);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> fromty;
@@ -872,6 +896,8 @@ public :
   TyFptruncInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyFptruncInst> make(const llvm::FPTruncInst &fpti);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> fromty;
@@ -884,6 +910,8 @@ public :
   TyZextInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyZextInst> make(const llvm::ZExtInst &zei);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> fromty;
@@ -896,6 +924,8 @@ public :
   TySextInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TySextInst> make(const llvm::SExtInst &sei);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> fromty;
@@ -908,6 +938,8 @@ public :
   TyTruncInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyTruncInst> make(const llvm::TruncInst &ti);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> fromty;
@@ -921,6 +953,8 @@ public:
                std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive &archive) const;
   static std::shared_ptr<TyFptosiInst> make(const llvm::FPToSIInst &ftsi);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyValueType> fromty;
@@ -933,6 +967,8 @@ public :
   TySitofpInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TySitofpInst> make(const llvm::SIToFPInst &stfi);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> fromty;
@@ -945,6 +981,8 @@ public :
   TyUitofpInst(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyUitofpInst> make(const llvm::UIToFPInst &utfi);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> fromty;
@@ -957,6 +995,8 @@ public :
   TyInsertValueInst(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::shared_ptr<TyValueType> _argty, std::shared_ptr<TyValue> _argv, std::vector<unsigned> _idx);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyInsertValueInst> make(const llvm::InsertValueInst &ivi);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> aggrty;
@@ -971,6 +1011,8 @@ public :
   TyExtractValueInst(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::vector<unsigned> _idx, std::shared_ptr<TyValueType> _retty);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyExtractValueInst> make(const llvm::ExtractValueInst &evi);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyValueType> aggrty;
@@ -987,6 +1029,8 @@ public:
        std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   static std::shared_ptr<TyInstruction> make(const llvm::BinaryOperator &bop);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyBinaryOperator> binary_operator;
@@ -1000,6 +1044,8 @@ public:
        std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   static std::shared_ptr<TyInstruction> make(const llvm::BinaryOperator &bop);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyFloatBinaryOperator> binary_operator;
@@ -1013,6 +1059,8 @@ public:
        std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   static std::shared_ptr<TyInstruction> make(const llvm::ICmpInst &iCmpInst);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyICmpInst> icmp_inst;
@@ -1026,6 +1074,8 @@ public:
        std::shared_ptr<TyValue> _operand1, std::shared_ptr<TyValue> _operand2);
   static std::shared_ptr<TyInstruction> make(const llvm::FCmpInst &fCmpInst);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyFCmpInst> fcmp_inst;
@@ -1040,6 +1090,8 @@ public:
        std::shared_ptr<TyValue> _ptrvalue, int _align);
   static std::shared_ptr<TyInstruction> make(const llvm::LoadInst &li);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
   std::shared_ptr<TyLoadInst> getTyLoadInst();
 private:
@@ -1052,6 +1104,8 @@ public :
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValue> _cond, std::shared_ptr<TyValueType> _valty, std::shared_ptr<TyValue> _trueval, std::shared_ptr<TyValue> _falseval);
   void serialize(cereal::JSONOutputArchive& archive) const;
   static std::shared_ptr<TyInstruction> make(const llvm::SelectInst &si);
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TySelectInst> select_inst;
@@ -1065,6 +1119,8 @@ public:
        std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::BitCastInst &bci);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyBitCastInst> bit_cast_inst;
@@ -1078,6 +1134,8 @@ public:
        std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::IntToPtrInst &itpi);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyIntToPtrInst> int_to_ptr_inst;
@@ -1091,6 +1149,8 @@ public:
        std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::PtrToIntInst &ptii);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyPtrToIntInst> ptr_to_int_inst;
@@ -1109,6 +1169,8 @@ public:
   static std::shared_ptr<TyInstruction>
   make(const llvm::GetElementPtrInst &gepi);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyGetElementPtrInst> get_element_ptr_inst;
@@ -1120,6 +1182,8 @@ public :
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::FPExtInst &fpei);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyFpextInst> fpext_inst;
@@ -1131,6 +1195,8 @@ public :
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::FPTruncInst &fpti);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyFptruncInst> fptrunc_inst;
@@ -1142,6 +1208,8 @@ public :
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::ZExtInst &zi);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyZextInst> zext_inst;
@@ -1153,6 +1221,8 @@ public :
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::SExtInst &si);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TySextInst> sext_inst;
@@ -1164,6 +1234,8 @@ public :
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::TruncInst &ti);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyTruncInst> trunc_inst;
@@ -1177,6 +1249,8 @@ public:
        std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::FPToSIInst &ftsi);
   void serialize(cereal::JSONOutputArchive &archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyFptosiInst> fptosi_inst;
@@ -1188,6 +1262,8 @@ public :
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::SIToFPInst &stfi);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TySitofpInst> sitofp_inst;
@@ -1199,6 +1275,8 @@ public :
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _fromty, std::shared_ptr<TyValue> _v, std::shared_ptr<TyValueType> _toty);
   static std::shared_ptr<TyInstruction> make(const llvm::UIToFPInst &utfi);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyUitofpInst> uitofp_inst;
@@ -1209,6 +1287,8 @@ public :
   ConsExtractValueInst(std::shared_ptr<TyExtractValueInst> _extract_value_inst);
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::vector<unsigned> _idx, std::shared_ptr<TyValueType> _retty);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyExtractValueInst> extract_value_inst;
@@ -1219,6 +1299,8 @@ public :
   ConsInsertValueInst(std::shared_ptr<TyInsertValueInst> _insert_value_inst);
   static std::shared_ptr<TyInstruction> make(std::shared_ptr<TyValueType> _aggrty, std::shared_ptr<TyValue> _aggrv, std::shared_ptr<TyValueType> _argty, std::shared_ptr<TyValue> _argv, std::vector<unsigned> _idx);
   void serialize(cereal::JSONOutputArchive& archive) const;
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private : 
   std::shared_ptr<TyInsertValueInst> insert_value_inst;
@@ -1314,6 +1396,8 @@ public:
   make(std::shared_ptr<TyInstruction> _instruction);
 
   std::shared_ptr<TyInstruction> getTyInsn();
+  std::shared_ptr<TyValue> get_op(int i);
+  void replace_op(int i, std::shared_ptr<TyValue> val);
 
 private:
   std::shared_ptr<TyInstruction> instruction;
