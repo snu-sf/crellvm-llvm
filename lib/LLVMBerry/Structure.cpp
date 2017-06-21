@@ -50,6 +50,8 @@ std::string toString(llvmberry::CoreHint::AUTO_OPT auto_opt) {
     return std::string("AUTO_SROA");
   case llvmberry::CoreHint::AUTO_INSTCOMBINE:
     return std::string("AUTO_INSTCOMBINE");
+  case llvmberry::CoreHint::AUTO_LICM:
+    return std::string("AUTO_LICM");
   case llvmberry::CoreHint::AUTO_DEFAULT:
     return std::string("AUTO_DEFAULT");
   default:
