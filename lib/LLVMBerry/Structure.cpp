@@ -2990,6 +2990,10 @@ std::shared_ptr<TyExpr> ConsVar::make(const llvm::Instruction &v, enum TyTag _ta
   return make(llvmberry::getVariable(v), _tag);
 }
 
+ConsVar* ConsVar::getConsVar() {
+  return this;
+}
+
 std::shared_ptr<TyRegister> ConsVar::getTyReg() {
   return register_name;
 }
@@ -3023,6 +3027,10 @@ std::shared_ptr<TyExpr> ConsRhs::make(std::string _name, enum TyTag _tag,
       new TyExpr(std::shared_ptr<TyExprImpl>(new ConsRhs(_name, _tag, _scope))));
 }
 
+ConsVar* ConsRhs::getConsVar() {
+  return nullptr;
+}
+
 ConsConst::ConsConst(std::shared_ptr<TyConstant> _constant)
     : constant(_constant) {}
 
@@ -3045,6 +3053,10 @@ std::shared_ptr<TyExpr> ConsConst::make(int _int_value, int _bitwidth) {
       std::shared_ptr<TyExprImpl>(new ConsConst(_int_value, _bitwidth))));
 }
 
+ConsVar* ConsConst::getConsVar() {
+  return nullptr;
+}
+
 std::shared_ptr<TyConstant> ConsConst::getTyConst() {
   return constant;
 }
@@ -3059,6 +3071,10 @@ std::shared_ptr<TyExpr>
 ConsInsn::make(std::shared_ptr<TyInstruction> _instruction) {
   return std::shared_ptr<TyExpr>(
       new TyExpr(std::shared_ptr<TyExprImpl>(new ConsInsn(_instruction))));
+}
+
+ConsVar* ConsInsn::getConsVar() {
+  return nullptr;
 }
 
 std::shared_ptr<TyInstruction> ConsInsn::getTyInsn() {
