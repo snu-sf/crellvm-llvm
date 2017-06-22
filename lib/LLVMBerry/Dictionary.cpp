@@ -76,7 +76,7 @@ VisitICmpArg::VisitICmpArg() {
 }
 
 Mem2RegArg::Mem2RegArg()
-    : storeItem(new TyStoreItemObj()), mem2regCmd(new TyMem2RegCmdObj()),
+    : storeItem(new TyStoreItemObj()),
       recentInstr(new TyRecentInstrObj()), instrWorkList(new TyInstrWorkListObj()), 
       replaceItem(new TyReplaceObj()), replaceTag(new TyReplaceTObj()) {}
 // PassDictionary

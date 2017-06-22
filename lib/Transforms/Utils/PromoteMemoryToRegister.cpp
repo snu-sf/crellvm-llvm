@@ -697,7 +697,7 @@ void PromoteMem2Reg::run() {
         AllocaInst *AItmp = Allocas[tmpNum];
         std::string Ralloca = llvmberry::getVariable(*AItmp);
         std::shared_ptr<llvmberry::TyPosition> from_pos;
-        std::shared_ptr<llvmberry::TyPosition> to_pos = ENDPOSINDEXED(SRC, BB, DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, blockName));
+        std::shared_ptr<llvmberry::TyPosition> to_pos = ENDPOSINDEXED(SRC, BB, DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, BB->getName()));
 
         // TODO: if we can validate "call -> nop", we need below condition
         //if (!llvmberry::hasBitcastOrGEP(AI)) { 
@@ -944,7 +944,7 @@ void PromoteMem2Reg::run() {
                 // value is instr
                 // from to prpagate undef > value
                 PROPAGATE(LESSDEF(EXPR(UNDEF(PN), Physical), VAR(llvmberry::getVariable(*In), Physical), TGT),
-                          BOUNDS(INSTPOS(TGT, In), ENDPOSINDEXED(SRC, Income, DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, llvmberry::getBasicBlockIndex(Income)))));
+                          BOUNDS(INSTPOS(TGT, In), ENDPOSINDEXED(SRC, Income, DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, Income->getName()))));
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
                 // value is constInt or constFloat
                 // infrule lessthanundef target undef > const
