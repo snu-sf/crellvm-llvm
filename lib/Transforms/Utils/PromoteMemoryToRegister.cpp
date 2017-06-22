@@ -1188,7 +1188,7 @@ NextIteration:
           recentInstr.get()->at(AllocaNo) =
             { DICTMAP(recentInstr, AllocaNo).instrL, VAR(Rphi, Physical),
               INDEXEDPOS(SRC, APN, DICTMAP(instrIndices, APN), llvmberry::getBasicBlockIndex(Pred)),
-              "llvmberry::PHI", Rphi, APN->getParent(), false };
+              "llvmberry::PHI", DICTMAP(recentInstr, AllocaNo).op1, APN->getParent(), false };
         });
 
         // Get the next phi node.
