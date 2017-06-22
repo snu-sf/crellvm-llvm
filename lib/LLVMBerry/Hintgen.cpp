@@ -1065,9 +1065,6 @@ void propagateFromInsnToPhi(unsigned key, llvm::PHINode *Phi, llvm::BasicBlock* 
 
   propagateFromToUsingKey(key, from_position, to_position, data, hints);
 
-  if (getVariable(*Phi) != recentInstr[key].op1)
-    INFRULE(TyPosition::make(SRC, *Phi, prev->getName()), ConsIntroGhost::make(VAR(recentInstr[key].op1, Ghost), REGISTER(getVariable(*Phi), Ghost)));
-
   recentInstr[key].check = false; 
 }
 
