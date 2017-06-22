@@ -941,7 +941,7 @@ std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet
     llvm::Instruction* use = std::get<1>(t);
     int useIndex =
       getIndexofMem2Reg(use, std::get<2>(t),
-                        DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, getBasicBlockIndex(useBB)));
+                        DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, useBB->getName()));
 
     if (use != nullptr && llvm::isa<llvm::PHINode>(use)) {
       llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(use);
@@ -965,10 +965,9 @@ std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet
 void saveInstrIndices(llvm::Function* F, Dictionary &data) {
   for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
     llvm::BasicBlock* BB = BS++;
-    std::string blockName = getBasicBlockIndex(BB);
 
     data.get<llvmberry::ArgForIndices>()->termIndices.get()->insert
-      (std::pair<std::string, unsigned>(blockName, getTerminatorIndex(BB->getTerminator())));
+      (std::pair<llvm::StringRef, unsigned>(BB->getName(), getTerminatorIndex(BB->getTerminator())));
 
     for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
       llvm::Instruction* I = IS++;

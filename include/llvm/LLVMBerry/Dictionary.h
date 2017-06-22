@@ -114,7 +114,7 @@ public:
   typedef std::shared_ptr<TyInstrIndicesObj> TyInstrIndices;
   TyInstrIndices instrIndices;
 
-  typedef std::map<std::string, unsigned> TyTermIndicesObj;
+  typedef std::map<llvm::StringRef, unsigned> TyTermIndicesObj;
   typedef std::shared_ptr<TyTermIndicesObj> TyTermIndices;
   TyTermIndices termIndices;
 
@@ -143,16 +143,6 @@ public:
   typedef std::map<const llvm::Instruction *, StoreTriple> TyStoreItemObj;
   typedef std::shared_ptr<TyStoreItemObj> TyStoreItem;
   TyStoreItem storeItem;
-
-  struct Tuple {
-    std::vector<std::shared_ptr<TyPropagateLessdef>> lessdef;
-    std::vector<std::shared_ptr<TyIntroGhost>> ghost;
-    std::vector<std::shared_ptr<TyLessthanUndef>> lessUndef; 
-  };
-
-  typedef std::map<std::string, Tuple> TyMem2RegCmdObj;
-  typedef std::shared_ptr<TyMem2RegCmdObj> TyMem2RegCmd;
-  TyMem2RegCmd mem2regCmd;
 
   struct RenamePassTuple {
     std::shared_ptr<TyExpr> instrL;
