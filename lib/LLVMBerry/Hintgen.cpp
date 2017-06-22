@@ -1189,8 +1189,8 @@ void propagateLoadGhostValueFromSIToLI(llvm::StoreInst* SI, llvm::LoadInst* LI, 
 }
 
 bool equalsIfConsVar(std::shared_ptr<TyExpr> e1, std::shared_ptr<TyExpr> e2) {
-  if (ConsVar *cv1 = dynamic_cast<ConsVar *>(e1->get().get())) {
-    if (ConsVar *cv2 = dynamic_cast<ConsVar *>(e2->get().get())) {
+  if (ConsVar *cv1 = e1->get().get()->getConsVar()) {
+    if (ConsVar *cv2 = e2->get().get()->getConsVar()) {
       return TyRegister::isSame(cv1->getTyReg(), cv2->getTyReg());
     }  
   }
