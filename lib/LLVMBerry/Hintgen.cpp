@@ -7,6 +7,7 @@
 #include "llvm/LLVMBerry/InstCombine/InfrulesCompares.h"
 #include "llvm/LLVMBerry/InstCombine/InfrulesSelect.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace llvmberry {
 // insert nop at tgt where I is at src
@@ -43,7 +44,8 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
  *   else :
  *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
  */
-void propagateInstruction(llvmberry::CoreHint &hints, llvm::Instruction *from, llvm::Instruction *to,
+void propagateInstruction(llvmberry::CoreHint &hints, const llvm::Instruction *from,
+                          const llvm::Instruction *to,
                           TyScope scope, bool propagateEquivalence) {
   assert(ValidationUnit::Exists());
   std::string reg_name = getVariable(*from);
@@ -68,7 +70,8 @@ void propagateInstruction(llvmberry::CoreHint &hints, llvm::Instruction *from, l
   }
 }
 
-void propagateLessdef(llvmberry::CoreHint &hints, llvm::Instruction *from, llvm::Instruction *to,
+void propagateLessdef(llvmberry::CoreHint &hints,
+                      const llvm::Instruction *from, const llvm::Instruction *to,
                       const llvm::Value *lesserval,
                       const llvm::Value *greaterval, TyScope scope) {
   assert(ValidationUnit::Exists());
@@ -250,18 +253,22 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I,
 void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
                                        llvm::Value *replaceTo,
                                        std::string ghostvar,
-                                       std::shared_ptr<TyPosition> source_pos) {
+                                       std::shared_ptr<TyPosition> source_pos,
+                                       std::function<bool(const llvm::Value *)> filter) {
   assert(ValidationUnit::Exists());
   if (!source_pos) {
     source_pos = INSTPOS(SRC, source);
   }
 
-  INTRUDE(CAPTURE(&source, &replaceTo, &ghostvar, &source_pos), {
+  INTRUDE(CAPTURE(&source, &replaceTo, &ghostvar, &source_pos, filter), {
     llvm::Instruction *I = source;
 
     std::string to_rem = getVariable(*I);
 
     for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+      if (filter && !filter(UI->getUser()))
+        continue;
+
       if (!llvm::isa<llvm::Instruction>(UI->getUser())) {
         // let the validation fail when the user is not an instruction
         return;
@@ -325,6 +332,16 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
                                             EXPR(replaceTo),
                                             VAR(user)));
         } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+          if (!TyInstruction::isSupported(*user_I)) {
+            std::string str;
+            llvm::raw_string_ostream rso(str);
+            rso << "\ngenerateHintForReplaceAllUsesWith : Unsupported instruction";
+
+            hints.appendToDescription(rso.str());
+            if (hints.getReturnCode() == CoreHint::ACTUAL)
+              hints.setReturnCodeToAdmitted();
+            return;
+          }
           INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
                   ConsSubstitute::make(REGISTER(to_rem),
                                        ID(ghostvar, Ghost), INSN(*user_I)));
@@ -345,12 +362,17 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
 }
 
 void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
-                                            llvm::Value *replaceTo) {
+                                            llvm::Value *replaceTo,
+                                            std::shared_ptr<TyPosition> invariant_pos) {
   assert(ValidationUnit::Exists());
 
-  INTRUDE(CAPTURE(&source, &replaceTo), {
+  if (!invariant_pos) {
+    invariant_pos = INSTPOS(TGT, source);
+  }
+
+  INTRUDE(CAPTURE(&source, &replaceTo, &invariant_pos), {
     llvm::Instruction *I = source;
-    auto I_pos = INSTPOS(TGT, I);
+    auto I_pos = invariant_pos;
 
     std::string I_var = getVariable(*I);
 
@@ -378,6 +400,16 @@ void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
                                           EXPR(replaceTo, Previous),
                                           VAR(user)));
       } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
+        if (!TyInstruction::isSupported(*user_I)) {
+          std::string str;
+          llvm::raw_string_ostream rso(str);
+          rso << "\ngenerateHintForReplaceAllUsesWithAtTgt : Unsupported instruction";
+
+          hints.appendToDescription(rso.str());
+          if (hints.getReturnCode() == CoreHint::ACTUAL)
+            hints.setReturnCodeToAdmitted();
+          return;
+        }
         llvm::Instruction *user_I_copy = user_I->clone();
         INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
                 ConsSubstituteTgt::make(REGISTER(I_var),

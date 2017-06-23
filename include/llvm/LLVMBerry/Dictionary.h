@@ -5,6 +5,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
@@ -32,7 +33,9 @@ enum DictKeys {
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
-  ArgForGVNReplace
+  ArgForGVNReplace,
+  // LICM
+  ArgForHoistOrSinkCond
 };
 
 /*
@@ -246,6 +249,16 @@ public:
   boost::any VNptr;
 };
 DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
+
+// lib/Transforms/Scalar/LICM.cpp : to record whether sinking of hoisting
+// an instruction can be validated
+struct LICMHoistOrSinkCond {
+public:
+  LICMHoistOrSinkCond();
+  bool useAA;
+  const llvm::Loop *CurLoop;
+};
+DEFINE_TRAITS(ArgForHoistOrSinkCond, LICMHoistOrSinkCond);
 
 class Dictionary {
 private:

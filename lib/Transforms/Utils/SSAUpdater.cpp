@@ -26,6 +26,9 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SSAUpdaterImpl.h"
 
+#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/LLVMBerry/Hintgen.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "ssaupdater"
@@ -183,6 +186,34 @@ void SSAUpdater::RewriteUse(Use &U) {
     V = GetValueAtEndOfBlock(UserPN->getIncomingBlock(U));
   else
     V = GetValueInMiddleOfBlock(User->getParent());
+
+  if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM &&
+        llvmberry::ValidationUnit::Exists() &&
+        llvmberry::ValidationUnit::GetInstance()->getOptimizationName() ==
+          "licm.formlcssa.rewrite2") {
+    INTRUDE(CAPTURE(&U, &V), {
+      if (Instruction *Org = dyn_cast<Instruction>(U.get())) {
+        if (PHINode *PHI_V = dyn_cast<PHINode>(V)) {
+          // PHI_V = phi(Org)
+          // phys(Org) >= prev(Org) >= phys(V)
+          // This undef propagate lets validator add prev(Inst) >= phys(V)
+          auto BBName = PHI_V->getParent()->getName();
+          for (unsigned i = 0; i < PHI_V->getNumIncomingValues(); i++) {
+            auto PrevBBName = PHI_V->getIncomingBlock(i)->getName();
+            PROPAGATE(LESSDEF(EXPR(UndefValue::get(Org->getType())), EXPR(Org), SRC),
+                      BOUNDS(INSTPOS(SRC, Org),
+                      llvmberry::TyPosition::make(SRC, BBName, PrevBBName)));
+          }
+        }
+      }
+    });
+    llvmberry::generateHintForReplaceAllUsesWith(
+              dyn_cast<Instruction>(U.get()),
+              dyn_cast<Instruction>(V), "",
+              INSTPOS(SRC, dyn_cast<Instruction>(V)),
+              [&User](const llvm::Value *V2)
+                { return V2 == User; });
+  }
 
   // Notify that users of the existing value that it is being replaced.
   Value *OldVal = U.get();

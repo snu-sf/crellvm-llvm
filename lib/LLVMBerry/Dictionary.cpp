@@ -100,5 +100,10 @@ GVNReplaceArg::GVNReplaceArg() {
   VNptr = nullptr;
 }
 
+LICMHoistOrSinkCond::LICMHoistOrSinkCond() {
+  useAA = false;
+  CurLoop = nullptr;
+}
+
 PassDictionary *PassDictionary::_Instance = nullptr;
 } // llvmberry
