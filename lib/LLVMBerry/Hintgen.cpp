@@ -973,7 +973,7 @@ std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet
     llvm::Instruction* use = std::get<1>(t);
     int useIndex =
       getIndexofMem2Reg(use, std::get<2>(t),
-                        DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, getBasicBlockIndex(useBB)));
+                        DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, useBB->getName()));
 
     if (use != nullptr && llvm::isa<llvm::PHINode>(use)) {
       llvm::PHINode *PHI = llvm::dyn_cast<llvm::PHINode>(use);
@@ -997,10 +997,9 @@ std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet
 void saveInstrIndices(llvm::Function* F, Dictionary &data) {
   for (auto BS = F->begin(), BE = F->end(); BS != BE;) {
     llvm::BasicBlock* BB = BS++;
-    std::string blockName = getBasicBlockIndex(BB);
 
     data.get<llvmberry::ArgForIndices>()->termIndices.get()->insert
-      (std::pair<std::string, unsigned>(blockName, getTerminatorIndex(BB->getTerminator())));
+      (std::pair<llvm::StringRef, unsigned>(BB->getName(), getTerminatorIndex(BB->getTerminator())));
 
     for (auto IS = BB->begin(), IE = BB->end(); IS != IE;) {
       llvm::Instruction* I = IS++;
@@ -1098,9 +1097,6 @@ void propagateFromInsnToPhi(unsigned key, llvm::PHINode *Phi, llvm::BasicBlock* 
 
   propagateFromToUsingKey(key, from_position, to_position, data, hints);
 
-  if (getVariable(*Phi) != recentInstr[key].op1)
-    INFRULE(TyPosition::make(SRC, *Phi, prev->getName()), ConsIntroGhost::make(VAR(recentInstr[key].op1, Ghost), REGISTER(getVariable(*Phi), Ghost)));
-
   recentInstr[key].check = false; 
 }
 
@@ -1189,8 +1185,8 @@ void propagateLoadGhostValueFromSIToLI(llvm::StoreInst* SI, llvm::LoadInst* LI, 
 }
 
 bool equalsIfConsVar(std::shared_ptr<TyExpr> e1, std::shared_ptr<TyExpr> e2) {
-  if (ConsVar *cv1 = dynamic_cast<ConsVar *>(e1->get().get())) {
-    if (ConsVar *cv2 = dynamic_cast<ConsVar *>(e2->get().get())) {
+  if (ConsVar *cv1 = e1->get().get()->getConsVar()) {
+    if (ConsVar *cv2 = e2->get().get()->getConsVar()) {
       return TyRegister::isSame(cv1->getTyReg(), cv2->getTyReg());
     }  
   }
