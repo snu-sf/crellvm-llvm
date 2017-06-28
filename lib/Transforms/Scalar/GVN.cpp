@@ -1036,6 +1036,19 @@ void extractOps(ValueTable &VN, SmallVector<Value*, 4> &ops_src, Instruction *I_
     ops_src.push_back(*OI);
 }
 
+void hintgenLoadOpt(llvmberry::CoreHint &hints, Instruction *I, Instruction *pos, Value *ptr, llvmberry::TyScope scp) {
+  // TODO: propagate I until pos at scp
+  std::string id = llvmberry::getVariable(*I);
+  if (I != pos) {
+    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, scp), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, pos)));
+    PROPAGATE(LESSDEF(RHS(id, Physical, scp), VAR(id), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, pos)));
+  }
+
+  if (I->getOperand(0) != ptr)
+    if (Instruction *Iop = dyn_cast<Instruction>(I->getOperand(0)))
+      hintgenLoadOpt(hints, Iop, pos, ptr, scp);
+}
+
 void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instruction *I, Value *repl) {
   DominatorTree *DT = VN.getDomTree();
 
@@ -1060,11 +1073,6 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
       hints.appendToDescription("GVN: HintgenPropeq Failed.");
       return;
     }
-    if ((!isa<PHINode>(Is) && !isa<PHINode>(It) && (Is->getOpcode() != It->getOpcode()))) {
-      hints.appendToDescription("GVN: We don't process processLoad optimization now.");
-      hints.setReturnCodeToAdmitted();
-      return;
-    }
 
     if ((Is->getOpcode() == Instruction::Call) ||
         (It->getOpcode() == Instruction::Call)) {
@@ -1079,7 +1087,6 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           hints.appendToDescription("GVN GEP BUG FOUND BY US");
 
     Instruction *pos_up = q.pos;
-    bool is_up_phi = false;
 
     // find upper position
     if (!q.val_s.is_clone || !q.val_t.is_clone) {
@@ -1101,6 +1108,25 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
       bool is_up_src = pos_up == Is;
       Instruction *I_down = is_up_src? It : Is;
 
+      // If this query comes from NonLocalLoad, process it here.
+      if (!isa<PHINode>(Is) && !isa<PHINode>(It) && Is->getOpcode() != It->getOpcode()) {
+        hints.appendToDescription("GVN: NonLocalLoad Optimization.");
+
+        auto gvar = VAR(ghostSymb(q.vn), Ghost);
+
+        if (LoadInst *LI = dyn_cast<LoadInst>(Is)) {
+          std::string id_LI = llvmberry::getVariable(*LI), id_other = llvmberry::getVariable(*It);
+          if (LI != I_down)
+            PROPAGATE(LESSDEF(VAR(id_LI), RHS(id_LI, Physical, SRC), TGT), BOUNDS(INSTPOS(SRC, LI), INSTPOS(SRC, I_down)));
+          hintgenLoadOpt(hints, It, I_down, LI->getPointerOperand(), TGT);
+
+          PROPAGATE(LESSDEF(VAR(id_LI), gvar, SRC), BOUNDS(INSTPOS(SRC, I_down), INSTPOS(SRC, q.pos)));
+          PROPAGATE(LESSDEF(gvar, VAR(id_other), TGT), BOUNDS(INSTPOS(TGT, I_down), INSTPOS(TGT, q.pos)));
+
+        }
+        continue;
+      }
+
       hintgenHoist(hints, VN, Is, q.pos, pos_up, true);
       hintgenHoist(hints, VN, It, q.pos, pos_up, false);
 
@@ -1117,34 +1143,34 @@ void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instructi
           if (visited.insert(std::make_pair(q.vn, term)))
             worklist.emplace_back(q.vn, is_up_src? v2 : v1, is_up_src? v1 : v2, term);
         }
-        is_up_phi = true;
+
+        continue;
       }
     }
-    if (!is_up_phi) {
-      SmallVector<Value*, 4> ops_src, ops_tgt;
 
-      extractOps(VN, ops_src, Is, q.pos);
-      extractOps(VN, ops_tgt, It, q.pos);
+    SmallVector<Value*, 4> ops_src, ops_tgt;
 
-      if ((Is->isCommutative() || isa<ICmpInst>(Is) || isa<FCmpInst>(Is)) &&
-          (VN.lookup_VN_of_expr(ops_src[0]) != VN.lookup_VN_of_expr(ops_tgt[0])) &&
-          (VN.lookup_VN_of_expr(ops_src[0]) == VN.lookup_VN_of_expr(ops_tgt[1])))
-        std::swap(ops_src[0], ops_src[1]);
+    extractOps(VN, ops_src, Is, q.pos);
+    extractOps(VN, ops_tgt, It, q.pos);
 
-      // Insert each unmatched operand pair into worklist
-      for (unsigned i = 0; i < ops_src.size(); ++i)
-        if (ops_src[i] != ops_tgt[i]) {
-          uint32_t vn_op = 0;
-          if (Instruction *I_op_s = dyn_cast<Instruction>(ops_src[i]))
-            vn_op = VN.lookup_VN_of_expr(I_op_s);
-          else if (Instruction *I_op_t = dyn_cast<Instruction>(ops_tgt[i]))
-            vn_op = VN.lookup_VN_of_expr(I_op_t);
-          else assert(false && "both values are not instruction");
+    if ((Is->isCommutative() || isa<ICmpInst>(Is) || isa<FCmpInst>(Is)) &&
+        (VN.lookup_VN_of_expr(ops_src[0]) != VN.lookup_VN_of_expr(ops_tgt[0])) &&
+        (VN.lookup_VN_of_expr(ops_src[0]) == VN.lookup_VN_of_expr(ops_tgt[1])))
+      std::swap(ops_src[0], ops_src[1]);
 
-          if (visited.insert(std::make_pair(vn_op, pos_up)))
-            worklist.emplace_back(vn_op, ops_src[i], ops_tgt[i], pos_up);
-        }
-    }
+    // Insert each unmatched operand pair into worklist
+    for (unsigned i = 0; i < ops_src.size(); ++i)
+      if (ops_src[i] != ops_tgt[i]) {
+        uint32_t vn_op = 0;
+        if (Instruction *I_op_s = dyn_cast<Instruction>(ops_src[i]))
+          vn_op = VN.lookup_VN_of_expr(I_op_s);
+        else if (Instruction *I_op_t = dyn_cast<Instruction>(ops_tgt[i]))
+          vn_op = VN.lookup_VN_of_expr(I_op_t);
+        else assert(false && "both values are not instruction");
+
+        if (visited.insert(std::make_pair(vn_op, pos_up)))
+          worklist.emplace_back(vn_op, ops_src[i], ops_tgt[i], pos_up);
+      }
   }
 } // End LLVMBerry
 
