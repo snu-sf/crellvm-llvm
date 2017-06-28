@@ -390,6 +390,19 @@ class FunctionDifferenceEngine {
       return Blocks[cast<BlockAddress>(L)->getBasicBlock()]
                  == cast<BlockAddress>(R)->getBasicBlock();
 
+    // If L and R are ConstantVectors, compare each element
+    if (isa<ConstantVector>(L)) {
+      ConstantVector *CVL = cast<ConstantVector>(L);
+      ConstantVector *CVR = cast<ConstantVector>(R);
+      if (CVL->getType()->getNumElements() != CVR->getType()->getNumElements())
+        return false;
+      for (unsigned i = 0; i < CVL->getType()->getNumElements(); i++) {
+        if (!equivalentAsOperands(CVL->getOperand(i), CVR->getOperand(i)))
+          return false;
+      }
+      return true;
+    }
+
     return false;
   }
 
