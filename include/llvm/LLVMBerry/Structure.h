@@ -694,6 +694,7 @@ struct TyInstruction {
 public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
   static std::shared_ptr<TyInstruction> make(const llvm::Instruction &inst);
+  static bool isSupported(const llvm::Instruction &inst);
   virtual std::shared_ptr<TyValue> get_op(int i) = 0;
   virtual void replace_op(int i, std::shared_ptr<TyValue> val) = 0;
 };
@@ -1688,7 +1689,7 @@ private:
 struct CoreHint {
 public:
   enum RETURN_CODE { ACTUAL = 0, ADMITTED, FAIL };
-  enum AUTO_OPT { AUTO_GVN = 0, AUTO_SROA, AUTO_INSTCOMBINE, AUTO_DEFAULT };
+  enum AUTO_OPT { AUTO_GVN = 0, AUTO_SROA, AUTO_INSTCOMBINE, AUTO_LICM, AUTO_DEFAULT };
   CoreHint();
   CoreHint(std::string _module_id, std::string _function_id,
            std::string _opt_name, std::string _description = "");

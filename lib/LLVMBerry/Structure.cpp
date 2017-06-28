@@ -50,6 +50,8 @@ std::string toString(llvmberry::CoreHint::AUTO_OPT auto_opt) {
     return std::string("AUTO_SROA");
   case llvmberry::CoreHint::AUTO_INSTCOMBINE:
     return std::string("AUTO_INSTCOMBINE");
+  case llvmberry::CoreHint::AUTO_LICM:
+    return std::string("AUTO_LICM");
   case llvmberry::CoreHint::AUTO_DEFAULT:
     return std::string("AUTO_DEFAULT");
   default:
@@ -1725,6 +1727,16 @@ void ConsStructType::serialize(cereal::JSONOutputArchive& archive) const{
 // instruction
 
 std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
+  if (!isSupported(i)) {
+    std::string output;
+    llvm::raw_string_ostream rso(output);
+    i.print(rso);
+    rso.str();
+    std::cerr << output << std::endl;
+    assert("TyInstruction::make : unsupporting instruction type" && false);
+    return std::shared_ptr<TyInstruction>(nullptr);
+  }
+
   if (const llvm::BinaryOperator *bo =
           llvm::dyn_cast<llvm::BinaryOperator>(&i)) {
     if (isFloatOpcode(bo->getOpcode()))
@@ -1798,15 +1810,30 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
   } else if (const llvm::ExtractValueInst *evi = llvm::dyn_cast<llvm::ExtractValueInst>(&i)) {
     return std::shared_ptr<TyInstruction>(
         new ConsExtractValueInst(TyExtractValueInst::make(*evi)));
-  } else {
-    std::string output;
-    llvm::raw_string_ostream rso(output);
-    i.print(rso);
-    rso.str();
-    std::cerr << output << std::endl;
-    assert("TyInstruction::make : unsupporting instruction type" && false);
-    return std::shared_ptr<TyInstruction>(nullptr);
   }
+}
+
+bool TyInstruction::isSupported(const llvm::Instruction &i) {
+  return llvm::isa<llvm::BinaryOperator>(&i) ||
+        llvm::isa<llvm::FCmpInst>(&i) ||
+        llvm::isa<llvm::AllocaInst>(&i) ||
+        llvm::isa<llvm::LoadInst>(&i) ||
+        llvm::isa<llvm::StoreInst>(&i) ||
+        llvm::isa<llvm::SelectInst>(&i) ||
+        llvm::isa<llvm::BitCastInst>(&i) ||
+        llvm::isa<llvm::IntToPtrInst>(&i) ||
+        llvm::isa<llvm::PtrToIntInst>(&i) ||
+        llvm::isa<llvm::GetElementPtrInst>(&i) ||
+        llvm::isa<llvm::FPExtInst>(&i) ||
+        llvm::isa<llvm::FPTruncInst>(&i) ||
+        llvm::isa<llvm::ZExtInst>(&i) ||
+        llvm::isa<llvm::SExtInst>(&i) ||
+        llvm::isa<llvm::TruncInst>(&i) ||
+        llvm::isa<llvm::UIToFPInst>(&i) ||
+        llvm::isa<llvm::FPToSIInst>(&i) ||
+        llvm::isa<llvm::SIToFPInst>(&i) ||
+        llvm::isa<llvm::InsertValueInst>(&i) ||
+        llvm::isa<llvm::ExtractValueInst>(&i);
 }
 
 // instruction make classes

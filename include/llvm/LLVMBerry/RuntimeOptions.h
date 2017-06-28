@@ -72,6 +72,8 @@ private:
         _OptPassWhiteList.push_back(ValidationUnit::PRE);
       else if (optname == "instcombine")
         _OptPassWhiteList.push_back(ValidationUnit::INSTCOMBINE);
+      else if (optname == "licm")
+        _OptPassWhiteList.push_back(ValidationUnit::LICM);
       else
         assert(false && "Invalid pass white list");
     }

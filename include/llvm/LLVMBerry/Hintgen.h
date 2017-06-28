@@ -189,13 +189,14 @@ void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position,
  *   else :
  *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
  */
-void propagateInstruction(llvmberry::CoreHint &hints, llvm::Instruction *from,
-                          llvm::Instruction *to,
+void propagateInstruction(llvmberry::CoreHint &hints, const llvm::Instruction *from,
+                          const llvm::Instruction *to,
                           TyScope scope, bool propagateEquivalence = false);
 /* propagateLessdef(I1, I2, v1, v2, scope) :
  *   Propagates v1 >= v2 from I1 to I2 in scope
  */
-void propagateLessdef(llvmberry::CoreHint &hints, llvm::Instruction *from, llvm::Instruction *to,
+void propagateLessdef(llvmberry::CoreHint &hints, const llvm::Instruction *from,
+                      const llvm::Instruction *to,
                       const llvm::Value *lesserval,
                       const llvm::Value *greaterval, TyScope scope);
 /* propagateMaydiffGlobal(var, tag) :
@@ -220,15 +221,18 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I,
  */
 void generateHintForReplaceAllUsesWith(
     llvm::Instruction *source, llvm::Value *replaceTo,
-    std::string ghost_var = "", std::shared_ptr<TyPosition> source_pos =
-                                    std::shared_ptr<TyPosition>(nullptr));
+    std::string ghost_var = "",
+    std::shared_ptr<TyPosition> invariant_pos = std::shared_ptr<TyPosition>(nullptr),
+    std::function<bool(const llvm::Value *)> filter = {});
 /* generateHintForReplaceAllUsesWithAtTgt(v1, v2) :
  *   For each use U of v1, propagates hints at target to prove that
  * replacing v1 with v2 in U is safe.
- *   Invariant { v1 >=tgt v2 } must be given at definition of v1
+ *   Invariant { v1 >=tgt v2 } must be given at definition of v1 (or invariant_pos)
  */
 void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
-                                            llvm::Value *replaceTo);
+                                            llvm::Value *replaceTo,
+                                            std::shared_ptr<TyPosition> invariant_pos = 
+                                              std::shared_ptr<TyPosition>(nullptr));
 
 /* Hint generation functions for instcombine/instsimplify micro-optimizations
  * that appear multiple times

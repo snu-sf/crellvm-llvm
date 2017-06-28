@@ -1839,6 +1839,31 @@ void ConsIntroEq::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(intro_eq));
 }
 
+TyIntroEqTgt::TyIntroEqTgt(std::shared_ptr<TyExpr> _x) : x(_x) {}
+
+void TyIntroEqTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(CEREAL_NVP(x));
+}
+
+ConsIntroEqTgt::ConsIntroEqTgt(std::shared_ptr<TyIntroEqTgt> _intro_eq_tgt)
+    : intro_eq_tgt(_intro_eq_tgt) {}
+
+std::shared_ptr<TyInfrule> ConsIntroEqTgt::make(std::shared_ptr<TyValue> _x) {
+  return ConsIntroEqTgt::make(TyExpr::make(_x));
+}
+
+std::shared_ptr<TyInfrule> ConsIntroEqTgt::make(std::shared_ptr<TyExpr> _x) {
+  std::shared_ptr<TyIntroEqTgt> _val(new TyIntroEqTgt(_x));
+  return std::shared_ptr<TyInfrule>(new ConsIntroEqTgt(_val));
+}
+
+void ConsIntroEqTgt::serialize(cereal::JSONOutputArchive &archive) const {
+  archive.makeArray();
+  archive.writeName();
+  archive.saveValue("IntroEqTgt");
+  archive(CEREAL_NVP(intro_eq_tgt));
+}
+
 TyXorCommutativeTgt::TyXorCommutativeTgt(std::shared_ptr<TyRegister> _z,
                                          std::shared_ptr<TyValue> _x,
                                          std::shared_ptr<TyValue> _y,
