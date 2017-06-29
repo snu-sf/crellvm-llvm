@@ -3072,6 +3072,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
 
   ++NumGVNPRE;
 
+  llvmberry::intrude([&CurInst]() {
+      llvmberry::ValidationUnit::Begin("GVN_PRE_insert", CurInst->getParent()->getParent());
+    });
+
   // Create a PHI to make the value available in this block.
   PHINode *Phi =
       PHINode::Create(CurInst->getType(), predMap.size(),
@@ -3082,6 +3086,14 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
     else
       Phi->addIncoming(PREInstr, PREPred);
   }
+  llvmberry::ValidationUnit::GetInstance()->intrude([&Phi](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    std::string id_p = llvmberry::getVariable(*Phi);
+    llvmberry::propagateMaydiffGlobal(hints, id_p, llvmberry::Physical);
+    llvmberry::propagateMaydiffGlobal(hints, id_p, llvmberry::Previous);
+  });
+
+  llvmberry::intrude([] { llvmberry::ValidationUnit::End(); });
 
   VN.add(Phi, ValNo);
   addToLeaderTable(ValNo, Phi, CurrentBlock);
