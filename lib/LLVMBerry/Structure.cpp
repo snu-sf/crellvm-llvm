@@ -1816,6 +1816,7 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
 bool TyInstruction::isSupported(const llvm::Instruction &i) {
   return llvm::isa<llvm::BinaryOperator>(&i) ||
         llvm::isa<llvm::FCmpInst>(&i) ||
+        llvm::isa<llvm::ICmpInst>(&i) ||
         llvm::isa<llvm::AllocaInst>(&i) ||
         llvm::isa<llvm::LoadInst>(&i) ||
         llvm::isa<llvm::StoreInst>(&i) ||
