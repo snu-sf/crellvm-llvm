@@ -3072,6 +3072,10 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
 
   ++NumGVNPRE;
 
+  llvmberry::intrude([&CurInst, this]() {
+      llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
+      llvmberry::ValidationUnit::Begin("GVN_PRE", CurInst->getParent()->getParent());});
+
   // Create a PHI to make the value available in this block.
   PHINode *Phi =
       PHINode::Create(CurInst->getType(), predMap.size(),
@@ -3087,39 +3091,42 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   addToLeaderTable(ValNo, Phi, CurrentBlock);
   Phi->setDebugLoc(CurInst->getDebugLoc());
 
-  llvmberry::intrude([&CurInst, &Phi, this]() {
-    llvmberry::name_instructions(*(CurInst->getParent()->getParent()));
-    llvmberry::ValidationUnit::Begin("GVN_PRE", CurInst->getParent()->getParent());
+  llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi, this](
+      llvmberry::ValidationUnit::Dictionary &data, llvmberry::CoreHint &hints) {
+    Instruction *I = CurInst, *Repl = Phi;
+    std::string id_I = llvmberry::getVariable(*I);
+    std::string id_p = llvmberry::getVariable(*Phi);
 
-    llvmberry::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi, this](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hints) {
-      Instruction *I = CurInst, *Repl = Phi;
-      std::string id_I = llvmberry::getVariable(*I);
-      hintgenGVN(hints, *this, VN, I, Phi);
-      auto gvar = VAR(ghostSymb(VN.lookup_VN_of_expr(I)), Ghost);
+    llvmberry::propagateMaydiffGlobal(hints, id_p, llvmberry::Physical);
+    llvmberry::propagateMaydiffGlobal(hints, id_p, llvmberry::Previous);
 
-      std::shared_ptr<llvmberry::TyPropagateObject>
+    hintgenGVN(hints, *this, VN, I, Phi);
+    auto gvar = VAR(ghostSymb(VN.lookup_VN_of_expr(I)), Ghost);
+
+    std::shared_ptr<llvmberry::TyPropagateObject>
         prop_src = LESSDEF(llvmberry::TyExpr::make(*I), gvar, SRC),
         prop_tgt = LESSDEF(gvar, llvmberry::TyExpr::make(*Repl), TGT);
 
-      for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
-        Instruction *userI = dyn_cast<Instruction>(UI->getUser());
-        std::string userI_id = llvmberry::getVariable(*userI);
+    for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+      Instruction *userI = dyn_cast<Instruction>(UI->getUser());
+      std::string userI_id = llvmberry::getVariable(*userI);
 
-        std::string prev_block_name = "";
-        if (isa<PHINode>(userI)) {
-          BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
-          prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
-        }
-
-        PROPAGATE(prop_src, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(llvmberry::Source, *userI, prev_block_name)));
-        PROPAGATE(prop_tgt, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(llvmberry::Source, *userI, prev_block_name)));
+      std::string prev_block_name = "";
+      if (isa<PHINode>(userI)) {
+        BasicBlock *bb_from = dyn_cast<PHINode>(userI)->getIncomingBlock(*UI);
+        prev_block_name = llvmberry::getBasicBlockIndex(bb_from);
       }
-      llvmberry::insertTgtNopAtSrcI(hints, I);
-      llvmberry::propagateMaydiffGlobal(hints, id_I, llvmberry::Physical); // id
-      llvmberry::propagateMaydiffGlobal(hints, id_I, llvmberry::Previous); // id
-    });
+
+      PROPAGATE(prop_src, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(
+                                                      llvmberry::Source, *userI,
+                                                      prev_block_name)));
+      PROPAGATE(prop_tgt, BOUNDS(INSTPOS(SRC, I), llvmberry::TyPosition::make(
+                                                      llvmberry::Source, *userI,
+                                                      prev_block_name)));
+    }
+    llvmberry::insertTgtNopAtSrcI(hints, I);
+    llvmberry::propagateMaydiffGlobal(hints, id_I, llvmberry::Physical); // id
+    llvmberry::propagateMaydiffGlobal(hints, id_I, llvmberry::Previous); // id
   });
 
   CurInst->replaceAllUsesWith(Phi);
