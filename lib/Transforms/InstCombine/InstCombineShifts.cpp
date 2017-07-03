@@ -700,25 +700,13 @@ Instruction *InstCombiner::visitShl(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  llvmberry::ValidationUnit::Begin("simplify_shift",
-                                   I.getParent()->getParent());
+  llvmberry::ValidationUnit::Begin("simplify_shift", I.getParent()->getParent());
   INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V =
           SimplifyShlInst(I.getOperand(0), I.getOperand(1), I.hasNoSignedWrap(),
                           I.hasNoUnsignedWrap(), DL, TLI, DT, AC)) {
-    INTRUDE(CAPTURE(&I, &V), {
-      auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
-      if (ptr->isActivated()) {
-        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
-            ptr->getMicroOptName());
-        ptr->generateHint(&I);
-        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
-      } else {
-        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-      }
-    });
-
+    llvmberry::generateHintForInstructionSimplify<llvmberry::ArgForSimplifyShiftInst>(I, V);
     return ReplaceInstUsesWith(I, V);
   }
   llvmberry::ValidationUnit::Abort();
@@ -760,24 +748,12 @@ Instruction *InstCombiner::visitLShr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  llvmberry::ValidationUnit::Begin("simplify_shift",
-                                   I.getParent()->getParent());
+  llvmberry::ValidationUnit::Begin("simplify_shift", I.getParent()->getParent());
   INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V = SimplifyLShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
                                   DL, TLI, DT, AC)) {
-    INTRUDE(CAPTURE(&I, &V), {
-      auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
-      if (ptr->isActivated()) {
-        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
-            ptr->getMicroOptName());
-        ptr->generateHint(&I);
-        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
-      } else {
-        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-      }
-    });
-
+    llvmberry::generateHintForInstructionSimplify<llvmberry::ArgForSimplifyShiftInst>(I, V);
     return ReplaceInstUsesWith(I, V);
   }
   llvmberry::ValidationUnit::Abort();
@@ -822,24 +798,12 @@ Instruction *InstCombiner::visitAShr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  llvmberry::ValidationUnit::Begin("simplify_shift",
-                                   I.getParent()->getParent());
+  llvmberry::ValidationUnit::Begin("simplify_shift", I.getParent()->getParent());
   INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForSimplifyShiftInst>(); });
 
   if (Value *V = SimplifyAShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
                                   DL, TLI, DT, AC)) {
-    INTRUDE(CAPTURE(&I, &V), {
-      auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
-      if (ptr->isActivated()) {
-        llvmberry::ValidationUnit::GetInstance()->setOptimizationName(
-            ptr->getMicroOptName());
-        ptr->generateHint(&I);
-        llvmberry::generateHintForReplaceAllUsesWith(&I, V);
-      } else {
-        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-      }
-    });
-
+    llvmberry::generateHintForInstructionSimplify<llvmberry::ArgForSimplifyShiftInst>(I, V);
     return ReplaceInstUsesWith(I, V);
   }
   llvmberry::ValidationUnit::Abort();
