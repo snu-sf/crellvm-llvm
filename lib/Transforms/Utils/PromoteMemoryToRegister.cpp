@@ -420,10 +420,9 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           PROPAGATE(LESSDEF(EXPR(UNDEF(ReplVal), Physical), EXPR(ReplVal, Physical), SRC),
                     BOUNDS(STARTPOS(SRC, std::string(AI->getParent()->getName())), INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), "")));
 
-        if (ConstantExpr* ce = dyn_cast<ConstantExpr>(ReplVal)) {
-          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndefConstGEPorCast::make(TYPEOF(ce), llvmberry::TyConstant::make(*ce)));
-        } else if (Constant* c = dyn_cast<Constant>(ReplVal)) {
-          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndefConst::make(llvmberry::TyConstant::make(*c))); }
+        if (isa<Constant>(ReplVal)) {
+          std::cout << "Const" << "\n";
+          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndef::make(TYPEOF(ReplVal), VAL(ReplVal, Physical))); }
 
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
@@ -948,8 +947,7 @@ void PromoteMem2Reg::run() {
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
                 // value is constInt or constFloat
                 // infrule lessthanundef target undef > const
-                Constant *C = dyn_cast<Constant>(V);
-                INFRULE(PHIPOS(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
+                INFRULE(PHIPOS(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefTgt::make(TYPEOF(V), VAL(V, Physical)));
               } else { hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT"); }
             }
           }
