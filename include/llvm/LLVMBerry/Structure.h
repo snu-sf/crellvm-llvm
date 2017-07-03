@@ -1684,6 +1684,20 @@ private:
   int line_number;
 };
 
+/* PostProp info */
+struct TyPostpropInfo {
+public:
+  enum POSTPROP_OPT { POSTPROP_GVN = 0, POSTPROP_NONE };
+  TyPostpropInfo(enum POSTPROP_OPT _opt, int _itrnum);
+  void serialize(cereal::JSONOutputArchive &archive) const;
+  static std::shared_ptr<TyPostpropInfo> make(POSTPROP_OPT _opt,
+                                              int _itrnum);
+
+private:
+  POSTPROP_OPT opt;
+  int itrnum;
+};
+
 /* core hint */
 
 struct CoreHint {
@@ -1704,6 +1718,7 @@ public:
                   std::shared_ptr<TyCppDebugInfo> d);
   void setOptimizationName(const std::string &name);
   void setAutoOption(AUTO_OPT opt);
+  void setPostpropOption(std::shared_ptr<TyPostpropInfo> postprop_option);
   void addNopPosition(std::shared_ptr<TyPosition> position);
   void serialize(cereal::JSONOutputArchive &archive) const;
 
@@ -1714,6 +1729,8 @@ private:
   std::string description;
   RETURN_CODE return_code;
   AUTO_OPT auto_option;
+  std::shared_ptr<TyPostpropInfo> postprop_option;
+  
   std::vector<std::shared_ptr<TyPosition>> nop_positions;
   std::vector<std::pair<std::shared_ptr<TyCommand>,
                         std::shared_ptr<TyCppDebugInfo>>> commands;
