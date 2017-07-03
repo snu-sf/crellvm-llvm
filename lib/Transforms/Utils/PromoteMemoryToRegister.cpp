@@ -421,7 +421,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
                     BOUNDS(STARTPOS(SRC, std::string(AI->getParent()->getName())), INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), "")));
 
         if (isa<Constant>(ReplVal)) 
-          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndef::make(TYPEOF(ReplVal), VAL(ReplVal, Physical))); 
+          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndef::make(TYPEOF(ReplVal), VAL(ReplVal))); 
 
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
@@ -946,7 +946,7 @@ void PromoteMem2Reg::run() {
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
                 // value is constInt or constFloat
                 // infrule lessthanundef target undef > const
-                INFRULE(PHIPOS(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefTgt::make(TYPEOF(V), VAL(V, Physical)));
+                INFRULE(PHIPOS(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefTgt::make(TYPEOF(V), VAL(V)));
               } else { hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT"); }
             }
           }
