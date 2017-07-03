@@ -85,7 +85,6 @@ STATISTIC(NumExpand,    "Number of expansions");
 STATISTIC(NumFactor   , "Number of factorizations");
 STATISTIC(NumReassoc  , "Number of reassociations");
 
-std::vector<BranchInst *> myHint;
 Value *InstCombiner::EmitGEPOffset(User *GEP) {
   return llvm::EmitGEPOffset(Builder, DL, GEP);
 }
@@ -2970,7 +2969,6 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (BI->isConditional() && isa<ConstantInt>(BI->getCondition())) {
         bool CondVal = cast<ConstantInt>(BI->getCondition())->getZExtValue();
         BasicBlock *ReachableBB = BI->getSuccessor(!CondVal);
-        myHint.push_back(BI);
         Worklist.push_back(ReachableBB);
         continue;
       }
@@ -3014,38 +3012,14 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
 static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
                                           TargetLibraryInfo *TLI,
                                           InstCombineWorklist &ICWorklist) {
-
   bool MadeIRChange = false;
 
   // Do a depth-first traversal of the function, populate the worklist with
   // the reachable instructions.  Ignore blocks that are not reachable.  Keep
   // track of which blocks we visit.
-  myHint.clear();
   SmallPtrSet<BasicBlock *, 64> Visited;
   MadeIRChange |=
       AddReachableCodeToWorklist(F.begin(), DL, Visited, ICWorklist, TLI);
-
-  llvmberry::ValidationUnit::Begin("dead_block_remove", &F);
-  for (auto i : myHint) {
-    BranchInst *BI = i;
-    bool CondVal = cast<ConstantInt>(BI->getCondition())->getZExtValue();
-    INTRUDE(CAPTURE(&BI, &CondVal), {
-      BasicBlock *UnreachableBB = BI->getSuccessor(CondVal);
-      LLVMContext &Ctx = BI->getContext();
-      ConstantInt *c1, *c2;
-      if (CondVal) {
-        c1 = ConstantInt::getTrue(Ctx);
-        c2 = ConstantInt::getFalse(Ctx);
-      } else {
-        c1 = ConstantInt::getFalse(Ctx);
-        c2 = ConstantInt::getTrue(Ctx);
-      }
-      INFRULE(llvmberry::TyPosition::make(SRC, UnreachableBB->getName(),
-                                          BI->getParent()->getName()),
-              llvmberry::ConsImpliesFalse::make(
-                  CONSTANT(c1), CONSTANT(c2)));
-    });
-  }
 
   // Do a quick scan over the function.  If we find any blocks that are
   // unreachable, remove any instructions inside of them.  This prevents
@@ -3053,14 +3027,6 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
   for (Function::iterator BB = F.begin(), E = F.end(); BB != E; ++BB) {
     if (Visited.count(BB))
       continue;
-
-    INTRUDE(CAPTURE(&BB), {
-      PROPAGATE(LESSDEF(llvmberry::false_encoding.first,
-                        llvmberry::false_encoding.second, SRC),
-                BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                           SRC, llvmberry::getBasicBlockIndex(BB)),
-                       llvmberry::TyPosition::make_end_of_block(SRC, *BB)));
-    });
 
     // Delete the instructions backwards, as it has a reduced likelihood of
     // having to update as many def-use and use-def chains.
@@ -3079,26 +3045,9 @@ static bool prepareICWorklistFromFunction(Function &F, const DataLayout &DL,
         ++NumDeadInst;
         MadeIRChange = true;
       }
-
-      INTRUDE(CAPTURE(&Inst), {
-        insertTgtNopAtSrcI(hints, Inst);
-        PROPAGATE(
-            LESSDEF(llvmberry::false_encoding.first,
-                    llvmberry::false_encoding.second, SRC),
-            BOUNDS(llvmberry::TyPosition::make_start_of_block(
-                       SRC, llvmberry::getBasicBlockIndex(Inst->getParent())),
-                   llvmberry::TyPosition::make_end_of_block(
-                       SRC, *Inst->getParent())));
-
-      });
-
       Inst->eraseFromParent();
     }
   }
-
-  if (!MadeIRChange)
-    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-  llvmberry::ValidationUnit::End();
 
   return MadeIRChange;
 }
@@ -3108,7 +3057,6 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
                                 AliasAnalysis *AA, AssumptionCache &AC,
                                 TargetLibraryInfo &TLI, DominatorTree &DT,
                                 LoopInfo *LI = nullptr) {
-  
   // Minimizing size?
   bool MinimizeSize = F.hasFnAttribute(Attribute::MinSize);
   auto &DL = F.getParent()->getDataLayout();

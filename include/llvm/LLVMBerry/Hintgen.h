@@ -28,6 +28,12 @@
                       ([ A ] (llvmberry::Dictionary &data,                     \
                                       llvmberry::CoreHint &hints)              \
                                       { __VA_ARGS__ })
+#define INTRUDE_IF(cond, A, ...) if (cond) { \
+                      llvmberry::ValidationUnit::GetInstance()->intrude        \
+                      ([ A ] (llvmberry::Dictionary &data,                     \
+                                      llvmberry::CoreHint &hints)              \
+                                      { __VA_ARGS__ });                        \
+                      }
 #define CAPTURE(...) __VA_ARGS__
 
 #define INFRULE(pos, x)                                                        \
