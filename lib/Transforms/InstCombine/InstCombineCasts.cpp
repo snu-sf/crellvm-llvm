@@ -302,7 +302,7 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
       // The first cast (CSrc) is eliminable so we need to fix up or replace
       // the second cast (CI). CSrc will then have a good chance of being dead.
       
-      llvmberry::ValidationUnit::Begin("cast_cast", CI.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("cast_cast", CI);
       INTRUDE(CAPTURE(&CI, &CSrc), {
         //     <src>                          |    <tgt>
         // mid = <opcode1> srcty src to midty | mod = <opcode1> srcty src to midty
@@ -615,7 +615,7 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
   // Canonicalize trunc x to i1 -> (icmp ne (and x, 1), 0), likewise for vector.
   if (DestTy->getScalarSizeInBits() == 1) {
     // XXX : trunc_onebit ValidationUnit
-    llvmberry::ValidationUnit::Begin("trunc_onebit", CI.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("trunc_onebit", CI);
     
     Constant *One = ConstantInt::get(Src->getType(), 1);
     Src = Builder->CreateAnd(Src, One);
@@ -1041,7 +1041,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
   if (SrcI &&
       match(SrcI, m_OneUse(m_And(m_Trunc(m_Value(X)), m_Constant(C)))) &&
       X->getType() == CI.getType()) {
-    llvmberry::ValidationUnit::Begin("zext_trunc_and", CI.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("zext_trunc_and", CI);
     INTRUDE(CAPTURE(&CI, &X, &C), {
       //        <src>        |       <tgt>
       // y = trunc s x to s' | y = trunc s x to s'
@@ -1065,7 +1065,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
   if (SrcI && match(SrcI, m_OneUse(m_Xor(m_Value(And), m_Constant(C)))) &&
       match(And, m_OneUse(m_And(m_Trunc(m_Value(X)), m_Specific(C)))) &&
       X->getType() == CI.getType()) {
-    llvmberry::ValidationUnit::Begin("zext_trunc_and_xor", CI.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("zext_trunc_and_xor", CI);
     
     Constant *ZC = ConstantExpr::getZExt(C, CI.getType());
     Value *NewAnd = Builder->CreateAnd(X, ZC);
@@ -1104,7 +1104,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
   if (SrcI && SrcI->hasOneUse() &&
       SrcI->getType()->getScalarType()->isIntegerTy(1) &&
       match(SrcI, m_Not(m_Value(X))) && (!X->hasOneUse() || !isa<CmpInst>(X))) {
-    llvmberry::ValidationUnit::Begin("zext_xor", CI.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("zext_xor", CI);
     
     Value *New = Builder->CreateZExt(X, CI.getType());
 
@@ -1346,7 +1346,7 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
       uint32_t SrcBitSize = SrcTy->getScalarSizeInBits();
       uint32_t DestBitSize = DestTy->getScalarSizeInBits();
 
-      llvmberry::ValidationUnit::Begin("sext_trunc_ashr", CI.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("sext_trunc_ashr", CI);
 
       // We need to emit a shl + ashr to do the sign extend.
       Value *ShAmt = ConstantInt::get(DestTy, DestBitSize-SrcBitSize);
@@ -2027,7 +2027,7 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
   // Get rid of casts from one type to the same type. These are useless and can
   // be replaced by the operand.
   if (DestTy == Src->getType()) {
-    llvmberry::ValidationUnit::Begin("bitcast_sametype", CI.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("bitcast_sametype", CI);
     INTRUDE(CAPTURE(&CI, &Src), {
       INFRULE(INSTPOS(SRC, &CI), llvmberry::ConsBitcastSametype::make(
                   VAL(Src), VAL(&CI), VALTYPE(Src->getType())));

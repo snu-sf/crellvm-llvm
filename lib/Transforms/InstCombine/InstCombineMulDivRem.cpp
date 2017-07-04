@@ -185,7 +185,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
 
   // X * -1 == 0 - X
   if (match(Op1, m_AllOnes())) {
-    llvmberry::ValidationUnit::Begin("mul_mone", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("mul_mone", I);
     
     BinaryOperator *BO = BinaryOperator::CreateNeg(Op0, I.getName());
     if (I.hasNoSignedWrap())
@@ -309,7 +309,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
           match(Op0, m_NSWSub(m_Value(), m_Value())) &&
           match(Op1, m_NSWSub(m_Value(), m_Value())))
         BO->setHasNoSignedWrap();
-      llvmberry::ValidationUnit::Begin("mul_neg", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("mul_neg", I);
 
       llvmberry::generateHintForNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
       llvmberry::generateHintForNegValue(Op1, I);
@@ -363,7 +363,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
 
   /// i1 mul -> i1 and.
   if (I.getType()->getScalarType()->isIntegerTy(1)) {
-    llvmberry::ValidationUnit::Begin("mul_bool", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("mul_bool", I);
 
     INTRUDE(CAPTURE(&I, &Op0, &Op1), {
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsMulBool::make(
@@ -376,7 +376,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
   // X*(1 << Y) --> X << Y
   // (1 << Y)*X --> X << Y
   {      
-    llvmberry::ValidationUnit::Begin("mul_shl", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("mul_shl", I);
  
     Value *Y;
     BinaryOperator *BO = nullptr;
@@ -986,7 +986,7 @@ Instruction *InstCombiner::commonIDivTransforms(BinaryOperator &I) {
     bool isSigned = I.getOpcode() == Instruction::SDiv;
     if ((isSigned && match(Z, m_SRem(m_Specific(X), m_Specific(Op1)))) ||
         (!isSigned && match(Z, m_URem(m_Specific(X), m_Specific(Op1))))){
-      llvmberry::ValidationUnit::Begin("div_sub_rem", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("div_sub_rem", I);
       INTRUDE(CAPTURE(&I, &X, &Z, &Op0, &Op1, &isSigned), {
         //    <src>      <tgt>
         // B = X % Y | B = X % Y
@@ -1182,7 +1182,7 @@ Instruction *InstCombiner::visitUDiv(BinaryOperator &I) {
   // (zext A) udiv (zext B) --> zext (A udiv B)
   if (ZExtInst *ZOp0 = dyn_cast<ZExtInst>(Op0))
     if (Value *ZOp1 = dyn_castZExtVal(Op1, ZOp0->getSrcTy())){
-      llvmberry::ValidationUnit::Begin("udiv_zext", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("udiv_zext", I);
 
       Value *UDivVal = Builder->CreateUDiv(ZOp0->getOperand(0), ZOp1, "div", I.isExact());
       INTRUDE(CAPTURE(&UDivVal, &ZOp0, &Op1, &I), {
@@ -1282,7 +1282,7 @@ Instruction *InstCombiner::visitSDiv(BinaryOperator &I) {
 
   // sdiv X, -1 == -X
   if (match(Op1, m_AllOnes())){
-    llvmberry::ValidationUnit::Begin("sdiv_mone", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("sdiv_mone", I);
 
     INTRUDE(CAPTURE(&I), {
       //    <src>     |    <tgt>
@@ -1560,7 +1560,7 @@ Instruction *InstCombiner::visitURem(BinaryOperator &I) {
   // (zext A) urem (zext B) --> zext (A urem B)
   if (ZExtInst *ZOp0 = dyn_cast<ZExtInst>(Op0))
     if (Value *ZOp1 = dyn_castZExtVal(Op1, ZOp0->getSrcTy())){
-      llvmberry::ValidationUnit::Begin("urem_zext", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("urem_zext", I);
 
       Value *URemVal = Builder->CreateURem(ZOp0->getOperand(0), ZOp1);
       INTRUDE(CAPTURE(&URemVal, &ZOp0, &Op1, &I), {
@@ -1646,7 +1646,7 @@ Instruction *InstCombiner::visitSRem(BinaryOperator &I) {
     const APInt *Y;
     // X % -Y -> X % Y
     if (match(Op1, m_APInt(Y)) && Y->isNegative() && !Y->isMinSignedValue()) {
-      llvmberry::ValidationUnit::Begin("srem_neg", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("srem_neg", I);
 
       llvmberry::generateHintForNegValue(Op1, I);
       INTRUDE(CAPTURE(&I, &Op1, &Y), {

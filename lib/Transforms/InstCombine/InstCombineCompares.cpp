@@ -2646,7 +2646,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
   if (Op0Cplxity < Op1Cplxity ||
         (Op0Cplxity == Op1Cplxity &&
          swapMayExposeCSEOpportunities(Op0, Op1))) {
-    llvmberry::ValidationUnit::Begin("icmp_swap", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("icmp_swap", I);
     INTRUDE(CAPTURE(&I, &Op0, &Op1), { INFRULE(INSTPOS(SRC, &I), llvmberry::ConsIcmpSwapOperands::make(I)); });
 
     I.swapOperands();
@@ -2683,7 +2683,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
 
   // icmp's with boolean values can always be turned into bitwise operations
   if (Ty->isIntegerTy(1)) {
-    llvmberry::ValidationUnit::Begin("icmp_unnamed", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("icmp_unnamed", I);
     INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForVisitICmp>(); });
     switch (I.getPredicate()) {
     default: llvm_unreachable("Invalid icmp instruction!");
@@ -2944,7 +2944,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       // (icmp ne/eq (sub A B) 0) -> (icmp ne/eq A, B)
       if (I.isEquality() && CI->isZero() &&
           match(Op0, m_Sub(m_Value(A), m_Value(B)))) {
-        llvmberry::ValidationUnit::Begin("icmp_unknown_sub", I.getParent()->getParent());
+        llvmberry::ValidationUnit::Begin("icmp_unknown_sub", I);
         INTRUDE(CAPTURE(&I, &Op0, &A, &B), {
           BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
           Value *A = X->getOperand(0), *B = X->getOperand(1);
@@ -3503,7 +3503,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         Y = A;
         Z = C;
       }
-      llvmberry::ValidationUnit::Begin("icmp_eq_bop", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("icmp_eq_bop", I);
       INTRUDE(CAPTURE(&I, &BO0, &BO1), {
         //       <src>      |      <tgt>
         // W = A + X        | W = A + X
@@ -3591,7 +3591,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
     if (B && D && B == D && NoOp0WrapProblem && NoOp1WrapProblem &&
         // Try not to increase register pressure.
         BO0->hasOneUse() && BO1->hasOneUse()) {
-      llvmberry::ValidationUnit::Begin("icmp_eq_bop", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("icmp_eq_bop", I);
       INTRUDE(CAPTURE(&I, &BO0, &BO1), {
         //       <src>      |      <tgt>
         // W = A - X        | W = A - X
@@ -3640,7 +3640,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       switch (SRem == BO0 ? ICmpInst::getSwappedPredicate(Pred) : Pred) {
         default: break;
         case ICmpInst::ICMP_EQ:
-          llvmberry::ValidationUnit::Begin("icmp_eq_srem", I.getParent()->getParent());
+          llvmberry::ValidationUnit::Begin("icmp_eq_srem", I);
           INTRUDE(CAPTURE(&SRem, &I), {
             // W = X % Y        | W = X % Y
             // Z = icmp eq W, Y | Z = icmp eq W, Y
@@ -3664,7 +3664,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
 
           return ReplaceInstUsesWith(I, ConstantInt::getFalse(I.getType()));
         case ICmpInst::ICMP_NE:
-          llvmberry::ValidationUnit::Begin("icmp_ne_srem", I.getParent()->getParent());
+          llvmberry::ValidationUnit::Begin("icmp_ne_srem", I);
           INTRUDE(CAPTURE(&SRem, &I), {
             // W = X % Y        | W = X % Y
             // Z = icmp ne W, Y | Z = icmp ne W, Y
@@ -3707,7 +3707,7 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       case Instruction::Sub:
       case Instruction::Xor:
         if (I.isEquality()) { // a+x icmp eq/ne b+x --> a icmp b
-          llvmberry::ValidationUnit::Begin("icmp_eq_bop", I.getParent()->getParent());
+          llvmberry::ValidationUnit::Begin("icmp_eq_bop", I);
           INTRUDE(CAPTURE(&I, &BO0, &BO1), {
             //       <src>      |      <tgt>
             // W = A + X        | W = A + X

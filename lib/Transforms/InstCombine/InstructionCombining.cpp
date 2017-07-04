@@ -211,34 +211,29 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
-          llvmberry::ValidationUnit::Begin("bop_associativity",
-                                           I.getParent()->getParent());
+          llvmberry::ValidationUnit::Begin("bop_associativity", I);
 
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
           I.setOperand(1, V);
 
           INTRUDE(CAPTURE(&Op0, &I, &B, &C, &V, &Opcode), {
-            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) &&
-                isa<ConstantInt>(V)) {
+            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) && isa<ConstantInt>(V)) {
               //    <src>    |     <tgt>
               // Y = X op C1 | Y = X op C1
               // Z = Y op C2 | Z = X op (C1 op C2)
 
               Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
 
-              llvmberry::propagateInstruction(hints, reg1_instr, &I, llvmberry::Source);
+              llvmberry::propagateInstruction(hints, reg1_instr, &I, SRC);
 
               INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopAssociative::make(
-                      REGISTER(*(Op0->getOperand(0))), REGISTER(*Op0),
-                      REGISTER(I), llvmberry::getBop(Opcode),
-                      CONSTINT(dyn_cast<ConstantInt>(B)),
-                      CONSTINT(dyn_cast<ConstantInt>(C)),
-                      CONSTINT(dyn_cast<ConstantInt>(V)),
-                      BITSIZE(*dyn_cast<ConstantInt>(B))));
-            } else {
+                  REGISTER(*(Op0->getOperand(0))), REGISTER(*Op0),
+                  REGISTER(I), llvmberry::getBop(Opcode),
+                  CONSTINT(dyn_cast<ConstantInt>(B)), CONSTINT(dyn_cast<ConstantInt>(C)),
+                  CONSTINT(dyn_cast<ConstantInt>(V)), BITSIZE(*B)));
+            } else
               llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-            }
           });
 
           llvmberry::ValidationUnit::End();
@@ -1948,7 +1943,7 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
   // true or false as appropriate.
   SmallVector<WeakVH, 64> Users;
   if (isAllocSiteRemovable(&MI, Users, TLI)) {
-    llvmberry::ValidationUnit::Begin("dead_store_elim2", MI.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("dead_store_elim2", MI);
     INTRUDE(CAPTURE(&MI, &Users), {
       // NOTE : We only support the case when Ptr is alloca and uses are store.
       bool doAbort = false;
@@ -1970,9 +1965,8 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
       } else {
         doAbort = true;
       }
-      if (doAbort) {
+      if (doAbort)
         llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-      }
     });
     for (unsigned i = 0, e = Users.size(); i != e; ++i) {
       Instruction *I = cast_or_null<Instruction>(&*Users[i]);
@@ -2745,11 +2739,8 @@ bool InstCombiner::run() {
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
-      //llvmberry::name_instructions(*(I->getParent()->getParent()));
       llvmberry::name_instruction(*I);
-      llvmberry::ValidationUnit::Begin("dead_code_elim",
-                                       I->getParent()->getParent(),
-                                       false);
+      llvmberry::ValidationUnit::Begin("dead_code_elim", *I, false);
       llvmberry::generateHintForTrivialDCE(*I);
       EraseInstFromFunction(*I);
       llvmberry::ValidationUnit::End();
@@ -2865,9 +2856,8 @@ bool InstCombiner::run() {
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
-          //llvmberry::name_instructions(*(I->getParent()->getParent()));
           llvmberry::name_instruction(*I);
-          llvmberry::ValidationUnit::Begin("dead_code_elim", I->getParent()->getParent(), false);
+          llvmberry::ValidationUnit::Begin("dead_code_elim", *I, false);
           llvmberry::generateHintForTrivialDCE(*I);
           EraseInstFromFunction(*I);
           llvmberry::ValidationUnit::End();
@@ -2918,10 +2908,8 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (isInstructionTriviallyDead(Inst, TLI)) {
         ++NumDeadInst;
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
-        //llvmberry::name_instructions(*(Inst->getParent()->getParent()));
         llvmberry::name_instruction(*Inst);
-        llvmberry::ValidationUnit::Begin("dead_code_elim",
-                              Inst->getParent()->getParent(), false);
+        llvmberry::ValidationUnit::Begin("dead_code_elim", *Inst, false);
         llvmberry::generateHintForTrivialDCE(*Inst);
         Inst->eraseFromParent();
         llvmberry::ValidationUnit::End();

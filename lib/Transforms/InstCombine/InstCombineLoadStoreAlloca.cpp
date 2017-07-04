@@ -760,7 +760,7 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
   // separated by a few arithmetic operations.
   BasicBlock::iterator BBI = &LI;
   AAMDNodes AATags;
-  llvmberry::ValidationUnit::Begin("load_load", LI.getParent()->getParent());
+  llvmberry::ValidationUnit::Begin("load_load", LI);
   INTRUDE(CAPTURE(), { data.create<llvmberry::ArgForFindAvailableLoadedValue>(); });
 
   if (Value *AvailableVal = FindAvailableLoadedValue(Op, LI.getParent(), BBI,
@@ -1632,7 +1632,7 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
   // alloca dead.
   if (Ptr->hasOneUse()) {
     if (isa<AllocaInst>(Ptr)) {
-      llvmberry::ValidationUnit::Begin("dead_store_elim", SI.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("dead_store_elim", SI);
       INTRUDE(CAPTURE(&SI, &Ptr), {
         AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
         llvmberry::insertTgtNopAtSrcI(hints, &SI);

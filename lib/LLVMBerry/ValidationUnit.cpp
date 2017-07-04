@@ -292,6 +292,10 @@ bool ValidationUnit::Exists() {
     return false;
 }
 
+void ValidationUnit::Begin(const std::string &optname, llvm::Instruction &I, bool rename) {
+  ValidationUnit::Begin(optname, I.getParent()->getParent(), rename);
+}
+
 void ValidationUnit::Begin(const std::string &optname, llvm::Function *func, bool rename) {
   if (Exists()) {
     std::cout << "ValidationUnit already exists!! : " << GetInstance()->getOptimizationName() << std::endl;

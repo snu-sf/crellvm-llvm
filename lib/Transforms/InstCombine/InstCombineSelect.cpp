@@ -149,7 +149,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
   if (!isa<BinaryOperator>(TI))
     return nullptr;
 
-  llvmberry::ValidationUnit::Begin("select_bop_fold", SI.getParent()->getParent());
+  llvmberry::ValidationUnit::Begin("select_bop_fold", SI);
   // Figure out if the operations have any operands in common.
   Value *MatchOp, *OtherOpT, *OtherOpF;
   bool MatchIsOpZero;
@@ -530,7 +530,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         else // (Pred == ICmpInst::ICMP_ULT || Pred == ICmpInst::ICMP_SLT)
           AdjustedRHS = ConstantInt::get(CI->getContext(), CI->getValue() - 1);
 
-        llvmberry::ValidationUnit::Begin("select_icmp_unknown_const", SI.getParent()->getParent());
+        llvmberry::ValidationUnit::Begin("select_icmp_unknown_const", SI);
         INTRUDE(CAPTURE(), {
           auto ptr = data.create<llvmberry::ArgForSelectIcmpConst>();
           ptr->activated = false;
@@ -711,7 +711,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
   if (CmpRHS != CmpLHS && isa<Constant>(CmpRHS)) {
     if (CmpLHS == TrueVal && Pred == ICmpInst::ICMP_EQ) {
       // Transform (X == C) ? X : Y -> (X == C) ? C : Y
-      llvmberry::ValidationUnit::Begin("select_icmp_eq", SI.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("select_icmp_eq", SI);
       INTRUDE(CAPTURE(&SI, &ICI, &CmpRHS, &CmpLHS, &FalseVal), {
         //    <src>           |    <tgt>
         // Y = icmp eq, X, C  | Y = icmp eq, X, C
@@ -738,7 +738,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
       Changed = true;
     } else if (CmpLHS == FalseVal && Pred == ICmpInst::ICMP_NE) {
       // Transform (X != C) ? Y : X -> (X != C) ? Y : C
-      llvmberry::ValidationUnit::Begin("select_icmp_ne", SI.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("select_icmp_ne", SI);
       INTRUDE(CAPTURE(&SI, &ICI, &CmpRHS, &CmpLHS, &TrueVal), {
         //     <src>          |      <tgt>
         // Y = icmp ne, X, C  | Y = icmp ne, X, C
@@ -789,7 +789,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
       TrueWhenUnset = true;
     }
     if (IsBitTest) {
-      llvmberry::ValidationUnit::Begin("select_icmp_unknown_xor", SI.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("select_icmp_unknown_xor", SI);
       Value *V = nullptr;
       // (X & Y) == 0 ? X : X ^ Y  --> X & ~Y
       if (TrueWhenUnset && TrueVal == X &&

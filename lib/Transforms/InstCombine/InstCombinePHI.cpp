@@ -79,7 +79,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
   // Otherwise, this is safe to transform!
 
-  llvmberry::ValidationUnit::Begin("fold_phi_bin", FirstInst->getParent()->getParent());
+  llvmberry::ValidationUnit::Begin("fold_phi_bin", *FirstInst);
 
   Value *InLHS = FirstInst->getOperand(0);    //a
   Value *InRHS = FirstInst->getOperand(1);    //b
@@ -488,7 +488,7 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
   Value *PhiVal;
 
   if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) { //in this function cast op does optimization too
-    llvmberry::ValidationUnit::Begin("fold_phi_bin_const", FirstInst->getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("fold_phi_bin_const", *FirstInst);
 
     INTRUDE(CAPTURE(&PN), {
       std::string oldphi = llvmberry::getVariable(PN);
