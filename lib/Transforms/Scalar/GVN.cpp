@@ -193,17 +193,19 @@ Expression ValueTable::create_expression(Instruction *I) {
       // dbgs() << "creating ConsInsn: " << *I << "\n";
       std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I)->get());
       for (unsigned i = 0; i < e.varargs.size(); ++i)
-        if (isa<Instruction>(I->getOperand(i))) {
-          std::string gsymb = "g" + std::to_string(e.varargs[i]);
-          ginsn->replace_op(i, ID(gsymb, Ghost));
-        }
+        if (Instruction *I_op = dyn_cast<Instruction>(I->getOperand(i)))
+          if (VET->count(I_op) > 0) {
+            std::string gsymb = "g" + std::to_string(e.varargs[i]);
+            ginsn->replace_op(i, ID(gsymb, Ghost));
+          }
+
       dbgs() << "VET insert: " << *I << " " << I << "\n";
       // TODO:macro
       // { Instruction *I_r = I;
       //   auto it = VET->find(I_r);
       //   if (it != VET->end()) VET->erase(it); }
       // VET->insert(std::make_pair(I, std::make_pair(ginsn, e.varargs)));
-      (*VET)[I] = std::make_pair(ginsn, e.varargs);
+      (*VET)[I] = std::make_pair(e.varargs, std::make_pair(ginsn, ginsn));
     }
     // TODO: do we need this for create_cmp_expression? since it's map from value, if the value isn't present ..
   });
@@ -1159,20 +1161,22 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
       if (VET->count(I_V) > 0) {
         dbgs() << "VET exists for " << *I_V << "\n";
         // TODO: is this necessary? how about storing VET TyExpr?
-        auto ginsn = DICTMAP(VET, I_V).first;
-        SmallVector<uint32_t, 4> vn_ops = DICTMAP(VET, I_V).second;
+        auto ginsn_src = DICTMAP(VET, I_V).second.first;
+        auto ginsn_tgt = DICTMAP(VET, I_V).second.second;
+        SmallVector<uint32_t, 4> vn_ops = DICTMAP(VET, I_V).first;
         // for (unsigned i = 0; i < vn_ops.size() ; ++i)
         //   dbgs() << i <<": " << vn_ops[i] <<"\n";
 
-        std::shared_ptr<llvmberry::TyExpr> ginsn_e(new llvmberry::TyExpr(ginsn));
+        std::shared_ptr<llvmberry::TyExpr> ginsn_e_src(new llvmberry::TyExpr(ginsn_src));
+        std::shared_ptr<llvmberry::TyExpr> ginsn_e_tgt(new llvmberry::TyExpr(ginsn_tgt));
 
         if (I_V != l_end) {
           std::string id_V = llvmberry::getVariable(*I_V);
           PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
                     BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
 
-          PROPAGATE(LESSDEF(ginsn_e, gvar, SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
-          PROPAGATE(LESSDEF(gvar, ginsn_e, TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+          PROPAGATE(LESSDEF(ginsn_e_src, gvar, SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+          PROPAGATE(LESSDEF(gvar, ginsn_e_tgt, TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
         }
         for (unsigned i = 0; i < I_V->getNumOperands(); ++i) {
           uint32_t vn_op = (isa<PHINode>(I_V))? vn : vn_ops[i];
@@ -1245,8 +1249,11 @@ void updateVETInPRE(ValueTable &VN, llvmberry::GVNReplaceArg::TyVET &VET,
                     PHINode *PN, uint32_t vn) {
   // TODO: for each PN, get VET
   DominatorTree *DT = VN.getDomTree();
-  std::shared_ptr<llvmberry::ConsInsn> ginsn(nullptr);
+  std::shared_ptr<llvmberry::ConsInsn> ginsn_src(nullptr);
+  std::shared_ptr<llvmberry::ConsInsn> ginsn_tgt(nullptr);
   SmallVector<uint32_t, 4> args;
+  bool is_found = false;
+
   dbgs() << "updateVETInPRE start for " << *PN << " \n";
   for (unsigned i = 0; i < PN->getNumIncomingValues(); ++i) {
     // TODO: for each PN->getIncomingValue(i), if not gep, use vet[0]
@@ -1254,16 +1261,17 @@ void updateVETInPRE(ValueTable &VN, llvmberry::GVNReplaceArg::TyVET &VET,
     Value *V_op = PN->getIncomingValue(i);
     dbgs() << "updateVETInPRE incoming " << *V_op << " \n";
 
+    SmallVector<uint32_t, 4> args_op;
+    std::shared_ptr<llvmberry::ConsInsn> ginsn_op_src(nullptr);
+    std::shared_ptr<llvmberry::ConsInsn> ginsn_op_tgt(nullptr);
+
     if (Instruction *I = dyn_cast<Instruction>(V_op)) {
       dbgs() << "V_op an instruction \n";
       if (VET->count(I) > 0) {
         auto val = DICTMAP(VET, I);
-        // for (unsigned i = 0; i < val.second.size() ; ++i)
-        //   dbgs() << i <<": " << val.second[i] <<"\n";
-        ginsn = val.first;
-        args = val.second;
-        // for (unsigned i = 0; i < args.size() ; ++i)
-        //   dbgs() << i <<": " << args[i] <<"\n";
+        args_op = val.first;
+        ginsn_op_src = val.second.first;
+        ginsn_op_tgt = val.second.second;
       } else {
         dbgs() << "VET not exist for I: " << *I << "\n";
         // assert(false && "VET of I not exist");
@@ -1284,23 +1292,109 @@ void updateVETInPRE(ValueTable &VN, llvmberry::GVNReplaceArg::TyVET &VET,
         // TODO: make ConsInsn from I_op and insert it to VET
         return;
       }
-      ginsn = DICTMAP(VET, elem.second.first).first;
-      args = DICTMAP(VET, elem.second.first).second;
+      args_op = DICTMAP(VET, elem.second.first).first;
+      ginsn_op_src = DICTMAP(VET, elem.second.first).second.first;
+      ginsn_op_tgt = DICTMAP(VET, elem.second.first).second.second;
     }
+    is_found = true;
+    args = args_op;
+    // ginsn_src = ginsn_op_src;
+    // ginsn_tgt = ginsn_op_tgt;
 
-    if (true) { // TODO: ginsn is not gep
-      // { Instruction *I_r = PN;
-      //   auto it = VET->find(I_r);
-      //   if (it != VET->end()) VET->erase(it); }
-      // VET->insert(std::make_pair(PN, std::make_pair(ginsn, args)));
-      (*VET)[PN] = std::make_pair(ginsn, args);
-      // for (unsigned i = 0; i < args.size() ; ++i)
-      //   dbgs() << i <<": " << args[i] <<"\n";
-      dbgs() << "VET insert: " << *PN << " " << PN << "\n";
-      dbgs() << "updateVETInPRE " << *PN << " inserted\n";
-      return;
+    if (std::shared_ptr<llvmberry::ConsGetElementPtrInst> cons_gep =
+        std::dynamic_pointer_cast<llvmberry::ConsGetElementPtrInst>(ginsn_op_src->getTyInsn())) {
+      if (cons_gep->inbounds()) {
+        dbgs() << "inbounds true" << ginsn_op_src.get() << "\n";
+        ginsn_src = ginsn_op_src;
+      }
+    } else ginsn_src = ginsn_op_src;
+    if (std::shared_ptr<llvmberry::ConsGetElementPtrInst> cons_gep =
+        std::dynamic_pointer_cast<llvmberry::ConsGetElementPtrInst>(ginsn_op_tgt->getTyInsn())) {
+      if (!cons_gep->inbounds()) {
+        dbgs() << "inbounds false" << ginsn_op_tgt.get() << "\n";
+        ginsn_tgt = ginsn_op_tgt;
+      }
+    } else {
+      dbgs() << "non-gep\n";
+      ginsn_tgt = ginsn_op_tgt;
+      break;
     }
   }
+
+  if (is_found) {
+    if (!ginsn_src) {
+      dbgs() << "src_empty\n";
+      ginsn_src = ginsn_tgt;
+    }
+    if (!ginsn_tgt) {
+      dbgs() << "tgt_empty\n";
+      ginsn_tgt = ginsn_src;
+    }
+    (*VET)[PN] = std::make_pair(args, std::make_pair(ginsn_src, ginsn_tgt));
+    // for (unsigned i = 0; i < args.size() ; ++i)
+    //   dbgs() << i <<": " << args[i] <<"\n";
+    dbgs() << "VET insert: " << *PN << " " << PN << "\n";
+    dbgs() << "updateVETInPRE " << *PN << " inserted\n";
+  }
+
+  // // old
+  // DominatorTree *DT = VN.getDomTree();
+  // std::shared_ptr<llvmberry::ConsInsn> ginsn(nullptr);
+  // SmallVector<uint32_t, 4> args;
+  // dbgs() << "updateVETInPRE start for " << *PN << " \n";
+  // for (unsigned i = 0; i < PN->getNumIncomingValues(); ++i) {
+  //   // TODO: for each PN->getIncomingValue(i), if not gep, use vet[0]
+  //   // if gep, test all inbounds
+  //   Value *V_op = PN->getIncomingValue(i);
+  //   dbgs() << "updateVETInPRE incoming " << *V_op << " \n";
+
+  //   if (Instruction *I = dyn_cast<Instruction>(V_op)) {
+  //     dbgs() << "V_op an instruction \n";
+  //     if (VET->count(I) > 0) {
+  //       auto val = DICTMAP(VET, I);
+  //       // for (unsigned i = 0; i < val.second.size() ; ++i)
+  //       //   dbgs() << i <<": " << val.second[i] <<"\n";
+  //       ginsn = val.first;
+  //       args = val.second;
+  //       // for (unsigned i = 0; i < args.size() ; ++i)
+  //       //   dbgs() << i <<": " << args[i] <<"\n";
+  //     } else {
+  //       dbgs() << "VET not exist for I: " << *I << "\n";
+  //       // assert(false && "VET of I not exist");
+  //       return;
+  //     }
+  //   } else {
+  //     dbgs() << "V_op not an instruction \n";
+  //     llvmberry::GVNReplaceArg::TyCTElem elem;
+  //     TerminatorInst *TI = PN->getIncomingBlock(i)->getTerminator();
+  //     bool flag = lookupCT(VN, CT, elem, V_op, vn, TI);
+  //     assert(flag && "lookupCT at updateVET failed");
+  //     // TODO: if vn is different from the output, calculate NotPred
+  //     // Otherwise, just use the instruction from CT.
+
+  //     uint32_t vn_elem = elem.second.second;
+  //     if (vn != vn_elem) {
+  //       assert (false && "Not Implemented yet: updateVETInPRE.");
+  //       // TODO: make ConsInsn from I_op and insert it to VET
+  //       return;
+  //     }
+  //     ginsn = DICTMAP(VET, elem.second.first).first;
+  //     args = DICTMAP(VET, elem.second.first).second;
+  //   }
+
+  //   if (true) { // TODO: ginsn is not gep
+  //     // { Instruction *I_r = PN;
+  //     //   auto it = VET->find(I_r);
+  //     //   if (it != VET->end()) VET->erase(it); }
+  //     // VET->insert(std::make_pair(PN, std::make_pair(ginsn, args)));
+  //     (*VET)[PN] = std::make_pair(ginsn, args);
+  //     // for (unsigned i = 0; i < args.size() ; ++i)
+  //     //   dbgs() << i <<": " << args[i] <<"\n";
+  //     dbgs() << "VET insert: " << *PN << " " << PN << "\n";
+  //     dbgs() << "updateVETInPRE " << *PN << " inserted\n";
+  //     return;
+  //   }
+  // }
 }
 
 // end NEW
@@ -3642,8 +3736,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       llvmberry::GVNReplaceArg::TyVET &VET =
           pdata.get<llvmberry::ArgForGVNReplace>()->VET;
       if (VET->count(CurInst) > 0) {
-        std::pair<std::shared_ptr<llvmberry::ConsInsn>,
-                  llvm::SmallVector<uint32_t, 4>> val = DICTMAP(VET, CurInst);
+        auto val = DICTMAP(VET, CurInst);
         dbgs() << *PREInstr << " cloned from " << *CurInst << "\n";
         // for (unsigned i = 0; i < val.second.size() ; ++i)
         //   dbgs() << i <<": " << val.second[i] <<"\n";

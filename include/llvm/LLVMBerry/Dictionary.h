@@ -237,7 +237,9 @@ public:
   boost::any GVNptr;
   boost::any VNptr;
 
-  typedef std::map<llvm::Instruction*, std::pair<std::shared_ptr<llvmberry::ConsInsn>, llvm::SmallVector<uint32_t, 4>>> TyVETobj;
+  typedef std::map<llvm::Instruction*,
+    std::pair<llvm::SmallVector<uint32_t, 4>,
+    std::pair<std::shared_ptr<llvmberry::ConsInsn>, std::shared_ptr<llvmberry::ConsInsn>>>> TyVETobj;
   typedef std::shared_ptr<TyVETobj> TyVET;
   TyVET VET;
 
