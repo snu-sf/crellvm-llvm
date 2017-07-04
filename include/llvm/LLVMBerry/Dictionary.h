@@ -236,6 +236,33 @@ public:
   bool isGVNReplace;
   boost::any GVNptr;
   boost::any VNptr;
+
+  typedef std::map<llvm::Instruction*, std::pair<std::shared_ptr<llvmberry::ConsInsn>, llvm::SmallVector<uint32_t, 4>>> TyVETobj;
+  typedef std::shared_ptr<TyVETobj> TyVET;
+  TyVET VET;
+
+  /* struct CTElemTy { */
+  /*   llvm::BasicBlock *BB; */
+  /*   Instruction *I; */
+  /*   uint32_t vn; */
+  /*   llvm::SmallVector<llvm::Instruction*, 4> to_prop; */
+  /*   llvm::SmallVector<std::shared_ptr<llvmberry::TyInfrule> , 4> infrules; */
+  /* }; */
+
+  typedef std::pair<llvm::BasicBlock *, std::pair<llvm::Instruction *, uint32_t>> TyCTElem;
+  typedef std::map<std::pair<llvm::Value*, uint32_t>, std::vector<TyCTElem>> TyCTobj;
+  typedef std::shared_ptr<TyCTobj> TyCT;
+  TyCT CT;
+
+  typedef std::map<llvm::BasicBlock*,
+    std::pair<std::vector<llvm::Instruction*>,
+    std::vector<std::shared_ptr<llvmberry::TyInfrule>>>> TyCTInvobj;
+  typedef std::shared_ptr<TyCTInvobj> TyCTInv;
+  TyCTInv CTInv;
+
+  std::vector<llvm::Instruction*> to_prop;
+  std::vector<std::shared_ptr<llvmberry::TyInfrule>> infrules;
+  
 };
 DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
 
