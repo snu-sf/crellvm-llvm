@@ -3368,8 +3368,10 @@ bool GVN::processInstruction(Instruction *I) {
   }
 
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
-    if (processLoad(LI))
+    if (processLoad(LI)) {
+      // llvmberry::intrude([&I](){ llvmberry::name_instructions(*(I->getParent()->getParent())); });
       return true;
+    }
 
     unsigned Num = VN.lookup_or_add(LI);
     addToLeaderTable(Num, LI, LI->getParent());
@@ -3480,7 +3482,8 @@ bool GVN::runOnFunction(Function& F) {
     return false;
 
   llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::GVN);
-  llvmberry::intrude([]() {
+  llvmberry::intrude([&F]() {
+    llvmberry::name_instructions(F);
     llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
     pdata.create<llvmberry::ArgForGVNReplace>();
   });
