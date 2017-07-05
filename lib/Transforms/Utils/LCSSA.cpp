@@ -118,9 +118,7 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
       continue;
 
     if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
-      llvmberry::ValidationUnit::Begin("licm.formlcssa.newphi",
-                                       Inst.getParent()->getParent(),
-                                       true);
+      llvmberry::ValidationUnit::Begin("licm.formlcssa.newphi", Inst);
     }
     PHINode *PN = PHINode::Create(Inst.getType(), PredCache.size(ExitBB),
                                   Inst.getName() + ".lcssa", ExitBB->begin());
@@ -178,29 +176,26 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
     if (isa<PHINode>(UserBB->begin()) && isExitBlock(UserBB, ExitBlocks)) {
       // Tell the VHs that the uses changed. This updates SCEV's caches.
       if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
-        llvmberry::ValidationUnit::Begin("licm.formlcssa.rewrite1",
-                                         Inst.getParent()->getParent(),
-                                         true);
+        llvmberry::ValidationUnit::Begin("licm.formlcssa.rewrite1", Inst);
         // Rewrites Inst to User
         // Setting description..
         INTRUDE(CAPTURE(&Inst, User, UserBB), { 
           PHINode *X = dyn_cast<PHINode>(UserBB->begin());
-          std::string str;
-          raw_string_ostream rso(str);
-          rso << "Replace from : ";
-          Inst.print(rso);
-          rso << "\nAt : ";
-          User->print(rso);
-          rso << "\nTo : ";
-          X->print(rso);
-          llvmberry::ValidationUnit::GetInstance()->setDescription(str);
+          //std::string str;
+          //raw_string_ostream rso(str);
+          //rso << "Replace from : ";
+          //Inst.print(rso);
+          //rso << "\nAt : ";
+          //User->print(rso);
+          //rso << "\nTo : ";
+          //X->print(rso);
+          //llvmberry::ValidationUnit::GetInstance()->setDescription(str);
           // This undef propagate lets validator add prev(Inst) >= phys(Inst)
           auto BBName = UserBB->getName();
           for (unsigned i = 0; i < X->getNumIncomingValues(); i++) {
             auto PrevBBName = X->getIncomingBlock(i)->getName();
             PROPAGATE(LESSDEF(EXPR(UndefValue::get(Inst.getType())), EXPR(&Inst), SRC),
-                      BOUNDS(INSTPOS(SRC, &Inst),
-                      llvmberry::TyPosition::make(SRC, BBName, PrevBBName)));
+                      BOUNDS(INSTPOS(SRC, &Inst), llvmberry::TyPosition::make(SRC, BBName, PrevBBName)));
           }
         });
         llvmberry::generateHintForReplaceAllUsesWith(&Inst, UserBB->begin(), "", INSTPOS(SRC, UserBB->begin()),
@@ -217,9 +212,7 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
     }
 
     if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
-      llvmberry::ValidationUnit::Begin("licm.formlcssa.rewrite2",
-                                       Inst.getParent()->getParent(),
-                                       true);
+      llvmberry::ValidationUnit::Begin("licm.formlcssa.rewrite2", Inst);
       // Setting description..
       INTRUDE(CAPTURE(&UsesToRewrite, i), {
         Value *V = UsesToRewrite[i]->get();
@@ -264,9 +257,8 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
   for (unsigned i = 0, e = AddedPHIs.size(); i != e; ++i) {
     if (AddedPHIs[i]->use_empty()) {
       if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
-        llvmberry::ValidationUnit::Begin("licm.formlcssa.deleteunsedphi",
-                                         Inst.getParent()->getParent(),
-                                         true);
+        llvmberry::name_instruction(Inst);
+        llvmberry::ValidationUnit::Begin("licm.formlcssa.deleteunsedphi", Inst, false);
         llvmberry::generateHintForTrivialDCE(*AddedPHIs[i]);
       }
 
