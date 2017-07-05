@@ -50,6 +50,7 @@ public:
   static PASS GetCurrentPass();
   static void EndPass();
   static void Begin(const std::string &optname, llvm::Function *func, bool rename=true);
+  static void Begin(const std::string &optname, llvm::Instruction &I, bool rename=true);
   static bool BeginIfNotExists(const std::string &optname,
                                llvm::Function *func);
   static void End();

@@ -2,6 +2,7 @@
 #define HINTGEN_H
 
 #include "llvm/LLVMBerry/Structure.h"
+#include "llvm/LLVMBerry/Dictionary.h"
 #include <string>
 #include <vector>
 #include <memory>
@@ -27,6 +28,12 @@
                       ([ A ] (llvmberry::Dictionary &data,                     \
                                       llvmberry::CoreHint &hints)              \
                                       { __VA_ARGS__ })
+#define INTRUDE_IF(cond, A, ...) if (cond) { \
+                      llvmberry::ValidationUnit::GetInstance()->intrude        \
+                      ([ A ] (llvmberry::Dictionary &data,                     \
+                                      llvmberry::CoreHint &hints)              \
+                                      { __VA_ARGS__ });                        \
+                      }
 #define CAPTURE(...) __VA_ARGS__
 
 #define INFRULE(pos, x)                                                        \
@@ -142,6 +149,8 @@
   llvmberry::isFloatOpcode((binop).getOpcode())                                \
       ? FBINOP(llvmberry::getFbop((binop).getOpcode()), type, val1, val2)      \
       : BINOP(llvmberry::getBop((binop).getOpcode()), type, val1, val2)
+#define ICMPINSN(pred, type, val1, val2)                                       \
+  llvmberry::ConsICmpInst::make(pred, type, val1, val2)
 
 // CONSTINT make TyConstInt object
 #define _CONSTINT_BITSIZE(val, bitwidth)                                       \
@@ -268,6 +277,23 @@ void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z, llvm::BinaryOperator *W,
 void generateHintForTrivialDCE(llvm::Instruction &I);
 void generateHintForGVNDCE(llvm::Instruction &I);
 
+template<DictKeys DICTKEY>
+void generateHintForInstructionSimplify(llvm::BinaryOperator &I, llvm::Value *V) {
+  INTRUDE(CAPTURE(&I, &V), {
+    auto ptr = data.get<DICTKEY>();
+    if(ptr->isActivated()){
+      llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
+      ptr->generateHint(&I);
+      llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+    }else
+      llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+  });
+}
+
+// oldPN->getOperand(0) == FirstInst.
+void generateHintForFoldPhiBin(llvm::PHINode &oldPN,
+    llvm::PHINode *NewLHS, llvm::PHINode *NewRHS, llvm::DominatorTree *DT);
+
 // inserting nop
 void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I);
 void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I);
@@ -310,6 +336,8 @@ void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints);
 
 bool equalsIfConsVar(std::shared_ptr<TyExpr> e1, std::shared_ptr<TyExpr> e2); 
 
+void propagateInvariantOnDominatedBlocks(std::shared_ptr<TyPropagateObject> invariant,
+    llvm::BasicBlock *dominatingBlock, llvm::DominatorTree *DT, CoreHint &hints);
 
 }
 

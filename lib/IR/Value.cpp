@@ -419,15 +419,12 @@ template <PointerStripKind StripKind>
 static Value *stripPointerCastsAndOffsets(Value *V) {
   bool llvmberry_isActive = llvmberry::ValidationUnit::Exists() && 
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
-  if(llvmberry_isActive){
-    llvmberry::ValidationUnit::GetInstance()->intrude([V](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-      if(data.exists<llvmberry::ArgForStripPointerCasts>()){
-        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
-        ptr->strippedValues->push_back(V);
-      }
-    });
-  }
+  INTRUDE_IF(llvmberry_isActive, CAPTURE(V), {
+    if(data.exists<llvmberry::ArgForStripPointerCasts>()){
+      auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
+      ptr->strippedValues->push_back(V);
+    }
+  });
 
   if (!V->getType()->isPointerTy()){
     return V;
@@ -468,15 +465,12 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
     }
     assert(V->getType()->isPointerTy() && "Unexpected operand type!");
 
-    if(llvmberry_isActive){
-      llvmberry::ValidationUnit::GetInstance()->intrude([V](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-        if(data.exists<llvmberry::ArgForStripPointerCasts>()){
-          auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
-          ptr->strippedValues->push_back(V);
-        }
-      });
-    }
+    INTRUDE_IF(llvmberry_isActive, CAPTURE(V), {
+      if(data.exists<llvmberry::ArgForStripPointerCasts>()){
+        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
+        ptr->strippedValues->push_back(V);
+      }
+    });
   } while (Visited.insert(V).second);
 
   return V;
