@@ -244,10 +244,15 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
         if (isa<PHINode>(u_I))
           INFRULE(TyPosition::make(SRC, *u_I, prev_block_name),
                   ConsTransitivity::make(VAR(u), VAR(to_rem, Previous), EXPR(replaceTo, Previous)));
-        else if (!u.empty() && !isa<CallInst>(u_I))
+        else if (!u.empty() && !isa<CallInst>(u_I)) {
           INFRULE(TyPosition::make(Source, *u_I, prev_block_name),
-                  ConsReplaceRhs::make(REGISTER(to_rem), VAL(replaceTo),
-                      VAR(u), RHS(u, Physical, SRC), RHS(u, Physical, TGT)));
+                  ConsSubstitute::make(REGISTER(to_rem), VAL(replaceTo), RHS(u, Physical, SRC)));
+          INFRULE(TyPosition::make(Source, *u_I, prev_block_name),
+                  ConsTransitivity::make(VAR(u), RHS(u, Physical, SRC), RHS(u, Physical, TGT)));
+          //INFRULE(TyPosition::make(Source, *u_I, prev_block_name),
+          //        ConsReplaceRhs::make(REGISTER(to_rem), VAL(replaceTo),
+          //            VAR(u), RHS(u, Physical, SRC), RHS(u, Physical, TGT)));
+        }
       } else {
         PROPAGATE(LESSDEF(VAR(to_rem), VAR(ghostvar, Ghost), SRC),
                   BOUNDS(source_pos, TyPosition::make(SRC, *u_I, prev_block_name)));
