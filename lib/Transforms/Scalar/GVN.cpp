@@ -193,11 +193,12 @@ Expression ValueTable::create_expression(Instruction *I) {
       // dbgs() << "creating ConsInsn: " << *I << "\n";
       std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I)->get());
       for (unsigned i = 0; i < e.varargs.size(); ++i)
-        if (Instruction *I_op = dyn_cast<Instruction>(I->getOperand(i)))
-          if (VET->count(I_op) > 0 || isa<LoadInst>(I_op)) {
-            std::string gsymb = "g" + std::to_string(e.varargs[i]);
-            ginsn->replace_op(i, ID(gsymb, Ghost));
-          }
+        if (Instruction *I_op = dyn_cast<Instruction>(I->getOperand(i))) {
+          // if (VET->count(I_op) > 0 || isa<LoadInst>(I_op)) {
+          std::string gsymb = "g" + std::to_string(e.varargs[i]);
+          ginsn->replace_op(i, ID(gsymb, Ghost));
+          // }
+        }
 
       dbgs() << "VET insert: " << *I << " " << I << "\n";
       // TODO:macro
@@ -981,6 +982,19 @@ static inline std::string ghostSymb(uint32_t vn) {
   return ("g" + std::to_string(vn));
 }
 
+void hintgenLoadOpt(llvmberry::CoreHint &hints, Instruction *I, Instruction *pos, Value *ptr, llvmberry::TyScope scp) {
+  // TODO: propagate I until pos at scp
+  std::string id = llvmberry::getVariable(*I);
+  if (I != pos) {
+    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, scp), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, pos)));
+    PROPAGATE(LESSDEF(RHS(id, Physical, scp), VAR(id), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, pos)));
+  }
+
+  if (I->getOperand(0) != ptr)
+    if (Instruction *Iop = dyn_cast<Instruction>(I->getOperand(0)))
+      hintgenLoadOpt(hints, Iop, pos, ptr, scp);
+}
+
 void insertProofForPropEq(llvmberry::CoreHint &hints, std::vector<llvm::Instruction*> props,
                           std::vector<std::shared_ptr<llvmberry::TyInfrule>> infrs,
                           bool is_src, BasicBlock *BB, Instruction *cur_pos) {
@@ -1049,6 +1063,7 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
                           llvmberry::GVNReplaceArg::TyCallPHI &CallPHIs,
                           Value *V, Instruction *l_end, uint32_t vn,
                           std::map<uint32_t, Instruction*> &calls,
+                          std::map<uint32_t, LoadInst*> &loads,
                           bool is_src) {
   // DominatorTree *DT = VN.getDomTree();
   SmallVector<std::pair<Instruction*, std::pair<Value *, uint32_t>>, 4> worklist;
@@ -1092,14 +1107,26 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
       }
 
       if (vn != VN.lookup_safe(I_V)) {
+        dbgs() << "vn different from I_V's vn\n";
         if (Instruction *TR = dyn_cast<TruncInst>(I_V)) {
           // TODO: process
-          PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
-                    BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+          if (loads.count(vn) > 0) {
+            LoadInst *LI = loads[vn];
+            std::string id_L = llvmberry::getVariable(*LI);
+            PROPAGATE(LESSDEF(RHS(id_L, Physical, SRC), VAR(id_L), SRC), BOUNDS(INSTPOS(SRC, LI), INSTPOS(SRC, TR)));
+            PROPAGATE(LESSDEF(gvar, RHS(id_L, Physical, SRC), TGT), BOUNDS(INSTPOS(SRC, LI), INSTPOS(SRC, TR)));
+            hintgenLoadOpt(hints, TR, TR, LI->getPointerOperand(), TGT);
+
+            PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
+                      BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+          } else {
+            dbgs() << "TRUNC without matching load!\n";
+          }
         } else {
           dbgs() << "ERROR: " << *I_V << "not the same vn: " << vn << " , cur-vn: " << VN.lookup_safe(I_V) << "\n";
         }
-      } else if (isa<LoadInst>(I_V)) {
+      } else if (LoadInst *LI = dyn_cast<LoadInst>(I_V)) {
+        loads[vn] = LI;
         PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
                   BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
       } else if (VET->count(I_V) > 0) {
@@ -1155,11 +1182,12 @@ bool new_proofGenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN,
                      Instruction *I_rem, Value *repl) {
   uint32_t vn = VN.lookup(I_rem);
   std::map<uint32_t, Instruction*> calls;
+  std::map<uint32_t, LoadInst*> loads;
   dbgs() << "SRC\n";
-  bool src = new_proofGenGVNUnary(hints, VN, VET, CT, CTInv, CallPHIs, I_rem, I_rem, vn, calls, true);
+  bool src = new_proofGenGVNUnary(hints, VN, VET, CT, CTInv, CallPHIs, I_rem, I_rem, vn, calls, loads, true);
   if (!src) return false;
   dbgs() << "TGT\n";
-  bool tgt = new_proofGenGVNUnary(hints, VN, VET, CT, CTInv, CallPHIs, repl, I_rem, vn, calls, false);
+  bool tgt = new_proofGenGVNUnary(hints, VN, VET, CT, CTInv, CallPHIs, repl, I_rem, vn, calls, loads, false);
   if (!tgt) return false;
 
   // TODO: generalize this
@@ -1381,19 +1409,6 @@ void hintgenHoist(llvmberry::CoreHint &hints, ValueTable &VN, Instruction *I_q, 
 void extractOps(ValueTable &VN, SmallVector<Value*, 4> &ops_src, Instruction *I_q, Instruction *pos) {
   for (auto OI = I_q->op_begin(), OE = I_q->op_end(); OI != OE; ++OI)
     ops_src.push_back(*OI);
-}
-
-void hintgenLoadOpt(llvmberry::CoreHint &hints, Instruction *I, Instruction *pos, Value *ptr, llvmberry::TyScope scp) {
-  // TODO: propagate I until pos at scp
-  std::string id = llvmberry::getVariable(*I);
-  if (I != pos) {
-    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, scp), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, pos)));
-    PROPAGATE(LESSDEF(RHS(id, Physical, scp), VAR(id), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, pos)));
-  }
-
-  if (I->getOperand(0) != ptr)
-    if (Instruction *Iop = dyn_cast<Instruction>(I->getOperand(0)))
-      hintgenLoadOpt(hints, Iop, pos, ptr, scp);
 }
 
 void hintgenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN, Instruction *I, Value *repl) {
