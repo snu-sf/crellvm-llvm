@@ -1073,8 +1073,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     // X + (signbit) --> X ^ signbit
     const APInt &Val = CI->getValue();
     if (Val.isSignBit()) {
-      llvmberry::ValidationUnit::Begin("add_signbit",
-                                       I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("add_signbit", I);
 
       INTRUDE(CAPTURE(&I, &LHS, &RHS), {
         // I = LHS + RHS --> I = LHS ^ 1
@@ -1093,8 +1092,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     // zext(bool) + C -> bool ? C + 1 : C
     if (ZExtInst *ZI = dyn_cast<ZExtInst>(LHS))
       if (ZI->getSrcTy()->isIntegerTy(1)){
-        llvmberry::ValidationUnit::Begin("add_zext_bool",
-                                       I.getParent()->getParent());
+        llvmberry::ValidationUnit::Begin("add_zext_bool", I);
 
         INTRUDE(CAPTURE(&I, &ZI, &CI), {
           BinaryOperator &Y = I;
@@ -1107,19 +1105,14 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           // tgt : 
           // x = zext i1 b to i<sz> 
           // y = select i1 b, (c + 1), c
-          //std::string reg_x_name = llvmberry::getVariable(*X);
-          //std::string reg_y_name = llvmberry::getVariable(Y);
-          int64_t c = C->getSExtValue();
-          int64_t cprime = c + 1;
-          int c_bitwidth = C->getType()->getIntegerBitWidth();
+          int64_t cprime = C->getSExtValue() + 1;
           int cprime_bitwidth = C->getType()->getIntegerBitWidth();
 
           llvmberry::propagateInstruction(hints, X, &Y, llvmberry::Source);
 
           INFRULE(INSTPOS(SRC, &Y), llvmberry::ConsAddZextBool::make(
-                  REGISTER(*X), REGISTER(Y),
-                  VAL(X->getOperand(0)), CONSTINT(c, c_bitwidth),
-                  CONSTINT(cprime, cprime_bitwidth), BITSIZE(c_bitwidth)));
+                  REGISTER(*X), REGISTER(Y), VAL(X->getOperand(0)), CONSTINT(C),
+                  CONSTINT(cprime, cprime_bitwidth), BITSIZE(*C)));
         });
 
         return SelectInst::Create(ZI->getOperand(0), AddOne(CI), CI);
@@ -1175,8 +1168,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       return NV;
 
   if (I.getType()->getScalarType()->isIntegerTy(1)){
-    llvmberry::ValidationUnit::Begin("add_onebit",
-                                   I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("add_onebit", I);
 
     INTRUDE(CAPTURE(&I), {
       BinaryOperator &Z = I;
@@ -1185,11 +1177,9 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       //
       // tgt : 
       // z = x ^ y
-      // std::string reg_z_name = llvmberry::getVariable(Z);
 
       INFRULE(INSTPOS(SRC, &Z), llvmberry::ConsAddOnebit::make(
-              REGISTER(Z), VAL(Z.getOperand(0)),
-              VAL(Z.getOperand(1))));
+              REGISTER(Z), VAL(Z.getOperand(0)), VAL(Z.getOperand(1))));
     });
     
     return BinaryOperator::CreateXor(LHS, RHS);
@@ -1197,7 +1187,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
   // X + X --> X << 1
   if (LHS == RHS) {
-    llvmberry::ValidationUnit::Begin("add_shift", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("add_shift", I);
 
     BinaryOperator *New =
       BinaryOperator::CreateShl(LHS, ConstantInt::get(I.getType(), 1));
@@ -1220,8 +1210,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   if (Value *LHSV = dyn_castNegVal(LHS)) {
     if (!isa<Constant>(RHS))
       if (Value *RHSV = dyn_castNegVal(RHS)) {
-        llvmberry::ValidationUnit::Begin("add_dist_sub",
-                                         I.getParent()->getParent());
+        llvmberry::ValidationUnit::Begin("add_dist_sub", I);
         
         Value *NewAdd = Builder->CreateAdd(LHSV, RHSV, "sum");
 
@@ -1252,8 +1241,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           llvmberry::insertSrcNopAtTgtI(hints, W);
          
           // propagate "w = x + y"
-          PROPAGATE(LESSDEF(RHS(reg_w_name, Physical, TGT),
-                            VAR(reg_w_name), TGT),
+          PROPAGATE(LESSDEF(RHS(reg_w_name, Physical, TGT), VAR(reg_w_name), TGT),
                     BOUNDS(INSTPOS(TGT, W), INSTPOS(TGT, Z)));
 
           // maydiff global w
@@ -1261,37 +1249,28 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
  
           // create z = x + y in tgt
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAddDistSub::make(
-                  REGISTER(*Z), REGISTER(*MX),
-                  VAL(MY), REGISTER(reg_w_name),
-                  VAL(X), VAL(Y), BITSIZE(*Z)));
+                  REGISTER(*Z), REGISTER(*MX), VAL(MY), REGISTER(reg_w_name), VAL(X), VAL(Y), BITSIZE(*Z)));
         });
 
 
         return BinaryOperator::CreateNeg(NewAdd);
       }
 
-    llvmberry::ValidationUnit::Begin("add_comm_sub",
-                                     I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("add_comm_sub", I);
     INTRUDE(CAPTURE(&LHS, &LHSV, &RHS, &I), {
       // LHS = 0   - LHSV    my = 0  - y
       //   I = LHS + RHS      z = my + x
-
-      // prepare variables
-      std::string reg_my_name = llvmberry::getVariable(*LHS);
-      std::string reg_z_name = llvmberry::getVariable(I);
 
       // propagate "my = 0 - y"
       llvmberry::propagateInstruction(hints, dyn_cast<Instruction>(LHS), &I, SRC);
 
       // from "z = my + x", create "z = x + my"
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopCommutative::make(
-              VAR(reg_z_name), llvmberry::TyBop::BopAdd,
-              VAL(LHS), VAL(RHS), BITSIZE(*LHSV)));
+              VAR(I), llvmberry::TyBop::BopAdd, VAL(LHS), VAL(RHS), BITSIZE(*LHSV)));
 
       // from "z = x + my" and "my = 0 - y", create "z = x - y"
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSub::make(
-              REGISTER(reg_my_name), REGISTER(reg_z_name), VAL(RHS), VAL(LHSV),
-              BITSIZE(*LHSV)));
+              REGISTER(*LHS), REGISTER(I), VAL(RHS), VAL(LHSV), BITSIZE(*LHSV)));
     });
 
     return BinaryOperator::CreateSub(RHS, LHSV);
@@ -1300,22 +1279,17 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   // A + -B  -->  A - B
   if (!isa<Constant>(RHS))
     if (Value *V = dyn_castNegVal(RHS)) {
-      llvmberry::ValidationUnit::Begin("add_sub", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("add_sub", I);
       INTRUDE(CAPTURE(&V, &LHS, &RHS, &I), {
         // RHS = 0   - V       my = 0 - y
         //   I = LHS + RHS      z = x + my
-
-        // prepare variables
-        std::string reg_my_name = llvmberry::getVariable(*RHS);
-        std::string reg_z_name = llvmberry::getVariable(I);
 
         // propagate "my = 0 - y"
         llvmberry::propagateInstruction(hints, dyn_cast<Instruction>(RHS), &I, SRC);
 
         // from "z = x + my" and "my = 0 - y", create "z = x - y"
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSub::make(
-                REGISTER(reg_my_name), REGISTER(reg_z_name), VAL(LHS), VAL(V),
-                BITSIZE(*V)));
+                REGISTER(*RHS), REGISTER(I), VAL(LHS), VAL(V), BITSIZE(*V)));
       });
 
       return BinaryOperator::CreateSub(LHS, V);
@@ -1331,7 +1305,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   if (Constant *CRHS = dyn_cast<Constant>(RHS)) {
     Value *X;
     if (match(LHS, m_Not(m_Value(X)))){ // ~X + C --> (C-1) - X
-      llvmberry::ValidationUnit::Begin("add_const_not", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("add_const_not", I);
       INTRUDE(CAPTURE(&CRHS, &LHS, &I, &X), {
         // Y = X ^ -1
         // Z = Y + C1
@@ -1348,9 +1322,8 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
         // To Z, apply add_const_not
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAddConstNot::make(
-                REGISTER(*Z), REGISTER(*Y), VAL(X),
-                CONSTINT(C1, bitwidth), CONSTINT(C1 - 1, bitwidth),
-                BITSIZE(bitwidth)));
+                REGISTER(*Z), REGISTER(*Y), VAL(X), CONSTINT(C1, bitwidth),
+                CONSTINT(C1 - 1, bitwidth), BITSIZE(bitwidth)));
       });
 
       return BinaryOperator::CreateSub(SubOne(CRHS), X);
@@ -1375,7 +1348,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       APInt AddRHSHighBitsAnd(AddRHSHighBits & C2->getValue());
 
       if (AddRHSHighBits == AddRHSHighBitsAnd) {
-        llvmberry::ValidationUnit::Begin("add_mask", I.getParent()->getParent());
+        llvmberry::ValidationUnit::Begin("add_mask", I);
         
         // Okay, the xform is safe.  Insert the new add pronto.
         Value *NewAdd = Builder->CreateAdd(X, CRHS, LHS->getName());
@@ -1441,7 +1414,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       // Can we fold the add into the argument of the select?
       // We check both true and false select arguments for a matching subtract.
       if (match(FV, m_Zero()) && match(TV, m_Sub(m_Value(N), m_Specific(A)))){
-        llvmberry::ValidationUnit::Begin("add_select_zero", I.getParent()->getParent());
+        llvmberry::ValidationUnit::Begin("add_select_zero", I);
         llvmberry::generateHintForAddSelectZero(&I, dyn_cast<BinaryOperator>(TV), SI,
                 llvmberry_needsCommutativity,
                 true);
@@ -1451,7 +1424,7 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       }
 
       if (match(TV, m_Zero()) && match(FV, m_Sub(m_Value(N), m_Specific(A)))){
-        llvmberry::ValidationUnit::Begin("add_select_zero2", I.getParent()->getParent());
+        llvmberry::ValidationUnit::Begin("add_select_zero2", I);
         llvmberry::generateHintForAddSelectZero(&I, dyn_cast<BinaryOperator>(FV), SI,
                 llvmberry_needsCommutativity,
                 false);
@@ -1503,26 +1476,20 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     if (match(RHS, m_Xor(m_Value(A), m_Value(B))) &&
         (match(LHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(LHS, m_And(m_Specific(B), m_Specific(A))))){
-      llvmberry::ValidationUnit::Begin("add_xor_and", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("add_xor_and", I);
       llvmberry::generateHintForAddXorAnd(&I, 
-          dyn_cast<BinaryOperator>(RHS), 
-          dyn_cast<BinaryOperator>(LHS), 
-          A, B, 
-          match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true,
-          true);
+          dyn_cast<BinaryOperator>(RHS), dyn_cast<BinaryOperator>(LHS), 
+          A, B, match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true, true);
       return BinaryOperator::CreateOr(A, B);
     }
 
     if (match(LHS, m_Xor(m_Value(A), m_Value(B))) &&
         (match(RHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(RHS, m_And(m_Specific(B), m_Specific(A))))){
-      llvmberry::ValidationUnit::Begin("add_xor_and", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("add_xor_and", I);
       llvmberry::generateHintForAddXorAnd(&I, 
-          dyn_cast<BinaryOperator>(LHS), 
-          dyn_cast<BinaryOperator>(RHS), 
-          A, B, 
-          match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true,
-          false);
+          dyn_cast<BinaryOperator>(LHS), dyn_cast<BinaryOperator>(RHS), 
+          A, B, match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true, false);
       return BinaryOperator::CreateOr(A, B);
     }
   }
@@ -1533,32 +1500,26 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     if (match(RHS, m_Or(m_Value(A), m_Value(B))) &&
         (match(LHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(LHS, m_And(m_Specific(B), m_Specific(A))))) {
-      llvmberry::ValidationUnit::Begin("add_or_and", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("add_or_and", I);
       auto *New = BinaryOperator::CreateAdd(A, B);
       New->setHasNoSignedWrap(I.hasNoSignedWrap());
       New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
       llvmberry::generateHintForAddOrAnd(&I, 
-          dyn_cast<BinaryOperator>(RHS), 
-          dyn_cast<BinaryOperator>(LHS), 
-          A, B, 
-          match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true,
-          true);
+          dyn_cast<BinaryOperator>(RHS), dyn_cast<BinaryOperator>(LHS), 
+          A, B, match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true, true);
       return New;
     }
 
     if (match(LHS, m_Or(m_Value(A), m_Value(B))) &&
         (match(RHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(RHS, m_And(m_Specific(B), m_Specific(A))))) {
-      llvmberry::ValidationUnit::Begin("add_or_and", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("add_or_and", I);
       auto *New = BinaryOperator::CreateAdd(A, B);
       New->setHasNoSignedWrap(I.hasNoSignedWrap());
       New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
       llvmberry::generateHintForAddOrAnd(&I, 
-          dyn_cast<BinaryOperator>(LHS), 
-          dyn_cast<BinaryOperator>(RHS), 
-          A, B, 
-          match(RHS, m_And(m_Specific(A), m_Specific(B))) ? false : true,
-          false);
+          dyn_cast<BinaryOperator>(LHS), dyn_cast<BinaryOperator>(RHS), 
+          A, B, match(RHS, m_And(m_Specific(A), m_Specific(B))) ? false : true, false);
       return New;
     }
   }
@@ -1786,8 +1747,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         Res->setHasNoSignedWrap(true);
     }
 
-    llvmberry::ValidationUnit::Begin("sub_add",
-                                     I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("sub_add", I);
 
     // Op1 will be propagated to Z if it is id
     // Inference rule will be applied if is a constant
@@ -1797,11 +1757,10 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
       //    <src>   |    <tgt>
       // my = 0 - y | my = 0 - y
       // z = x - my | z = x + y
-      std::string reg0_name = llvmberry::getVariable(I);
+      //std::string reg0_name = llvmberry::getVariable(I);
 
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubAdd::make(
-              REGISTER(reg0_name), VAL(Op1), VAL(Op0), VAL(V),
-              BITSIZE(I)));
+              REGISTER(I), VAL(Op1), VAL(Op0), VAL(V), BITSIZE(I)));
     });
 
     return Res;
@@ -1809,8 +1768,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
 
   if (I.getType()->isIntegerTy(1)){
-    llvmberry::ValidationUnit::Begin("sub_onebit",
-                                     I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("sub_onebit", I);
 
     INTRUDE(CAPTURE(&I), {
       //   <src>          <tgt>
@@ -1826,8 +1784,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
   // Replace (-1 - A) with (~A).
   if (match(Op0, m_AllOnes())){
-    llvmberry::ValidationUnit::Begin("sub_mone",
-                                     I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("sub_mone", I);
 
     INTRUDE(CAPTURE(&I), {
       //   <src>          <tgt>
@@ -1846,8 +1803,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     // C - ~X == X + (1+C)
     Value *X = nullptr;
     if (match(Op1, m_Not(m_Value(X)))){
-      llvmberry::ValidationUnit::Begin("sub_const_not",
-                                       I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("sub_const_not", I);
 
       INTRUDE(CAPTURE(&I, &C, &X), {
         //     <src>     <tgt>
@@ -1858,16 +1814,14 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         ConstantInt *C1 = dyn_cast<ConstantInt>(C);
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(1));
 
-        int64_t c1 = C1->getSExtValue();
-        int64_t c2 = c1 + 1;
+        int64_t c2 = C1->getSExtValue() + 1;
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
-        llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubConstNot::make(
                 REGISTER(*Z), REGISTER(*Y), VAL(X),
-                CONSTINT(c1, bitwidth), CONSTINT(c2, bitwidth),
-                BITSIZE(bitwidth)));
+                CONSTINT(C1), CONSTINT(c2, bitwidth), BITSIZE(bitwidth)));
       });
 
 
@@ -1882,8 +1836,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     // C-(X+C2) --> (C-C2)-X
     Constant *C2;
     if (match(Op1, m_Add(m_Value(X), m_Constant(C2)))){
-      llvmberry::ValidationUnit::Begin("sub_const_add",
-                                       I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("sub_const_add", I);
       INTRUDE(CAPTURE(&I, &C2, &X, &C), {
         //     <src>     <tgt>
         // Y = X  + C1 | Y = X  + C1
@@ -1900,15 +1853,15 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
         int64_t c1 = C1->getSExtValue();
         int64_t c2 = C2->getSExtValue();
-        int64_t c3 = c2 - c1;
+        //int64_t c3 = c2 - c1;
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
-        llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubConstAdd::make(
                 REGISTER(*Z), REGISTER(*Y), VAL(X),
                 CONSTINT(c1, bitwidth), CONSTINT(c2, bitwidth),
-                CONSTINT(c3, bitwidth), BITSIZE(bitwidth)));
+                CONSTINT(c2 - c1, bitwidth), BITSIZE(bitwidth)));
       });
       return BinaryOperator::CreateSub(ConstantExpr::getSub(C, C2), X);
     }
@@ -1964,21 +1917,18 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     // X-(X+Y) == -Y    X-(Y+X) == -Y
     if (match(Op1, m_Add(m_Specific(Op0), m_Value(Y))) ||
         match(Op1, m_Add(m_Value(Y), m_Specific(Op0)))) {
-      llvmberry::ValidationUnit::Begin("sub_remove",
-                                       I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("sub_remove", I);
       INTRUDE(CAPTURE(&I, &Op1, &Op0, &Y), {
         // prepare variable
         Instruction *reg_y_instr = dyn_cast<Instruction>(Op1);
 
         std::string reg_y_name = llvmberry::getVariable(*Op1);
-        llvmberry::propagateInstruction(hints, reg_y_instr, &I, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, reg_y_instr, &I, SRC);
 
         INFRULE(INSTPOS(SRC, reg_y_instr), llvmberry::ConsBopCommutative::make(
-                VAR(reg_y_name), llvmberry::TyBop::BopAdd,
-                VAL(Op0), VAL(Y), BITSIZE(*Op1)));
+                VAR(reg_y_name), llvmberry::TyBop::BopAdd, VAL(Op0), VAL(Y), BITSIZE(*Op1)));
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubRemove::make(
-                REGISTER(I), REGISTER(reg_y_name), VAL(Op0),
-                VAL(Y), BITSIZE(*Op1)));
+                REGISTER(I), REGISTER(reg_y_name), VAL(Op0), VAL(Y), BITSIZE(*Op1)));
       });
       llvmberry::ValidationUnit::End();
 
@@ -1987,19 +1937,18 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
     // (X-Y)-X == -Y
     if (match(Op0, m_Sub(m_Specific(Op1), m_Value(Y)))){
-      llvmberry::ValidationUnit::Begin("sub_sub", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("sub_sub", I);
       INTRUDE(CAPTURE(&I, &Op1, &Op0, &Y), {
         //    <src>      <tgt>
         // W = X - Y | W = X - Y
         // Z = W - X | Z = 0 - Y
         BinaryOperator *W = dyn_cast<BinaryOperator>(Op0);
-        assert(W);
+        //assert(W);
 
-        llvmberry::propagateInstruction(hints, W, &I, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, W, &I, SRC);
 
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubSub::make(
-                REGISTER(llvmberry::getVariable(I)), VAL(Op1), VAL(Y),
-                VAL(Op0), BITSIZE(*Op1)));
+                REGISTER(I), VAL(Op1), VAL(Y), VAL(Op0), BITSIZE(*Op1)));
       });
       return BinaryOperator::CreateNeg(Y);
     }
@@ -2011,7 +1960,7 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     if (match(Op1, m_Xor(m_Value(A), m_Value(B))) &&
         (match(Op0, m_Or(m_Specific(A), m_Specific(B))) ||
          match(Op0, m_Or(m_Specific(B), m_Specific(A))))){
-      llvmberry::ValidationUnit::Begin("sub_or_xor", I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("sub_or_xor", I);
       INTRUDE(CAPTURE(&I, &Op1, &Op0, &A, &B), {
         //    <src>      <tgt>
         // X = A | B | X = A | B
@@ -2020,17 +1969,16 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         BinaryOperator *Z = &I;
         BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
-        assert(X);
-        assert(Y);
+        //assert(X);
+        //assert(Y);
 
-        llvmberry::propagateInstruction(hints, X, Z, llvmberry::Source);
-        llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, X, Z, SRC);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
         if(match(X, m_Or(m_Specific(B), m_Specific(A))))
-          llvmberry::applyCommutativity(hints, Z, X, llvmberry::Source);
+          llvmberry::applyCommutativity(hints, Z, X, SRC);
 
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubOrXor::make(
-                REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X),
-                REGISTER(*Y), BITSIZE(*Z)));
+                REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X), REGISTER(*Y), BITSIZE(*Z)));
       });
       return BinaryOperator::CreateAnd(A, B);
     }
@@ -2090,29 +2038,8 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
     // 0 - (X sdiv C)  -> (X sdiv -C)  provided the negation doesn't overflow.
     if (match(Op1, m_SDiv(m_Value(X), m_Constant(C))) && match(Op0, m_Zero()) &&
-        C->isNotMinSignedValue() && !C->isOneValue()){
-      llvmberry::ValidationUnit::Begin("sub_sdiv", I.getParent()->getParent());
-      INTRUDE(CAPTURE(&I, &Op1, &X, &C), {
-        //    <src>      <tgt>
-        // Y = X / C  | Y = X / C
-        // Z = 0 - Y  | Z = X / C'
-        BinaryOperator *Z = &I;
-        BinaryOperator *Y = (BinaryOperator *)Op1;
-
-        int bitwidth = Z->getType()->getIntegerBitWidth();
-        ConstantInt *C_ci = dyn_cast<ConstantInt>(C);
-        int64_t c_val = C_ci->getSExtValue();
-        int64_t cprime_val = -c_val;
-
-        llvmberry::propagateInstruction(hints, Y, Z, SRC);
-        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubSdiv::make(
-                REGISTER(*Z), REGISTER(*Y), VAL(X),
-                CONSTINT(c_val, bitwidth), CONSTINT(cprime_val, bitwidth),
-                BITSIZE(bitwidth)));
-      });
-
+        C->isNotMinSignedValue() && !C->isOneValue())
       return BinaryOperator::CreateSDiv(X, ConstantExpr::getNeg(C));
-    }
 
     // 0 - (X << Y)  -> (-X << Y)   when X is freely negatable.
     if (match(Op1, m_Shl(m_Value(X), m_Value(Y))) && match(Op0, m_Zero())){
@@ -2126,13 +2053,12 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
           BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
           Value *A = Y->getOperand(1);
           Value *mX = XNeg;
-          llvmberry::ValidationUnit::Begin("sub_shl", I.getParent()->getParent());
+          llvmberry::ValidationUnit::Begin("sub_shl", I);
           llvmberry::generateHintForNegValue(X, I);
           INTRUDE(CAPTURE(Z, Y, X, A, mX), {
             llvmberry::propagateInstruction(hints, Y, Z, SRC);
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubShl::make(
-                    REGISTER(*Z), VAL(X), REGISTER(*Y), VAL(mX),
-                    VAL(A), BITSIZE(*Z)));
+                    REGISTER(*Z), VAL(X), REGISTER(*Y), VAL(mX), VAL(A), BITSIZE(*Z)));
           });
         }
  

@@ -15,12 +15,11 @@ void insertTgtNopAtSrcI(CoreHint &hints, llvm::Instruction *I) {
   std::string empty_str = "";
   if (I == I->getParent()->getFirstNonPHI()) {
     std::string nop_block_name = getBasicBlockIndex(I->getParent());
-    hints.addNopPosition(
-        TyPosition::make(TyScope::Target, nop_block_name, empty_str));
+    hints.addNopPosition(TyPosition::make(TGT, nop_block_name, empty_str));
   } else if (!llvm::isa<llvm::PHINode>(I)) {
     llvm::BasicBlock::iterator prevI = I;
     prevI--;
-    hints.addNopPosition(TyPosition::make(TyScope::Target, *prevI));
+    hints.addNopPosition(TyPosition::make(TGT, *prevI));
   }
 }
 
@@ -29,12 +28,11 @@ void insertSrcNopAtTgtI(CoreHint &hints, llvm::Instruction *I) {
   std::string empty_str = "";
   if (I == I->getParent()->getFirstNonPHI()) {
     std::string nop_block_name = getBasicBlockIndex(I->getParent());
-    hints.addNopPosition(
-        TyPosition::make(TyScope::Source, nop_block_name, empty_str));
+    hints.addNopPosition(TyPosition::make(SRC, nop_block_name, empty_str));
   } else if (!llvm::isa<llvm::PHINode>(I)) {
     llvm::BasicBlock::iterator prevI = I;
     prevI--;
-    hints.addNopPosition(TyPosition::make(TyScope::Source, *prevI));
+    hints.addNopPosition(TyPosition::make(SRC, *prevI));
   }
 }
 /* propagateInstruction(I1, I2, scope, propagateEquivalence) :
@@ -48,26 +46,21 @@ void propagateInstruction(llvmberry::CoreHint &hints, const llvm::Instruction *f
                           const llvm::Instruction *to,
                           TyScope scope, bool propagateEquivalence) {
   assert(ValidationUnit::Exists());
-  std::string reg_name = getVariable(*from);
+  std::string name = getVariable(*from);
+  auto pos1 = INSTPOS(scope, from), pos2 = INSTPOS(scope, to);
 
   if (scope == Source) {
-    PROPAGATE(LESSDEF(VAR(reg_name, Physical), RHS(reg_name, Physical, scope), scope),
-              BOUNDS(INSTPOS(scope, from), INSTPOS(scope, to)));
-    if (propagateEquivalence) {
-      PROPAGATE(LESSDEF(RHS(reg_name, Physical, scope), VAR(reg_name, Physical), scope),
-                BOUNDS(INSTPOS(scope, from), INSTPOS(scope, to)));
-    }
+    PROPAGATE(LESSDEF(VAR(name), RHS(name, Physical, scope), scope), BOUNDS(pos1, pos2));
+    if (propagateEquivalence)
+      PROPAGATE(LESSDEF(RHS(name, Physical, scope), VAR(name), scope), BOUNDS(pos1, pos2));
   } else if (scope == Target) {
-    PROPAGATE(LESSDEF(RHS(reg_name, Physical, scope), VAR(reg_name, Physical), scope),
-              BOUNDS(INSTPOS(scope, from), INSTPOS(scope, to)));
-    if (propagateEquivalence) {
-      PROPAGATE(LESSDEF(VAR(reg_name, Physical), RHS(reg_name, Physical, scope), scope),
-                BOUNDS(INSTPOS(scope, from), INSTPOS(scope, to)));
-    }
-  } else {
-    assert("propagateInstruction() : scope is neither Source nor Target" &&
-           false);
-  }
+    PROPAGATE(LESSDEF(RHS(name, Physical, scope), VAR(name), scope), BOUNDS(pos1, pos2));
+    if (propagateEquivalence)
+      PROPAGATE(LESSDEF(VAR(name), RHS(name, Physical, scope), scope), BOUNDS(pos1, pos2));
+  }// else {
+  //  assert("propagateInstruction() : scope is neither Source nor Target" &&
+  //         false);
+  //}
 }
 
 void propagateLessdef(llvmberry::CoreHint &hints,
@@ -75,8 +68,7 @@ void propagateLessdef(llvmberry::CoreHint &hints,
                       const llvm::Value *lesserval,
                       const llvm::Value *greaterval, TyScope scope) {
   assert(ValidationUnit::Exists());
-  PROPAGATE(ConsLessdef::make(TyExpr::make(*greaterval),
-                        TyExpr::make(*lesserval), scope),
+  PROPAGATE(LESSDEF(EXPR(greaterval), EXPR(lesserval), scope),
       BOUNDS(INSTPOS(scope, from), INSTPOS(scope, to)));
 }
 
@@ -162,19 +154,17 @@ void applyCommutativity(llvmberry::CoreHint &hints, llvm::Instruction *position,
   }
 }
 
-void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position, llvm::Value *v_greatest,
-                       llvm::Value *v_mid, llvm::Value *v_smallest,
-                       TyScope scope) {
-  applyTransitivity(hints, position, v_greatest, v_mid, v_smallest, scope, scope);
+void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position,
+                       llvm::Value *v1, llvm::Value *v2, llvm::Value *v3, TyScope scope) {
+  // v1 >= v2 >= v3
+  applyTransitivity(hints, position, v1, v2, v3, scope, scope);
 }
 
-void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position, llvm::Value *v_greatest,
-                       llvm::Value *v_mid, llvm::Value *v_smallest,
-                       TyScope scope, TyScope position_scopetag) {
+void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position, llvm::Value *v1,
+                       llvm::Value *v2, llvm::Value *v3, TyScope scope, TyScope position_scopetag) {
   assert(ValidationUnit::Exists());
-
-  INFRULE(INSTPOS(position_scopetag, position),
-          ConsTransitivity::make(EXPR(v_greatest, Physical), EXPR(v_mid, Physical), EXPR(v_smallest, Physical)));
+  // v1 >= v2 >= v3
+  INFRULE(INSTPOS(position_scopetag, position), ConsTransitivity::make(EXPR(v1), EXPR(v2), EXPR(v3)));
 }
 
 void propagateMaydiffGlobal(llvmberry::CoreHint &hints, std::string varname, TyTag tag) {
@@ -193,75 +183,39 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I,
 
       llvm::Instruction *Vins = llvm::dyn_cast<llvm::Instruction>(V);
 
-      PROPAGATE(LESSDEF(VAR(reg1_name), RHS(reg1_name, Physical, scope), scope),
+      PROPAGATE(LESSDEF(VAR(*Vins), RHS(reg1_name, Physical, scope), scope),
           BOUNDS(INSTPOS(scope, Vins), INSTPOS(scope, &I)));
-      /*
-          ConsLessdef::make(ConsVar::make(reg1_name, Physical), // my = -y
-                            ConsRhs::make(reg1_name, Physical, scope), scope),
-          ConsBounds::make(
-              TyPosition::make(scope, *Vins), // From my to z = x -my
-              TyPosition::make(scope, I))));
-      */
 
-      PROPAGATE(LESSDEF(RHS(reg1_name, Physical, scope), VAR(reg1_name), scope),
+      PROPAGATE(LESSDEF(RHS(reg1_name, Physical, scope), VAR(*Vins), scope),
                 BOUNDS(INSTPOS(scope, Vins), INSTPOS(scope, &I)));
-      /*
-      hints.addCommand(ConsPropagate::make(
-          ConsLessdef::make(ConsRhs::make(reg1_name, Physical, scope),
-                            ConsVar::make(reg1_name, Physical), // my = -y
-                            scope),
-          ConsBounds::make(
-              TyPosition::make(scope, *Vins), // From my to z = x -my
-              TyPosition::make(scope, I))));
-      */
     });
   }
   // Constants can be considered to be negated values if they can be folded.
   if (llvm::ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(V)) {
     INTRUDE(CAPTURE(&I, &V, &C, &scope), {
-      //std::string reg0_name = getVariable(I); // z = x -my
-
       unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
-      int64_t c1 = C->getSExtValue();
-      int64_t c2 = -c1;
+      int64_t c1 = C->getSExtValue(), c2 = -c1;
 
       INFRULE(INSTPOS(scope, &I), ConsNegVal::make(CONSTINT(c1, sz_bw),
               CONSTINT(c2, sz_bw), BITSIZE(I)));
-      /*
-      hints.addCommand(
-          ConsInfrule::make(TyPosition::make(scope, I),
-                            ConsNegVal::make(TyConstInt::make(c1, sz_bw),
-                                             TyConstInt::make(c2, sz_bw),
-                                             ConsSize::make(sz_bw))));*/
 
       INFRULE(INSTPOS(scope, &I), ConsNegVal::make(CONSTINT(c1, sz_bw),
               CONSTINT(c2, sz_bw), BITSIZE(I)));
-      /*hints.addCommand(
-          ConsInfrule::make(TyPosition::make(scope, I),
-                            ConsNegVal::make(TyConstInt::make(c1, sz_bw),
-                                             TyConstInt::make(c2, sz_bw),
-                                             ConsSize::make(sz_bw))));
-      */
     });
   }
-  //  if(ConstantDataVector *C = dyn_cast<ConstantDataVector>(V))
-  //  {
-  //  Todo
-  //  }
 }
 
 void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
-                                       llvm::Value *replaceTo,
-                                       std::string ghostvar,
-                                       std::shared_ptr<TyPosition> source_pos,
-                                       std::function<bool(const llvm::Value *)> filter) {
+          llvm::Value *replaceTo, std::string ghostvar,
+          std::shared_ptr<TyPosition> source_pos,
+          std::function<bool(const llvm::Value *)> filter) {
+  using namespace llvm;
   assert(ValidationUnit::Exists());
-  if (!source_pos) {
+  if (!source_pos)
     source_pos = INSTPOS(SRC, source);
-  }
 
   INTRUDE(CAPTURE(&source, &replaceTo, &ghostvar, &source_pos, filter), {
-    llvm::Instruction *I = source;
+    Instruction *I = source;
 
     std::string to_rem = getVariable(*I);
 
@@ -269,72 +223,54 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
       if (filter && !filter(UI->getUser()))
         continue;
 
-      if (!llvm::isa<llvm::Instruction>(UI->getUser())) {
+      if (!isa<Instruction>(UI->getUser()))
         // let the validation fail when the user is not an instruction
         return;
-      }
-      std::string user = getVariable(*UI->getUser());
-      llvm::Instruction *user_I =
-          llvm::dyn_cast<llvm::Instruction>(UI->getUser());
+      
+      std::string u = getVariable(*UI->getUser());
+      Instruction *u_I = dyn_cast<Instruction>(UI->getUser());
 
       std::string prev_block_name = "";
-      if (llvm::isa<llvm::PHINode>(user_I)) {
-        llvm::BasicBlock *bb_from =
-            llvm::dyn_cast<llvm::PHINode>(user_I)->getIncomingBlock(*UI);
+      if (isa<PHINode>(u_I)) {
+        BasicBlock *bb_from = dyn_cast<PHINode>(u_I)->getIncomingBlock(*UI);
         prev_block_name = getBasicBlockIndex(bb_from);
       }
 
       if (ghostvar == "") {
         PROPAGATE(LESSDEF(VAR(to_rem), EXPR(replaceTo, Physical), SRC),
-                  BOUNDS(source_pos,
-                    TyPosition::make(SRC, *user_I, prev_block_name)));
-        if (llvm::isa<llvm::PHINode>(user_I)) {
-          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
-                  ConsTransitivity::make(VAR(user), VAR(to_rem, Previous),
-                                         EXPR(replaceTo, Previous)));
-        } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
-          INFRULE(TyPosition::make(Source, *user_I, prev_block_name),
-                  ConsReplaceRhs::make(
-                      REGISTER(to_rem), VAL(replaceTo),
-                      VAR(user), RHS(user, Physical, Source),
-                      RHS(user, Physical, Target)));
-        }
+              BOUNDS(source_pos, TyPosition::make(SRC, *u_I, prev_block_name)));
+        if (isa<PHINode>(u_I))
+          INFRULE(TyPosition::make(SRC, *u_I, prev_block_name),
+                  ConsTransitivity::make(VAR(u), VAR(to_rem, Previous), EXPR(replaceTo, Previous)));
+        else if (!u.empty() && !isa<CallInst>(u_I))
+          INFRULE(TyPosition::make(Source, *u_I, prev_block_name),
+                  ConsReplaceRhs::make(REGISTER(to_rem), VAL(replaceTo),
+                      VAR(u), RHS(u, Physical, SRC), RHS(u, Physical, TGT)));
       } else {
         PROPAGATE(LESSDEF(VAR(to_rem), VAR(ghostvar, Ghost), SRC),
-                  BOUNDS(source_pos,
-                         TyPosition::make(SRC, *user_I, prev_block_name)));
+                  BOUNDS(source_pos, TyPosition::make(SRC, *u_I, prev_block_name)));
         PROPAGATE(LESSDEF(VAR(ghostvar, Ghost), EXPR(replaceTo), TGT),
-                  BOUNDS(INSTPOS(TGT, I),
-                         TyPosition::make(TGT, *user_I, prev_block_name)));
+                  BOUNDS(INSTPOS(TGT, I), TyPosition::make(TGT, *u_I, prev_block_name)));
 
-
-        if (llvm::isa<llvm::PHINode>(user_I)) {
+        if (isa<PHINode>(u_I)) {
           // src : user = phi [ to_rem, prev_block_name ]
           // tgt : user = phi [replaceTo, prev_block_name ]
           // In src : Transitivity ;
           //    user >= to_rem(physical) >= to_rem(previous) >= ghostvar
           // In tgt : TransitivityTgt ;
           //    ghostva >= replaceTo(physical) >= replaceTo(previous) >= user
-          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
-                  ConsTransitivity::make(VAR(user),
-                                         VAR(to_rem, Previous),
-                                         VAR(to_rem)));
-          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
-                  ConsTransitivity::make(VAR(user),
-                                         VAR(to_rem),
-                                         VAR(ghostvar, Ghost)));
-          INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
-                  ConsTransitivityTgt::make(EXPR(replaceTo),
-                                            EXPR(replaceTo, Previous),
-                                            VAR(user)));
-          INFRULE(TyPosition::make(TGT, *user_I, prev_block_name),
-                  ConsTransitivityTgt::make(VAR(ghostvar, Ghost),
-                                            EXPR(replaceTo),
-                                            VAR(user)));
-        } else if (!user.empty() && !llvm::isa<llvm::CallInst>(user_I)) {
-          if (!TyInstruction::isSupported(*user_I)) {
+          INFRULE(TyPosition::make(SRC, *u_I, prev_block_name),
+                  ConsTransitivity::make(VAR(u), VAR(to_rem, Previous), VAR(to_rem)));
+          INFRULE(TyPosition::make(SRC, *u_I, prev_block_name),
+                  ConsTransitivity::make(VAR(u), VAR(to_rem), VAR(ghostvar, Ghost)));
+          INFRULE(TyPosition::make(TGT, *u_I, prev_block_name),
+                  ConsTransitivityTgt::make(EXPR(replaceTo), EXPR(replaceTo, Previous), VAR(u)));
+          INFRULE(TyPosition::make(TGT, *u_I, prev_block_name),
+                  ConsTransitivityTgt::make(VAR(ghostvar, Ghost), EXPR(replaceTo), VAR(u)));
+        } else if (!u.empty() && !isa<CallInst>(u_I)) {
+          if (!TyInstruction::isSupported(*u_I)) {
             std::string str;
-            llvm::raw_string_ostream rso(str);
+            raw_string_ostream rso(str);
             rso << "\ngenerateHintForReplaceAllUsesWith : Unsupported instruction";
 
             hints.appendToDescription(rso.str());
@@ -342,19 +278,17 @@ void generateHintForReplaceAllUsesWith(llvm::Instruction *source,
               hints.setReturnCodeToAdmitted();
             return;
           }
-          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
-                  ConsSubstitute::make(REGISTER(to_rem),
-                                       ID(ghostvar, Ghost), INSN(*user_I)));
-          llvm::Instruction *user_I_copy = user_I->clone();
+          INFRULE(TyPosition::make(SRC, *u_I, prev_block_name),
+                  ConsSubstitute::make(REGISTER(to_rem), ID(ghostvar, Ghost), INSN(*u_I)));
+          Instruction *u_I_copy = u_I->clone();
 
-          for (unsigned i = 0; i < user_I_copy->getNumOperands(); i++) {
-            if (user_I->getOperand(i) == source)
-              user_I_copy->setOperand(i, replaceTo);
+          for (unsigned i = 0; i < u_I_copy->getNumOperands(); i++) {
+            if (u_I->getOperand(i) == source)
+              u_I_copy->setOperand(i, replaceTo);
           }
-          INFRULE(TyPosition::make(SRC, *user_I, prev_block_name),
-                  ConsTransitivity::make(EXPR(user_I), INSN(*user_I),
-                                         INSN(*user_I_copy)));
-          delete user_I_copy;
+          INFRULE(TyPosition::make(SRC, *u_I, prev_block_name),
+                  ConsTransitivity::make(EXPR(u_I), INSN(*u_I), INSN(*u_I_copy)));
+          delete u_I_copy;
         }
       }
     }
@@ -366,9 +300,8 @@ void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
                                             std::shared_ptr<TyPosition> invariant_pos) {
   assert(ValidationUnit::Exists());
 
-  if (!invariant_pos) {
+  if (!invariant_pos)
     invariant_pos = INSTPOS(TGT, source);
-  }
 
   INTRUDE(CAPTURE(&source, &replaceTo, &invariant_pos), {
     llvm::Instruction *I = source;
@@ -377,10 +310,9 @@ void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
     std::string I_var = getVariable(*I);
 
     for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
-      if (!llvm::isa<llvm::Instruction>(UI->getUser())) {
+      if (!llvm::isa<llvm::Instruction>(UI->getUser()))
         // let the validation fail when the user is not an instruction
         return;
-      }
       std::string user = getVariable(*UI->getUser());
       llvm::Instruction *user_I =
           llvm::dyn_cast<llvm::Instruction>(UI->getUser());
@@ -433,9 +365,6 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
                                   llvm::BinaryOperator *X, llvm::SelectInst *Y,
                                   bool needs_commutativity, bool is_leftform) {
   assert(ValidationUnit::Exists());
-  assert(Z);
-  assert(X);
-  assert(Y);
 
   INTRUDE(CAPTURE(&Z, &X, &Y, needs_commutativity, is_leftform), {
     // is_leftform == true :
@@ -450,78 +379,30 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
     // Y = select c ? 0 : x             | Y = select c ? 0 : x
     // Z = Y + a                        | Z = select c ? a : n
 
-    llvm::Value *c = Y->getCondition();
-    llvm::Value *n = X->getOperand(0);
-    llvm::Value *a = X->getOperand(1);
-    llvm::Value *a_Z = Z->getOperand(1);
-    int bitwidth = Z->getType()->getIntegerBitWidth();
+    llvm::Value *c = Y->getCondition(), *n = X->getOperand(0);
+    llvm::Value *a = X->getOperand(1), *a_Z = Z->getOperand(1);
 
     // prepare variables
-    std::string reg_y_name = getVariable(*Y);
-    std::string reg_z_name = getVariable(*Z);
-    std::string reg_x_name = getVariable(*X);
+    std::string ry = getVariable(*Y);
+    std::string rz = getVariable(*Z);
+    std::string rx = getVariable(*X);
 
     // Propagate "X = n - a"
-    PROPAGATE(LESSDEF(VAR(reg_x_name), RHS(reg_x_name, Physical, Source), Source),
-              BOUNDS(INSTPOS(Source, X), INSTPOS(Source, Z)));
-    /*
-    hints.addCommand(ConsPropagate::make(
-        ConsLessdef::make(ConsVar::make(reg_x_name, Physical),
-                          ConsRhs::make(reg_x_name, Physical, Source), Source),
-        ConsBounds::make(TyPosition::make(Source, *X),
-                         TyPosition::make(Source, *Z))));
-    */
+    PROPAGATE(LESSDEF(VAR(*X), RHS(rx, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, X), INSTPOS(SRC, Z)));
 
     // Propagate "Y = select c ? x : 0" or "Y = select c ? 0 : x"
-    PROPAGATE(LESSDEF(VAR(reg_y_name), RHS(reg_y_name, Physical, Source), Source),
-              BOUNDS(INSTPOS(Source, Y), INSTPOS(Source, Z)));
-    /*
-    hints.addCommand(ConsPropagate::make(
-        ConsLessdef::make(ConsVar::make(reg_y_name, Physical),
-                          ConsRhs::make(reg_y_name, Physical, Source), Source),
-        ConsBounds::make(TyPosition::make(Source, *Y),
-                         TyPosition::make(Source, *Z))));
-    */
+    PROPAGATE(LESSDEF(VAR(*Y), RHS(ry, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, Y), INSTPOS(SRC, Z)));
 
-    if (needs_commutativity) {
-      INFRULE(INSTPOS(Source, Z), ConsBopCommutative::make(VAR(reg_z_name),
-              TyBop::BopAdd, VAL(Y), VAL(a_Z), BITSIZE(bitwidth)));
-      /*
-      hints.addCommand(ConsInfrule::make(
-          TyPosition::make(Source, *Z),
-          ConsBopCommutative::make(VAR(reg_z_name, Physical), TyBop::BopAdd,
-                                   TyValue::make(*Y), TyValue::make(*a_Z),
-                                   ConsSize::make(bitwidth))));
-      */
-    }
+    if (needs_commutativity)
+      INFRULE(INSTPOS(SRC, Z), ConsBopCommutative::make(VAR(*Z),
+              TyBop::BopAdd, VAL(Y), VAL(a_Z), BITSIZE(*Z)));
 
-    if (is_leftform) {
-      INFRULE(INSTPOS(Source, Z), ConsAddSelectZero::make(REGISTER(reg_z_name),
-              REGISTER(reg_x_name), REGISTER(reg_y_name), VAL(c), VAL(n), VAL(a),
-              BITSIZE(bitwidth)));
-      /*
-      hints.addCommand(ConsInfrule::make(
-          TyPosition::make(Source, *Z),
-          ConsAddSelectZero::make(
-              TyRegister::make(reg_z_name, Physical),
-              TyRegister::make(reg_x_name, Physical),
-              TyRegister::make(reg_y_name, Physical), TyValue::make(*c),
-              TyValue::make(*n), TyValue::make(*a), ConsSize::make(bitwidth))));
-      */
-    } else {
-      INFRULE(INSTPOS(Source, Z), ConsAddSelectZero2::make(REGISTER(reg_z_name),
-              REGISTER(reg_x_name), REGISTER(reg_y_name), VAL(c), VAL(n), VAL(a),
-              BITSIZE(bitwidth)));
-      /*
-      hints.addCommand(ConsInfrule::make(
-          TyPosition::make(Source, *Z),
-          ConsAddSelectZero2::make(
-              TyRegister::make(reg_z_name, Physical),
-              TyRegister::make(reg_x_name, Physical),
-              TyRegister::make(reg_y_name, Physical), TyValue::make(*c),
-              TyValue::make(*n), TyValue::make(*a), ConsSize::make(bitwidth))));
-      */
-    }
+    if (is_leftform)
+      INFRULE(INSTPOS(SRC, Z), ConsAddSelectZero::make(REGISTER(*Z),
+              REGISTER(*X), REGISTER(*Y), VAL(c), VAL(n), VAL(a), BITSIZE(*Z)));
+    else
+      INFRULE(INSTPOS(SRC, Z), ConsAddSelectZero2::make(REGISTER(*Z),
+              REGISTER(*X), REGISTER(*Y), VAL(c), VAL(n), VAL(a), BITSIZE(*Z)));
   });
 }
 
@@ -538,7 +419,7 @@ void generateHintForOrAnd(llvm::BinaryOperator *Y, llvm::Value *X,
       // Y = X & A | Y = X & A
       // Z = Y | X | (Z equals X)
       llvm::BinaryOperator *Z = llvm::dyn_cast<llvm::BinaryOperator>(I);
-      assert(Z && "Z must be a binary operator in or_and optimization");
+      //assert(Z && "Z must be a binary operator in or_and optimization");
 
       bool Zswapped = Z->getOperand(0) == X;
       propagateInstruction(hints, Y, Z, SRC);
@@ -564,27 +445,24 @@ void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0,
     // W = Y | Z   | W = A ^ B
     llvm::BinaryOperator *Z = llvm::dyn_cast<llvm::BinaryOperator>(op1);
     llvm::BinaryOperator *Y = llvm::dyn_cast<llvm::BinaryOperator>(op0);
-    llvm::BinaryOperator *X =
-        llvm::dyn_cast<llvm::BinaryOperator>(Y->getOperand(1));
-    assert(X);
-    assert(Y);
-    assert(Z);
-    assert(W);
-    llvm::Value *A = Z->getOperand(0);
-    llvm::Value *B = Z->getOperand(1);
-    int bitwidth = W->getType()->getIntegerBitWidth();
+    llvm::BinaryOperator *X = llvm::dyn_cast<llvm::BinaryOperator>(Y->getOperand(1));
+    //assert(X);
+    //assert(Y);
+    //assert(Z);
+    //assert(W);
+    llvm::Value *A = Z->getOperand(0), *B = Z->getOperand(1);
 
-    propagateInstruction(hints, X, W, Source);
-    propagateInstruction(hints, Y, W, Source);
-    propagateInstruction(hints, Z, W, Source);
+    propagateInstruction(hints, X, W, SRC);
+    propagateInstruction(hints, Y, W, SRC);
+    propagateInstruction(hints, Z, W, SRC);
     if (X->getOperand(1) == B)
-      applyCommutativity(hints, W, X, Source);
+      applyCommutativity(hints, W, X, SRC);
 
     if (needsCommutativity)
-      applyCommutativity(hints, W, W, Source);
+      applyCommutativity(hints, W, W, SRC);
 
     INFRULE(INSTPOS(SRC, W), ConsOrXor::make(
-        VAL(W), VAL(Z), VAL(X), VAL(Y), VAL(A), VAL(B), BITSIZE(bitwidth)));
+        VAL(W), VAL(Z), VAL(X), VAL(Y), VAL(A), VAL(B), BITSIZE(*W)));
   });
 }
 
@@ -601,41 +479,31 @@ void generateHintForOrXor2(llvm::BinaryOperator *Z, llvm::Value *X1_val,
     // X2 = A  ^ -1  | X2 =  A ^ -1
     // Y2 = X2 & B   | Y2 = X2 & B
     // Z =  Y1 | Y2  | Z =   A ^ B
-    llvm::BinaryOperator *Y1 =
-        llvm::dyn_cast<llvm::BinaryOperator>(Z->getOperand(0));
-    llvm::BinaryOperator *Y2 =
-        llvm::dyn_cast<llvm::BinaryOperator>(Z->getOperand(1));
+    llvm::BinaryOperator *Y1 = llvm::dyn_cast<llvm::BinaryOperator>(Z->getOperand(0));
+    llvm::BinaryOperator *Y2 = llvm::dyn_cast<llvm::BinaryOperator>(Z->getOperand(1));
     llvm::BinaryOperator *X1 = llvm::dyn_cast<llvm::BinaryOperator>(X1_val);
     llvm::BinaryOperator *X2 = llvm::dyn_cast<llvm::BinaryOperator>(X2_val);
-    assert(Y1);
-    assert(Y2);
-    assert(X1);
-    assert(X2);
-    int bitwidth = Z->getType()->getIntegerBitWidth();
+    //assert(Y1);
+    //assert(Y2);
+    //assert(X1);
+    //assert(X2);
+    //int bitwidth = Z->getType()->getIntegerBitWidth();
 
-    propagateInstruction(hints, X1, Z, Source);
-    propagateInstruction(hints, X2, Z, Source);
-    propagateInstruction(hints, Y1, Z, Source);
-    propagateInstruction(hints, Y2, Z, Source);
+    propagateInstruction(hints, X1, Z, SRC);
+    propagateInstruction(hints, X2, Z, SRC);
+    propagateInstruction(hints, Y1, Z, SRC);
+    propagateInstruction(hints, Y2, Z, SRC);
     if (X1->getOperand(1) == B)
-      applyCommutativity(hints, Z, X1, Source);
+      applyCommutativity(hints, Z, X1, SRC);
     if (X2->getOperand(1) == A)
-      applyCommutativity(hints, Z, X2, Source);
+      applyCommutativity(hints, Z, X2, SRC);
     if (needsY1Commutativity)
-      applyCommutativity(hints, Z, Y1, Source);
+      applyCommutativity(hints, Z, Y1, SRC);
     if (needsY2Commutativity)
-      applyCommutativity(hints, Z, Y2, Source);
+      applyCommutativity(hints, Z, Y2, SRC);
 
     INFRULE(INSTPOS(TGT, Z), ConsOrXor2::make(
-        VAL(Z), VAL(X1), VAL(Y1), VAL(X2), VAL(Y2), VAL(A), VAL(B), BITSIZE(bitwidth)));
-    /*
-    hints.addCommand(ConsInfrule::make(
-        TyPosition::make(Target, *Z),
-        ConsOrXor2::make(TyValue::make(*Z), TyValue::make(*X1),
-                         TyValue::make(*Y1), TyValue::make(*X2),
-                         TyValue::make(*Y2), TyValue::make(*A),
-                         TyValue::make(*B), ConsSize::make(bitwidth))));
-    */
+        VAL(Z), VAL(X1), VAL(Y1), VAL(X2), VAL(Y2), VAL(A), VAL(B), BITSIZE(*Z)));
   });
 }
 
@@ -643,7 +511,7 @@ void generateHintForOrXor4(llvm::BinaryOperator *Z, llvm::Value *X,
                            llvm::BinaryOperator *Y, llvm::BinaryOperator *A,
                            llvm::Value *B, llvm::BinaryOperator *NB,
                            bool needsYCommutativity, bool needsZCommutativity) {
-  assert(ValidationUnit::Exists());
+  //assert(ValidationUnit::Exists());
 
   INTRUDE(CAPTURE(&Z, &X, &Y, &A, &B, &NB, needsYCommutativity, needsZCommutativity), {
     // <src>      |  <tgt>
@@ -651,20 +519,19 @@ void generateHintForOrXor4(llvm::BinaryOperator *Z, llvm::Value *X,
     // Y = A ^ B  | Y = A ^ B
     // <nop>      | NB = B ^ -1
     // Z = X | Y  | Z = NB | X
-    int bitwidth = Z->getType()->getIntegerBitWidth();
-    propagateInstruction(hints, A, Z, Target);
-    propagateInstruction(hints, Y, Z, Target);
-    propagateInstruction(hints, NB, Z, Target);
+    propagateInstruction(hints, A, Z, TGT);
+    propagateInstruction(hints, Y, Z, TGT);
+    propagateInstruction(hints, NB, Z, TGT);
     if (needsYCommutativity)
-      applyCommutativity(hints, Z, Y, Target);
+      applyCommutativity(hints, Z, Y, TGT);
     insertSrcNopAtTgtI(hints, NB);
     propagateMaydiffGlobal(hints, getVariable(*NB), Physical);
 
     INFRULE(INSTPOS(TGT, Z), ConsOrXor4::make(VAL(Z), VAL(X),
-            VAL(Y), VAL(A), VAL(B), VAL(NB), BITSIZE(bitwidth)));
+            VAL(Y), VAL(A), VAL(B), VAL(NB), BITSIZE(*Z)));
     if (needsZCommutativity)
       INFRULE(INSTPOS(TGT, Z), ConsOrCommutativeTgt::make(
-              REGISTER(*Z), VAL(X), VAL(Y), BITSIZE(bitwidth)));
+              REGISTER(*Z), VAL(X), VAL(Y), BITSIZE(*Z)));
   });
 }
 
@@ -677,28 +544,18 @@ void generateHintForAddXorAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
     // X = A ^ B  | X = A ^ B
     // Y = A & B  | Y = A & B
     // Z = X + Y  | Z = A | B
-    llvm::Value *A = X->getOperand(0);
-    llvm::Value *B = X->getOperand(1);
-    int bitwidth = Z->getType()->getIntegerBitWidth();
+    llvm::Value *A = X->getOperand(0), *B = X->getOperand(1);
 
-    propagateInstruction(hints, X, Z, Source);
-    propagateInstruction(hints, Y, Z, Source);
+    propagateInstruction(hints, X, Z, SRC);
+    propagateInstruction(hints, Y, Z, SRC);
 
     if (needsYCommutativity)
-      applyCommutativity(hints, Z, Y, Source);
+      applyCommutativity(hints, Z, Y, SRC);
     if (needsZCommutativity)
-      applyCommutativity(hints, Z, Z, Source);
+      applyCommutativity(hints, Z, Z, SRC);
 
     INFRULE(INSTPOS(SRC, Z), ConsAddXorAnd::make(
-        REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X),
-        REGISTER(*Y), BITSIZE(bitwidth)));
-    /*
-        TyRegister::make(getVariable(*Z), Physical),
-                            TyValue::make(*A), TyValue::make(*B),
-                            TyRegister::make(getVariable(*X), Physical),
-                            TyRegister::make(getVariable(*Y), Physical),
-                            ConsSize::make(bitwidth))));
-    */
+        REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X), REGISTER(*Y), BITSIZE(*Z)));
   });
 }
 
@@ -713,29 +570,17 @@ void generateHintForAddOrAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
     // X = A ^ B  | X = A ^ B
     // Y = A & B  | Y = A & B
     // Z = X + Y  | Z = A | B
-    llvm::Value *A = X->getOperand(0);
-    llvm::Value *B = X->getOperand(1);
-    int bitwidth = Z->getType()->getIntegerBitWidth();
+    llvm::Value *A = X->getOperand(0), *B = X->getOperand(1);
 
-    propagateInstruction(hints, X, Z, Source);
-    propagateInstruction(hints, Y, Z, Source);
+    propagateInstruction(hints, X, Z, SRC);
+    propagateInstruction(hints, Y, Z, SRC);
 
     if (needsYCommutativity)
-      applyCommutativity(hints, Z, Y, Source);
+      applyCommutativity(hints, Z, Y, SRC);
     if (needsZCommutativity)
-      applyCommutativity(hints, Z, Z, Source);
+      applyCommutativity(hints, Z, Z, SRC);
 
-    INFRULE(INSTPOS(Source, Z), ConsAddOrAnd::make(
-        REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X), REGISTER(*Y), BITSIZE(bitwidth)));
-    /*
-    hints.addCommand(ConsInfrule::make(
-        TyPosition::make(Source, *Z),
-        ConsAddOrAnd::make(TyRegister::make(getVariable(*Z), Physical),
-                           TyValue::make(*A), TyValue::make(*B),
-                           TyRegister::make(getVariable(*X), Physical),
-                           TyRegister::make(getVariable(*Y), Physical),
-                           ConsSize::make(bitwidth))));
-    */
+    INFRULE(INSTPOS(SRC, Z), ConsAddOrAnd::make(REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X), REGISTER(*Y), BITSIZE(*Z)));
   });
 }
 
@@ -752,14 +597,7 @@ void generateHintForAndOr(llvm::BinaryOperator *Z, llvm::Value *X,
       applyCommutativity(hints, Z, Y, Source);
     if (needsZCommutativity)
       applyCommutativity(hints, Z, Z, Source);
-    INFRULE(INSTPOS(Source, Z), ConsAndOr::make(VAL(Z), VAL(X), VAL(Y), VAL(A), BITSIZE(*Z)));
-    /*
-    hints.addCommand(ConsInfrule::make(
-        INSTPOS(Source, Z),
-        ConsAndOr::make(VAL(Z, Physical), VAL(X, Physical), VAL(Y, Physical),
-                        VAL(A, Physical),
-                        ConsSize::make(Z->getType()->getIntegerBitWidth()))));
-    */
+    INFRULE(INSTPOS(SRC, Z), ConsAndOr::make(VAL(Z), VAL(X), VAL(Y), VAL(A), BITSIZE(*Z)));
   });
 }
 
@@ -776,9 +614,7 @@ void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z, llvm::BinaryOperator *W,
     // W = A + X        | W = A + X
     // Y = B + X        | Y = B + X
     // Z = icmp ne W, Y | Z = icmp ne A, B
-    llvm::Value *X = nullptr;
-    llvm::Value *A = nullptr;
-    llvm::Value *B = nullptr;
+    llvm::Value *X = nullptr, *A = nullptr, *B = nullptr;
     auto pred = Z->getPredicate();
     unsigned bitsize = Y->getType()->getIntegerBitWidth();
     propagateInstruction(hints, W, Z, SRC);
@@ -884,6 +720,117 @@ void generateHintForGVNDCE(llvm::Instruction &I) {
   });
 }
 
+void generateHintForFoldPhiBin(llvm::PHINode &PN, llvm::PHINode *NewLHS, llvm::PHINode *NewRHS, llvm::DominatorTree *DT) {
+  assert(NewLHS == nullptr || NewRHS == nullptr);
+
+  INTRUDE(CAPTURE(&PN, NewLHS, NewRHS, DT), {
+    llvm::PHINode *NewPHI = nullptr;
+    if (NewLHS)
+      NewPHI = NewLHS;
+    else if (NewRHS)
+      NewPHI = NewRHS;
+
+    std::string oldphi = llvmberry::getVariable(PN), newphi = "";
+    llvm::BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
+
+    if (NewPHI) {
+      newphi = llvmberry::getVariable(*NewPHI);
+      PROPAGATE(MAYDIFF(newphi, Physical), llvmberry::ConsGlobal::make());
+    }
+
+    for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+      llvm::Instruction *InI = llvm::cast<llvm::Instruction>(PN.getIncomingValue(i));
+      llvm::BasicBlock *InstB = InI->getParent();
+
+      llvm::Value *CommonOp = InI->getOperand(NewLHS ? 1 : 0);
+      llvm::Value *SpecialOp = InI->getOperand(NewLHS ? 0 : 1);
+
+      auto PNpos = llvmberry::TyPosition::make(SRC, PN.getParent()->getName(), PN.getIncomingBlock(i)->getName());
+
+      //from I to endofblock propagate x or y depend on edge
+      std::string reg = llvmberry::getVariable(*InI); //reg is x or y
+      PROPAGATE(LESSDEF(VAR(reg), RHS(reg, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, InI),
+          llvmberry::TyPosition::make_end_of_block(SRC, *InstB)));
+
+      llvmberry::propagateInvariantOnDominatedBlocks(LESSDEF(VAR(reg), RHS(reg, Physical, SRC), SRC), InstB, DT, hints);
+
+      llvm::BinaryOperator *BinOp = llvm::dyn_cast<llvm::BinaryOperator>(InI);
+      llvm::ICmpInst *CmpInst = llvm::dyn_cast<llvm::ICmpInst>(InI);
+      auto Op0Phy = VAL(InI->getOperand(0)), Op1Phy = VAL(InI->getOperand(1));
+
+      if (!NewPHI) {
+        std::shared_ptr<llvmberry::TyExpr> aph_bph;
+        
+        // (z >= x^) && (x^ >= x) -> (z >= x)
+        INFRULE(PNpos, llvmberry::ConsTransitivity::make(VAR(oldphi), VAR(reg, Previous), VAR(reg)));
+
+        if (BinOp)
+          aph_bph = INSN(BINARYINSN(*BinOp, TYPEOF(BinOp), Op0Phy, Op1Phy));
+        else if (CmpInst)
+          aph_bph = INSN(ICMPINSN(llvmberry::getIcmpPred(CmpInst->getPredicate()),
+                        TYPEOF(CmpInst->getOperand(0)), Op0Phy, Op1Phy));
+
+        // (z >= x) && (x >= a + b) -> z >= a + b
+        INFRULE(PNpos, llvmberry::ConsTransitivity::make(VAR(oldphi), VAR(reg), aph_bph));
+        // { z >= a + b } at src after phinode
+        //    from I to endofblock propagate x or y depend on edge
+        PROPAGATE(LESSDEF(VAR(oldphi), RHS(reg, Physical, SRC), SRC), BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+
+      } else {
+
+        std::shared_ptr<llvmberry::TyExpr> expr_twoprevs, expr_oneprev, expr_oneghost;
+        auto Op0Prv = VAL(InI->getOperand(0), Previous), Op1Prv = VAL(InI->getOperand(1), Previous);
+        auto K = ID("K", Ghost);
+        auto CommOpTy = TYPEOF(CommonOp);
+
+        if (BinOp) {
+          expr_twoprevs = INSN(BINARYINSN(*BinOp, CommOpTy, Op0Prv, Op1Prv));
+          expr_oneprev  = INSN(BINARYINSN(*BinOp, CommOpTy, NewLHS ? Op0Prv:Op0Phy, NewRHS ? Op1Prv:Op1Phy));
+          expr_oneghost = INSN(BINARYINSN(*BinOp, CommOpTy, NewLHS ? K:Op0Phy,      NewRHS ? K:Op1Phy));
+        } else if (CmpInst) {
+          auto Pred = llvmberry::getIcmpPred(CmpInst->getPredicate());
+          expr_twoprevs = INSN(ICMPINSN(Pred, CommOpTy, Op0Prv, Op1Prv));
+          expr_oneprev  = INSN(ICMPINSN(Pred, CommOpTy, NewLHS ? Op0Prv:Op0Phy, NewRHS ? Op1Prv:Op1Phy));
+          expr_oneghost = INSN(ICMPINSN(Pred, CommOpTy, NewLHS ? K:Op0Phy,      NewRHS ? K:Op1Phy));
+        }
+
+        // x^ >= a^+b^ , z = x^ -> z >= a^+b^
+        INFRULE(PNpos, llvmberry::ConsTransitivity::make(VAR(oldphi), VAR(reg, Previous), expr_twoprevs));
+        
+        // If NewLHS: replace_rhs z >= a^ + b^ -> z >= a^ + b     //a is special b is common
+        // If NewRHS: replace_rhs z >= a^ + b^ -> z >= a + b^     //a is common b is physical
+        if (!llvm::isa<llvm::Constant>(CommonOp))
+          INFRULE(PNpos, llvmberry::ConsSubstitute::make(REGISTER(*CommonOp, Previous),
+              VAL(CommonOp), expr_twoprevs));
+        
+        INFRULE(PNpos, llvmberry::ConsTransitivity::make(VAR(oldphi), expr_twoprevs, expr_oneprev));
+
+        // If NewLHS: introduce a^ >= k && k >= a^
+        // If NewRHS: introduce b^ >= k && k >= b^
+        INFRULE(PNpos, llvmberry::ConsIntroGhost::make(EXPR(SpecialOp, Previous), REGISTER("K", Ghost)));
+
+        // If NewLHS: infer (k >= a^) && (a^ >= t) -> k >= t in tgt
+        // If NewRHS: infer (k >= b^) && (b^ >= t) -> k >= t in tgt
+        INFRULE(PNpos, llvmberry::ConsTransitivityTgt::make(VAR("K", Ghost), EXPR(SpecialOp, Previous), VAR(newphi)));
+
+        // If NewLHS: introduce a^ + b >= k + b from a^ >= k 
+        // If NewRHS: introduce a + b^ >= a + k from b^ >= k 
+        INFRULE(PNpos, llvmberry::ConsSubstituteRev::make(REGISTER("K", Ghost), VAL(SpecialOp, Previous), expr_oneghost));
+
+        // If NewLHS: infer (z >= a^ + b) && (a^ + b >= K + b) -> z >= K + b in src
+        // If NewRHS: infer (z >= a + b^) && (a + b^ >= a + K) -> z >= a + K in src
+        INFRULE(PNpos, llvmberry::ConsTransitivity::make(VAR(oldphi), expr_oneprev, expr_oneghost));
+
+        // { z >= a + K } at src after phinode
+        PROPAGATE(LESSDEF(VAR(oldphi), expr_oneghost, SRC), BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(SRC, InsertPos)));
+
+        // { K  >= t } at tgt after phinode
+        PROPAGATE(LESSDEF(VAR("K", Ghost), VAR(newphi), TGT), BOUNDS(PHIPOSJustPhi(TGT, PN), INSTPOS(TGT, InsertPos)));
+      }
+    }//end of for
+  });
+}
+
 int getIndexofMem2Reg(llvm::Instruction* I,
                       int instrIndex, int termIndex) {
   if (I == nullptr)
@@ -922,13 +869,11 @@ void generateHintForPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB,
             SRC, getBasicBlockIndex(I->getParent()),
             getBasicBlockIndex(PB));
 
-        INFRULE(IPBPos,
-                ConsTransitivity::make(VAR(OpPHIResolved_id),
+        INFRULE(IPBPos, ConsTransitivity::make(VAR(OpPHIResolved_id),
                                        VAR(OpPHIResolved_id, Previous),
-                                       VAR(OpPHI_id, Physical)));
+                                       VAR(OpPHI_id)));
 
-        INFRULE(IPBPos,
-                ConsTransitivity::make(VAR(OpPHI_id),
+        INFRULE(IPBPos, ConsTransitivity::make(VAR(OpPHI_id),
                                        VAR(OpPHIResolved_id, Previous),
                                        VAR(OpPHIResolved_id)));
 
@@ -971,8 +916,7 @@ std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet
     auto t = *(UI++);
     llvm::BasicBlock* useBB = std::get<0>(t);
     llvm::Instruction* use = std::get<1>(t);
-    int useIndex =
-      getIndexofMem2Reg(use, std::get<2>(t),
+    int useIndex = getIndexofMem2Reg(use, std::get<2>(t),
                         DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, useBB->getName()));
 
     if (use != nullptr && llvm::isa<llvm::PHINode>(use)) {
@@ -986,9 +930,8 @@ std::shared_ptr<std::vector<std::shared_ptr<TyPosition>>> saveUseSet
             destSet->push_back(TyPosition::make(SRC, *use, useIndex, prev));
         }
       }
-    } else {
+    } else
       destSet->push_back(TyPosition::make(SRC, *useBB, useIndex));
-    }
   }
 
   return destSet;
@@ -1243,6 +1186,20 @@ void unreachableBlockPropagateFalse(llvm::BasicBlock* bb, CoreHint &hints) {
     // find predessor of K and insert in worklist if it has one
     for (auto BI = pred_begin(L), BE = pred_end(L); BI != BE; BI++)
       DeadBlockList.push_back((*BI));
+  }
+}
+
+void propagateInvariantOnDominatedBlocks(std::shared_ptr<TyPropagateObject> invariant,
+    llvm::BasicBlock *dominatingBlock, llvm::DominatorTree *DT, CoreHint &hints) {
+  for (auto node = llvm::GraphTraits<llvm::DominatorTree *>::nodes_begin(DT);
+       node != llvm::GraphTraits<llvm::DominatorTree *>::nodes_end(DT);
+       ++node) {
+    llvm::BasicBlock *BB = node->getBlock();
+    if ((BB->getName() != dominatingBlock->getName()) && DT->dominates(dominatingBlock, BB)) {
+      PROPAGATE(invariant,
+          BOUNDS(llvmberry::TyPosition::make_start_of_block(SRC, (BB->getName())),
+                 llvmberry::TyPosition::make_end_of_block(SRC, *(BB->begin()->getParent()))));
+    }
   }
 }
 
