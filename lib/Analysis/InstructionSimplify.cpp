@@ -1305,10 +1305,6 @@ static bool isUndefShift(Value *Amount) {
       auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
 
       ptr->setHintGenFunc("shift_undef1", [&hints](llvm::Instruction *I) {
-        // BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-        // Value *Y = Z->getOperand(0);
-        //Value *Y = I->getOperand(0);
-        //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftUndef1::make(VAL(Z), VAL(Y), BITSIZE(*Z)));
         INFRULE(INSTPOS(SRC, I), llvmberry::ConsShiftUndef1::make(VAL(I), VAL(I->getOperand(0)), BITSIZE(*I)));
       });
     });
@@ -1332,13 +1328,6 @@ static bool isUndefShift(Value *Amount) {
         auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
 
         ptr->setHintGenFunc("shift_undef2", [CI, &hints](llvm::Instruction *I) {
-          //BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-          //Value *Y = Z->getOperand(0);
-          //ConstantInt *C = CI;
-          //INFRULE(INSTPOS(SRC, Z),
-          //        llvmberry::ConsShiftUndef2::make(
-          //            VAL(Z), VAL(Y),
-          //            llvmberry::TyConstInt::make(*C), BITSIZE(*Z)));
           INFRULE(INSTPOS(SRC, I), llvmberry::ConsShiftUndef2::make(
               VAL(I), VAL(I->getOperand(0)), CONSTINT(dyn_cast<ConstantInt>(CI)), BITSIZE(*I)));
         });
@@ -1389,9 +1378,6 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
       auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
 
       ptr->setHintGenFunc("shift_zero1", [Op0, Op1, &hints](llvm::Instruction *I) {
-        //BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-        //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftZero1::make(
-        //            VAL(Z), VAL(Z->getOperand(1)), BITSIZE(*Z)));
         INFRULE(INSTPOS(SRC, I), llvmberry::ConsShiftZero1::make(VAL(I), VAL(I->getOperand(1)), BITSIZE(*I)));
       });
     });
@@ -1410,9 +1396,6 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
       auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
 
       ptr->setHintGenFunc("shift_zero2", [Op0, Op1, &hints](llvm::Instruction *I) {
-        //BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-        //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsShiftZero2::make(
-        //        VAL(Z), VAL(Z->getOperand(0)), BITSIZE(*Z)));
         INFRULE(INSTPOS(SRC, I), llvmberry::ConsShiftZero2::make(VAL(I), VAL(I->getOperand(0)), BITSIZE(*I)));
       });
     });
@@ -1703,9 +1686,6 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
       auto ptr = data.get<llvmberry::ArgForSimplifyAndInst>();
       
       ptr->setHintGenFunc("and_same", [Op0, Op1, &hints](llvm::Instruction *I){
-        //BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-        //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndSame::make(
-        //        VAL(Z), VAL(Op0), BITSIZE(*Z)));
         INFRULE(INSTPOS(SRC, I), llvmberry::ConsAndSame::make(VAL(I), VAL(Op0), BITSIZE(*I)));
       });
     });
@@ -1721,9 +1701,6 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
 
       ptr->setHintGenFunc("and_zero", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
         BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-        //if(ptr->isSwapped)
-        //  llvmberry::applyCommutativity(hints, Z, Z, SRC);
-        //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndZero::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
         if(ptr->isSwapped) llvmberry::applyCommutativity(hints, Z, Z, SRC);
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAndZero::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
       });
@@ -1810,7 +1787,6 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
       
       ptr->setHintGenFunc("and_or", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
         BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-        //Value *X = Op0;
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
         //assert(Y);
         llvmberry::generateHintForAndOr(Z, Op0, Y, 
