@@ -40,10 +40,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include <algorithm>
 #include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/Hintgen.h"
-#include "llvm/LLVMBerry/Dictionary.h"
-#include "llvm/Support/Debug.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "mem2reg"
@@ -454,8 +451,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       ReplVal = UndefValue::get(LI->getType());
 
     INTRUDE(CAPTURE(&AI, &LI, &ReplVal), {
-      llvmberry::replaceExpr(AI, ReplVal, data);
-      llvmberry::replaceTag(AI, llvmberry::Ghost, data);
       llvmberry::replaceExpr(LI, ReplVal, data);
       llvmberry::replaceTag(LI, llvmberry::Ghost, data);
     });
@@ -536,9 +531,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   StoresByIndexTy StoresByIndex;
 
   for (User *U : AI->users())
-    if (StoreInst *SI = dyn_cast<StoreInst>(U)) {
+    if (StoreInst *SI = dyn_cast<StoreInst>(U)) 
       StoresByIndex.push_back(std::make_pair(LBI.getInstructionIndex(SI), SI));
-    }
 
   // Sort the stores by their index, making it efficient to do a lookup with a
   // binary search.
@@ -950,9 +944,7 @@ void PromoteMem2Reg::run() {
               } else { hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT"); }
             }
           }
-
           llvmberry::replaceExpr(PN, V, data);
-          llvmberry::replaceTag(PN, llvmberry::Ghost, data);
         });
 
         PN->replaceAllUsesWith(V);
@@ -1124,8 +1116,9 @@ bool PromoteMem2Reg::QueuePhiNode(BasicBlock *BB, unsigned AllocaNo,
   PN = PHINode::Create(Allocas[AllocaNo]->getAllocatedType(), getNumPreds(BB),
                        Allocas[AllocaNo]->getName() + "." + Twine(Version++),
                        BB->begin());
+  ++NumPHIInsert;
   PhiToAllocaMap[PN] = AllocaNo;
-
+  
   if (AST && PN->getType()->isPointerTy())
     AST->copyValue(PointerAllocaValues[AllocaNo], PN);
 

@@ -1064,7 +1064,7 @@ void propagateFromToUsingKey(unsigned key, std::shared_ptr<TyPosition> from_posi
 
   // Infrule function
   // if from position is SI or AI, apply infrule  
-  // if from position is PHI, infrule is already applied 
+  // if from position is PHI, no need to apply infrule  
   // if store operand changed before, then infrule already applied 
   if ((recentInstr[key].op0 != "llvmberry::PHI") && (!recentInstr[key].check))
     INFRULE(recentInstr[key].instrPos, ConsIntroGhost::make(recentInstr[key].instrR, REGISTER(recentInstr[key].op1, Ghost)));
