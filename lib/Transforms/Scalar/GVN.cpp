@@ -1046,9 +1046,10 @@ bool lookupCT(ValueTable &VN, llvmberry::GVNReplaceArg::TyCT &CT,
     elem = *II;
     BasicBlock *cur = elem.first;
     dbgs() << "curblock: " << cur->getName() << "\n";
-    BasicBlock *pred = cur->getSinglePredecessor();
-    assert(pred && "pred not found");
-    if (DT->dominates(pred->getTerminator(), pos)){
+    // BasicBlock *pred = cur->getSinglePredecessor();
+    // assert(pred && "pred not found");
+    Instruction *cur_begin = cur->begin();
+    if (DT->dominates(cur_begin, pos) || cur_begin == pos){
       flag = true;
       break;
     }
