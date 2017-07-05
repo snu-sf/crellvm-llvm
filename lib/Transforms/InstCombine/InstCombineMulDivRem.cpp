@@ -406,9 +406,9 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
         // propagate Y = 1 << A
         llvmberry::propagateInstruction(hints, Y, Z, SRC);
         
-        if(needsTransitivity)
-          // replace Z = X * Y to Z = Y * X
-          llvmberry::applyCommutativity(hints, Z, Z, SRC);
+        // auto: replace Z = X * Y to Z = Y * X
+        //if(needsTransitivity)
+        //  llvmberry::applyCommutativity(hints, Z, Z, SRC);
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsMulShl::make(
                 REGISTER(*Z), REGISTER(*Y), VAL(X), VAL(A), BITSIZE(*Z)));

@@ -64,7 +64,6 @@ public:
   void generateHint(llvm::Instruction *arg) const;
   bool isActivated() const;
   std::string getMicroOptName() const;
-  bool isSwapped;
 
 private:
   bool activated;

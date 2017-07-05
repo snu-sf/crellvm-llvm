@@ -2738,8 +2738,9 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Not), llvmberry::Physical);
         llvmberry::propagateInstruction(hints, Zprime, &I, TGT);
-        if(Zprime->getOperand(0) == Op0)
-          llvmberry::applyCommutativity(hints, &I, Zprime, TGT);
+        // auto: If Z' = xor A, -1 , apply commutativity
+        //if(Zprime->getOperand(0) == Op0)
+        //  llvmberry::applyCommutativity(hints, &I, Zprime, TGT);
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_ugt_and_not");
@@ -2775,8 +2776,9 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Not), llvmberry::Physical);
         llvmberry::propagateInstruction(hints, Zprime, &I, TGT);
-        if(Zprime->getOperand(0) == Op1)
-          llvmberry::applyCommutativity(hints, &I, Zprime, TGT);
+        // auto: If Z' = xor B, -1 , apply commutativity
+        //if(Zprime->getOperand(0) == Op1)
+        //  llvmberry::applyCommutativity(hints, &I, Zprime, TGT);
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sgt_and_not");
@@ -2811,8 +2813,9 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Not), llvmberry::Physical);
         llvmberry::propagateInstruction(hints, Zprime, &I, TGT);
-        if(Zprime->getOperand(0) == Op0)
-          llvmberry::applyCommutativity(hints, &I, Zprime, TGT);
+        // auto: If Z' = A ^ -1, apply commutativity
+        //if(Zprime->getOperand(0) == Op0)
+        //  llvmberry::applyCommutativity(hints, &I, Zprime, TGT);
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_uge_or_not");
@@ -2847,8 +2850,9 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         llvmberry::insertSrcNopAtTgtI(hints, Zprime);
         llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Not), llvmberry::Physical);
         llvmberry::propagateInstruction(hints, Zprime, &I, TGT);
-        if(Zprime->getOperand(0) == Op1)
-          llvmberry::applyCommutativity(hints, &I, Zprime, TGT);
+        // auto: If Z' = xor B, -1, apply commutativity
+        //if(Zprime->getOperand(0) == Op1)
+        //  llvmberry::applyCommutativity(hints, &I, Zprime, TGT);
 
         if (data.get<llvmberry::ArgForVisitICmp>()->swapOps) {
           llvmberry::ValidationUnit::GetInstance()->setOptimizationName("icmp_sge_or_not");
