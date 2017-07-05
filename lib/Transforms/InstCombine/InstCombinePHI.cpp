@@ -117,7 +117,6 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
   // ex) FirstInst x = a + b  I = a + c
   INTRUDE(CAPTURE(&PN, &NewLHS, &NewRHS, this), {
-    DominatorTree *DT = this->getDominatorTree();
     std::string oldphi = llvmberry::getVariable(PN);
 
     BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
