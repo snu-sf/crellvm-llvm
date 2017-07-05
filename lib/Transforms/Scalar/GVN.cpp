@@ -1123,40 +1123,74 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
             dbgs() << "TRUNC without matching load!\n";
           }
         } else {
-          dbgs() << "ERROR: " << *I_V << "not the same vn: " << vn << " , cur-vn: " << VN.lookup_safe(I_V) << "\n";
+          dbgs() << *I_V << "not the same vn: " << vn << " , cur-vn: " << VN.lookup_safe(I_V) << "\n";
+          PROPAGATE(LESSDEF(VAR(id_V), gvar, SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+          PROPAGATE(LESSDEF(gvar, VAR(id_V), TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
         }
-      } else if (LoadInst *LI = dyn_cast<LoadInst>(I_V)) {
-        loads[vn] = LI;
-        PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
-                  BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
-      } else if (VET->count(I_V) > 0) {
-        dbgs() << "VET exists for " << *I_V << "\n";
-        // TODO: is this necessary? how about storing VET TyExpr?
-        auto ginsn_src = DICTMAP(VET, I_V).second.first;
-        auto ginsn_tgt = DICTMAP(VET, I_V).second.second;
-        SmallVector<uint32_t, 4> vn_ops = DICTMAP(VET, I_V).first;
-        // for (unsigned i = 0; i < vn_ops.size() ; ++i)
-        //   dbgs() << i <<": " << vn_ops[i] <<"\n";
+      } else {
+        if (LoadInst *LI = dyn_cast<LoadInst>(I_V)) loads[vn] = LI;
+        if (I_V != l_end) PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
+                                    BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
 
-        std::shared_ptr<llvmberry::TyExpr> ginsn_e_src(new llvmberry::TyExpr(ginsn_src));
-        std::shared_ptr<llvmberry::TyExpr> ginsn_e_tgt(new llvmberry::TyExpr(ginsn_tgt));
+        if (VET->count(I_V) > 0) {
+          dbgs() << "VET exists for " << *I_V << "\n";
+          auto ginsn_src = DICTMAP(VET, I_V).second.first;
+          auto ginsn_tgt = DICTMAP(VET, I_V).second.second;
+          SmallVector<uint32_t, 4> vn_ops = DICTMAP(VET, I_V).first;
+          // for (unsigned i = 0; i < vn_ops.size() ; ++i)
+          //   dbgs() << i <<": " << vn_ops[i] <<"\n";
 
-        if (I_V != l_end) {
-          std::string id_V = llvmberry::getVariable(*I_V);
-          PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
-                    BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+          std::shared_ptr<llvmberry::TyExpr> ginsn_e_src(new llvmberry::TyExpr(ginsn_src));
+          std::shared_ptr<llvmberry::TyExpr> ginsn_e_tgt(new llvmberry::TyExpr(ginsn_tgt));
 
-          PROPAGATE(LESSDEF(ginsn_e_src, gvar, SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
-          PROPAGATE(LESSDEF(gvar, ginsn_e_tgt, TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
-        }
-        for (unsigned i = 0; i < I_V->getNumOperands(); ++i) {
-          uint32_t vn_op = (isa<PHINode>(I_V))? vn : vn_ops[i];
-          Instruction *new_pos = I_V;
-          if (PHINode *PN = dyn_cast<PHINode>(I_V)) new_pos = PN->getIncomingBlock(i)->getTerminator();
-          auto to_insert = std::make_pair(new_pos, std::make_pair(I_V->getOperand(i), vn_op));
-          if (visited.insert(to_insert)) worklist.push_back(to_insert);
+          if (I_V != l_end) {
+            // PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
+            //           BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+            PROPAGATE(LESSDEF(ginsn_e_src, gvar, SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+            PROPAGATE(LESSDEF(gvar, ginsn_e_tgt, TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+          }
+          for (unsigned i = 0; i < I_V->getNumOperands(); ++i) {
+            uint32_t vn_op = (isa<PHINode>(I_V))? vn : vn_ops[i];
+            Instruction *new_pos = I_V;
+            if (PHINode *PN = dyn_cast<PHINode>(I_V)) new_pos = PN->getIncomingBlock(i)->getTerminator();
+            auto to_insert = std::make_pair(new_pos, std::make_pair(I_V->getOperand(i), vn_op));
+            if (visited.insert(to_insert)) worklist.push_back(to_insert);
+          }
         }
       }
+      //
+      // } else if (LoadInst *LI = dyn_cast<LoadInst>(I_V)) {
+      //   loads[vn] = LI;
+      //   PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
+      //             BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+      // } else if (VET->count(I_V) > 0) {
+      //   dbgs() << "VET exists for " << *I_V << "\n";
+      //   // TODO: is this necessary? how about storing VET TyExpr?
+      //   auto ginsn_src = DICTMAP(VET, I_V).second.first;
+      //   auto ginsn_tgt = DICTMAP(VET, I_V).second.second;
+      //   SmallVector<uint32_t, 4> vn_ops = DICTMAP(VET, I_V).first;
+      //   // for (unsigned i = 0; i < vn_ops.size() ; ++i)
+      //   //   dbgs() << i <<": " << vn_ops[i] <<"\n";
+
+      //   std::shared_ptr<llvmberry::TyExpr> ginsn_e_src(new llvmberry::TyExpr(ginsn_src));
+      //   std::shared_ptr<llvmberry::TyExpr> ginsn_e_tgt(new llvmberry::TyExpr(ginsn_tgt));
+
+      //   if (I_V != l_end) {
+      //     std::string id_V = llvmberry::getVariable(*I_V);
+      //     PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
+      //               BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+
+      //     PROPAGATE(LESSDEF(ginsn_e_src, gvar, SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+      //     PROPAGATE(LESSDEF(gvar, ginsn_e_tgt, TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+      //   }
+      //   for (unsigned i = 0; i < I_V->getNumOperands(); ++i) {
+      //     uint32_t vn_op = (isa<PHINode>(I_V))? vn : vn_ops[i];
+      //     Instruction *new_pos = I_V;
+      //     if (PHINode *PN = dyn_cast<PHINode>(I_V)) new_pos = PN->getIncomingBlock(i)->getTerminator();
+      //     auto to_insert = std::make_pair(new_pos, std::make_pair(I_V->getOperand(i), vn_op));
+      //     if (visited.insert(to_insert)) worklist.push_back(to_insert);
+      //   }
+      // }
     } else {
       dbgs() << "lookup: " << *V << " for vn: " << vn << "\n";
       dbgs() << "lookup_safe result: " << VN.lookup_safe(V) << "\n";
