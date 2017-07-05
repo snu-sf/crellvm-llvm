@@ -239,7 +239,7 @@ public:
 
   typedef std::map<llvm::Instruction*,
     std::pair<llvm::SmallVector<uint32_t, 4>,
-    std::pair<std::shared_ptr<llvmberry::ConsInsn>, std::shared_ptr<llvmberry::ConsInsn>>>> TyVETobj;
+    llvm::SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4>>> TyVETobj;
   typedef std::shared_ptr<TyVETobj> TyVET;
   TyVET VET;
 
