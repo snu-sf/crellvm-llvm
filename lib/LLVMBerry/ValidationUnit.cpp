@@ -157,6 +157,19 @@ static CoreHint::AUTO_OPT getAutoOptOf(ValidationUnit::PASS pass) {
   }
 }
 
+static std::shared_ptr<TyPostpropInfo> getPostpropOptOf(ValidationUnit::PASS pass) {
+  static auto _forGVN = TyPostpropInfo::make(TyPostpropInfo::POSTPROP_GVN, 99999999);
+  static auto _NONE = TyPostpropInfo::make(TyPostpropInfo::POSTPROP_NONE, 0);
+  
+  switch (pass) {
+  case ValidationUnit::GVN:
+  case ValidationUnit::PRE:
+    return _forGVN;
+  default:
+    return _NONE;
+  }
+}
+
 // private functions
 void ValidationUnit::begin(bool rename) {
   assert(!isAborted);
@@ -185,6 +198,7 @@ void ValidationUnit::begin(bool rename) {
   std::string fid = _func->getName().str();
   _corehint = CoreHint(mid, fid, _optname);
   _corehint.setAutoOption(getAutoOptOf(_CurrentPass));
+  _corehint.setPostpropOption(getPostpropOptOf(_CurrentPass));
 }
 
 void ValidationUnit::commit() {
@@ -276,6 +290,10 @@ bool ValidationUnit::Exists() {
     return true;
   else
     return false;
+}
+
+void ValidationUnit::Begin(const std::string &optname, llvm::Instruction &I, bool rename) {
+  ValidationUnit::Begin(optname, I.getParent()->getParent(), rename);
 }
 
 void ValidationUnit::Begin(const std::string &optname, llvm::Function *func, bool rename) {

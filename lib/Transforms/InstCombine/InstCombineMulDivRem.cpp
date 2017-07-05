@@ -185,8 +185,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
 
   // X * -1 == 0 - X
   if (match(Op1, m_AllOnes())) {
-    llvmberry::ValidationUnit::Begin("mul_mone",
-                                     I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("mul_mone", I);
     
     BinaryOperator *BO = BinaryOperator::CreateNeg(Op0, I.getName());
     if (I.hasNoSignedWrap())
@@ -195,11 +194,12 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
     INTRUDE(CAPTURE(&I, &Op0), {
       //    <src>           <tgt>
       //  z = x * (-1) |  z = 0 - x
-      BinaryOperator *Z = &I;
-      Value *X = Op0;
+      //BinaryOperator *Z = &I;
+      //Value *X = Op0;
 
-      INFRULE(INSTPOS(TGT, Z), llvmberry::ConsMulMone::make(
-              REGISTER(*Z), VAL(X), BITSIZE(*Z)));
+      //INFRULE(INSTPOS(TGT, Z), llvmberry::ConsMulMone::make(
+      //        REGISTER(*Z), VAL(X), BITSIZE(*Z)));
+      INFRULE(INSTPOS(TGT, &I), llvmberry::ConsMulMone::make(REGISTER(I), VAL(Op0), BITSIZE(I)));
     });
 
     return BO;
@@ -309,16 +309,14 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
           match(Op0, m_NSWSub(m_Value(), m_Value())) &&
           match(Op1, m_NSWSub(m_Value(), m_Value())))
         BO->setHasNoSignedWrap();
-      llvmberry::ValidationUnit::Begin("mul_neg",
-                                       I.getParent()->getParent());
+      llvmberry::ValidationUnit::Begin("mul_neg", I);
 
       llvmberry::generateHintForNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
       llvmberry::generateHintForNegValue(Op1, I);
 
       INTRUDE(CAPTURE(&Op0, &Op1, &Op0v, &Op1v, &I), {
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsMulNeg::make(
-                REGISTER(I), VAL(Op0), VAL(Op1), VAL(Op0v),
-                VAL(Op1v), BITSIZE(I)));
+                REGISTER(I), VAL(Op0), VAL(Op1), VAL(Op0v), VAL(Op1v), BITSIZE(I)));
       });
       return BO;
     }
@@ -365,7 +363,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
 
   /// i1 mul -> i1 and.
   if (I.getType()->getScalarType()->isIntegerTy(1)) {
-    llvmberry::ValidationUnit::Begin("mul_bool", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("mul_bool", I);
 
     INTRUDE(CAPTURE(&I, &Op0, &Op1), {
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsMulBool::make(
@@ -378,7 +376,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
   // X*(1 << Y) --> X << Y
   // (1 << Y)*X --> X << Y
   {      
-    llvmberry::ValidationUnit::Begin("mul_shl", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("mul_shl", I);
  
     Value *Y;
     BinaryOperator *BO = nullptr;
@@ -405,9 +403,10 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
         // Y = 1 << A | Y = 1 << A
         // Z = Y *  X | Z = X << A
         Value *A = Y;
-        BinaryOperator *Y = nullptr;
-        Value *X = nullptr;
+        //BinaryOperator *Y = nullptr;
+        //Value *X = nullptr;
         bool needsTransitivity = data.get<llvmberry::ArgForVisitMul>()->needsTransitivity;
+        /*
         if(needsTransitivity){
           X = Op0;
           Y = dyn_cast<BinaryOperator>(Op1);
@@ -415,10 +414,13 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
           X = Op1;
           Y = dyn_cast<BinaryOperator>(Op0);
         }
+        */
+        Value *X = needsTransitivity ? Op0 : Op1;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(needsTransitivity ? Op1 : Op0);
         BinaryOperator *Z = &I;
 
         // propagate Y = 1 << A
-        llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Source);
+        llvmberry::propagateInstruction(hints, Y, Z, SRC);
         
         if(needsTransitivity)
           // replace Z = X * Y to Z = Y * X
@@ -983,41 +985,8 @@ Instruction *InstCombiner::commonIDivTransforms(BinaryOperator &I) {
   if (match(Op0, m_Sub(m_Value(X), m_Value(Z)))) { // (X - Z) / Y; Y = Op1
     bool isSigned = I.getOpcode() == Instruction::SDiv;
     if ((isSigned && match(Z, m_SRem(m_Specific(X), m_Specific(Op1)))) ||
-        (!isSigned && match(Z, m_URem(m_Specific(X), m_Specific(Op1))))){
-      llvmberry::ValidationUnit::Begin("div_sub_rem", I.getParent()->getParent());
-      INTRUDE(CAPTURE(&I, &X, &Z, &Op0, &Op1, &isSigned), {
-        //    <src>      <tgt>
-        // B = X % Y | B = X % Y
-        // A = X - B | A = X - B
-        // Z = A / Y | Z = X / Y
-        BinaryOperator *A = dyn_cast<BinaryOperator>(Op0);
-        Value *Y = Op1;
-        BinaryOperator *B = dyn_cast<BinaryOperator>(Z);
-        BinaryOperator *Z = &I;
-
-        // prepare variables
-        std::string reg_a_name = llvmberry::getVariable(*A);
-        std::string reg_b_name = llvmberry::getVariable(*B);
-
-        PROPAGATE(LESSDEF(VAR(*B), RHS(reg_b_name, Physical, SRC), SRC),
-                  BOUNDS(INSTPOS(TGT, B), INSTPOS(TGT, Z)));
-
-        PROPAGATE(LESSDEF(VAR(*A), RHS(reg_a_name, Physical, SRC), SRC),
-                  BOUNDS(INSTPOS(TGT, A), INSTPOS(TGT, Z)));
-
-        if(isSigned){
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSdivSubSrem::make(
-                  REGISTER(*Z), REGISTER(reg_b_name), REGISTER(reg_a_name),
-                  VAL(X), VAL(Y), BITSIZE(*Z)));
-        }else{
-          INFRULE(INSTPOS(SRC, Z), llvmberry::ConsUdivSubUrem::make(
-                  REGISTER(*Z), REGISTER(reg_b_name), REGISTER(reg_a_name),
-                  VAL(X), VAL(Y), BITSIZE(*Z)));
-        }
-      });
-
+        (!isSigned && match(Z, m_URem(m_Specific(X), m_Specific(Op1)))))
       return BinaryOperator::Create(I.getOpcode(), X, Op1);
-    }
   }
 
   return nullptr;
@@ -1181,59 +1150,10 @@ Instruction *InstCombiner::visitUDiv(BinaryOperator &I) {
 
   // (zext A) udiv (zext B) --> zext (A udiv B)
   if (ZExtInst *ZOp0 = dyn_cast<ZExtInst>(Op0))
-    if (Value *ZOp1 = dyn_castZExtVal(Op1, ZOp0->getSrcTy())){
-      llvmberry::ValidationUnit::Begin("udiv_zext", I.getParent()->getParent());
-
-      Value *UDivVal = Builder->CreateUDiv(ZOp0->getOperand(0), ZOp1, "div", I.isExact());
-      INTRUDE(CAPTURE(&UDivVal, &ZOp0, &Op1, &I), {
-        // udiv_zext (case 1) : 
-        //        <src>        |     <tgt>
-        // X = zext s1 A to s2 | X = zext s1 A to s2
-        // Y = zext s1 B to s2 | Y = zext s1 B to s2
-        // <nop>               | K = A udiv B
-        // Z = udiv X Y        | Z = zext s1 K to s2
-        //
-        // udiv_zext (case 2) : 
-        //        <src>        |     <tgt>
-        // X = zext s1 A to s2 | X = zext s1 A to s2
-        // <nop>               | K = A udiv c
-        // Z = udiv X c        | Z = zext s1 K to s2
-        BinaryOperator *Z = &I;
-        ZExtInst *X = ZOp0;
-        BinaryOperator *K = dyn_cast<BinaryOperator>(UDivVal);
-        Value *A = X->getOperand(0);
-        std::string reg_k_name = llvmberry::getVariable(*K);
-        int size1 = X->getSrcTy()->getIntegerBitWidth();
-        int size2 = X->getDestTy()->getIntegerBitWidth();
-
-        llvmberry::propagateInstruction(hints, X, Z, llvmberry::Target);
-        llvmberry::insertSrcNopAtTgtI(hints, K);
-        llvmberry::propagateMaydiffGlobal(hints, reg_k_name, llvmberry::Physical);
-        llvmberry::propagateInstruction(hints, K, Z, llvmberry::Target);
-       
-        if(isa<ZExtInst>(Op1)) {
-          ZExtInst *Y = dyn_cast<ZExtInst>(Op1);
-          std::string reg_y_name = llvmberry::getVariable(*Y);
-          Value *B = Y->getOperand(0);
-
-          llvmberry::propagateInstruction(hints, Y, Z, TGT);
-          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsUdivZext::make(
-                REGISTER(*Z), REGISTER(*X),
-                REGISTER(reg_y_name), REGISTER(reg_k_name),
-                VAL(A), VAL(B), BITSIZE(size1), BITSIZE(size2)));
-        } else if(isa<ConstantInt>(Op1)) {
-          ConstantInt *C = dyn_cast<ConstantInt>(Op1);
-          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsUdivZextConst::make(
-                REGISTER(*Z), REGISTER(*X),
-                CONSTINT(C->getSExtValue(), C->getBitWidth()),
-                REGISTER(reg_k_name), VAL(A), BITSIZE(size1), BITSIZE(size2)));
-        } else {
-          assert("Must be constant int or ZExtInst, by dyn_castZExtVal definition " && false);
-        }
-      });
-
-      return new ZExtInst(UDivVal, I.getType());
-    }
+    if (Value *ZOp1 = dyn_castZExtVal(Op1, ZOp0->getSrcTy()))
+      return new ZExtInst(
+          Builder->CreateUDiv(ZOp0->getOperand(0), ZOp1, "div", I.isExact()),
+          I.getType());
 
   // (LHS udiv (select (select (...)))) -> (LHS >> (select (select (...))))
   SmallVector<UDivFoldAction, 6> UDivActions;
@@ -1284,15 +1204,17 @@ Instruction *InstCombiner::visitSDiv(BinaryOperator &I) {
 
   // sdiv X, -1 == -X
   if (match(Op1, m_AllOnes())){
-    llvmberry::ValidationUnit::Begin("sdiv_mone", I.getParent()->getParent());
+    llvmberry::ValidationUnit::Begin("sdiv_mone", I);
 
     INTRUDE(CAPTURE(&I), {
       //    <src>     |    <tgt>
       // z = x / (-1) | z = 0 - x
-      BinaryOperator *Z = &I;
+      //BinaryOperator *Z = &I;
 
-      INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSdivMone::make(
-              REGISTER(*Z), VAL(Z->getOperand(0)), BITSIZE(*Z)));
+      //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSdivMone::make(
+      //        REGISTER(*Z), VAL(Z->getOperand(0)), BITSIZE(*Z)));
+      INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSdivMone::make(
+              REGISTER(I), VAL(I.getOperand(0)), BITSIZE(I)));
     });
  
     return BinaryOperator::CreateNeg(Op0);
@@ -1559,60 +1481,9 @@ Instruction *InstCombiner::visitURem(BinaryOperator &I) {
 
   // (zext A) urem (zext B) --> zext (A urem B)
   if (ZExtInst *ZOp0 = dyn_cast<ZExtInst>(Op0))
-    if (Value *ZOp1 = dyn_castZExtVal(Op1, ZOp0->getSrcTy())){
-      llvmberry::ValidationUnit::Begin("urem_zext", I.getParent()->getParent());
-
-      Value *URemVal = Builder->CreateURem(ZOp0->getOperand(0), ZOp1);
-      INTRUDE(CAPTURE(&URemVal, &ZOp0, &Op1, &I), {
-        llvmberry::name_instructions(*I.getParent()->getParent());
-        // (case 1)
-        //        <src>        |     <tgt>
-        // X = zext s1 A to s2 | X = zext s1 A to s2
-        // Y = zext s1 B to s2 | Y = zext s1 B to s2
-        // <nop>               | K = A urem B
-        // Z = urem X Y        | Z = zext s1 K to s2
-        // (case 2)
-        //        <src>        |     <tgt>
-        // X = zext s1 A to s2 | X = zext s1 A to s2
-        // <nop>               | K = A urem C
-        // Z = urem X C        | Z = zext s1 K to s2
-         BinaryOperator *Z = &I;
-        ZExtInst *X = ZOp0;
-        BinaryOperator *K = dyn_cast<BinaryOperator>(URemVal);
-        Value *A = X->getOperand(0);
-        std::string reg_k_name = llvmberry::getVariable(*K);
-        int size1 = X->getSrcTy()->getIntegerBitWidth();
-        int size2 = X->getDestTy()->getIntegerBitWidth();
-
-        llvmberry::propagateInstruction(hints, X, Z, llvmberry::Target);
-        llvmberry::insertSrcNopAtTgtI(hints, K);
-        llvmberry::propagateMaydiffGlobal(hints, reg_k_name, llvmberry::Physical);
-        llvmberry::propagateInstruction(hints, K, Z, llvmberry::Target);
-
-        if(isa<ZExtInst>(Op1)) {
-          ZExtInst *Y = dyn_cast<ZExtInst>(Op1);
-          std::string reg_y_name = llvmberry::getVariable(*Y);
-          Value *B = Y->getOperand(0);
-
-          llvmberry::propagateInstruction(hints, Y, Z, llvmberry::Target);
-          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsUremZext::make(
-                REGISTER(*Z), REGISTER(*X),
-                REGISTER(reg_y_name), REGISTER(reg_k_name),
-                VAL(A), VAL(B), BITSIZE(size1), BITSIZE(size2)));
-        } else if(isa<ConstantInt>(Op1)) {
-          ConstantInt *C = dyn_cast<ConstantInt>(Op1);
-          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsUremZextConst::make(
-                REGISTER(*Z), REGISTER(*X),
-                CONSTINT(C->getSExtValue(), C->getBitWidth()),
-                REGISTER(reg_k_name), VAL(A), BITSIZE(size1), BITSIZE(size2)));
-        } else {
-          assert("Must be constant int or ZExtInst, by dyn_castZExtVal definition " && false);
-        }
-      });
-
-
-      return new ZExtInst(URemVal, I.getType());
-    }
+    if (Value *ZOp1 = dyn_castZExtVal(Op1, ZOp0->getSrcTy()))
+      return new ZExtInst(Builder->CreateURem(ZOp0->getOperand(0), ZOp1),
+                          I.getType());
 
   // X urem Y -> X and Y-1, where Y is a power of 2,
   if (isKnownToBeAPowerOfTwo(Op1, DL, /*OrZero*/ true, 0, AC, &I, DT)) {
@@ -1648,26 +1519,8 @@ Instruction *InstCombiner::visitSRem(BinaryOperator &I) {
     const APInt *Y;
     // X % -Y -> X % Y
     if (match(Op1, m_APInt(Y)) && Y->isNegative() && !Y->isMinSignedValue()) {
-      llvmberry::ValidationUnit::Begin("srem_neg", I.getParent()->getParent());
-
-      llvmberry::generateHintForNegValue(Op1, I);
-      INTRUDE(CAPTURE(&I, &Op1, &Y), {
-        //    <src>     |    <tgt>
-        // z = x % (-c) | z = x % c
-        BinaryOperator *Z = &I;
-        Value *C = Op1;
-
-        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsRemNeg::make(
-                REGISTER(*Z), VAL(C), VAL(Z->getOperand(0)), 
-                VAL(ConstantInt::get(C->getType(), -*Y)),
-                BITSIZE(*Z)));
-      });
-
       Worklist.AddValue(I.getOperand(1));
       I.setOperand(1, ConstantInt::get(I.getType(), -*Y));
-      
-      llvmberry::ValidationUnit::End();
-      
       return &I;
     }
   }

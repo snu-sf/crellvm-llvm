@@ -303,6 +303,26 @@ class FunctionDifferenceEngine {
       if (TryUnify) tryUnify(LI->getSuccessor(0), RI->getSuccessor(0));
       return false;
 
+    } else if (isa<IndirectBrInst>(L)) {
+      IndirectBrInst *LI = cast<IndirectBrInst>(L);
+      IndirectBrInst *RI = cast<IndirectBrInst>(R);
+      if (LI->getNumDestinations() != RI->getNumDestinations()) {
+        if (Complain) Engine.log("indirectbr # of destinations differ");
+        return true;
+      }
+
+      if (!equivalentAsOperands(LI->getAddress(), RI->getAddress())) {
+        if (Complain) Engine.log("indirectbr addresses differ");
+        return true;
+      }
+
+      if (TryUnify) {
+        for (unsigned i = 0; i < LI->getNumDestinations(); i++) {
+          tryUnify(LI->getDestination(i), RI->getDestination(i));
+        }
+      }
+      return false;
+
     } else if (isa<SwitchInst>(L)) {
       SwitchInst *LI = cast<SwitchInst>(L);
       SwitchInst *RI = cast<SwitchInst>(R);
@@ -381,7 +401,7 @@ class FunctionDifferenceEngine {
 
     // Nulls of the "same type" don't always actually have the same
     // type; I don't know why.  Just white-list them.
-    if (isa<ConstantPointerNull>(L))
+    if (isa<ConstantPointerNull>(L) || isa<UndefValue>(L) || isa<ConstantAggregateZero>(L))
       return true;
 
     // Block addresses only match if we've already encountered the

@@ -192,12 +192,8 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
                                       AliasAnalysis *AA, AAMDNodes *AATags) {
   bool llvmberry_isActive = llvmberry::ValidationUnit::Exists() && 
         llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
-  if(llvmberry_isActive){
-     llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-      data.assertExists<llvmberry::ArgForFindAvailableLoadedValue>();
-    });
-  }
+  INTRUDE_IF(llvmberry_isActive, CAPTURE(), 
+  { data.assertExists<llvmberry::ArgForFindAvailableLoadedValue>(); });
 
   if (MaxInstsToScan == 0)
     MaxInstsToScan = ~0U;
@@ -209,38 +205,28 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
   // Try to get the store size for the type.
   uint64_t AccessSize = DL.getTypeStoreSize(AccessTy);
 
-  if(llvmberry_isActive){
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-      data.create<llvmberry::ArgForStripPointerCasts>();
-    });
-  }
+  INTRUDE_IF(llvmberry_isActive, CAPTURE(), 
+  { data.create<llvmberry::ArgForStripPointerCasts>(); });
 
   Value *StrippedPtr = Ptr->stripPointerCasts();
   
-  if(llvmberry_isActive){
-    llvmberry::ValidationUnit::GetInstance()->intrude([](
-        llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-      auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-      auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
-      falvarg->ptr2EquivalentValues = spcarg->strippedValues;
-      data.erase<llvmberry::ArgForStripPointerCasts>();
-    });
-  }
+  INTRUDE_IF(llvmberry_isActive, CAPTURE(), {
+    auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+    auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
+    falvarg->ptr2EquivalentValues = spcarg->strippedValues;
+    data.erase<llvmberry::ArgForStripPointerCasts>();
+  });
 
   while (ScanFrom != ScanBB->begin()) {
     // We must ignore debug info directives when counting (otherwise they
     // would affect codegen).
     Instruction *Inst = --ScanFrom;
     if (isa<DbgInfoIntrinsic>(Inst)) {
-      if(llvmberry_isActive){
-        llvmberry::ValidationUnit::GetInstance()->intrude([Inst](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
-              std::make_pair(Inst, "intrinsics")));
-        });
-      }
+      INTRUDE_IF(llvmberry_isActive, CAPTURE(Inst), {
+        auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+        falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
+            std::make_pair(Inst, "intrinsics")));
+      });
       continue;
     }
 
@@ -256,24 +242,17 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
     // (This is true even if the load is volatile or atomic, although
     // those cases are unlikely.)
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)){
-      if(llvmberry_isActive){
-        llvmberry::ValidationUnit::GetInstance()->intrude([](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-          data.create<llvmberry::ArgForStripPointerCasts>();
-        });
-      }
+      INTRUDE_IF(llvmberry_isActive, CAPTURE(),
+      { data.create<llvmberry::ArgForStripPointerCasts>(); });
       
       Value *StrippedPtr2 = LI->getPointerOperand()->stripPointerCasts();
       
-      if(llvmberry_isActive){
-        llvmberry::ValidationUnit::GetInstance()->intrude([](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-          auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
-          falvarg->ptr1EquivalentValues = spcarg->strippedValues;
-          data.erase<llvmberry::ArgForStripPointerCasts>();
-        });
-      }
+      INTRUDE_IF(llvmberry_isActive, CAPTURE(), {
+        auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+        auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
+        falvarg->ptr1EquivalentValues = spcarg->strippedValues;
+        data.erase<llvmberry::ArgForStripPointerCasts>();
+      });
 
       if (AreEquivalentAddressValues(StrippedPtr2, StrippedPtr) &&
           CastInst::isBitOrNoopPointerCastable(LI->getType(), AccessTy, DL)) {
@@ -285,24 +264,17 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
     }
 
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-      if(llvmberry_isActive){
-        llvmberry::ValidationUnit::GetInstance()->intrude([](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-          data.create<llvmberry::ArgForStripPointerCasts>();
-        });
-      }
+      INTRUDE_IF(llvmberry_isActive, CAPTURE(),
+      { data.create<llvmberry::ArgForStripPointerCasts>(); });
 
       Value *StorePtr = SI->getPointerOperand()->stripPointerCasts();
 
-      if(llvmberry_isActive){
-        llvmberry::ValidationUnit::GetInstance()->intrude([](
-            llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-          auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
-          falvarg->ptr1EquivalentValues = spcarg->strippedValues;
-          data.erase<llvmberry::ArgForStripPointerCasts>();
-        });
-      }
+      INTRUDE_IF(llvmberry_isActive, CAPTURE(), {
+        auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+        auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
+        falvarg->ptr1EquivalentValues = spcarg->strippedValues;
+        data.erase<llvmberry::ArgForStripPointerCasts>();
+      });
 
       // If this is a store through Ptr, the value is available!
       // (This is true even if the store is volatile or atomic, although
@@ -310,14 +282,11 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       if (AreEquivalentAddressValues(StorePtr, StrippedPtr) &&
           CastInst::isBitOrNoopPointerCastable(SI->getValueOperand()->getType(),
                                                AccessTy, DL)) {
-        if(llvmberry_isActive){
-          llvmberry::ValidationUnit::GetInstance()->intrude([&SI](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-            auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-            falvarg->isLoadStore = true;
-            falvarg->loadstoreStoreInst = SI;
-          });
-        }       
+        INTRUDE_IF(llvmberry_isActive, CAPTURE(&SI), {
+          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+          falvarg->isLoadStore = true;
+          falvarg->loadstoreStoreInst = SI;
+        });
         if (AATags)
           SI->getAAMetadata(*AATags);
         return SI->getOperand(0);
@@ -329,13 +298,10 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       if ((isa<AllocaInst>(StrippedPtr) || isa<GlobalVariable>(StrippedPtr)) &&
           (isa<AllocaInst>(StorePtr) || isa<GlobalVariable>(StorePtr)) &&
           StrippedPtr != StorePtr){
-        if(llvmberry_isActive){
-          llvmberry::ValidationUnit::GetInstance()->intrude([SI](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-            auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-            falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "alloca_or_global")));
-          });
-        }
+        INTRUDE_IF(llvmberry_isActive, CAPTURE(SI), {
+          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "alloca_or_global")));
+        });
         continue;
       }
 
@@ -344,13 +310,10 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       if (AA &&
           (AA->getModRefInfo(SI, StrippedPtr, AccessSize) &
            AliasAnalysis::Mod) == 0){
-        if(llvmberry_isActive){
-          llvmberry::ValidationUnit::GetInstance()->intrude([SI](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-            auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-            falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "aliasanalysis")));
-          });
-        }
+        INTRUDE_IF(llvmberry_isActive, CAPTURE(SI), {
+          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "aliasanalysis")));
+        });
         continue;
       }
 
@@ -366,13 +329,10 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       if (AA &&
           (AA->getModRefInfo(Inst, StrippedPtr, AccessSize) &
            AliasAnalysis::Mod) == 0) {
-        if(llvmberry_isActive){
-          llvmberry::ValidationUnit::GetInstance()->intrude([Inst](
-              llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-            auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-            falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(Inst, "aliasanalysis")));
-          });
-        }
+        INTRUDE_IF(llvmberry_isActive, CAPTURE(Inst), {
+          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(Inst, "aliasanalysis")));
+        });
         continue;
       }
 
@@ -381,17 +341,13 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       return nullptr;
     }
 
-    if(llvmberry_isActive){
-      llvmberry::ValidationUnit::GetInstance()->intrude([Inst](
-          llvmberry::Dictionary &data, llvmberry::CoreHint &hints){
-        auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-        if (isa<CallInst>(Inst)) {
-          // Yes, readonly / readnone calls must be considered as well.
-          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
-              std::make_pair(Inst, "readonlycall")));
-        }
-      });
-    }
+    INTRUDE_IF(llvmberry_isActive, CAPTURE(Inst), {
+      auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
+      if (isa<CallInst>(Inst))
+        // Yes, readonly / readnone calls must be considered as well.
+        falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
+            std::make_pair(Inst, "readonlycall")));
+    });
   }
 
   // Got to the start of the block, we didn't find it, but are done for this

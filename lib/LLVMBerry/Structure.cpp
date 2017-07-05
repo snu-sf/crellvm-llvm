@@ -28,6 +28,19 @@ void throw_exception(std::exception const &e) {
 
 namespace {
 
+std::string toString(llvmberry::TyPostpropInfo::POSTPROP_OPT opt) {
+  //enum POSTPROP_OPT { POSTPROP_GVN = 0, POSTPROP_NONE };
+  switch (opt) {
+  case llvmberry::TyPostpropInfo::POSTPROP_GVN:
+    return std::string("POSTPROP_GVN");
+  case llvmberry::TyPostpropInfo::POSTPROP_NONE:
+    return std::string("POSTPROP_NONE");
+  default:
+    assert(false && "POSTPROP_OPT toString");
+  }
+  return "";
+}
+
 std::string toString(llvmberry::CoreHint::RETURN_CODE return_code) {
   switch (return_code) {
   case llvmberry::CoreHint::ACTUAL:
@@ -1816,6 +1829,7 @@ std::shared_ptr<TyInstruction> TyInstruction::make(const llvm::Instruction &i) {
 bool TyInstruction::isSupported(const llvm::Instruction &i) {
   return llvm::isa<llvm::BinaryOperator>(&i) ||
         llvm::isa<llvm::FCmpInst>(&i) ||
+        llvm::isa<llvm::ICmpInst>(&i) ||
         llvm::isa<llvm::AllocaInst>(&i) ||
         llvm::isa<llvm::LoadInst>(&i) ||
         llvm::isa<llvm::StoreInst>(&i) ||
@@ -3458,6 +3472,19 @@ std::shared_ptr<TyCppDebugInfo> TyCppDebugInfo::make(const char *_file_name,
       new TyCppDebugInfo(std::string(_file_name), _line_number));
 }
 
+// postprop_info
+
+TyPostpropInfo::TyPostpropInfo(enum POSTPROP_OPT _opt,
+                               int _itrnum)
+    : opt(_opt), itrnum(_itrnum) {}
+void TyPostpropInfo::serialize(cereal::JSONOutputArchive &archive) const {
+  archive(cereal::make_nvp("opt", ::toString(opt)));
+  archive(CEREAL_NVP(itrnum));
+}
+std::shared_ptr<TyPostpropInfo> TyPostpropInfo::make(POSTPROP_OPT _opt, int _itrnum) {
+  return std::shared_ptr<TyPostpropInfo>(new TyPostpropInfo(_opt, _itrnum));
+}
+
 // core hint
 
 CoreHint::CoreHint() : return_code(CoreHint::ACTUAL), auto_option(CoreHint::AUTO_DEFAULT) {}
@@ -3465,7 +3492,9 @@ CoreHint::CoreHint() : return_code(CoreHint::ACTUAL), auto_option(CoreHint::AUTO
 CoreHint::CoreHint(std::string _module_id, std::string _function_id,
                    std::string _opt_name, std::string _description)
     : module_id(_module_id), function_id(_function_id), opt_name(_opt_name),
-      description(_description), return_code(CoreHint::ACTUAL), auto_option(CoreHint::AUTO_DEFAULT){}
+      description(_description), return_code(CoreHint::ACTUAL),
+      auto_option(CoreHint::AUTO_DEFAULT),
+      postprop_option(TyPostpropInfo::make(TyPostpropInfo::POSTPROP_NONE, 0)){}
 
 const std::string &CoreHint::getDescription() const {
   return this->description;
@@ -3516,6 +3545,7 @@ void CoreHint::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(description));
   archive(cereal::make_nvp("return_code", ::toString(return_code)));
   archive(cereal::make_nvp("auto_option", ::toString(auto_option)));
+  archive(CEREAL_NVP(postprop_option));
   archive(CEREAL_NVP(commands));
   archive(CEREAL_NVP(nop_positions));
 }
@@ -3526,6 +3556,11 @@ void CoreHint::setOptimizationName(const std::string &name) {
 
 void CoreHint::setAutoOption(CoreHint::AUTO_OPT opt) {
   this->auto_option = opt;
+}
+
+void CoreHint::setPostpropOption(
+      std::shared_ptr<TyPostpropInfo> postprop_option) {
+  this->postprop_option = postprop_option;
 }
 
 void intrude(std::function<void()> func) {

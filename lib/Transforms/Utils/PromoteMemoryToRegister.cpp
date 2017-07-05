@@ -40,10 +40,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include <algorithm>
 #include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Infrules.h"
 #include "llvm/LLVMBerry/Hintgen.h"
-#include "llvm/LLVMBerry/Dictionary.h"
-#include "llvm/Support/Debug.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "mem2reg"
@@ -420,10 +417,8 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           PROPAGATE(LESSDEF(EXPR(UNDEF(ReplVal), Physical), EXPR(ReplVal, Physical), SRC),
                     BOUNDS(STARTPOS(SRC, std::string(AI->getParent()->getName())), INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), "")));
 
-        if (ConstantExpr* ce = dyn_cast<ConstantExpr>(ReplVal)) {
-          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndefConstGEPorCast::make(TYPEOF(ce), llvmberry::TyConstant::make(*ce)));
-        } else if (Constant* c = dyn_cast<Constant>(ReplVal)) {
-          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndefConst::make(llvmberry::TyConstant::make(*c))); }
+        if (isa<Constant>(ReplVal)) 
+          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), llvmberry::ConsLessthanUndef::make(TYPEOF(ReplVal), VAL(ReplVal))); 
 
         std::shared_ptr<llvmberry::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
         
@@ -456,8 +451,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       ReplVal = UndefValue::get(LI->getType());
 
     INTRUDE(CAPTURE(&AI, &LI, &ReplVal), {
-      llvmberry::replaceExpr(AI, ReplVal, data);
-      llvmberry::replaceTag(AI, llvmberry::Ghost, data);
       llvmberry::replaceExpr(LI, ReplVal, data);
       llvmberry::replaceTag(LI, llvmberry::Ghost, data);
     });
@@ -538,9 +531,8 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   StoresByIndexTy StoresByIndex;
 
   for (User *U : AI->users())
-    if (StoreInst *SI = dyn_cast<StoreInst>(U)) {
+    if (StoreInst *SI = dyn_cast<StoreInst>(U)) 
       StoresByIndex.push_back(std::make_pair(LBI.getInstructionIndex(SI), SI));
-    }
 
   // Sort the stores by their index, making it efficient to do a lookup with a
   // binary search.
@@ -948,14 +940,11 @@ void PromoteMem2Reg::run() {
               } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
                 // value is constInt or constFloat
                 // infrule lessthanundef target undef > const
-                Constant *C = dyn_cast<Constant>(V);
-                INFRULE(PHIPOS(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefConstTgt::make(llvmberry::TyConstant::make(*C)));
+                INFRULE(PHIPOS(SRC, Current->getName(), Income->getName()), llvmberry::ConsLessthanUndefTgt::make(TYPEOF(V), VAL(V)));
               } else { hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT"); }
             }
           }
-
           llvmberry::replaceExpr(PN, V, data);
-          llvmberry::replaceTag(PN, llvmberry::Ghost, data);
         });
 
         PN->replaceAllUsesWith(V);
@@ -1127,8 +1116,9 @@ bool PromoteMem2Reg::QueuePhiNode(BasicBlock *BB, unsigned AllocaNo,
   PN = PHINode::Create(Allocas[AllocaNo]->getAllocatedType(), getNumPreds(BB),
                        Allocas[AllocaNo]->getName() + "." + Twine(Version++),
                        BB->begin());
+  ++NumPHIInsert;
   PhiToAllocaMap[PN] = AllocaNo;
-
+  
   if (AST && PN->getType()->isPointerTy())
     AST->copyValue(PointerAllocaValues[AllocaNo], PN);
 
