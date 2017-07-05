@@ -95,7 +95,7 @@ void PassDictionary::Destroy() {
 
 GVNReplaceArg::GVNReplaceArg()
   : isGVNReplace(false), GVNptr(nullptr), VNptr(nullptr),
-    VET(new TyVETobj()), CT(new TyCTobj), CTInv(new TyCTInvobj) {}
+    VET(new TyVETobj()), CT(new TyCTobj), CTInv(new TyCTInvobj), CallPHIs(new TyCallPHIobj) {}
 
 LICMHoistOrSinkCond::LICMHoistOrSinkCond() {
   useAA = false;

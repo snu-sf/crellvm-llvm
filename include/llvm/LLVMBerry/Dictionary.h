@@ -243,14 +243,6 @@ public:
   typedef std::shared_ptr<TyVETobj> TyVET;
   TyVET VET;
 
-  /* struct CTElemTy { */
-  /*   llvm::BasicBlock *BB; */
-  /*   Instruction *I; */
-  /*   uint32_t vn; */
-  /*   llvm::SmallVector<llvm::Instruction*, 4> to_prop; */
-  /*   llvm::SmallVector<std::shared_ptr<llvmberry::TyInfrule> , 4> infrules; */
-  /* }; */
-
   typedef std::pair<llvm::BasicBlock *, std::pair<llvm::Instruction *, uint32_t>> TyCTElem;
   typedef std::map<std::pair<llvm::Value*, uint32_t>, std::vector<TyCTElem>> TyCTobj;
   typedef std::shared_ptr<TyCTobj> TyCT;
@@ -261,6 +253,10 @@ public:
     std::vector<std::shared_ptr<llvmberry::TyInfrule>>>> TyCTInvobj;
   typedef std::shared_ptr<TyCTInvobj> TyCTInv;
   TyCTInv CTInv;
+
+  typedef std::map<llvm::PHINode*, uint32_t> TyCallPHIobj;
+  typedef std::shared_ptr<TyCallPHIobj> TyCallPHI;
+  TyCallPHI CallPHIs;
 
   std::vector<llvm::Instruction*> to_prop;
   std::vector<std::shared_ptr<llvmberry::TyInfrule>> infrules;
