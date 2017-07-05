@@ -2097,35 +2097,8 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
     // 0 - (X sdiv C)  -> (X sdiv -C)  provided the negation doesn't overflow.
     if (match(Op1, m_SDiv(m_Value(X), m_Constant(C))) && match(Op0, m_Zero()) &&
-        C->isNotMinSignedValue() && !C->isOneValue()){
-      llvmberry::ValidationUnit::Begin("sub_sdiv", I);
-      INTRUDE(CAPTURE(&I, &Op1, &X, &C), {
-        //    <src>      <tgt>
-        // Y = X / C  | Y = X / C
-        // Z = 0 - Y  | Z = X / C'
-        BinaryOperator *Z = &I;
-        BinaryOperator *Y = (BinaryOperator *)Op1;
-
-        int bitwidth = Z->getType()->getIntegerBitWidth();
-        //ConstantInt *C_ci = dyn_cast<ConstantInt>(C);
-        //int64_t c_val = C_ci->getSExtValue();
-        //int64_t cprime_val = -c_val;
-        int64_t c_val = dyn_cast<ConstantInt>(C)->getSExtValue();
-
-        llvmberry::propagateInstruction(hints, Y, Z, SRC);
-        /*
-        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubSdiv::make(
-                REGISTER(*Z), REGISTER(*Y), VAL(X),
-                CONSTINT(c_val, bitwidth), CONSTINT(cprime_val, bitwidth),
-                BITSIZE(bitwidth)));
-        */
-        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubSdiv::make(
-                REGISTER(*Z), REGISTER(*Y), VAL(X), CONSTINT(c_val, bitwidth),
-                CONSTINT(-c_val, bitwidth), BITSIZE(bitwidth)));
-      });
-
+        C->isNotMinSignedValue() && !C->isOneValue())
       return BinaryOperator::CreateSDiv(X, ConstantExpr::getNeg(C));
-    }
 
     // 0 - (X << Y)  -> (-X << Y)   when X is freely negatable.
     if (match(Op1, m_Shl(m_Value(X), m_Value(Y))) && match(Op0, m_Zero())){
