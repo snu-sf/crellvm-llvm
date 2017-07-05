@@ -379,17 +379,13 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
     if (match(Op0, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op1, Y);
       ShlNSW = cast<ShlOperator>(Op0)->hasNoSignedWrap();
-      INTRUDE(CAPTURE(), {
-        data.create<llvmberry::ArgForVisitMul>();
-        data.get<llvmberry::ArgForVisitMul>()->needsTransitivity = false;
-      });
+      INTRUDE(CAPTURE(),
+      { data.create<llvmberry::ArgForVisitMul>()->needsComm = false; });
     } else if (match(Op1, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op0, Y);
       ShlNSW = cast<ShlOperator>(Op1)->hasNoSignedWrap();
-      INTRUDE(CAPTURE(), {
-        data.create<llvmberry::ArgForVisitMul>();
-        data.get<llvmberry::ArgForVisitMul>()->needsTransitivity = true;
-      });
+      INTRUDE(CAPTURE(),
+      { data.create<llvmberry::ArgForVisitMul>()->needsComm = true; });
     }
 
     if (BO) {
@@ -397,17 +393,16 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
         //    <src>   |    <tgt>
         // Y = 1 << A | Y = 1 << A
         // Z = Y *  X | Z = X << A
-        Value *A = Y;
-        bool needsTransitivity = data.get<llvmberry::ArgForVisitMul>()->needsTransitivity;
-        Value *X = needsTransitivity ? Op0 : Op1;
-        BinaryOperator *Y = dyn_cast<BinaryOperator>(needsTransitivity ? Op1 : Op0);
+        bool needsComm = data.get<llvmberry::ArgForVisitMul>()->needsComm;
+        Value *X = needsComm ? Op0 : Op1, *A = Y;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(needsComm ? Op1 : Op0);
         BinaryOperator *Z = &I;
 
         // propagate Y = 1 << A
         llvmberry::propagateInstruction(hints, Y, Z, SRC);
         
         // auto: replace Z = X * Y to Z = Y * X
-        //if(needsTransitivity)
+        //if(needsComm)
         //  llvmberry::applyCommutativity(hints, Z, Z, SRC);
 
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsMulShl::make(

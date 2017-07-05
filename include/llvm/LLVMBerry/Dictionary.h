@@ -179,7 +179,7 @@ DEFINE_TRAITS(ArgForMem2Reg, Mem2RegArg);
 // lib/Transforms/InstCombine/InstCombineMulDivRem.cpp : visitMul
 struct VisitMulArg {
 public:
-  bool needsTransitivity;
+  bool needsComm;
 };
 DEFINE_TRAITS(ArgForVisitMul, VisitMulArg);
 

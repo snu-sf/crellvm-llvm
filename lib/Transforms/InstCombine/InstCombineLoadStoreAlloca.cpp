@@ -844,18 +844,18 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
             PHINode *phi2 = dyn_cast<PHINode>(i2);
             //assert(phi2 && "ptr2src must be PHI node");
             std::string phi1name = getVariable(*phi1), phi2name = getVariable(*phi2);
-            for (unsigned i = 0; i < phi1->getNumIncomingValues(); i++) {
-              BasicBlock *bbi1 = phi1->getIncomingBlock(i);
-              Value *vi1 = phi1->getIncomingValue(i);
+            //for (unsigned i = 0; i < phi1->getNumIncomingValues(); i++) {
+            //  BasicBlock *bbi1 = phi1->getIncomingBlock(i);
+            //  Value *vi1 = phi1->getIncomingValue(i);
 
-              auto rulepos = TyPosition::make(SRC, *phi1, bbi1->getName());
+            //  auto rulepos = TyPosition::make(SRC, *phi1, bbi1->getName());
               // Transitivity :
               // phi1name >= vi1(prev) >= phi2name
-              INFRULE(rulepos, ConsTransitivity::make(VAR(phi1name), EXPR(vi1, Previous), VAR(phi2name)));
+              //INFRULE(rulepos, ConsTransitivity::make(VAR(phi1name), EXPR(vi1, Previous), VAR(phi2name)));
               // Transitivity :
               // phi2name >= vi1(prev) >= phi1name
-              INFRULE(rulepos, ConsTransitivity::make(VAR(phi2name), EXPR(vi1, Previous), VAR(phi1name)));
-            }
+              //INFRULE(rulepos, ConsTransitivity::make(VAR(phi2name), EXPR(vi1, Previous), VAR(phi1name)));
+            //}
 
             auto phi1pos = INSTPOS(SRC, phi1);
             PROPAGATE(LESSDEF(VAR(phi1name), VAR(phi2name), SRC), BOUNDS(phi1pos, LIpos));
@@ -1103,8 +1103,8 @@ Instruction *InstCombiner::visitLoadInst(LoadInst &LI) {
       }
       // step 1-(3). prove %ptr2 >= %ptr1 by transitivity
       // (%ptr2 >= %ptr2src >= %ptr1src >= %ptr1)
-      applyTransitivity(hints, &LI, ptr2src, ptr1src, ptr1, SRC, TGT);
-      applyTransitivity(hints, &LI, ptr2, ptr2src, ptr1, SRC, TGT);
+      //applyTransitivity(hints, &LI, ptr2src, ptr1src, ptr1, SRC, TGT);
+      //applyTransitivity(hints, &LI, ptr2, ptr2src, ptr1, SRC, TGT);
 
       // step 2. Show orthogonality
       for (auto itr = orthogonalInsns->begin(); itr != orthogonalInsns->end(); itr++) {
