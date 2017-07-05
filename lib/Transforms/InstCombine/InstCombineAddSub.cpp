@@ -1105,22 +1105,11 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
           // tgt : 
           // x = zext i1 b to i<sz> 
           // y = select i1 b, (c + 1), c
-          //std::string reg_x_name = llvmberry::getVariable(*X);
-          //std::string reg_y_name = llvmberry::getVariable(Y);
-          //int64_t c = C->getSExtValue();
-          //int64_t cprime = c + 1;
           int64_t cprime = C->getSExtValue() + 1;
-          //int c_bitwidth = C->getType()->getIntegerBitWidth();
           int cprime_bitwidth = C->getType()->getIntegerBitWidth();
 
           llvmberry::propagateInstruction(hints, X, &Y, llvmberry::Source);
 
-/*
-          INFRULE(INSTPOS(SRC, &Y), llvmberry::ConsAddZextBool::make(
-                  REGISTER(*X), REGISTER(Y),
-                  VAL(X->getOperand(0)), CONSTINT(c, c_bitwidth),
-                  CONSTINT(cprime, cprime_bitwidth), BITSIZE(c_bitwidth)));
-*/
           INFRULE(INSTPOS(SRC, &Y), llvmberry::ConsAddZextBool::make(
                   REGISTER(*X), REGISTER(Y), VAL(X->getOperand(0)), CONSTINT(C),
                   CONSTINT(cprime, cprime_bitwidth), BITSIZE(*C)));
@@ -1188,7 +1177,6 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       //
       // tgt : 
       // z = x ^ y
-      // std::string reg_z_name = llvmberry::getVariable(Z);
 
       INFRULE(INSTPOS(SRC, &Z), llvmberry::ConsAddOnebit::make(
               REGISTER(Z), VAL(Z.getOperand(0)), VAL(Z.getOperand(1))));
@@ -1273,28 +1261,14 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       // LHS = 0   - LHSV    my = 0  - y
       //   I = LHS + RHS      z = my + x
 
-      // prepare variables
-      //std::string reg_my_name = llvmberry::getVariable(*LHS);
-      //std::string reg_z_name = llvmberry::getVariable(I);
-
       // propagate "my = 0 - y"
       llvmberry::propagateInstruction(hints, dyn_cast<Instruction>(LHS), &I, SRC);
 
       // from "z = my + x", create "z = x + my"
-/*
-      INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopCommutative::make(
-              VAR(reg_z_name), llvmberry::TyBop::BopAdd,
-              VAL(LHS), VAL(RHS), BITSIZE(*LHSV)));
-*/
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopCommutative::make(
               VAR(I), llvmberry::TyBop::BopAdd, VAL(LHS), VAL(RHS), BITSIZE(*LHSV)));
 
       // from "z = x + my" and "my = 0 - y", create "z = x - y"
-/*
-      INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSub::make(
-              REGISTER(reg_my_name), REGISTER(reg_z_name), VAL(RHS), VAL(LHSV),
-              BITSIZE(*LHSV)));
-*/
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSub::make(
               REGISTER(*LHS), REGISTER(I), VAL(RHS), VAL(LHSV), BITSIZE(*LHSV)));
     });
@@ -1310,19 +1284,10 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         // RHS = 0   - V       my = 0 - y
         //   I = LHS + RHS      z = x + my
 
-        // prepare variables
-        //std::string reg_my_name = llvmberry::getVariable(*RHS);
-        //std::string reg_z_name = llvmberry::getVariable(I);
-
         // propagate "my = 0 - y"
         llvmberry::propagateInstruction(hints, dyn_cast<Instruction>(RHS), &I, SRC);
 
         // from "z = x + my" and "my = 0 - y", create "z = x - y"
-/*
-        INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSub::make(
-                REGISTER(reg_my_name), REGISTER(reg_z_name), VAL(LHS), VAL(V),
-                BITSIZE(*V)));
-*/
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsAddSub::make(
                 REGISTER(*RHS), REGISTER(I), VAL(LHS), VAL(V), BITSIZE(*V)));
       });
@@ -1356,12 +1321,6 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
         llvmberry::propagateInstruction(hints, Y, Z, SRC);
 
         // To Z, apply add_const_not
-/*
-        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAddConstNot::make(
-                REGISTER(*Z), REGISTER(*Y), VAL(X),
-                CONSTINT(C1, bitwidth), CONSTINT(C1 - 1, bitwidth),
-                BITSIZE(bitwidth)));
-*/
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsAddConstNot::make(
                 REGISTER(*Z), REGISTER(*Y), VAL(X), CONSTINT(C1, bitwidth),
                 CONSTINT(C1 - 1, bitwidth), BITSIZE(bitwidth)));
@@ -1800,11 +1759,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
       // z = x - my | z = x + y
       //std::string reg0_name = llvmberry::getVariable(I);
 
-      /*
-      INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubAdd::make(
-              REGISTER(reg0_name), VAL(Op1), VAL(Op0), VAL(V),
-              BITSIZE(I)));
-      */
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubAdd::make(
               REGISTER(I), VAL(Op1), VAL(Op0), VAL(V), BITSIZE(I)));
     });
@@ -1860,19 +1814,11 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         ConstantInt *C1 = dyn_cast<ConstantInt>(C);
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(1));
 
-        //int64_t c1 = C1->getSExtValue();
-        //int64_t c2 = c1 + 1;
         int64_t c2 = C1->getSExtValue() + 1;
         int bitwidth = Z->getType()->getIntegerBitWidth();
 
         llvmberry::propagateInstruction(hints, Y, Z, SRC);
 
-        /*
-        INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubConstNot::make(
-                REGISTER(*Z), REGISTER(*Y), VAL(X),
-                CONSTINT(c1, bitwidth), CONSTINT(c2, bitwidth),
-                BITSIZE(bitwidth)));
-        */
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubConstNot::make(
                 REGISTER(*Z), REGISTER(*Y), VAL(X),
                 CONSTINT(C1), CONSTINT(c2, bitwidth), BITSIZE(bitwidth)));
@@ -2001,11 +1947,6 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
         llvmberry::propagateInstruction(hints, W, &I, SRC);
 
-        /*
-        INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubSub::make(
-                REGISTER(llvmberry::getVariable(I)), VAL(Op1), VAL(Y),
-                VAL(Op0), BITSIZE(*Op1)));
-        */
         INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubSub::make(
                 REGISTER(I), VAL(Op1), VAL(Y), VAL(Op0), BITSIZE(*Op1)));
       });

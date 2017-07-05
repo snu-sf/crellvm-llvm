@@ -184,11 +184,7 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
       // Z = Y & C2  | Z  = Y ^ (C1 & C2)
 
       INTRUDE(CAPTURE(&TheAnd, &Op), {
-        //BinaryOperator *Z = &TheAnd;
-        //BinaryOperator *Ysrc = dyn_cast<BinaryOperator>(Op);
-
         // Propagate Y = X ^ C1 in Source
-        //llvmberry::propagateInstruction(hints, Ysrc, Z, SRC);
         llvmberry::propagateInstruction(hints, dyn_cast<BinaryOperator>(Op), &TheAnd, SRC);
       });
 
@@ -199,16 +195,10 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
 
         BinaryOperator *Z = &TheAnd, *Y = dyn_cast<BinaryOperator>(And),
                        *Yprime = dyn_cast<BinaryOperator>(Op);
-        //ConstantInt *C1 = OpRHS;
-        //ConstantInt *C2 = AndRHS;
         std::string reg_z = llvmberry::getVariable(*Z), reg_y = llvmberry::getVariable(*Y),
                     reg_yprime = llvmberry::getVariable(*Yprime);
 
-        //int64_t c1 = C1->getSExtValue();
-        //int64_t c2 = C2->getSExtValue();
         int64_t c1 = OpRHS->getSExtValue(), c2 = AndRHS->getSExtValue();
-        //int64_t c3 = c1 & c2;
-        //int bitwidth = Z->getType()->getIntegerBitWidth();
         int bw = Z->getType()->getIntegerBitWidth();
 
         llvmberry::propagateInstruction(hints, Yprime, Z, TGT);
@@ -220,13 +210,6 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
         llvmberry::propagateMaydiffGlobal(hints, reg_yprime, llvmberry::Previous);
         llvmberry::propagateMaydiffGlobal(hints, reg_y, llvmberry::Previous);
 
-        /*
-        INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndXorConst::make(
-                REGISTER(reg_z_name), REGISTER(reg_y_name),
-                REGISTER(reg_yprime_name), VAL(X), CONSTINT(c1, bitwidth),
-                CONSTINT(c2, bitwidth), CONSTINT(c3, bitwidth),
-                BITSIZE(bitwidth)));
-        */
         INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndXorConst::make(
                 REGISTER(*Z), REGISTER(*Y), REGISTER(*Yprime), VAL(X),
                 CONSTINT(c1, bw), CONSTINT(c2, bw), CONSTINT(c1 & c2, bw), BITSIZE(bw)));
@@ -259,10 +242,6 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
 
         // Propagate Y = X | C1 in Source
         INTRUDE(CAPTURE(&TheAnd, &Op), {
-          //BinaryOperator *Z = &TheAnd;
-          //BinaryOperator *Ysrc = dyn_cast<BinaryOperator>(Op);
-
-          //llvmberry::propagateInstruction(hints, Ysrc, Z, SRC);
           llvmberry::propagateInstruction(hints, dyn_cast<BinaryOperator>(Op), &TheAnd, SRC);
         });
 
@@ -271,28 +250,12 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
         INTRUDE(CAPTURE(&TheAnd, &And, &Op, &X, &OpRHS, &AndRHS), {
           llvmberry::name_instructions(*Op->getParent()->getParent());
 
-          /*
-          BinaryOperator *Z = &TheAnd;
-          BinaryOperator *Y = dyn_cast<BinaryOperator>(And);
-          BinaryOperator *Yprime = dyn_cast<BinaryOperator>(Op);
-          ConstantInt *C1 = OpRHS;
-          ConstantInt *C2 = AndRHS;
-          std::string reg_z_name = llvmberry::getVariable(*Z);
-          std::string reg_y_name = llvmberry::getVariable(*Y);
-          std::string reg_yprime_name = llvmberry::getVariable(*Yprime);
-          */
           BinaryOperator *Z = &TheAnd, *Y = dyn_cast<BinaryOperator>(And),
                          *Yprime = dyn_cast<BinaryOperator>(Op);
           ConstantInt *C1 = OpRHS, *C2 = AndRHS;
           std::string reg_z = llvmberry::getVariable(*Z), reg_y = llvmberry::getVariable(*Y),
                       reg_yprime = llvmberry::getVariable(*Yprime);
 
-          /*
-          int64_t c1 = C1->getSExtValue();
-          int64_t c2 = C2->getSExtValue();
-          int64_t c3 = c2 ^ c1;
-          int bitwidth = Z->getType()->getIntegerBitWidth();
-          */
           int64_t c1 = C1->getSExtValue(), c2 = C2->getSExtValue();
           int bw = Z->getType()->getIntegerBitWidth();
 
@@ -304,13 +267,6 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
           llvmberry::propagateMaydiffGlobal(hints, reg_yprime, llvmberry::Previous);
           llvmberry::propagateMaydiffGlobal(hints, reg_y, llvmberry::Physical);
           llvmberry::propagateMaydiffGlobal(hints, reg_y, llvmberry::Previous);
-          /*
-          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndOrConst2::make(
-                  REGISTER(reg_z_name), REGISTER(reg_y_name),
-                  REGISTER(reg_yprime_name), VAL(X),
-                  CONSTINT(c1, bitwidth), CONSTINT(c2, bitwidth),
-                  CONSTINT(c3, bitwidth), BITSIZE(bitwidth)));
-          */
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndOrConst2::make(
                   REGISTER(*Z), REGISTER(*Y), REGISTER(*Yprime), VAL(X),
                   CONSTINT(c1, bw), CONSTINT(c2, bw), CONSTINT(c2 ^ c1, bw), BITSIZE(bw)));
@@ -1482,8 +1438,6 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
           BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
           BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
           BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Or);
-          //Value *A = Op0NotVal;
-          //Value *B = Op1NotVal;
 
           llvmberry::propagateInstruction(hints, X, Z, TGT);
           llvmberry::propagateInstruction(hints, Y, Z, TGT);
@@ -1492,12 +1446,6 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
           llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*Zprime), llvmberry::Physical); 
           
           llvmberry::propagateInstruction(hints, Zprime, Z, TGT);
-          
-          /*
-          INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndDeMorgan::make(
-                  REGISTER(*Z), REGISTER(*X), REGISTER(*Y), REGISTER(*Zprime),
-                  VAL(A), VAL(B), BITSIZE(*Z)));
-          */
           INFRULE(INSTPOS(TGT, Z), llvmberry::ConsAndDeMorgan::make(
                   REGISTER(*Z), REGISTER(*X), REGISTER(*Y), REGISTER(*Zprime),
                   VAL(Op0NotVal), VAL(Op1NotVal), BITSIZE(*Z)));
@@ -1573,18 +1521,12 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
         else
           X = dyn_cast<BinaryOperator>(Y->getOperand(0));
 
-        //Value *B = Op1;
-
         llvmberry::propagateInstruction(hints, X, Z, TGT);
         llvmberry::propagateInstruction(hints, Y, Z, TGT);
 
         if (is_x_second)
            llvmberry::applyCommutativity(hints, Z, Y, TGT);
 
-        /*
-        INFRULE(INSTPOS(TGT, &I), llvmberry::ConsAndOrNot1::make(
-                REGISTER(*Z), REGISTER(*X), REGISTER(*Y), VAL(A), VAL(B), BITSIZE(*Z)));
-        */
         INFRULE(INSTPOS(TGT, &I), llvmberry::ConsAndOrNot1::make(
                 REGISTER(*Z), REGISTER(*X), REGISTER(*Y), VAL(A), VAL(Op1), BITSIZE(*Z)));
       });
@@ -2467,8 +2409,6 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
       //assert(X);
       //assert(X->getOpcode() == llvm::Instruction::Xor);
       //assert(Y);
-      //Value *A = Op1;
-      //Value *B = Y->getOperand(1);
 
       llvmberry::propagateInstruction(hints, X, Z, SRC);
       llvmberry::propagateInstruction(hints, Y, Z, SRC);

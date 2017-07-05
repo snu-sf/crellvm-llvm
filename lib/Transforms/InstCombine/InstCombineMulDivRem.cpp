@@ -194,11 +194,6 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
     INTRUDE(CAPTURE(&I, &Op0), {
       //    <src>           <tgt>
       //  z = x * (-1) |  z = 0 - x
-      //BinaryOperator *Z = &I;
-      //Value *X = Op0;
-
-      //INFRULE(INSTPOS(TGT, Z), llvmberry::ConsMulMone::make(
-      //        REGISTER(*Z), VAL(X), BITSIZE(*Z)));
       INFRULE(INSTPOS(TGT, &I), llvmberry::ConsMulMone::make(REGISTER(I), VAL(Op0), BITSIZE(I)));
     });
 
@@ -403,18 +398,7 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
         // Y = 1 << A | Y = 1 << A
         // Z = Y *  X | Z = X << A
         Value *A = Y;
-        //BinaryOperator *Y = nullptr;
-        //Value *X = nullptr;
         bool needsTransitivity = data.get<llvmberry::ArgForVisitMul>()->needsTransitivity;
-        /*
-        if(needsTransitivity){
-          X = Op0;
-          Y = dyn_cast<BinaryOperator>(Op1);
-        }else{
-          X = Op1;
-          Y = dyn_cast<BinaryOperator>(Op0);
-        }
-        */
         Value *X = needsTransitivity ? Op0 : Op1;
         BinaryOperator *Y = dyn_cast<BinaryOperator>(needsTransitivity ? Op1 : Op0);
         BinaryOperator *Z = &I;
@@ -1209,10 +1193,6 @@ Instruction *InstCombiner::visitSDiv(BinaryOperator &I) {
     INTRUDE(CAPTURE(&I), {
       //    <src>     |    <tgt>
       // z = x / (-1) | z = 0 - x
-      //BinaryOperator *Z = &I;
-
-      //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSdivMone::make(
-      //        REGISTER(*Z), VAL(Z->getOperand(0)), BITSIZE(*Z)));
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSdivMone::make(
               REGISTER(I), VAL(I.getOperand(0)), BITSIZE(I)));
     });

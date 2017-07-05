@@ -193,8 +193,6 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I,
   // Constants can be considered to be negated values if they can be folded.
   if (llvm::ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(V)) {
     INTRUDE(CAPTURE(&I, &V, &C, &scope), {
-      //std::string reg0_name = getVariable(I); // z = x -my
-
       unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
       int64_t c1 = C->getSExtValue(), c2 = -c1;
 
@@ -453,7 +451,6 @@ void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0,
     //assert(Z);
     //assert(W);
     llvm::Value *A = Z->getOperand(0), *B = Z->getOperand(1);
-    //int bitwidth = W->getType()->getIntegerBitWidth();
 
     propagateInstruction(hints, X, W, SRC);
     propagateInstruction(hints, Y, W, SRC);
@@ -522,7 +519,6 @@ void generateHintForOrXor4(llvm::BinaryOperator *Z, llvm::Value *X,
     // Y = A ^ B  | Y = A ^ B
     // <nop>      | NB = B ^ -1
     // Z = X | Y  | Z = NB | X
-    //int bitwidth = Z->getType()->getIntegerBitWidth();
     propagateInstruction(hints, A, Z, TGT);
     propagateInstruction(hints, Y, Z, TGT);
     propagateInstruction(hints, NB, Z, TGT);
@@ -549,7 +545,6 @@ void generateHintForAddXorAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
     // Y = A & B  | Y = A & B
     // Z = X + Y  | Z = A | B
     llvm::Value *A = X->getOperand(0), *B = X->getOperand(1);
-    //int bitwidth = Z->getType()->getIntegerBitWidth();
 
     propagateInstruction(hints, X, Z, SRC);
     propagateInstruction(hints, Y, Z, SRC);

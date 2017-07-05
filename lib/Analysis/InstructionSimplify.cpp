@@ -1764,7 +1764,6 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
       
       ptr->setHintGenFunc("and_or", [isSwapped, Op0, Op1, &hints](llvm::Instruction *I){
         BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-        //Value *X = Op1;
         BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
         //assert(Z);
         //assert(Y);
@@ -2173,11 +2172,9 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
       //    <src>      |  <tgt>
       // Z = X ^ undef | (Z equals undef)
       auto ptr = data.get<llvmberry::ArgForSimplifyXorInst>();
-      // bool isSwapped = ptr->isSwapped;
       
       ptr->setHintGenFunc("xor_undef", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
         BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
-        // auto zero = Constant::getNullValue(Op0->getType());
         if(ptr->isSwapped) llvmberry::applyCommutativity(hints, Z, Z, SRC);
         INFRULE(INSTPOS(SRC, Z), llvmberry::ConsXorUndef::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
       });

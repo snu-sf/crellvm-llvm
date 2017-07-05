@@ -747,14 +747,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
           llvmberry::ValidationUnit::Abort();
           return;
         }
-        //SelectInst *Z = &SI;
-        //ICmpInst *Y = ICI;
-        //Value *X = CmpLHS;
-        //Value *V = TrueVal;
         Constant *C = dyn_cast<Constant>(CmpRHS);
-        //llvmberry::propagateInstruction(hints, Y, Z, SRC);
-        //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpNe::make(
-        //           VAL(Z), VAL(Y), VAL(X), VAL(V), CONSTANT(C), VALTYPE(C->getType())));
         llvmberry::propagateInstruction(hints, ICI, &SI, SRC);
         INFRULE(INSTPOS(SRC, &SI), llvmberry::ConsSelectIcmpNe::make(
             VAL(&SI), VAL(ICI), VAL(CmpLHS), VAL(TrueVal), CONSTANT(C), VALTYPE(C->getType())));
