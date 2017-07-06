@@ -391,7 +391,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     // Otherwise, we *can* safely rewrite this load.
     Value *ReplVal = OnlyStore->getOperand(0);
 
-    INTRUDE(CAPTURE(&AI, &OnlyStore, &LI, &ReplVal, &DT, &StoringGlobalVal, &LBI, &StoreIndex, &StoreBB), {
+    INTRUDE(CAPTURE(&AI, &OnlyStore, &LI, &ReplVal, &StoringGlobalVal), {
       //        <src>          |     <tgt>
       // %x = alloca i32       | nop
       // store i32 1, %x       | nop
@@ -450,7 +450,7 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     if (ReplVal == LI)
       ReplVal = UndefValue::get(LI->getType());
 
-    INTRUDE(CAPTURE(&AI, &LI, &ReplVal), {
+    INTRUDE(CAPTURE(&LI, &ReplVal), {
       llvmberry::replaceExpr(LI, ReplVal, data);
       llvmberry::replaceTag(LI, llvmberry::Ghost, data);
     });
