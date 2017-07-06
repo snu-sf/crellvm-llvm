@@ -182,10 +182,13 @@ static inline std::shared_ptr<llvmberry::TyExpr> gVAR(uint32_t vn) {
 void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
   llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
   auto VNCnt = pdata.get<llvmberry::ArgForGVN>()->VNCnt;
-  if (VNCnt->count(vn) == 0)
+  if (VNCnt->count(vn) == 0) {
+    dbgs() << "VNCNT " << vn <<" first\n";
     (*VNCnt)[vn] = 1;
-  else
+  } else {
+    dbgs() << "VNCNT " << vn << " " <<(*VNCnt)[vn] << " -th\n";
     (*VNCnt)[vn] = (*VNCnt)[vn] + 1;
+  }
   dbgs() << "[ constructVET start ]\n";
   if (llvmberry::TyInstruction::isSupported(*I)) {
     if (isa<ExtractValueInst>(I) || isa<InsertValueInst>(I)) return;
@@ -196,7 +199,7 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
     auto InvT = pdata.get<llvmberry::ArgForGVN>()->InvT;
     std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I)->get());
 
-    dbgs() << "[ VET insert: " << *I << " " << I << " ]\n";
+    dbgs() << "[ VET insert: " << *I << " " << I << " " << vn << " ]\n";
     if (isa<CmpInst>(I) || I->isCommutative())
       if (lookup(I->getOperand(0)) != e.varargs[0]) std::swap(e.varargs[0], e.varargs[1]);
     (*VET)[I] = std::make_pair(e.varargs, SmallSetVector<llvmberry::GVNArg::TyInvTKey, 4>());
@@ -1004,7 +1007,7 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
 
         if (((*VNCnt)[vn] > 1) && (VET->count(I_V) > 0)) {
           // TODO:...
-          dbgs() << "VET exists for " << *I_V << "\n";
+          dbgs() << "VET exists for " << *I_V << ", cnt: " << (*VNCnt)[vn]  << "\n";
           // auto inv = (*InvT)[(*VET)[I_V].second]; // (vn_ops, (inv_s, inv_t))
           // SmallVector<uint32_t, 4> &vn_ops = ;
 
@@ -3327,6 +3330,7 @@ bool GVN::iterateOnFunction(Function &F) {
     pdata.get<llvmberry::ArgForGVN>()->CT->clear();
     pdata.get<llvmberry::ArgForGVN>()->CTInv->clear();
     pdata.get<llvmberry::ArgForGVN>()->CallPHIs->clear();
+    pdata.get<llvmberry::ArgForGVN>()->VNCnt->clear();
   });
 
   // Top-down walk of the dominator tree
