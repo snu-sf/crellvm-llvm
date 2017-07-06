@@ -843,19 +843,18 @@ static bool hoist(Instruction &I, BasicBlock *Preheader) {
           "that is safe.");
       hints.setReturnCodeToAdmitted();
       return;
-    }/* else if (BinaryOperator *bop = dyn_cast<BinaryOperator>(&I)) {
+    } else if (BinaryOperator *bop = dyn_cast<BinaryOperator>(&I)) {
       switch (bop->getOpcode()) {
       case Instruction::UDiv:
       case Instruction::SDiv:
       case Instruction::URem:
       case Instruction::SRem:
         llvmberry::ValidationUnit::GetInstance()->setDescription(
-            "Hoisting division needs further analysis"
-            "(denominator should not be zero)");
+            "Hoisting division is not implemented.");
         hints.setReturnCodeToAdmitted();
         return;
       }
-    }*/
+    }
     auto CurLoop = pdic.get<llvmberry::ArgForHoistOrSinkCond>()->CurLoop;
     auto Iname = llvmberry::getVariable(I);
 
