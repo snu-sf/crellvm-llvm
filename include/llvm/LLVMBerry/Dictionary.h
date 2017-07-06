@@ -34,7 +34,7 @@ enum DictKeys {
   // Mem2Reg
   ArgForMem2Reg,
   // GVN
-  ArgForGVNReplace,
+  ArgForGVN,
   // LICM
   ArgForHoistOrSinkCond
 };
@@ -231,26 +231,34 @@ public:
 DEFINE_TRAITS(ArgForSelectIcmpConst, SelectIcmpConstArg);
 
 // lib/Transforms/Scalar/GVN.cpp : processInstruction, findLeader
-struct GVNReplaceArg {
+struct GVNArg {
 public:
-  GVNReplaceArg();
+  GVNArg();
   bool isGVNReplace;
   boost::any GVNptr;
   boost::any VNptr;
 
-  struct TyVETElem {
-    TyVETElem(std::shared_ptr<llvmberry::TyPropagateObject> po)
-        : prop_obj(po) {}
+  /* struct TyVETElem { */
+  /*   TyVETElem(std::shared_ptr<llvmberry::TyPropagateObject> po) */
+  /*       : prop_obj(po) {} */
 
-    std::shared_ptr<llvmberry::TyPropagateObject> prop_obj;
-    bool operator<(const TyVETElem &q2) const { return (prop_obj.get() < q2.prop_obj.get()); }
-    bool operator==(const TyVETElem &q2) const { return (prop_obj.get() == q2.prop_obj.get()); }
-  };
+  /*   std::shared_ptr<llvmberry::TyPropagateObject> prop_obj; */
+  /*   bool operator<(const TyVETElem &q2) const { return (prop_obj.get() < q2.prop_obj.get()); } */
+  /*   bool operator==(const TyVETElem &q2) const { return (prop_obj.get() == q2.prop_obj.get()); } */
+  /* }; */
+  /* typedef std::pair<uint32_t, std::pair<bool, bool>> TyInvTKey; */
+  typedef std::pair<uint32_t, bool> TyInvTKey;
 
   typedef std::map<llvm::Instruction*,
-    std::pair<llvm::SmallVector<uint32_t, 4>, llvm::SmallSetVector<TyVETElem, 4>>> TyVETobj;
+    std::pair<llvm::SmallVector<uint32_t, 4>, llvm::SmallSetVector<TyInvTKey, 4>>> TyVETobj;
+    /* std::pair<llvm::SmallVector<uint32_t, 4>, llvm::SmallSetVector<TyVETElem, 4>>> TyVETobj; */
   typedef std::shared_ptr<TyVETobj> TyVET;
   TyVET VET;
+
+  typedef std::map<TyInvTKey,
+    std::pair<std::shared_ptr<llvmberry::TyPropagateObject>, std::shared_ptr<llvmberry::TyPropagateObject>>> TyInvTobj;
+  typedef std::shared_ptr<TyInvTobj> TyInvT;
+  TyInvT InvT;
 
   typedef std::pair<llvm::BasicBlock *, std::pair<llvm::Instruction *, uint32_t>> TyCTElem;
   typedef std::map<std::pair<llvm::Value*, uint32_t>, std::vector<TyCTElem>> TyCTobj;
@@ -267,11 +275,17 @@ public:
   typedef std::shared_ptr<TyCallPHIobj> TyCallPHI;
   TyCallPHI CallPHIs;
 
+  typedef std::map<uint32_t, uint32_t> TyVNCntobj;
+    /* std::pair<llvm::SmallVector<uint32_t, 4>, llvm::SmallSetVector<TyInvTKey, 4>>> TyVETobj; */
+  /* std::pair<llvm::SmallVector<uint32_t, 4>, llvm::SmallSetVector<TyVETElem, 4>>> TyVETobj; */
+  typedef std::shared_ptr<TyVNCntobj> TyVNCnt;
+  TyVNCnt VNCnt;
+
   std::vector<llvm::Instruction*> to_prop;
   std::vector<std::shared_ptr<llvmberry::TyInfrule>> infrules;
   
 };
-DEFINE_TRAITS(ArgForGVNReplace, GVNReplaceArg);
+DEFINE_TRAITS(ArgForGVN, GVNArg);
 
 // lib/Transforms/Scalar/LICM.cpp : to record whether sinking of hoisting
 // an instruction can be validated
