@@ -6,7 +6,6 @@ namespace llvmberry {
 
 SimplifyInstArg::SimplifyInstArg() {
   this->activated = false;
-  this->isSwapped = false;
   this->aborted = false;
 }
 

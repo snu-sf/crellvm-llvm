@@ -248,30 +248,22 @@ void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
  */
 void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
                                   llvm::BinaryOperator *X, llvm::SelectInst *Y,
-                                  bool needs_commutativity, bool is_leftform);
-void generateHintForOrAnd(llvm::BinaryOperator *Y, llvm::Value *X,
-                          llvm::Value *A);
-void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0,
-                          llvm::Value *op1, bool needsCommutativity);
+                                  bool is_leftform);
+void generateHintForOrAnd(llvm::BinaryOperator *Y, llvm::Value *X, llvm::Value *A);
+void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0, llvm::Value *op1);
 void generateHintForOrXor2(llvm::BinaryOperator *Z, llvm::Value *X1_val,
-                           llvm::Value *X2_val, llvm::Value *A, llvm::Value *B,
-                           bool needsY1Commutativity,
-                           bool needsY2Commutativity);
+                           llvm::Value *X2_val, llvm::Value *A, llvm::Value *B);
 void generateHintForOrXor4(llvm::BinaryOperator *Z, llvm::Value *X,
                            llvm::BinaryOperator *Y, llvm::BinaryOperator *A,
-                           llvm::Value *B, llvm::BinaryOperator *NB,
-                           bool needsYCommutativity, bool needsZCommutativity);
+                           llvm::Value *B, llvm::BinaryOperator *NB);
 void generateHintForAddXorAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
                               llvm::BinaryOperator *Y, llvm::Value *A,
-                              llvm::Value *B, bool needsYCommutativity,
-                              bool needsZCommutativity);
+                              llvm::Value *B);
 void generateHintForAddOrAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
                              llvm::BinaryOperator *Y, llvm::Value *A,
-                             llvm::Value *B, bool needsYCommutativity,
-                             bool needsZCommutativity);
+                             llvm::Value *B);
 void generateHintForAndOr(llvm::BinaryOperator *Z, llvm::Value *X,
-                          llvm::BinaryOperator *Y, llvm::Value *A,
-                          bool needsZCommutativity);
+                          llvm::BinaryOperator *Y, llvm::Value *A);
 void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z, llvm::BinaryOperator *W,
                                    llvm::BinaryOperator *Y);
 void generateHintForTrivialDCE(llvm::Instruction &I);
