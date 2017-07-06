@@ -6,6 +6,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/LLVMBerry/Structure.h"
 #include "llvm/LLVMBerry/Infrules.h"
 
@@ -237,9 +238,17 @@ public:
   boost::any GVNptr;
   boost::any VNptr;
 
+  struct TyVETElem {
+    TyVETElem(std::shared_ptr<llvmberry::TyPropagateObject> po)
+        : prop_obj(po) {}
+
+    std::shared_ptr<llvmberry::TyPropagateObject> prop_obj;
+    bool operator<(const TyVETElem &q2) const { return (prop_obj.get() < q2.prop_obj.get()); }
+    bool operator==(const TyVETElem &q2) const { return (prop_obj.get() == q2.prop_obj.get()); }
+  };
+
   typedef std::map<llvm::Instruction*,
-    std::pair<llvm::SmallVector<uint32_t, 4>,
-    llvm::SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4>>> TyVETobj;
+    std::pair<llvm::SmallVector<uint32_t, 4>, llvm::SmallSetVector<TyVETElem, 4>>> TyVETobj;
   typedef std::shared_ptr<TyVETobj> TyVET;
   TyVET VET;
 

@@ -179,6 +179,7 @@ template <> struct DenseMapInfo<Expression> {
 // For llvmberry
 void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
   llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
+  dbgs() << "[ constructVET start ]\n";
   if (llvmberry::TyInstruction::isSupported(*I)) {
     if (isa<ExtractValueInst>(I) || isa<InsertValueInst>(I)) return;
     if (I->getType()->isFloatingPointTy())
@@ -187,30 +188,41 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
     auto VET = pdata.get<llvmberry::ArgForGVNReplace>()->VET;
     std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I)->get());
 
-    dbgs() << "VET insert: " << *I << " " << I << "\n";
+    dbgs() << "[ VET insert: " << *I << " " << I << " ]\n";
     if (isa<CmpInst>(I) || I->isCommutative())
       if (lookup(I->getOperand(0)) != e.varargs[0]) std::swap(e.varargs[0], e.varargs[1]);
-    (*VET)[I] = std::make_pair(e.varargs, SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4>());
-    SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4> &invs = (*VET)[I].second;
+    (*VET)[I] = std::make_pair(e.varargs, SmallSetVector<llvmberry::GVNReplaceArg::TyVETElem, 4>());
+    SmallSetVector<llvmberry::GVNReplaceArg::TyVETElem, 4> &invs = (*VET)[I].second;
 
     dbgs() << "varargs size: " << e.varargs.size() << " , op size: " << I->getNumOperands() << "\n";
-    for (unsigned i = 0; i < e.varargs.size(); ++i)
+    for (unsigned i = 0; i < e.varargs.size(); ++i) {
+      dbgs() << "constructVET traversing e.varargs " << i << "\n";
       if (Instruction *I_op = dyn_cast<Instruction>(I->getOperand(i))) {
-        dbgs() << "varargs " << i << ": " << e.varargs[i] << "\n";
+        dbgs() << "varargs of " << *I_op << " : " << e.varargs[i] << "\n";
         std::string gsymb = "g" + std::to_string(e.varargs[i]);
         ginsn->replace_op(i, ID(gsymb, Ghost));
         if (VET->count(I_op) > 0) {
           dbgs() << "VET union happens with " << *I_op << "\n";
           auto vet_op = DICTMAP(VET, I_op).second;
-          for (auto II = vet_op.begin(), EI = vet_op.end(); II != EI; ++II)
-            invs.push_back(*II);
+          dbgs() << "invs size: " << invs.size() << "\n";
+          dbgs() << "vet_op size: " << vet_op.size() << "\n";
+          dbgs() << "union start\n";
+          // PropObjUnion(invs, vet_op);
+          for (auto II = vet_op.begin(), EI = vet_op.end(); II != EI; ++II) {
+            dbgs() << "iter \n";
+            invs.insert(*II);
+          }
         }
+        dbgs() << "processing op ended " << i << "\n";
       }
+    }
+    dbgs() << "VET inserting propobj\n";
     std::shared_ptr<llvmberry::TyExpr> ginsn_e(new llvmberry::TyExpr(ginsn));
     std::string gid = "g" + std::to_string(vn);
-    invs.push_back(LESSDEF(ginsn_e, VAR(gid, Ghost), SRC));
-    invs.push_back(LESSDEF(VAR(gid, Ghost), ginsn_e, TGT));
+    invs.insert(llvmberry::GVNReplaceArg::TyVETElem(LESSDEF(ginsn_e, VAR(gid, Ghost), SRC)));
+    invs.insert(llvmberry::GVNReplaceArg::TyVETElem(LESSDEF(VAR(gid, Ghost), ginsn_e, TGT)));
   }
+  dbgs() << "constructVET end\n";
 }
 
 Expression ValueTable::create_expression(Instruction *I) {
@@ -1074,17 +1086,16 @@ bool lookupCT(ValueTable &VN, llvmberry::GVNReplaceArg::TyCT &CT,
   return flag;
 }
 
-void PropagateVETInv(llvmberry::CoreHint &hints, SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4> &s,
+void PropagateVETInv(llvmberry::CoreHint &hints, SmallSetVector<llvmberry::GVNReplaceArg::TyVETElem, 4> &s,
                      Instruction *from, Instruction *to) {
   if (from != to)
     for (auto I = s.begin(), E = s.end(); I != E; ++I)
-      PROPAGATE(*I, BOUNDS(INSTPOS(SRC, from), INSTPOS(SRC, to)));
+      PROPAGATE(I->prop_obj, BOUNDS(INSTPOS(SRC, from), INSTPOS(SRC, to)));
 }
 
-void PropObjUnion(SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4> &s,
-                  SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4> &t) {
-  for (auto I = t.begin(), E = t.end(); I != E; ++I)
-    s.push_back(*I);
+void PropObjUnion(SmallSetVector<llvmberry::GVNReplaceArg::TyVETElem, 4> &s,
+                  SmallSetVector<llvmberry::GVNReplaceArg::TyVETElem, 4> &t) {
+  for (auto I = t.begin(), E = t.end(); I != E; ++I) s.insert(*I);
 }
 
 bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
@@ -1274,8 +1285,8 @@ void updateVETInPRE(ValueTable &VN, llvmberry::GVNReplaceArg::TyVET &VET,
 
   dbgs() << "updateVETInPRE start for " << *PN << " \n";
   (*VET)[PN] = std::make_pair(SmallVector<uint32_t, 4>(),
-                              SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4>());
-  SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4> &prop_objs = (*VET)[PN].second;
+                              SmallSetVector<llvmberry::GVNReplaceArg::TyVETElem, 4>());
+  SmallSetVector<llvmberry::GVNReplaceArg::TyVETElem, 4> &prop_objs = (*VET)[PN].second;
 
   for (unsigned i = 0; i < PN->getNumIncomingValues(); ++i) {
     // TODO: for each PN->getIncomingValue(i), if not gep, use vet[0]
@@ -1290,6 +1301,7 @@ void updateVETInPRE(ValueTable &VN, llvmberry::GVNReplaceArg::TyVET &VET,
     if (Instruction *I = dyn_cast<Instruction>(V_op)) {
       dbgs() << "V_op an instruction \n";
       if (VET->count(I) > 0) {
+        // prop_objs.set_union(DICTMAP(VET, I).second);
         PropObjUnion(prop_objs, (*VET)[I].second);
         // auto val = DICTMAP(VET, I);
         // args_op = val.first;
@@ -1316,6 +1328,7 @@ void updateVETInPRE(ValueTable &VN, llvmberry::GVNReplaceArg::TyVET &VET,
         return;
       }
 
+      // prop_objs.set_union(DICTMAP(VET, elem.second.first).second);
       PropObjUnion(prop_objs, (*VET)[elem.second.first].second);
       // args_op = DICTMAP(VET, elem.second.first).first;
       // ginsn_op_src = DICTMAP(VET, elem.second.first).second.first;
