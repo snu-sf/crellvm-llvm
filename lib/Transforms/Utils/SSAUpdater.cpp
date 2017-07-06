@@ -201,18 +201,14 @@ void SSAUpdater::RewriteUse(Use &U) {
           for (unsigned i = 0; i < PHI_V->getNumIncomingValues(); i++) {
             auto PrevBBName = PHI_V->getIncomingBlock(i)->getName();
             PROPAGATE(LESSDEF(EXPR(UndefValue::get(Org->getType())), EXPR(Org), SRC),
-                      BOUNDS(INSTPOS(SRC, Org),
-                      llvmberry::TyPosition::make(SRC, BBName, PrevBBName)));
+                      BOUNDS(INSTPOS(SRC, Org), llvmberry::TyPosition::make(SRC, BBName, PrevBBName)));
           }
         }
       }
     });
-    llvmberry::generateHintForReplaceAllUsesWith(
-              dyn_cast<Instruction>(U.get()),
-              dyn_cast<Instruction>(V), "",
-              INSTPOS(SRC, dyn_cast<Instruction>(V)),
-              [&User](const llvm::Value *V2)
-                { return V2 == User; });
+    llvmberry::generateHintForReplaceAllUsesWith(dyn_cast<Instruction>(U.get()),
+              dyn_cast<Instruction>(V), "", INSTPOS(SRC, dyn_cast<Instruction>(V)),
+              [&User](const llvm::Value *V2) { return V2 == User; });
   }
 
   // Notify that users of the existing value that it is being replaced.
