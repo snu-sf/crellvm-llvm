@@ -351,9 +351,8 @@ bool llvm::sinkRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
       DEBUG(dbgs() << "LICM deleting dead inst: " << I << '\n');
       ++II;
       CurAST->deleteValue(&I);
-      llvmberry::ValidationUnit::Begin("licm.sinkregion.dce",
-                                       I.getParent()->getParent(),
-                                       true);
+      llvmberry::name_instruction(I);
+      llvmberry::ValidationUnit::Begin("licm.sinkregion.dce", I, false);
       llvmberry::generateHintForTrivialDCE(I);
       I.eraseFromParent();
       llvmberry::ValidationUnit::End();
@@ -401,9 +400,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
       // Try constant folding this instruction.  If all the operands are
       // constants, it is technically hoistable, but it would be better to just
       // fold it.
-      llvmberry::ValidationUnit::Begin("licm.hoistregion.constantfold",
-                                       I.getParent()->getParent(),
-                                       true);
+      llvmberry::ValidationUnit::Begin("licm.hoistregion.constantfold", I);
       if (Constant *C = ConstantFoldInstruction(
               &I, I.getModule()->getDataLayout(), TLI)) {
         INTRUDE(CAPTURE(), {
@@ -597,9 +594,7 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
                                                 BasicBlock &ExitBlock,
                                                 PHINode &PN,
                                                 const LoopInfo *LI) {
-  llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.clone",
-                                   ExitBlock.getParent(),
-                                   true);
+  llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.clone", ExitBlock.getParent());
 
   Instruction *New = I.clone();
   ExitBlock.getInstList().insert(ExitBlock.getFirstInsertionPt(), New);
@@ -632,9 +627,7 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
     if (Instruction *OInst = dyn_cast<Instruction>(*OI))
       if (Loop *OLoop = LI->getLoopFor(OInst->getParent()))
         if (!OLoop->contains(&PN)) {
-          llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.phicreate",
-                                           ExitBlock.getParent(),
-                                           true);
+          llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.phicreate", ExitBlock.getParent());
           PHINode *OpPN =
               PHINode::Create(OInst->getType(), PN.getNumIncomingValues(),
                               OInst->getName() + ".lcssa", ExitBlock.begin());
@@ -647,9 +640,7 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
           });
           llvmberry::ValidationUnit::End();
 
-          llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.phireplace",
-                                           ExitBlock.getParent(),
-                                           true);
+          llvmberry::ValidationUnit::Begin("licm.sink.cloneinst.phireplace", ExitBlock.getParent());
           INTRUDE(CAPTURE(OpPN, New, OInst), {
             // Propagating undef >= OInst enables creation of Prev(OInst) >= Phys(OInst)
             // and Phys(OInst) >= Prev(OInst).
@@ -696,9 +687,7 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
     Value::user_iterator UI = I.user_begin();
     auto *User = cast<Instruction>(*UI);
     if (!DT->isReachableFromEntry(User->getParent())) {
-      llvmberry::ValidationUnit::Begin("licm.sink.makeundef1",
-                                       I.getParent()->getParent(),
-                                       true);
+      llvmberry::ValidationUnit::Begin("licm.sink.makeundef1", I);
       // LLVMBerry: This optimization never happens in Python, SPECCPU2006,
       // GNU-projects, and LNT!
       User->replaceUsesOfWith(&I, UndefValue::get(I.getType()));
@@ -714,9 +703,7 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
     Use &U = UI.getUse();
     BasicBlock *BB = PN->getIncomingBlock(U);
     if (!DT->isReachableFromEntry(BB)) {
-      llvmberry::ValidationUnit::Begin("licm.sink.makeundef2",
-                                       I.getParent()->getParent(),
-                                       true);
+      llvmberry::ValidationUnit::Begin("licm.sink.makeundef2", I);
       // LLVMBerry: This optimization never happens in Python, SPECCPU2006,
       // GNU-projects, and LNT!
       U = UndefValue::get(I.getType());
@@ -736,9 +723,7 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
       New = SunkCopies[ExitBlock] =
             CloneInstructionInExitBlock(I, *ExitBlock, *PN, LI);
 
-    llvmberry::ValidationUnit::Begin("licm.sink.replaceinst",
-                                     I.getParent()->getParent(),
-                                     true);
+    llvmberry::ValidationUnit::Begin("licm.sink.replaceinst", I);
     INTRUDE(CAPTURE(&I, New, PN, ExitBlock), {
       auto &pdic = llvmberry::PassDictionary::GetInstance();
       if (pdic.get<llvmberry::ArgForHoistOrSinkCond>()->useAA) {
@@ -825,18 +810,16 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
 
     llvmberry::ValidationUnit::End();
 
-    llvmberry::ValidationUnit::Begin("licm.sink.eraseoldphi",
-                                     I.getParent()->getParent(),
-                                     true);
+    llvmberry::name_instruction(I);
+    llvmberry::ValidationUnit::Begin("licm.sink.eraseoldphi", I, false);
     llvmberry::generateHintForTrivialDCE(*PN);
     PN->eraseFromParent();
     llvmberry::ValidationUnit::End();
   }
 
   CurAST->deleteValue(&I);
-  llvmberry::ValidationUnit::Begin("licm.sink.eraseoldinst",
-                                   I.getParent()->getParent(),
-                                   true);
+  llvmberry::name_instruction(I);
+  llvmberry::ValidationUnit::Begin("licm.sink.eraseoldinst", I, false);
   llvmberry::generateHintForTrivialDCE(I);
   I.eraseFromParent();
   llvmberry::ValidationUnit::End();
@@ -850,9 +833,7 @@ static bool hoist(Instruction &I, BasicBlock *Preheader) {
   DEBUG(dbgs() << "LICM hoisting to " << Preheader->getName() << ": "
         << I << "\n");
   // Move the new node to the Preheader, before its terminator.
-  llvmberry::ValidationUnit::Begin("licm.hoist",
-                                   I.getParent()->getParent(),
-                                   true);
+  llvmberry::ValidationUnit::Begin("licm.hoist", I);
   INTRUDE(CAPTURE(&I, Preheader), {
 
     auto &pdic = llvmberry::PassDictionary::GetInstance();
@@ -862,7 +843,19 @@ static bool hoist(Instruction &I, BasicBlock *Preheader) {
           "that is safe.");
       hints.setReturnCodeToAdmitted();
       return;
-    }
+    }/* else if (BinaryOperator *bop = dyn_cast<BinaryOperator>(&I)) {
+      switch (bop->getOpcode()) {
+      case Instruction::UDiv:
+      case Instruction::SDiv:
+      case Instruction::URem:
+      case Instruction::SRem:
+        llvmberry::ValidationUnit::GetInstance()->setDescription(
+            "Hoisting division needs further analysis"
+            "(denominator should not be zero)");
+        hints.setReturnCodeToAdmitted();
+        return;
+      }
+    }*/
     auto CurLoop = pdic.get<llvmberry::ArgForHoistOrSinkCond>()->CurLoop;
     auto Iname = llvmberry::getVariable(I);
 
@@ -1212,8 +1205,7 @@ bool llvm::promoteLoopAccessesToScalars(AliasSet &AS,
                         PointerMustAliases, ExitBlocks,
                         InsertPts, PIC, *CurAST, *LI, DL, Alignment, AATags);
 
-  llvmberry::ValidationUnit::Begin("licm.promoteloopaccessestoscalars",
-                                   Preheader->getParent(), true);
+  llvmberry::ValidationUnit::Begin("licm.promoteloopaccessestoscalars", Preheader->getParent());
   INTRUDE(CAPTURE(), {
     hints.setDescription("We do not deal with promoteLoopAccessToScalars because it uses AA");
     hints.setReturnCodeToAdmitted();

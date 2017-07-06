@@ -824,36 +824,6 @@ private:
   std::shared_ptr<TyExpr> e;
 };
 
-struct TyReplaceRhs {
-public:
-  TyReplaceRhs(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyValue> _y,
-               std::shared_ptr<TyExpr> _e1, std::shared_ptr<TyExpr> _e2,
-               std::shared_ptr<TyExpr> _e2_p);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  std::shared_ptr<TyRegister> x;
-  std::shared_ptr<TyValue> y;
-  std::shared_ptr<TyExpr> e1;
-  std::shared_ptr<TyExpr> e2;
-  std::shared_ptr<TyExpr> e2_p;
-};
-
-struct TyReplaceRhsOpt {
-public:
-  TyReplaceRhsOpt(std::shared_ptr<TyRegister> _x, std::shared_ptr<TyValue> _y,
-                  std::shared_ptr<TyExpr> _e1, std::shared_ptr<TyExpr> _e2,
-                  std::shared_ptr<TyExpr> _e2_p);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-private:
-  std::shared_ptr<TyRegister> x;
-  std::shared_ptr<TyValue> y;
-  std::shared_ptr<TyExpr> e1;
-  std::shared_ptr<TyExpr> e2;
-  std::shared_ptr<TyExpr> e2_p;
-};
-
 struct TyIntroGhost {
 public:
   TyIntroGhost(std::shared_ptr<TyExpr> _x, std::shared_ptr<TyRegister> _g);
@@ -1919,36 +1889,6 @@ public:
 
 private:
   std::shared_ptr<TySubstituteTgt> substitute_tgt;
-};
-
-struct ConsReplaceRhs : TyInfrule {
-public:
-  ConsReplaceRhs(std::shared_ptr<TyReplaceRhs> _replace_rhs);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x,
-                                         std::shared_ptr<TyValue> _y,
-                                         std::shared_ptr<TyExpr> _e1,
-                                         std::shared_ptr<TyExpr> _e2,
-                                         std::shared_ptr<TyExpr> _e2_p);
-
-private:
-  std::shared_ptr<TyReplaceRhs> replace_rhs;
-};
-
-struct ConsReplaceRhsOpt : TyInfrule {
-public:
-  ConsReplaceRhsOpt(std::shared_ptr<TyReplaceRhsOpt> _replace_rhs_opt);
-  void serialize(cereal::JSONOutputArchive &archive) const;
-
-  static std::shared_ptr<TyInfrule> make(std::shared_ptr<TyRegister> _x,
-                                         std::shared_ptr<TyValue> _y,
-                                         std::shared_ptr<TyExpr> _e1,
-                                         std::shared_ptr<TyExpr> _e2,
-                                         std::shared_ptr<TyExpr> _e2_p);
-
-private:
-  std::shared_ptr<TyReplaceRhsOpt> replace_rhs_opt;
 };
 
 struct ConsInttoptrPtrtoint : public TyInfrule {
