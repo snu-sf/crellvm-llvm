@@ -74,10 +74,10 @@ bool llvm::isAllocaPromotable(const AllocaInst *AI) {
           II->getIntrinsicID() != Intrinsic::lifetime_end)
         return false;
     } else if (const BitCastInst *BCI = dyn_cast<BitCastInst>(U)) {
-      if (BCI->getType() != Type::getInt8PtrTy(U->getContext(), AS)) {
-        return false; }
-      if (!onlyUsedByLifetimeMarkers(BCI)) {
-        return false;}
+      if (BCI->getType() != Type::getInt8PtrTy(U->getContext(), AS)) 
+        return false; 
+      if (!onlyUsedByLifetimeMarkers(BCI)) 
+        return false;
     } else if (const GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(U)) {
       if (GEPI->getType() != Type::getInt8PtrTy(U->getContext(), AS))
         return false;
