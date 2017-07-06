@@ -180,6 +180,7 @@ template <> struct DenseMapInfo<Expression> {
 void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
   llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
   if (llvmberry::TyInstruction::isSupported(*I)) {
+    if (isa<ExtractValueInst>(I) || isa<InsertValueInst>(I)) return;
     if (I->getType()->isFloatingPointTy())
       if (!I->getType()->isFloatTy() && !I->getType()->isDoubleTy()) return;
 
@@ -187,11 +188,15 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
     std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I)->get());
 
     dbgs() << "VET insert: " << *I << " " << I << "\n";
+    if (isa<CmpInst>(I) || I->isCommutative())
+      if (lookup(I->getOperand(0)) != e.varargs[0]) std::swap(e.varargs[0], e.varargs[1]);
     (*VET)[I] = std::make_pair(e.varargs, SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4>());
     SmallVector<std::shared_ptr<llvmberry::TyPropagateObject>, 4> &invs = (*VET)[I].second;
 
+    dbgs() << "varargs size: " << e.varargs.size() << " , op size: " << I->getNumOperands() << "\n";
     for (unsigned i = 0; i < e.varargs.size(); ++i)
       if (Instruction *I_op = dyn_cast<Instruction>(I->getOperand(i))) {
+        dbgs() << "varargs " << i << ": " << e.varargs[i] << "\n";
         std::string gsymb = "g" + std::to_string(e.varargs[i]);
         ginsn->replace_op(i, ID(gsymb, Ghost));
         if (VET->count(I_op) > 0) {
