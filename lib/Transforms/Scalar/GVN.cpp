@@ -204,10 +204,10 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
 
     dbgs() << "varargs size: " << e.varargs.size() << " , op size: " << I->getNumOperands() << "\n";
     for (unsigned i = 0; i < e.varargs.size(); ++i) {
-      dbgs() << "constructVET traversing e.varargs " << i << "\n";
+      // dbgs() << "constructVET traversing e.varargs " << i << "\n";
       if (Instruction *I_op = dyn_cast<Instruction>(I->getOperand(i))) {
         // Constructing ginsn
-        dbgs() << "varargs of " << *I_op << " : " << e.varargs[i] << "\n";
+        //dbgs() << "varargs of " << *I_op << " : " << e.varargs[i] << "\n";
         ginsn->replace_op(i, ID("g" + std::to_string(e.varargs[i]), Ghost));
 
         // Constructing VET[I]
@@ -217,7 +217,7 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
           dbgs() << "union start.. invks size: " << invks.size() << ", invks_op size: " << invks_op.size() << "\n";
           // PropObjUnion(invs, vet_op);
           for (auto II = invks_op.begin(), EI = invks_op.end(); II != EI; ++II) {
-            dbgs() << "iter \n";
+            // dbgs() << "iter \n";
             invks.insert(*II);
           }
         }
@@ -1047,10 +1047,10 @@ bool new_proofGenGVN(llvmberry::CoreHint &hints, GVN &pass, ValueTable &VN,
   uint32_t vn = VN.lookup(I_rem);
   std::map<uint32_t, Instruction*> calls;
   std::map<uint32_t, LoadInst*> loads;
-  dbgs() << "SRC\n";
+  dbgs() << "[[SRC]]\n";
   bool src = new_proofGenGVNUnary(hints, VN, VET, InvT, CT, CTInv, CallPHIs, VNCnt, I_rem, I_rem, vn, calls, loads, true);
   if (!src) return false;
-  dbgs() << "TGT\n";
+  dbgs() << "[[TGT]]\n";
   bool tgt = new_proofGenGVNUnary(hints, VN, VET, InvT, CT, CTInv, CallPHIs, VNCnt, repl, I_rem, vn, calls, loads, false);
   if (!tgt) return false;
 
@@ -1077,11 +1077,11 @@ void updateVETInPRE(ValueTable &VN, llvmberry::GVNArg::TyVET &VET,
     Value *V_op = PN->getIncomingValue(i);
 
     if (Instruction *I = dyn_cast<Instruction>(V_op)) {
-      dbgs() << "V_op an instruction \n";
+      // dbgs() << "V_op an instruction \n";
       if (VET->count(I) > 0) {
         PropObjUnion(prop_objs, (*VET)[I].second);
       } else {
-        dbgs() << "VET not exist for I: " << *I << "\n";
+        // dbgs() << "VET not exist for I: " << *I << "\n";
         // assert(false && "VET of I not exist");
         return;
       }
@@ -2199,8 +2199,8 @@ static void patchAndReplaceAllUsesWith(Instruction *I, Value *Repl) {
       llvmberry::GVNArg::TyCallPHI &CallPHIs = pdata.get<llvmberry::ArgForGVN>()->CallPHIs;
       llvmberry::GVNArg::TyVNCnt &VNCnt = pdata.get<llvmberry::ArgForGVN>()->VNCnt;
 
-      for (auto II = VNCnt->begin(), EI = VNCnt->end(); II != EI; ++II)
-        dbgs() << "CNT[ " << II->first << " ] : " << II->second << "\n";
+      // for (auto II = VNCnt->begin(), EI = VNCnt->end(); II != EI; ++II)
+      //   dbgs() << "CNT[ " << II->first << " ] : " << II->second << "\n";
 
       new_proofGenGVN(hints, pass, VN, VET, InvT, CT, CTInv, CallPHIs, VNCnt, I, Repl);
 
