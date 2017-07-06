@@ -1146,26 +1146,26 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
             hintgenLoadOpt(hints, TR, TR, LI->getPointerOperand(), TGT);
 
             PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
-                      BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+                      BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
           } else {
             dbgs() << "TRUNC without matching load!\n";
           }
         } else {
           dbgs() << *I_V << "not the same vn: " << vn << " , cur-vn: " << VN.lookup_safe(I_V) << "\n";
-          PROPAGATE(LESSDEF(VAR(id_V), gvar, SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
-          PROPAGATE(LESSDEF(gvar, VAR(id_V), TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+          PROPAGATE(LESSDEF(VAR(id_V), gvar, SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
+          PROPAGATE(LESSDEF(gvar, VAR(id_V), TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
         }
       } else {
         if (LoadInst *LI = dyn_cast<LoadInst>(I_V)) loads[vn] = LI;
-        if (I_V != l_end) PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
-                                    BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, l_end)));
+        if (I_V != cur_pos) PROPAGATE(is_src? LESSDEF(VAR(id_V), gvar, SRC) : LESSDEF(gvar, VAR(id_V), TGT),
+                                      BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
 
         if (VET->count(I_V) > 0) {
           dbgs() << "VET exists for " << *I_V << "\n";
           SmallVector<uint32_t, 4> &vn_ops = DICTMAP(VET, I_V).first;
           // auto prop_obj = DICTMAP(VET, I_V).second;
 
-          PropagateVETInv(hints, DICTMAP(VET, I_V).second, I_V, l_end);
+          PropagateVETInv(hints, DICTMAP(VET, I_V).second, I_V, cur_pos);
           // for (unsigned i = 0; i < vn_ops.size() ; ++i)
           //   dbgs() << i <<": " << vn_ops[i] <<"\n";
 
