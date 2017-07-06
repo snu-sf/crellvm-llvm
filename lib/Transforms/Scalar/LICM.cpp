@@ -843,7 +843,7 @@ static bool hoist(Instruction &I, BasicBlock *Preheader) {
           "that is safe.");
       hints.setReturnCodeToAdmitted();
       return;
-    } else if (BinaryOperator *bop = dyn_cast<BinaryOperator>(&I)) {
+    }/* else if (BinaryOperator *bop = dyn_cast<BinaryOperator>(&I)) {
       switch (bop->getOpcode()) {
       case Instruction::UDiv:
       case Instruction::SDiv:
@@ -855,7 +855,7 @@ static bool hoist(Instruction &I, BasicBlock *Preheader) {
         hints.setReturnCodeToAdmitted();
         return;
       }
-    }
+    }*/
     auto CurLoop = pdic.get<llvmberry::ArgForHoistOrSinkCond>()->CurLoop;
     auto Iname = llvmberry::getVariable(I);
 
