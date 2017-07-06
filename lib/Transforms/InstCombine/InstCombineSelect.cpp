@@ -202,8 +202,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
                                        OtherOpF, SI.getName()+".v");
 
   INTRUDE(CAPTURE(&SI, &TI, &FI, &MatchOp, &NewSI, &OtherOpT, &OtherOpF), {
-    llvmberry::FoldSelectOpOpArg::OperandCases the_case = 
-        data.get<llvmberry::ArgForFoldSelectOpOp>()->the_case;
+    auto the_case = data.get<llvmberry::ArgForFoldSelectOpOp>()->the_case;
     // case == "XY/XZ" : 
     //        <src>          |         <tgt>
     // R  = X bop Y          | R = X bop Y
@@ -247,10 +246,12 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     llvmberry::propagateInstruction(hints, S, T0, TGT);
     llvmberry::propagateInstruction(hints, Tprime, T0, TGT);
     
-    if (the_case == llvmberry::FoldSelectOpOpArg::XY_ZX)
-      llvmberry::applyCommutativity(hints, T0, S, TGT);
-    else if (the_case == llvmberry::FoldSelectOpOpArg::YX_XZ)
-      llvmberry::applyCommutativity(hints, T0, R, TGT);
+    // auto: (XY_ZX case) If S = Z bop X, apply commutativity
+    //if (the_case == llvmberry::FoldSelectOpOpArg::XY_ZX)
+    //  llvmberry::applyCommutativity(hints, T0, S, TGT);
+    // auto: (YX_XZ case) If R = Y bop X, apply commutativity
+    //else if (the_case == llvmberry::FoldSelectOpOpArg::YX_XZ)
+    //  llvmberry::applyCommutativity(hints, T0, R, TGT);
 
     if (the_case == llvmberry::FoldSelectOpOpArg::YX_ZX) {
       if(llvmberry::isFloatOpcode(bop))
@@ -264,15 +265,12 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     } else {
       if(llvmberry::isFloatOpcode(bop))
         INFRULE(INSTPOS(TGT, T0), llvmberry::ConsFbopDistributiveOverSelectinst::make(
-              llvmberry::getFbop(bop), REGISTER(*R), REGISTER(*S),
-              REGISTER(*Tprime), REGISTER(*T0), VAL(X), VAL(Y),
-              VAL(Z), VAL(C), llvmberry::getFloatType(R->getType()),
-              VALTYPE(C->getType())));
+            llvmberry::getFbop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime), REGISTER(*T0),
+            VAL(X), VAL(Y), VAL(Z), VAL(C), llvmberry::getFloatType(R->getType()), VALTYPE(C->getType())));
       else
         INFRULE(INSTPOS(TGT, T0), llvmberry::ConsBopDistributiveOverSelectinst::make(
-              llvmberry::getBop(bop), REGISTER(*R), REGISTER(*S),
-              REGISTER(*Tprime), REGISTER(*T0), VAL(X), VAL(Y),
-              VAL(Z), VAL(C), BITSIZE(*R), VALTYPE(C->getType())));
+            llvmberry::getBop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime), REGISTER(*T0),
+            VAL(X), VAL(Y), VAL(Z), VAL(C), BITSIZE(*R), VALTYPE(C->getType())));
     }
   });
 
@@ -747,14 +745,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
           llvmberry::ValidationUnit::Abort();
           return;
         }
-        //SelectInst *Z = &SI;
-        //ICmpInst *Y = ICI;
-        //Value *X = CmpLHS;
-        //Value *V = TrueVal;
         Constant *C = dyn_cast<Constant>(CmpRHS);
-        //llvmberry::propagateInstruction(hints, Y, Z, SRC);
-        //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpNe::make(
-        //           VAL(Z), VAL(Y), VAL(X), VAL(V), CONSTANT(C), VALTYPE(C->getType())));
         llvmberry::propagateInstruction(hints, ICI, &SI, SRC);
         INFRULE(INSTPOS(SRC, &SI), llvmberry::ConsSelectIcmpNe::make(
             VAL(&SI), VAL(ICI), VAL(CmpLHS), VAL(TrueVal), CONSTANT(C), VALTYPE(C->getType())));

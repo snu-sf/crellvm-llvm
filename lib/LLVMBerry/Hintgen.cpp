@@ -193,8 +193,6 @@ void generateHintForNegValue(llvm::Value *V, llvm::BinaryOperator &I,
   // Constants can be considered to be negated values if they can be folded.
   if (llvm::ConstantInt *C = llvm::dyn_cast<llvm::ConstantInt>(V)) {
     INTRUDE(CAPTURE(&I, &V, &C, &scope), {
-      //std::string reg0_name = getVariable(I); // z = x -my
-
       unsigned sz_bw = I.getType()->getPrimitiveSizeInBits();
       int64_t c1 = C->getSExtValue(), c2 = -c1;
 
@@ -370,10 +368,10 @@ void generateHintForReplaceAllUsesWithAtTgt(llvm::Instruction *source,
 
 void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
                                   llvm::BinaryOperator *X, llvm::SelectInst *Y,
-                                  bool needs_commutativity, bool is_leftform) {
+                                  bool is_leftform) {
   assert(ValidationUnit::Exists());
 
-  INTRUDE(CAPTURE(&Z, &X, &Y, needs_commutativity, is_leftform), {
+  INTRUDE(CAPTURE(&Z, &X, &Y, is_leftform), {
     // is_leftform == true :
     //   <src>                          |     <tgt>
     // X = n - a                        | Z = n - a
@@ -387,7 +385,7 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
     // Z = Y + a                        | Z = select c ? a : n
 
     llvm::Value *c = Y->getCondition(), *n = X->getOperand(0);
-    llvm::Value *a = X->getOperand(1), *a_Z = Z->getOperand(1);
+    llvm::Value *a = X->getOperand(1); //, *a_Z = Z->getOperand(1);
 
     // prepare variables
     std::string ry = getVariable(*Y);
@@ -400,9 +398,9 @@ void generateHintForAddSelectZero(llvm::BinaryOperator *Z,
     // Propagate "Y = select c ? x : 0" or "Y = select c ? 0 : x"
     PROPAGATE(LESSDEF(VAR(*Y), RHS(ry, Physical, SRC), SRC), BOUNDS(INSTPOS(SRC, Y), INSTPOS(SRC, Z)));
 
-    if (needs_commutativity)
-      INFRULE(INSTPOS(SRC, Z), ConsBopCommutative::make(VAR(*Z),
-              TyBop::BopAdd, VAL(Y), VAL(a_Z), BITSIZE(*Z)));
+    // if (needs_commutativity)
+    //  INFRULE(INSTPOS(SRC, Z), ConsBopCommutative::make(VAR(*Z),
+    //          TyBop::BopAdd, VAL(Y), VAL(a_Z), BITSIZE(*Z)));
 
     if (is_leftform)
       INFRULE(INSTPOS(SRC, Z), ConsAddSelectZero::make(REGISTER(*Z),
@@ -419,32 +417,30 @@ void generateHintForOrAnd(llvm::BinaryOperator *Y, llvm::Value *X,
 
   INTRUDE(CAPTURE(Y, X, A), {
     auto ptr = data.get<ArgForSimplifyOrInst>();
-    bool isSwapped = ptr->isSwapped;
-    ptr->setHintGenFunc("or_and", [Y, X, A, isSwapped,
-                                   &hints](llvm::Instruction *I) {
+    //bool isSwapped = ptr->isSwapped;
+    ptr->setHintGenFunc("or_and", [Y, X, A, &hints](llvm::Instruction *I) {
       //   <src>   |   <tgt>
       // Y = X & A | Y = X & A
       // Z = Y | X | (Z equals X)
       llvm::BinaryOperator *Z = llvm::dyn_cast<llvm::BinaryOperator>(I);
       //assert(Z && "Z must be a binary operator in or_and optimization");
 
-      bool Zswapped = Z->getOperand(0) == X;
+      //bool Zswapped = Z->getOperand(0) == X;
       propagateInstruction(hints, Y, Z, SRC);
-      if (Zswapped ^ isSwapped)
-        applyCommutativity(hints, Z, Z, SRC);
-      if (Y->getOperand(0) == A)
-        applyCommutativity(hints, Z, Y, SRC);
+      //if (Zswapped ^ isSwapped)
+      //  applyCommutativity(hints, Z, Z, SRC);
+      //if (Y->getOperand(0) == A)
+      //  applyCommutativity(hints, Z, Y, SRC);
       INFRULE(INSTPOS(SRC, Z), ConsOrAnd::make(VAL(Z), VAL(Y),
               VAL(X), VAL(A), BITSIZE(*Z)));
     });
   });
 }
 
-void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0,
-                          llvm::Value *op1, bool needsCommutativity) {
+void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0, llvm::Value *op1) {
   assert(ValidationUnit::Exists());
 
-  INTRUDE(CAPTURE(&W, &op0, &op1, &needsCommutativity), {
+  INTRUDE(CAPTURE(&W, &op0, &op1), {
     //    <src>    |   <tgt>
     // X = B ^ -1  | X = B ^ -1
     // Y = A & X   | Y = A & X
@@ -458,16 +454,16 @@ void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0,
     //assert(Z);
     //assert(W);
     llvm::Value *A = Z->getOperand(0), *B = Z->getOperand(1);
-    //int bitwidth = W->getType()->getIntegerBitWidth();
 
     propagateInstruction(hints, X, W, SRC);
     propagateInstruction(hints, Y, W, SRC);
     propagateInstruction(hints, Z, W, SRC);
-    if (X->getOperand(1) == B)
-      applyCommutativity(hints, W, X, SRC);
+    // auto: If X = -1 ^ B, apply commutativity
+    //if (X->getOperand(1) == B)
+    //  applyCommutativity(hints, W, X, SRC);
 
-    if (needsCommutativity)
-      applyCommutativity(hints, W, W, SRC);
+    //if (needsCommutativity)
+    //  applyCommutativity(hints, W, W, SRC);
 
     INFRULE(INSTPOS(SRC, W), ConsOrXor::make(
         VAL(W), VAL(Z), VAL(X), VAL(Y), VAL(A), VAL(B), BITSIZE(*W)));
@@ -475,12 +471,10 @@ void generateHintForOrXor(llvm::BinaryOperator *W, llvm::Value *op0,
 }
 
 void generateHintForOrXor2(llvm::BinaryOperator *Z, llvm::Value *X1_val,
-                           llvm::Value *X2_val, llvm::Value *A, llvm::Value *B,
-                           bool needsY1Commutativity,
-                           bool needsY2Commutativity) {
+                           llvm::Value *X2_val, llvm::Value *A, llvm::Value *B) {
   assert(ValidationUnit::Exists());
 
-  INTRUDE(CAPTURE(&Z, &X1_val, &X2_val, &A, &B, needsY1Commutativity, needsY2Commutativity), {
+  INTRUDE(CAPTURE(&Z, &X1_val, &X2_val, &A, &B), {
     //     <src>           <tgt>
     // X1 = B  ^ -1  | X1 =  B ^ -1
     // Y1 = A  & X1  | Y1 =  A & X1
@@ -501,14 +495,16 @@ void generateHintForOrXor2(llvm::BinaryOperator *Z, llvm::Value *X1_val,
     propagateInstruction(hints, X2, Z, SRC);
     propagateInstruction(hints, Y1, Z, SRC);
     propagateInstruction(hints, Y2, Z, SRC);
-    if (X1->getOperand(1) == B)
-      applyCommutativity(hints, Z, X1, SRC);
-    if (X2->getOperand(1) == A)
-      applyCommutativity(hints, Z, X2, SRC);
-    if (needsY1Commutativity)
-      applyCommutativity(hints, Z, Y1, SRC);
-    if (needsY2Commutativity)
-      applyCommutativity(hints, Z, Y2, SRC);
+    // auto: If X1 = -1 ^ B, apply commutativity
+    //if (X1->getOperand(1) == B)
+    //  applyCommutativity(hints, Z, X1, SRC);
+    // auto: If X2 = -1 ^ A, apply commutativity
+    //if (X2->getOperand(1) == A)
+    //  applyCommutativity(hints, Z, X2, SRC);
+    //if (needsY1Commutativity)
+    //  applyCommutativity(hints, Z, Y1, SRC);
+    //if (needsY2Commutativity)
+    //  applyCommutativity(hints, Z, Y2, SRC);
 
     INFRULE(INSTPOS(TGT, Z), ConsOrXor2::make(
         VAL(Z), VAL(X1), VAL(Y1), VAL(X2), VAL(Y2), VAL(A), VAL(B), BITSIZE(*Z)));
@@ -517,52 +513,50 @@ void generateHintForOrXor2(llvm::BinaryOperator *Z, llvm::Value *X1_val,
 
 void generateHintForOrXor4(llvm::BinaryOperator *Z, llvm::Value *X,
                            llvm::BinaryOperator *Y, llvm::BinaryOperator *A,
-                           llvm::Value *B, llvm::BinaryOperator *NB,
-                           bool needsYCommutativity, bool needsZCommutativity) {
+                           llvm::Value *B, llvm::BinaryOperator *NB) {
   //assert(ValidationUnit::Exists());
 
-  INTRUDE(CAPTURE(&Z, &X, &Y, &A, &B, &NB, needsYCommutativity, needsZCommutativity), {
+  INTRUDE(CAPTURE(&Z, &X, &Y, &A, &B, &NB), {
     // <src>      |  <tgt>
     // A = X ^ -1 | A = X ^ -1
     // Y = A ^ B  | Y = A ^ B
     // <nop>      | NB = B ^ -1
     // Z = X | Y  | Z = NB | X
-    //int bitwidth = Z->getType()->getIntegerBitWidth();
     propagateInstruction(hints, A, Z, TGT);
     propagateInstruction(hints, Y, Z, TGT);
     propagateInstruction(hints, NB, Z, TGT);
-    if (needsYCommutativity)
-      applyCommutativity(hints, Z, Y, TGT);
+    //if (needsYCommutativity)
+    //  applyCommutativity(hints, Z, Y, TGT);
     insertSrcNopAtTgtI(hints, NB);
     propagateMaydiffGlobal(hints, getVariable(*NB), Physical);
 
     INFRULE(INSTPOS(TGT, Z), ConsOrXor4::make(VAL(Z), VAL(X),
             VAL(Y), VAL(A), VAL(B), VAL(NB), BITSIZE(*Z)));
-    if (needsZCommutativity)
-      INFRULE(INSTPOS(TGT, Z), ConsOrCommutativeTgt::make(
-              REGISTER(*Z), VAL(X), VAL(Y), BITSIZE(*Z)));
+    //if (needsZCommutativity)
+    //  INFRULE(INSTPOS(TGT, Z), ConsOrCommutativeTgt::make(
+    //          REGISTER(*Z), VAL(X), VAL(Y), BITSIZE(*Z)));
   });
 }
 
 void generateHintForAddXorAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
                               llvm::BinaryOperator *Y, llvm::Value *A,
-                              llvm::Value *B, bool needsYCommutativity,
-                              bool needsZCommutativity) {
-  INTRUDE(CAPTURE(&Z, &X, &Y, needsYCommutativity, needsZCommutativity), {
+                              llvm::Value *B) {
+  INTRUDE(CAPTURE(&Z, &X, &Y), {
     //    <src>       <tgt>
     // X = A ^ B  | X = A ^ B
     // Y = A & B  | Y = A & B
     // Z = X + Y  | Z = A | B
     llvm::Value *A = X->getOperand(0), *B = X->getOperand(1);
-    //int bitwidth = Z->getType()->getIntegerBitWidth();
 
     propagateInstruction(hints, X, Z, SRC);
     propagateInstruction(hints, Y, Z, SRC);
 
-    if (needsYCommutativity)
-      applyCommutativity(hints, Z, Y, SRC);
-    if (needsZCommutativity)
-      applyCommutativity(hints, Z, Z, SRC);
+    // auto: If Y = B & A, apply commutativity
+    //if (needsYCommutativity)
+    //  applyCommutativity(hints, Z, Y, SRC);
+    // auto: If Z = Y + X, apply commutativity
+    //if (needsZCommutativity)
+    //  applyCommutativity(hints, Z, Z, SRC);
 
     INFRULE(INSTPOS(SRC, Z), ConsAddXorAnd::make(
         REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X), REGISTER(*Y), BITSIZE(*Z)));
@@ -571,11 +565,10 @@ void generateHintForAddXorAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
 
 void generateHintForAddOrAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
                              llvm::BinaryOperator *Y, llvm::Value *A,
-                             llvm::Value *B, bool needsYCommutativity,
-                             bool needsZCommutativity) {
+                             llvm::Value *B) {
   assert(ValidationUnit::Exists());
 
-  INTRUDE(CAPTURE(&Z, &X, &Y, needsYCommutativity, needsZCommutativity), {
+  INTRUDE(CAPTURE(&Z, &X, &Y), {
     //    <src>       <tgt>
     // X = A ^ B  | X = A ^ B
     // Y = A & B  | Y = A & B
@@ -585,28 +578,30 @@ void generateHintForAddOrAnd(llvm::BinaryOperator *Z, llvm::BinaryOperator *X,
     propagateInstruction(hints, X, Z, SRC);
     propagateInstruction(hints, Y, Z, SRC);
 
-    if (needsYCommutativity)
-      applyCommutativity(hints, Z, Y, SRC);
-    if (needsZCommutativity)
-      applyCommutativity(hints, Z, Z, SRC);
+    // auto: If Y = B & A, apply commutativity
+    //if (needsYCommutativity)
+    //  applyCommutativity(hints, Z, Y, SRC);
+    // auto: If Z = Y + X, apply commutativity
+    //if (needsZCommutativity)
+    //  applyCommutativity(hints, Z, Z, SRC);
 
     INFRULE(INSTPOS(SRC, Z), ConsAddOrAnd::make(REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X), REGISTER(*Y), BITSIZE(*Z)));
   });
 }
 
 void generateHintForAndOr(llvm::BinaryOperator *Z, llvm::Value *X,
-                          llvm::BinaryOperator *Y, llvm::Value *A,
-                          bool needsZCommutativity) {
+                          llvm::BinaryOperator *Y, llvm::Value *A) {
   assert(ValidationUnit::Exists());
 
-  INTRUDE(CAPTURE(&Z, &X, &Y, &A, needsZCommutativity), {
+  INTRUDE(CAPTURE(&Z, &X, &Y, &A), {
     assert(Z);
 
     propagateInstruction(hints, Y, Z, Source);
-    if (Y->getOperand(0) != X)
-      applyCommutativity(hints, Z, Y, Source);
-    if (needsZCommutativity)
-      applyCommutativity(hints, Z, Z, Source);
+    // auto:
+    //if (Y->getOperand(0) != X)
+    //  applyCommutativity(hints, Z, Y, Source);
+    //if (needsZCommutativity)
+    //  applyCommutativity(hints, Z, Z, Source);
     INFRULE(INSTPOS(SRC, Z), ConsAndOr::make(VAL(Z), VAL(X), VAL(Y), VAL(A), BITSIZE(*Z)));
   });
 }
@@ -637,18 +632,22 @@ void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z, llvm::BinaryOperator *W,
       X = W->getOperand(0);
       A = W->getOperand(1);
       B = Y->getOperand(1);
-      applyCommutativity(hints, Z, W, SRC);
-      applyCommutativity(hints, Z, Y, SRC);
+      // auto: W = X + A -> W = A + X
+      // auto: Y = X + B -> Y = B + X
+      //applyCommutativity(hints, Z, W, SRC);
+      //applyCommutativity(hints, Z, Y, SRC);
     } else if (W->getOperand(0) == Y->getOperand(1)) {
       X = W->getOperand(0);
       A = W->getOperand(1);
       B = Y->getOperand(0);
-      applyCommutativity(hints, Z, W, SRC);
+      // auto: W = X + A -> W = A + X
+      //applyCommutativity(hints, Z, W, SRC);
     } else if (W->getOperand(1) == Y->getOperand(0)) {
       X = W->getOperand(1);
       A = W->getOperand(0);
       B = Y->getOperand(1);
-      applyCommutativity(hints, Z, Y, SRC);
+      // auto: Y = X + B -> Y = B + X
+      //applyCommutativity(hints, Z, Y, SRC);
     }
 
     std::function<std::shared_ptr<TyInfrule>(
@@ -681,10 +680,10 @@ void generateHintForIcmpEqNeBopBop(llvm::ICmpInst *Z, llvm::BinaryOperator *W,
         optname = "icmp_ne_xor_xor";
         makeFunc = ConsIcmpNeXorXor::make;
       }
-    } else {
-      assert(false && "icmp_eq_<bop> optimization : opcode should be one of "
-                      "ADD, SUB, or XOR");
-    }
+    }// else {
+    //  assert(false && "icmp_eq_<bop> optimization : opcode should be one of "
+    //                  "ADD, SUB, or XOR");
+    //}
 
     ValidationUnit::GetInstance()->setOptimizationName(optname);
     INFRULE(INSTPOS(SRC, Z), makeFunc(VAL(Z), VAL(W), VAL(X),
