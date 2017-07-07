@@ -867,6 +867,7 @@ public:
   make(const llvm::GetElementPtrInst &li);
   std::shared_ptr<TyValue> get_op(int i);
   void replace_op(int i, std::shared_ptr<TyValue> val);
+  bool inbounds() { return is_inbounds; }
 
 private:
   std::shared_ptr<TyValueType> ty;
@@ -1171,6 +1172,7 @@ public:
   void serialize(cereal::JSONOutputArchive &archive) const;
   std::shared_ptr<TyValue> get_op(int i);
   void replace_op(int i, std::shared_ptr<TyValue> val);
+  bool inbounds() { return get_element_ptr_inst->inbounds(); }
 
 private:
   std::shared_ptr<TyGetElementPtrInst> get_element_ptr_inst;
