@@ -1329,7 +1329,7 @@ static bool isUndefShift(Value *Amount) {
 
         ptr->setHintGenFunc("shift_undef2", [CI, &hints](llvm::Instruction *I) {
           INFRULE(INSTPOS(SRC, I), llvmberry::ConsShiftUndef2::make(
-              VAL(I), VAL(I->getOperand(0)), CONSTINT(CI), BITSIZE(*I)));
+              VAL(I), VAL(I->getOperand(0)), CONSTINT(dyn_cast<ConstantInt>(CI)), BITSIZE(*I)));
         });
       });
       return true;
