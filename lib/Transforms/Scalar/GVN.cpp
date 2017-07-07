@@ -1037,8 +1037,10 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
             Instruction *new_pos = I_V;
             if (PHINode *PN = dyn_cast<PHINode>(I_V))
               new_pos = PN->getIncomingBlock(i)->getTerminator();
-            if (!is_src && (I_V->getOperand(i) == l_end)) continue;
-            auto to_insert = std::make_pair(new_pos, std::make_pair(I_V->getOperand(i), vn_op));
+            // if (!is_src && (I_V->getOperand(i) == l_end)) continue;
+            Value *V_wl = I_V->getOperand(i);
+            if (!is_src && (V_wl == l_end)) V_wl = V_term;
+            auto to_insert = std::make_pair(new_pos, std::make_pair(V_wl, vn_op));
             if (visited.insert(to_insert)) worklist.push_back(to_insert);
           }
         }
