@@ -901,8 +901,14 @@ void insertProofForPropEq(llvmberry::CoreHint &hints, std::vector<llvm::Instruct
     PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, SRC), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, cur_pos)));
     PROPAGATE(LESSDEF(RHS(id, Physical, SRC), VAR(id), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, cur_pos)));
   }
-  for (auto II = infrs.begin(), EI = infrs.end(); II != EI; ++II)
-    INFRULE(INSTPOS(scp, cur_pos), *II);
+  for (auto II = infrs.begin(), EI = infrs.end(); II != EI; ++II) {
+    if (TerminatorInst *TI = dyn_cast<TerminatorInst>(cur_pos))
+      for (unsigned i = 0; i < TI->getNumSuccessors(); ++i)
+        INFRULE(PHIPOS(scp, TI->getSuccessor(i)->getName(), TI->getParent()->getName()), *II);
+    else INFRULE(INSTPOS(scp, cur_pos), *II);
+  }
+  // for (auto II = infrs.begin(), EI = infrs.end(); II != EI; ++II)
+  //   INFRULE(INSTPOS(scp, cur_pos), *II);
 }
 
 bool lookupCT(ValueTable &VN, llvmberry::GVNArg::TyCT &CT,
