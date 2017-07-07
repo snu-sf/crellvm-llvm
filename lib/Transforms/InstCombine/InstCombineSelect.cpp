@@ -236,6 +236,16 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     //assert(R);
     //assert(S);
     //assert(Tprime);
+    switch(R->getOpcode()) {
+    case Instruction::UDiv: case Instruction::SDiv:
+    case Instruction::URem: case Instruction::SRem:
+      // This optimization is controversial because its correctness
+      // depends on the semantics of `select`. If C is poison,
+      // the program after transformation may contain UB.
+      // See PLDI17 [Taming Undefined Behavior in LLVM].
+      hints.setReturnCodeToAdmitted();
+      return;
+    }
     Value *X = MatchOp, *Y = OtherOpT, *Z = OtherOpF, *C = SI.getCondition();
     Instruction::BinaryOps bop = R->getOpcode();
 
