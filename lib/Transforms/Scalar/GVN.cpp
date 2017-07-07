@@ -179,6 +179,15 @@ static inline std::shared_ptr<llvmberry::TyExpr> gVAR(uint32_t vn) {
   return VAR("g" + std::to_string(vn), Ghost);
 }
 
+bool not_supported_floatingTy(Instruction *I) {
+  for (auto OI = I->op_begin(), OE = I->op_end(); OI != OE; ++OI) {
+    auto ty = (*OI)->getType();
+    if (ty->isFloatingPointTy() && (!ty->isFloatTy() && !ty->getType()->isDoubleTy()))
+      return true;
+  }
+  return false;
+}
+
 void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
   llvmberry::PassDictionary &pdata = llvmberry::PassDictionary::GetInstance();
   auto VNCnt = pdata.get<llvmberry::ArgForGVN>()->VNCnt;
@@ -192,8 +201,9 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
   //d dbgs() << "[ constructVET start ]\n";
   if (llvmberry::TyInstruction::isSupported(*I)) {
     if (isa<ExtractValueInst>(I) || isa<InsertValueInst>(I)) return;
-    if (I->getType()->isFloatingPointTy())
-      if (!I->getType()->isFloatTy() && !I->getType()->isDoubleTy()) return;
+    if (not_supported_floatingTy(I)) return;
+    // if (I->getType()->isFloatingPointTy())
+    //   if (!I->getType()->isFloatTy() && !I->getType()->isDoubleTy()) return;
 
     auto VET = pdata.get<llvmberry::ArgForGVN>()->VET;
     auto InvT = pdata.get<llvmberry::ArgForGVN>()->InvT;
