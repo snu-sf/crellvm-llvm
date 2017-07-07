@@ -952,15 +952,15 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
                           llvmberry::GVNArg::TyCT &CT, llvmberry::GVNArg::TyCTInv &CTInv,
                           llvmberry::GVNArg::TyCallPHI &CallPHIs,
                           llvmberry::GVNArg::TyVNCnt &VNCnt,
-                          Value *V, Instruction *l_end, uint32_t vn,
+                          Value *V_term, Instruction *l_end, uint32_t vn,
                           std::map<uint32_t, Instruction*> &calls,
                           std::map<uint32_t, LoadInst*> &loads,
                           bool is_src) {
   SmallVector<std::pair<Instruction*, std::pair<Value *, uint32_t>>, 4> worklist;
   SmallSetVector<std::pair<Instruction*, std::pair<Value *, uint32_t>>, 4> visited;
 
-  worklist.push_back(std::make_pair(l_end, std::make_pair(V, vn))); // TODO: in constructor
-  visited.insert(std::make_pair(l_end, std::make_pair(V, vn)));
+  worklist.push_back(std::make_pair(l_end, std::make_pair(V_term, vn))); // TODO: in constructor
+  visited.insert(std::make_pair(l_end, std::make_pair(V_term, vn)));
 
   //d dbgs() << "worklist start \n";
   while(!worklist.empty()) {
@@ -1031,6 +1031,7 @@ bool new_proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
             Instruction *new_pos = I_V;
             if (PHINode *PN = dyn_cast<PHINode>(I_V))
               new_pos = PN->getIncomingBlock(i)->getTerminator();
+            if (!is_src && (I_V->getOperand(i) == l_end)) continue;
             auto to_insert = std::make_pair(new_pos, std::make_pair(I_V->getOperand(i), vn_op));
             if (visited.insert(to_insert)) worklist.push_back(to_insert);
           }
