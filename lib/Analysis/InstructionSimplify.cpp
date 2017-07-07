@@ -1328,10 +1328,8 @@ static bool isUndefShift(Value *Amount) {
         auto ptr = data.get<llvmberry::ArgForSimplifyShiftInst>();
 
         ptr->setHintGenFunc("shift_undef2", [CI, &hints](llvm::Instruction *I) {
-          auto c = CI->getZExtValue();
-          auto sz = CI->getType()->getBitWidth();
           INFRULE(INSTPOS(SRC, I), llvmberry::ConsShiftUndef2::make(
-              VAL(I), VAL(I->getOperand(0)), CONSTINT(c, sz), BITSIZE(*I)));
+              VAL(I), VAL(I->getOperand(0)), CONSTINT(CI), BITSIZE(*I)));
         });
       });
       return true;
