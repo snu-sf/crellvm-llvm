@@ -2051,13 +2051,13 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
           // X = 0 - mX | X =  0 - mX
           // Y = X << A | Y =  X << A
           // Z = 0 -  Y | Z = mX << A
-          BinaryOperator *Z = &I;
-          BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
-          Value *A = Y->getOperand(1);
-          Value *mX = XNeg;
           llvmberry::ValidationUnit::Begin("sub_shl", I);
           llvmberry::generateHintForNegValue(X, I);
-          INTRUDE(CAPTURE(Z, Y, X, A, mX), {
+          INTRUDE(CAPTURE(&I, &Op1, &Y, &XNeg, &X), {
+            BinaryOperator *Z = &I;
+            BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+            Value *A = Y->getOperand(1);
+            Value *mX = XNeg;
             llvmberry::propagateInstruction(hints, Y, Z, SRC);
             INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSubShl::make(
                     REGISTER(*Z), VAL(X), REGISTER(*Y), VAL(mX), VAL(A), BITSIZE(*Z)));
