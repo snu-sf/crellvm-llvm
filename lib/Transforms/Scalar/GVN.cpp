@@ -838,8 +838,8 @@ void GVN::dump(DenseMap<uint32_t, Value*>& d) {
 void hintgenLoadOpt(llvmberry::CoreHint &hints, Instruction *I, Instruction *pos, Value *ptr, llvmberry::TyScope scp) {
   std::string id = llvmberry::getVariable(*I);
   if (I != pos) {
-    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, scp), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, pos)));
-    PROPAGATE(LESSDEF(RHS(id, Physical, scp), VAR(id), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, pos)));
+    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, scp), scp), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, pos)));
+    PROPAGATE(LESSDEF(RHS(id, Physical, scp), VAR(id), scp), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, pos)));
   }
 
   if (I->getOperand(0) != ptr)
@@ -867,15 +867,15 @@ void insertProofForPropEq(llvmberry::CoreHint &hints, std::vector<llvm::Instruct
 
   std::string id_I_cond = llvmberry::getVariable(*I_cond);
     
-  PROPAGATE(LESSDEF(EXPR(C_cond, Physical), VAR(id_I_cond), scp), BOUNDS(STARTPOS(scp, BB->getName()), INSTPOS(scp, cur_pos)));
-  PROPAGATE(LESSDEF(VAR(id_I_cond), EXPR(C_cond, Physical), scp), BOUNDS(STARTPOS(scp, BB->getName()), INSTPOS(scp, cur_pos)));
+  PROPAGATE(LESSDEF(EXPR(C_cond, Physical), VAR(id_I_cond), scp), BOUNDS(STARTPOS(SRC, BB->getName()), INSTPOS(SRC, cur_pos)));
+  PROPAGATE(LESSDEF(VAR(id_I_cond), EXPR(C_cond, Physical), scp), BOUNDS(STARTPOS(SRC, BB->getName()), INSTPOS(SRC, cur_pos)));
 
   // TODO: factor this out to a function
   for (auto II = props.begin(), EI = props.end(); II != EI; ++II) {
     Instruction *I = *II;
     std::string id = llvmberry::getVariable(*I);
-    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, SRC), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, cur_pos)));
-    PROPAGATE(LESSDEF(RHS(id, Physical, SRC), VAR(id), scp), BOUNDS(INSTPOS(scp, I), INSTPOS(scp, cur_pos)));
+    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, scp), scp), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, cur_pos)));
+    PROPAGATE(LESSDEF(RHS(id, Physical, scp), VAR(id), scp), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, cur_pos)));
   }
   for (auto II = infrs.begin(), EI = infrs.end(); II != EI; ++II) {
     if (TerminatorInst *TI = dyn_cast<TerminatorInst>(cur_pos))
@@ -890,7 +890,7 @@ bool lookupCT(ValueTable &VN, llvmberry::GVNArg::TyCT &CT,
               Value *V, uint32_t vn, Instruction *pos) {
   DominatorTree *DT = VN.getDomTree();
   bool flag = false;
-  std::vector<llvmberry::GVNArg::TyCTElem> ct_list = DICTMAP(CT, std::make_pair(V, vn));
+  std::vector<llvmberry::GVNArg::TyCTElem> &ct_list = DICTMAP(CT, std::make_pair(V, vn));
 
   for (auto II = ct_list.begin(), IE = ct_list.end(); II != IE; ++II) {
     elem = *II;
@@ -920,13 +920,13 @@ void PropagateVETInv(llvmberry::CoreHint &hints, llvmberry::GVNArg::TyInvT &InvT
 }
 
 bool proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
-                          llvmberry::GVNArg::TyVET &VET, llvmberry::GVNArg::TyInvT &InvT,
-                          llvmberry::GVNArg::TyCT &CT, llvmberry::GVNArg::TyCTInv &CTInv,
-                          llvmberry::GVNArg::TyCallPHI &CallPHIs,
-                          llvmberry::GVNArg::TyVNCnt &VNCnt,
-                          std::map<uint32_t, Instruction*> &calls,
-                          std::map<uint32_t, LoadInst*> &loads,
-                          Value *V_term, Instruction *l_end, uint32_t vn, bool is_src) {
+                      llvmberry::GVNArg::TyVET &VET, llvmberry::GVNArg::TyInvT &InvT,
+                      llvmberry::GVNArg::TyCT &CT, llvmberry::GVNArg::TyCTInv &CTInv,
+                      llvmberry::GVNArg::TyCallPHI &CallPHIs,
+                      llvmberry::GVNArg::TyVNCnt &VNCnt,
+                      std::map<uint32_t, Instruction*> &calls,
+                      std::map<uint32_t, LoadInst*> &loads,
+                      Value *V_term, Instruction *l_end, uint32_t vn, bool is_src) {
   SmallVector<std::pair<Instruction*, std::pair<Value *, uint32_t>>, 4> worklist;
   SmallSetVector<std::pair<Instruction*, std::pair<Value *, uint32_t>>, 4> visited;
 
@@ -949,14 +949,14 @@ bool proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
 
       if (is_call) {
         auto II = calls.find(vn);
-        if (II != calls.end())
+        if (II != calls.end()) {
           if (I_V != II->second) {
             // We admit readonly call cases now.
             hints.appendToDescription("GVN: Readonly calls.");
             hints.setReturnCodeToAdmitted();
             return false;
           }
-        else calls.insert(std::make_pair(vn, I_V));
+        } else calls.insert(std::make_pair(vn, I_V));
       }
 
       if (vn != VN.lookup_safe(I_V)) {
@@ -3005,10 +3005,12 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       delete PREInstr;
       return false;
     }
-    llvmberry::intrude([&CurInst, &PREInstr]() {
-      if (GVNDICT(VET)->count(CurInst) > 0)
-        (*GVNDICT(VET))[PREInstr] = (*GVNDICT(VET))[CurInst];
-    });
+    llvmberry::intrude([&CurInst, &PREInstr, &ValNo]() {
+        if (GVNDICT(VET)->count(CurInst) > 0) {
+          ++(*GVNDICT(VNCnt))[ValNo];
+          (*GVNDICT(VET))[PREInstr] = (*GVNDICT(VET))[CurInst];
+        }
+      });
   }
 
   // Either we should have filled in the PRE instruction, or we should
