@@ -204,6 +204,8 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
   if (llvmberry::TyInstruction::isSupported(*I)) {
     if (isa<ExtractValueInst>(I) || isa<InsertValueInst>(I)) return;
     if (not_supported_floatingTy(I)) return;
+    if (I->getNumOperands() > 0 && I->getOperand(0)->getType()->isIntegerTy() &&
+      I->getOperand(0)->getType()->getIntegerBitWidth() > 64) return;
 
     std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I)->get());
 
@@ -1045,9 +1047,10 @@ void updateVETInPRE(ValueTable &VN, llvmberry::GVNArg::TyVET &VET,
     Value *V_op = PN->getIncomingValue(i);
 
     if (Instruction *I = dyn_cast<Instruction>(V_op)) {
-      SmallSetVector<llvmberry::GVNArg::TyInvTKey, 4> &sec = (*VET)[I].second;
-      if (VET->count(I) > 0) { INVARIANT_UNION(prop_objs, sec); }
-      else return;
+      if (VET->count(I) > 0) {
+        SmallSetVector<llvmberry::GVNArg::TyInvTKey, 4> &sec = (*VET)[I].second;
+        INVARIANT_UNION(prop_objs, sec);
+      } else return;
     } else {
       llvmberry::GVNArg::TyCTElem elem;
       TerminatorInst *TI = PN->getIncomingBlock(i)->getTerminator();
