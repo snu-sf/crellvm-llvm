@@ -205,7 +205,7 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
     if (isa<ExtractValueInst>(I) || isa<InsertValueInst>(I)) return;
     if (not_supported_floatingTy(I)) return;
     if (I->getNumOperands() > 0 && I->getOperand(0)->getType()->isIntegerTy() &&
-      I->getOperand(0)->getType()->getIntegerBitWidth() > 64) return;
+        I->getOperand(0)->getType()->getIntegerBitWidth() > 64) return;
 
     std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I)->get());
 
@@ -921,6 +921,11 @@ void PropagateVETInv(llvmberry::CoreHint &hints, llvmberry::GVNArg::TyInvT &InvT
     }
 }
 
+static inline Value *src_tgt(bool is_src, Value *src, Value *tgt, Value *v) {
+  if (!is_src && (src == v)) return tgt;
+  return v;
+}
+
 bool proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
                       llvmberry::GVNArg::TyVET &VET, llvmberry::GVNArg::TyInvT &InvT,
                       llvmberry::GVNArg::TyCT &CT, llvmberry::GVNArg::TyCTInv &CTInv,
@@ -943,7 +948,10 @@ bool proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
 
     if (Instruction *I_V = dyn_cast<Instruction>(V)) {
       bool is_call = false;
-      std::string id_V = llvmberry::getVariable(*I_V);
+      Value *V_t = src_tgt(is_src, l_end, V_term, V);
+
+      std::string id_V = llvmberry::getVariable(*I_V),
+        id_V_t = llvmberry::getVariable(*V_t);
 
       if (isa<CallInst>(I_V)) is_call = true;
       if (PHINode *PN = dyn_cast<PHINode>(I_V))
@@ -979,7 +987,8 @@ bool proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
         }
       } else {
         if (LoadInst *LI = dyn_cast<LoadInst>(I_V)) loads[vn] = LI;
-        if (I_V != cur_pos) PROPAGATE(is_src? LESSDEF(VAR(id_V), GVAR(vn), SRC) : LESSDEF(GVAR(vn), VAR(id_V), TGT),
+
+        if (I_V != cur_pos) PROPAGATE(is_src? LESSDEF(VAR(id_V), GVAR(vn), SRC) : LESSDEF(GVAR(vn), VAR(id_V_t), TGT),
                                       BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
 
         if (((*VNCnt)[vn] > 1) && (VET->count(I_V) > 0)) {
@@ -992,8 +1001,10 @@ bool proofGenGVNUnary(llvmberry::CoreHint &hints, ValueTable &VN,
             if (PHINode *PN = dyn_cast<PHINode>(I_V))
               new_pos = PN->getIncomingBlock(i)->getTerminator();
 
-            Value *V_wl = I_V->getOperand(i);
-            if (!is_src && (V_wl == l_end)) V_wl = V_term;
+            // Value *V_wl = I_V->getOperand(i);
+            // if (!is_src && (V_wl == l_end)) V_wl = V_term;
+            Value *V_wl = src_tgt(is_src, l_end, V_term, I_V->getOperand(i));
+
             auto to_insert = std::make_pair(new_pos, std::make_pair(V_wl, vn_op));
             if (visited.insert(to_insert)) worklist.push_back(to_insert);
           }
