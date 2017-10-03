@@ -3147,6 +3147,19 @@ int LLVMAPIntCompare(LLVMAPIntRef I1, LLVMAPIntRef I2) {
     return 0;
 }
 
+int LLVMAPIntCompareOrd(LLVMAPIntRef I1, LLVMAPIntRef I2) {
+  APInt* i1 = unwrap(I1);	 
+  APInt* i2 = unwrap(I2);	 
+  if (i1->getBitWidth() == i2->getBitWidth()) {
+    if (*i1==*i2) return 0;
+    if (i1->ult(*i2)) return -1;
+    return 1;
+  }
+  else if (i1->getBitWidth() < i2->getBitWidth())
+    return -1;
+  return 1; 
+}
+
 LLVMAPIntRef LLVMAPIntConstIntGetValue(LLVMValueRef ConstantVal) {
   APInt *RI = new APInt(unwrap<ConstantInt>(ConstantVal)->getValue());	
   return wrap(RI);
@@ -3201,7 +3214,11 @@ LLVMAPFloatSemantics LLVMAPFloatGetSemantics(LLVMAPFloatRef F) {
 
 LLVMAPFloatCmpResult LLVMAPFloatCompare(LLVMAPFloatRef F1, LLVMAPFloatRef F2) {
   return (LLVMAPFloatCmpResult)(unwrap(F1)->compare(*unwrap(F2)));	
-}  
+}
+
+LLVMAPFloatCmpResult LLVMAPFloatCompareOrd(LLVMAPFloatRef F1, LLVMAPFloatRef F2) {
+  return (LLVMAPFloatCmpResult)(unwrap(F1)->compare_ord(*unwrap(F2)));	
+}
 
 int LLVMAPFloatBitwiseIsEqual(LLVMAPFloatRef F1, LLVMAPFloatRef F2) {
   return unwrap(F1)->bitwiseIsEqual(*unwrap(F2));

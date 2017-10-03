@@ -2766,6 +2766,8 @@ module APInt : sig
       See the method [llvm::APInt::==]. *)
   external compare : t -> t -> bool = "llvm_apint_compare"
 
+  external compare_ord : t -> t -> int = "llvm_apint_compare_ord"
+
   (** [const_int_get_value c] returns APInt value. See the method
       [llvm::ConstInt::getValue] *)
   external const_int_get_value : llvalue -> t = "llvm_apint_const_int_get_value"
@@ -2820,6 +2822,9 @@ module APFloat : sig
   (** IEEE comparison with another floating point number (NaNs compare
    * unordered, 0==-0). *)
   external compare : t -> t -> CmpResult.t = "llvm_apfloat_compare"
+
+  (* for crellvm - ordset *)
+  external compare_ord : t -> t -> CmpResult.t = "llvm_apfloat_compare_ord"
 
   (** Bitwise comparison for equality (QNaNs compare equal, 0!=-0). *)
   external bitwise_is_equal : t -> t -> bool = "llvm_apfloat_bitwise_is_equal"

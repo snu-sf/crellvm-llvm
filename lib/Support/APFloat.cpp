@@ -1888,6 +1888,43 @@ APFloat::opStatus APFloat::roundToIntegral(roundingMode rounding_mode) {
 }
 
 
+/* Added for crellvm(llvmberry): Comparison for ordered set.  */
+APFloat::cmpResult
+APFloat::compare_ord(const APFloat &rhs) const
+{
+  if (this == &rhs)
+    return cmpEqual;
+
+  // pointer comparison
+  if (semantics < rhs.semantics) return cmpLessThan;
+  else if (semantics > rhs.semantics) return cmpGreaterThan;
+
+  if (category < rhs.category) return cmpLessThan;
+  else if (category > rhs.category) return cmpGreaterThan;
+
+  if (sign < rhs.sign) return cmpLessThan;
+  else if (sign > rhs.sign) return cmpGreaterThan;
+
+  if (category == fcZero || category == fcInfinity)
+    return cmpEqual;
+
+  if (isFiniteNonZero()) {
+    if (exponent < rhs.exponent) return cmpLessThan;
+    else if (exponent > rhs.exponent) return cmpGreaterThan;
+  }
+
+  // Don't compare exponent for NaNs,
+  // because all NaN's exponent slots are filled with 1
+  int i= partCount();
+  const integerPart* p=significandParts();
+  const integerPart* q=rhs.significandParts();
+  for (; i>0; i--, p++, q++) {
+    if (*p < *q) return cmpLessThan;
+    else if (*p > *q) return cmpGreaterThan;
+  }
+  return cmpEqual;
+}
+
 /* Comparison requires normalized numbers.  */
 APFloat::cmpResult
 APFloat::compare(const APFloat &rhs) const

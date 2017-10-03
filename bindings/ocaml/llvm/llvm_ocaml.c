@@ -2582,6 +2582,12 @@ CAMLprim value llvm_apint_compare(value I1, value I2) {
   CAMLreturn(Val_bool(LLVMAPIntCompare(APInt_val(I1), APInt_val(I2))));
 }
 
+/* APInt,t -> APInt.t -> int */
+CAMLprim value llvm_apint_compare_ord(value I1, value I2) {
+  CAMLparam2(I1, I2);	
+  CAMLreturn(Val_int(LLVMAPIntCompareOrd(APInt_val(I1), APInt_val(I2))));
+}
+
 /* llvalue -> APInt.t */
 CAMLprim value llvm_apint_const_int_get_value(LLVMValueRef Val) {
   CAMLparam0();	
@@ -2655,6 +2661,12 @@ CAMLprim value llvm_apfloat_get_semantics(value F) {
 CAMLprim value llvm_apfloat_compare(value F1, value F2) {
   CAMLparam2(F1, F2);
   CAMLreturn(Val_int(LLVMAPFloatCompare(APFloat_val(F1), APFloat_val(F2))));
+}
+
+/* t -> t -> CmpResult.t */
+CAMLprim value llvm_apfloat_compare_ord(value F1, value F2) {
+  CAMLparam2(F1, F2);
+  CAMLreturn(Val_int(LLVMAPFloatCompareOrd(APFloat_val(F1), APFloat_val(F2))));
 }  
 
 /* t -> t -> bool */
