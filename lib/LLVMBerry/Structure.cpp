@@ -247,26 +247,7 @@ std::string getVariable(const llvm::Value &value) {
     return rso.str();
   }
 
-  std::string val;
-
-  if (llvm::isa<llvm::GlobalValue>(value)) {
-    val = std::string("@");
-  } else if (llvm::isa<llvm::Instruction>(value) ||
-             llvm::isa<llvm::Argument>(value) ||
-             llvm::isa<llvm::ConstantExpr>(value) ||
-             llvm::isa<llvm::ConstantPointerNull>(value) ||
-             llvm::isa<llvm::UndefValue>(value)) {
-    val = std::string("%");
-  } else {
-    assert("value must be a global value or an instruction" && false);
-  }
-
-  val += std::string(value.getName().data());
-
-  if (val == "%")
-    val = "";
-
-  return val;
+  return "";
 }
 
 llvm::Instruction *getPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB) {

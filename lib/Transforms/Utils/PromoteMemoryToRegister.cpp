@@ -685,18 +685,20 @@ void PromoteMem2Reg::run() {
       BasicBlock *BB = BS++;
       std::string blockName = llvmberry::getBasicBlockIndex(BB);
 
+      std::shared_ptr<llvmberry::TyPosition> from_pos;
+      std::shared_ptr<llvmberry::TyPosition> to_pos = ENDPOSINDEXED(SRC, BB, DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, blockName));
+
+      if (BB != F.begin())
+        from_pos = STARTPOS(SRC, blockName);
+      
       for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
         AllocaInst *AItmp = Allocas[tmpNum];
         std::string Ralloca = llvmberry::getVariable(*AItmp);
-        std::shared_ptr<llvmberry::TyPosition> from_pos;
-        std::shared_ptr<llvmberry::TyPosition> to_pos = ENDPOSINDEXED(SRC, BB, DICTMAP(data.get<llvmberry::ArgForIndices>()->termIndices, BB->getName()));
 
         // TODO: if we can validate "call -> nop", we need below condition
         //if (!llvmberry::hasBitcastOrGEP(AI)) { 
         if (BB == F.begin())
           from_pos = INDEXEDPOS(SRC, AItmp, DICTMAP(data.get<llvmberry::ArgForIndices>()->instrIndices, AItmp), "");
-        else
-          from_pos = STARTPOS(SRC, blockName);
 
         PROPAGATE(UNIQUE(Ralloca, SRC), BOUNDS(from_pos, to_pos));
         PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC), BOUNDS(from_pos, to_pos));

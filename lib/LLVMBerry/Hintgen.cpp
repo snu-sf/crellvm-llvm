@@ -842,10 +842,7 @@ void generateHintForFoldPhiBin(llvm::PHINode &PN, llvm::PHINode *NewLHS, llvm::P
 
 int getIndexofMem2Reg(llvm::Instruction* I,
                       int instrIndex, int termIndex) {
-  if (I == nullptr)
-    return instrIndex;
-
-  if (llvm::dyn_cast<llvm::TerminatorInst>(I) != NULL)
+  if (llvm::dyn_cast_or_null<llvm::TerminatorInst>(I) != NULL)
     return termIndex;
   else
     return instrIndex;
