@@ -384,6 +384,10 @@ public:
   /// unordered, 0==-0).
   cmpResult compare(const APFloat &) const;
 
+  /* Added for crellvm */
+  cmpResult compare_ord(const APFloat &) const;
+  /* End */
+
   /// Bitwise comparison for equality (QNaNs compare equal, 0!=-0).
   bool bitwiseIsEqual(const APFloat &) const;
 

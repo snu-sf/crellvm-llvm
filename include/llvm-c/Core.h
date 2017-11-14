@@ -3130,6 +3130,7 @@ unsigned LLVMAPIntGetActiveBits(LLVMAPIntRef I);
 unsigned LLVMAPIntGetActiveWords(LLVMAPIntRef I);
 LLVMAPIntRef LLVMAPIntInc(LLVMAPIntRef I);
 int LLVMAPIntCompare(LLVMAPIntRef I1, LLVMAPIntRef I2);
+int LLVMAPIntCompareOrd(LLVMAPIntRef I1, LLVMAPIntRef I2);
 LLVMAPIntRef LLVMAPIntConstIntGetValue(LLVMValueRef ConstantVal);
 LLVMValueRef LLVMAPIntConstAPInt(LLVMContextRef Context, LLVMAPIntRef N);
 LLVMAPIntRef LLVMAPIntOfInt64(unsigned NumBits, unsigned long long Val,
@@ -3142,6 +3143,7 @@ double LLVMAPFloatConvertToDouble(LLVMAPFloatRef F);
 double LLVMAPFloatConvertToFloat(LLVMAPFloatRef F);
 LLVMAPFloatSemantics LLVMAPFloatGetSemantics(LLVMAPFloatRef F);
 LLVMAPFloatCmpResult LLVMAPFloatCompare(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
+LLVMAPFloatCmpResult LLVMAPFloatCompareOrd(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
 int LLVMAPFloatBitwiseIsEqual(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
 LLVMAPFloatRef LLVMAPFloatConstFloatGetValue(LLVMValueRef ConstantVal);
 LLVMValueRef LLVMAPFloatConstAPFloat(LLVMContextRef Ctx, LLVMAPFloatRef F);
