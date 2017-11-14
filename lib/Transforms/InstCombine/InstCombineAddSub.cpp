@@ -1759,6 +1759,8 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
       // z = x - my | z = x + y
       //std::string reg0_name = llvmberry::getVariable(I);
 
+      if (I.getType()->isVectorTy()) { llvmberry::ValidationUnit::Abort(); return; }
+
       INFRULE(INSTPOS(SRC, &I), llvmberry::ConsSubAdd::make(
               REGISTER(I), VAL(Op1), VAL(Op0), VAL(V), BITSIZE(I)));
     });
