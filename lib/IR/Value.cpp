@@ -417,18 +417,8 @@ enum PointerStripKind {
 
 template <PointerStripKind StripKind>
 static Value *stripPointerCastsAndOffsets(Value *V) {
-  bool llvmberry_isActive = llvmberry::ValidationUnit::Exists() && 
-        llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
-  INTRUDE_IF(llvmberry_isActive, CAPTURE(V), {
-    if(data.exists<llvmberry::ArgForStripPointerCasts>()){
-      auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
-      ptr->strippedValues->push_back(V);
-    }
-  });
-
-  if (!V->getType()->isPointerTy()){
+  if (!V->getType()->isPointerTy())
     return V;
-  }
 
   // Even though we don't look through PHI nodes, we could be called on an
   // instruction in an unreachable block, which may be on a cycle.
@@ -464,13 +454,6 @@ static Value *stripPointerCastsAndOffsets(Value *V) {
       return V;
     }
     assert(V->getType()->isPointerTy() && "Unexpected operand type!");
-
-    INTRUDE_IF(llvmberry_isActive, CAPTURE(V), {
-      if(data.exists<llvmberry::ArgForStripPointerCasts>()){
-        auto ptr = data.get<llvmberry::ArgForStripPointerCasts>();
-        ptr->strippedValues->push_back(V);
-      }
-    });
   } while (Visited.insert(V).second);
 
   return V;
