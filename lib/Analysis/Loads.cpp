@@ -21,12 +21,6 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
-
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/Infrules.h"
-#include "llvm/LLVMBerry/Hintgen.h"
-
 using namespace llvm;
 
 /// \brief Test if A and B will obviously have the same value.
@@ -190,11 +184,6 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
                                       BasicBlock::iterator &ScanFrom,
                                       unsigned MaxInstsToScan,
                                       AliasAnalysis *AA, AAMDNodes *AATags) {
-  bool llvmberry_isActive = llvmberry::ValidationUnit::Exists() && 
-        llvmberry::ValidationUnit::GetInstance()->getOptimizationName() == "load_load";
-  INTRUDE_IF(llvmberry_isActive, CAPTURE(), 
-  { data.assertExists<llvmberry::ArgForFindAvailableLoadedValue>(); });
-
   if (MaxInstsToScan == 0)
     MaxInstsToScan = ~0U;
 
@@ -205,30 +194,14 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
   // Try to get the store size for the type.
   uint64_t AccessSize = DL.getTypeStoreSize(AccessTy);
 
-  INTRUDE_IF(llvmberry_isActive, CAPTURE(), 
-  { data.create<llvmberry::ArgForStripPointerCasts>(); });
-
   Value *StrippedPtr = Ptr->stripPointerCasts();
-  
-  INTRUDE_IF(llvmberry_isActive, CAPTURE(), {
-    auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-    auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
-    falvarg->ptr2EquivalentValues = spcarg->strippedValues;
-    data.erase<llvmberry::ArgForStripPointerCasts>();
-  });
 
   while (ScanFrom != ScanBB->begin()) {
     // We must ignore debug info directives when counting (otherwise they
     // would affect codegen).
     Instruction *Inst = --ScanFrom;
-    if (isa<DbgInfoIntrinsic>(Inst)) {
-      INTRUDE_IF(llvmberry_isActive, CAPTURE(Inst), {
-        auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-        falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
-            std::make_pair(Inst, "intrinsics")));
-      });
+    if (isa<DbgInfoIntrinsic>(Inst))
       continue;
-    }
 
     // Restore ScanFrom to expected value in case next test succeeds
     ScanFrom++;
@@ -241,52 +214,23 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
     // If this is a load of Ptr, the loaded value is available.
     // (This is true even if the load is volatile or atomic, although
     // those cases are unlikely.)
-    if (LoadInst *LI = dyn_cast<LoadInst>(Inst)){
-      INTRUDE_IF(llvmberry_isActive, CAPTURE(),
-      { data.create<llvmberry::ArgForStripPointerCasts>(); });
-      
-      Value *StrippedPtr2 = LI->getPointerOperand()->stripPointerCasts();
-      
-      INTRUDE_IF(llvmberry_isActive, CAPTURE(), {
-        auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-        auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
-        falvarg->ptr1EquivalentValues = spcarg->strippedValues;
-        data.erase<llvmberry::ArgForStripPointerCasts>();
-      });
-
-      if (AreEquivalentAddressValues(StrippedPtr2, StrippedPtr) &&
+    if (LoadInst *LI = dyn_cast<LoadInst>(Inst))
+      if (AreEquivalentAddressValues(
+              LI->getPointerOperand()->stripPointerCasts(), StrippedPtr) &&
           CastInst::isBitOrNoopPointerCastable(LI->getType(), AccessTy, DL)) {
         if (AATags)
           LI->getAAMetadata(*AATags);
         return LI;
       }
 
-    }
-
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-      INTRUDE_IF(llvmberry_isActive, CAPTURE(),
-      { data.create<llvmberry::ArgForStripPointerCasts>(); });
-
       Value *StorePtr = SI->getPointerOperand()->stripPointerCasts();
-
-      INTRUDE_IF(llvmberry_isActive, CAPTURE(), {
-        auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-        auto spcarg = data.get<llvmberry::ArgForStripPointerCasts>();
-        falvarg->ptr1EquivalentValues = spcarg->strippedValues;
-        data.erase<llvmberry::ArgForStripPointerCasts>();
-      });
-
       // If this is a store through Ptr, the value is available!
       // (This is true even if the store is volatile or atomic, although
       // those cases are unlikely.)
       if (AreEquivalentAddressValues(StorePtr, StrippedPtr) &&
           CastInst::isBitOrNoopPointerCastable(SI->getValueOperand()->getType(),
                                                AccessTy, DL)) {
-        INTRUDE_IF(llvmberry_isActive, CAPTURE(&SI), {
-          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-          falvarg->isLoadStore = true;
-          falvarg->loadstoreStoreInst = SI;
-        });
         if (AATags)
           SI->getAAMetadata(*AATags);
         return SI->getOperand(0);
@@ -297,25 +241,15 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       // of alias analysis that is important for reg2mem'd code.
       if ((isa<AllocaInst>(StrippedPtr) || isa<GlobalVariable>(StrippedPtr)) &&
           (isa<AllocaInst>(StorePtr) || isa<GlobalVariable>(StorePtr)) &&
-          StrippedPtr != StorePtr){
-        INTRUDE_IF(llvmberry_isActive, CAPTURE(SI), {
-          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "alloca_or_global")));
-        });
+          StrippedPtr != StorePtr)
         continue;
-      }
 
       // If we have alias analysis and it says the store won't modify the loaded
       // value, ignore the store.
       if (AA &&
           (AA->getModRefInfo(SI, StrippedPtr, AccessSize) &
-           AliasAnalysis::Mod) == 0){
-        INTRUDE_IF(llvmberry_isActive, CAPTURE(SI), {
-          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(SI, "aliasanalysis")));
-        });
+           AliasAnalysis::Mod) == 0)
         continue;
-      }
 
       // Otherwise the store that may or may not alias the pointer, bail out.
       ++ScanFrom;
@@ -328,26 +262,13 @@ Value *llvm::FindAvailableLoadedValue(Value *Ptr, BasicBlock *ScanBB,
       // ignore it.
       if (AA &&
           (AA->getModRefInfo(Inst, StrippedPtr, AccessSize) &
-           AliasAnalysis::Mod) == 0) {
-        INTRUDE_IF(llvmberry_isActive, CAPTURE(Inst), {
-          auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-          falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues, std::make_pair(Inst, "aliasanalysis")));
-        });
+           AliasAnalysis::Mod) == 0)
         continue;
-      }
 
       // May modify the pointer, bail out.
       ++ScanFrom;
       return nullptr;
     }
-
-    INTRUDE_IF(llvmberry_isActive, CAPTURE(Inst), {
-      auto falvarg = data.get<llvmberry::ArgForFindAvailableLoadedValue>();
-      if (isa<CallInst>(Inst))
-        // Yes, readonly / readnone calls must be considered as well.
-        falvarg->orthogonalInsns->push_back(std::make_pair(falvarg->ptr1EquivalentValues,
-            std::make_pair(Inst, "readonlycall")));
-    });
   }
 
   // Got to the start of the block, we didn't find it, but are done for this
