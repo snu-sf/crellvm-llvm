@@ -44,10 +44,10 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Infrules.h"
-#include "llvm/LLVMBerry/Hintgen.h"
-#include "llvm/LLVMBerry/Dictionary.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
+#include "llvm/Crellvm/Dictionary.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "local"
@@ -991,11 +991,11 @@ bool llvm::ConvertDebugDeclareToDebugValue(DbgDeclareInst *DDI,
   auto *DIExpr = DDI->getExpression();
   assert(DIVar && "Missing variable");
 
-  if (llvmberry::ValidationUnit::Exists()) {
-    llvmberry::ValidationUnit::GetInstance()->intrude
+  if (crellvm::ValidationUnit::Exists()) {
+    crellvm::ValidationUnit::GetInstance()->intrude
             ([]
-              (llvmberry::Dictionary &data, 
-               llvmberry::CoreHint &hints) {
+              (crellvm::Dictionary &data, 
+               crellvm::CoreHint &hints) {
       hints.appendToDescription("ConvertDebugDeclareToDebugValue");
       hints.setReturnCodeToAdmitted();
     });
@@ -1028,11 +1028,11 @@ bool llvm::ConvertDebugDeclareToDebugValue(DbgDeclareInst *DDI,
   auto *DIExpr = DDI->getExpression();
   assert(DIVar && "Missing variable");
   
-  if (llvmberry::ValidationUnit::Exists()) {
-    llvmberry::ValidationUnit::GetInstance()->intrude
+  if (crellvm::ValidationUnit::Exists()) {
+    crellvm::ValidationUnit::GetInstance()->intrude
            ([]
-             (llvmberry::Dictionary &data, 
-              llvmberry::CoreHint &hints) {
+             (crellvm::Dictionary &data, 
+              crellvm::CoreHint &hints) {
       llvm::dbgs()<< "Admit ConvertDebugDeclareToDebugValue\n";        
       hints.setReturnCodeToAdmitted();
     });

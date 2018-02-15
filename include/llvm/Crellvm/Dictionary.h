@@ -7,13 +7,13 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
 
 #include <memory>
 #include <tuple>
 
-namespace llvmberry {
+namespace crellvm {
 
 enum DictKeys {
   // Common
@@ -93,12 +93,12 @@ DEFINE_TRAITS(ArgForStripPointerCasts, StripPointerCastsArg);
 struct FindAvailableLoadedValueArg {
 public:
   typedef std::vector<std::pair<
-      llvmberry::StripPointerCastsArg::TyStrippedValues,
+      crellvm::StripPointerCastsArg::TyStrippedValues,
       std::pair<llvm::Instruction *, std::string>>> TyOrthogonalInsnsObj;
       // Note that there are two kinds of orthogonal instructions : 
       // store, and 'call'.
 
-  typedef llvmberry::StripPointerCastsArg::TyStrippedValuesObj TyPtrEqValuesObj;
+  typedef crellvm::StripPointerCastsArg::TyStrippedValuesObj TyPtrEqValuesObj;
   typedef std::shared_ptr<TyOrthogonalInsnsObj> TyOrthogonalInsns;
   typedef std::shared_ptr<TyPtrEqValuesObj> TyPtrEqValues;
   TyOrthogonalInsns orthogonalInsns;
@@ -245,7 +245,7 @@ public:
   TyVET VET;
 
   typedef std::map<TyInvTKey,
-    std::pair<std::shared_ptr<llvmberry::TyPropagateObject>, std::shared_ptr<llvmberry::TyPropagateObject>>> TyInvTobj;
+    std::pair<std::shared_ptr<crellvm::TyPropagateObject>, std::shared_ptr<crellvm::TyPropagateObject>>> TyInvTobj;
   typedef std::shared_ptr<TyInvTobj> TyInvT;
   TyInvT InvT;
 
@@ -256,7 +256,7 @@ public:
 
   typedef std::map<llvm::BasicBlock*,
     std::pair<std::vector<llvm::Instruction*>,
-    std::vector<std::shared_ptr<llvmberry::TyInfrule>>>> TyCTInvobj;
+    std::vector<std::shared_ptr<crellvm::TyInfrule>>>> TyCTInvobj;
   typedef std::shared_ptr<TyCTInvobj> TyCTInv;
   TyCTInv CTInv;
 
@@ -269,7 +269,7 @@ public:
   TyVNCnt VNCnt;
 
   std::vector<llvm::Instruction*> to_prop;
-  std::vector<std::shared_ptr<llvmberry::TyInfrule>> infrules;
+  std::vector<std::shared_ptr<crellvm::TyInfrule>> infrules;
   
 };
 DEFINE_TRAITS(ArgForGVN, GVNArg);

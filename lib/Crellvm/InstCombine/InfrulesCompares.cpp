@@ -1,11 +1,11 @@
 #include <string>
 #include <cassert>
 #include <cereal/archives/json.hpp>
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/InstCombine/InfrulesCompares.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/InstCombine/InfrulesCompares.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 TyIcmpEqXorNot::TyIcmpEqXorNot(std::shared_ptr<TyValue> _z, std::shared_ptr<TyValue> _zprime, std::shared_ptr<TyValue> _a, std::shared_ptr<TyValue> _b, std::shared_ptr<TySize> _s) : z(_z), zprime(_zprime), a(_a), b(_b), s(_s){
 }

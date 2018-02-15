@@ -1,8 +1,8 @@
 #include <boost/any.hpp>
-#include "llvm/LLVMBerry/Dictionary.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
+#include "llvm/Crellvm/Dictionary.h"
+#include "llvm/Crellvm/ValidationUnit.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 SimplifyInstArg::SimplifyInstArg() {
   this->activated = false;
@@ -28,8 +28,8 @@ void SimplifyInstArg::generateHint(llvm::Instruction *arg) const {
   if (!this->aborted) {
     auto &func = this->hintGenFunc;
     ValidationUnit::GetInstance()->intrude([&func, &arg](
-        llvmberry::ValidationUnit::Dictionary &data,
-        llvmberry::CoreHint &hint) { func(arg); });
+        crellvm::ValidationUnit::Dictionary &data,
+        crellvm::CoreHint &hint) { func(arg); });
   }
 }
 
@@ -103,4 +103,4 @@ LICMHoistOrSinkCond::LICMHoistOrSinkCond() {
 }
 
 PassDictionary *PassDictionary::_Instance = nullptr;
-} // llvmberry
+} // crellvm

@@ -1,12 +1,12 @@
 #ifndef INFRULES_COMPARES
 #define INFRUELS_COMPARES
 
-#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/Crellvm/Structure.h"
 #include "llvm/IR/Instructions.h"
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/json.hpp"
 
-namespace llvmberry {
+namespace crellvm {
 
 struct TyIcmpEqXorNot{
 public : 
@@ -545,6 +545,6 @@ private:
   std::shared_ptr<TyIcmpNeXorXor> icmp_ne_xor_xor;
 };
 
-} // llvmberry
+} // crellvm
 
 #endif

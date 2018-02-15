@@ -1,12 +1,12 @@
 #ifndef INFRULES_MUL_DIV_REM
 #define INFRUELS_MUL_DIV_REM
 
-#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/Crellvm/Structure.h"
 #include "llvm/IR/Instructions.h"
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/json.hpp"
 
-namespace llvmberry {
+namespace crellvm {
 
 struct TyMulMone {
 public:
@@ -345,6 +345,6 @@ private:
 
 
 
-} // llvmberry
+} // crellvm
 
 #endif

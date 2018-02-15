@@ -1,12 +1,12 @@
 #ifndef INFRULES_SELECT
 #define INFRUELS_SELECT
 
-#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/Crellvm/Structure.h"
 #include "llvm/IR/Instructions.h"
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/json.hpp"
 
-namespace llvmberry {
+namespace crellvm {
 
 struct TyFbopDistributiveOverSelectinst {
 public:
@@ -620,6 +620,6 @@ private:
       bop_distributive_over_selectinst2;
 };
 
-} // llvmberry
+} // crellvm
 
 #endif

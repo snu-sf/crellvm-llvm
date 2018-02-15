@@ -6,11 +6,11 @@
 #include <cereal/types/vector.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Infrules.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 TyAddCommutativeTgt::TyAddCommutativeTgt(std::shared_ptr<TyRegister> _z,
                                          std::shared_ptr<TyValue> _x,
@@ -56,7 +56,7 @@ TyBopAssociative::TyBopAssociative(std::shared_ptr<TyRegister> _x,
 
 void TyBopAssociative::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(z),
-          cereal::make_nvp("bop", llvmberry::toString(bop)), CEREAL_NVP(c1),
+          cereal::make_nvp("bop", crellvm::toString(bop)), CEREAL_NVP(c1),
           CEREAL_NVP(c2), CEREAL_NVP(c3), CEREAL_NVP(sz));
 }
 
@@ -89,7 +89,7 @@ TyBopCommutative::TyBopCommutative(std::shared_ptr<TyExpr> _e, TyBop _bop,
     : e(_e), bop(_bop), x(_x), y(_y), sz(_sz) {}
 
 void TyBopCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), cereal::make_nvp("bop", llvmberry::toString(bop)),
+  archive(CEREAL_NVP(e), cereal::make_nvp("bop", crellvm::toString(bop)),
           CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
 }
 
@@ -121,7 +121,7 @@ TyBopCommutativeRev::TyBopCommutativeRev(std::shared_ptr<TyExpr> _e, TyBop _bop,
     : e(_e), bop(_bop), x(_x), y(_y), sz(_sz) {}
 
 void TyBopCommutativeRev::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), cereal::make_nvp("bop", llvmberry::toString(bop)),
+  archive(CEREAL_NVP(e), cereal::make_nvp("bop", crellvm::toString(bop)),
           CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
 }
 
@@ -153,7 +153,7 @@ TyBopCommutativeTgt::TyBopCommutativeTgt(std::shared_ptr<TyExpr> _e, TyBop _bop,
     : e(_e), bop(_bop), x(_x), y(_y), sz(_sz) {}
 
 void TyBopCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), cereal::make_nvp("bop", llvmberry::toString(bop)),
+  archive(CEREAL_NVP(e), cereal::make_nvp("bop", crellvm::toString(bop)),
           CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
 }
 
@@ -185,7 +185,7 @@ TyBopCommutativeRevTgt::TyBopCommutativeRevTgt(std::shared_ptr<TyExpr> _e, TyBop
     : e(_e), bop(_bop), x(_x), y(_y), sz(_sz) {}
 
 void TyBopCommutativeRevTgt::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), cereal::make_nvp("bop", llvmberry::toString(bop)),
+  archive(CEREAL_NVP(e), cereal::make_nvp("bop", crellvm::toString(bop)),
           CEREAL_NVP(x), CEREAL_NVP(y), CEREAL_NVP(sz));
 }
 
@@ -217,7 +217,7 @@ TyFbopCommutative::TyFbopCommutative(std::shared_ptr<TyExpr> _e, TyFbop _fbop,
     : e(_e), fbop(_fbop), x(_x), y(_y), fty(_fty) {}
 
 void TyFbopCommutative::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", llvmberry::toString(fbop)),
+  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", crellvm::toString(fbop)),
           CEREAL_NVP(x), CEREAL_NVP(y), cereal::make_nvp("fty", toString(fty)));
 }
 
@@ -249,7 +249,7 @@ TyFbopCommutativeRev::TyFbopCommutativeRev(std::shared_ptr<TyExpr> _e, TyFbop _f
     : e(_e), fbop(_fbop), x(_x), y(_y), fty(_fty) {}
 
 void TyFbopCommutativeRev::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", llvmberry::toString(fbop)),
+  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", crellvm::toString(fbop)),
           CEREAL_NVP(x), CEREAL_NVP(y), cereal::make_nvp("fty", toString(fty)));
 }
 
@@ -281,7 +281,7 @@ TyFbopCommutativeTgt::TyFbopCommutativeTgt(std::shared_ptr<TyExpr> _e, TyFbop _f
     : e(_e), fbop(_fbop), x(_x), y(_y), fty(_fty) {}
 
 void TyFbopCommutativeTgt::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", llvmberry::toString(fbop)),
+  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", crellvm::toString(fbop)),
           CEREAL_NVP(x), CEREAL_NVP(y), cereal::make_nvp("fty", toString(fty)));
 }
 
@@ -313,7 +313,7 @@ TyFbopCommutativeRevTgt::TyFbopCommutativeRevTgt(std::shared_ptr<TyExpr> _e, TyF
     : e(_e), fbop(_fbop), x(_x), y(_y), fty(_fty) {}
 
 void TyFbopCommutativeRevTgt::serialize(cereal::JSONOutputArchive &archive) const {
-  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", llvmberry::toString(fbop)),
+  archive(CEREAL_NVP(e), cereal::make_nvp("fbop", crellvm::toString(fbop)),
           CEREAL_NVP(x), CEREAL_NVP(y), cereal::make_nvp("fty", toString(fty)));
 }
 
@@ -2487,4 +2487,4 @@ void ConsIcmpNeqSameTgt::serialize(cereal::JSONOutputArchive &archive) const {
   archive(CEREAL_NVP(icmp_neq_same_tgt));
 }
 
-} // llvmberry
+} // crellvm

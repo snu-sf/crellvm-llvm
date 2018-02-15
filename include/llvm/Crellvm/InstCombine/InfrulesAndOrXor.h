@@ -1,12 +1,12 @@
 #ifndef INFRULES_AND_OR_XOR
 #define INFRUELS_AND_OR_XOR
 
-#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/Crellvm/Structure.h"
 #include "llvm/IR/Instructions.h"
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/json.hpp"
 
-namespace llvmberry {
+namespace crellvm {
 
 struct TyAndXorConst {
 public:
@@ -354,6 +354,6 @@ private:
   std::shared_ptr<TyOrXor4> or_xor4;
 };
 
-} // llvmberry
+} // crellvm
 
 #endif

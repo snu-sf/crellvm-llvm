@@ -1,12 +1,12 @@
 #ifndef INFRULES_LOAD_STORE_ALLOCA
 #define INFRUELS_LOAD_STORE_ALLOCA
 
-#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/Crellvm/Structure.h"
 #include "llvm/IR/Instructions.h"
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/json.hpp"
 
-namespace llvmberry {
+namespace crellvm {
 
 struct TyGepzero {
 public:
@@ -164,6 +164,6 @@ private:
   std::shared_ptr<TyInttoptrLoad> inttoptr_load;
 };
 
-} // llvmberry
+} // crellvm
 
 #endif

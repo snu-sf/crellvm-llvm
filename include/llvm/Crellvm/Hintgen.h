@@ -1,8 +1,8 @@
 #ifndef HINTGEN_H
 #define HINTGEN_H
 
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/Dictionary.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Dictionary.h"
 #include <string>
 #include <vector>
 #include <memory>
@@ -24,171 +24,171 @@
 //   });
 // or
 #define INTRUDE(A, ...) \
-                      llvmberry::ValidationUnit::GetInstance()->intrude        \
-                      ([ A ] (llvmberry::Dictionary &data,                     \
-                                      llvmberry::CoreHint &hints)              \
+                      crellvm::ValidationUnit::GetInstance()->intrude        \
+                      ([ A ] (crellvm::Dictionary &data,                     \
+                                      crellvm::CoreHint &hints)              \
                                       { __VA_ARGS__ })
 #define INTRUDE_IF(cond, A, ...) if (cond) { \
-                      llvmberry::ValidationUnit::GetInstance()->intrude        \
-                      ([ A ] (llvmberry::Dictionary &data,                     \
-                                      llvmberry::CoreHint &hints)              \
+                      crellvm::ValidationUnit::GetInstance()->intrude        \
+                      ([ A ] (crellvm::Dictionary &data,                     \
+                                      crellvm::CoreHint &hints)              \
                                       { __VA_ARGS__ });                        \
                       }
 #define CAPTURE(...) __VA_ARGS__
 
 #define INFRULE(pos, x)                                                        \
-  hints.addCommand(llvmberry::ConsInfrule::make(pos, x),                       \
-                   llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
+  hints.addCommand(crellvm::ConsInfrule::make(pos, x),                       \
+                   crellvm::TyCppDebugInfo::make(__FILE__, __LINE__))
 #define PROPAGATE(what, where)                                                 \
-  hints.addCommand(llvmberry::ConsPropagate::make(what, where),                \
-                   llvmberry::TyCppDebugInfo::make(__FILE__, __LINE__))
+  hints.addCommand(crellvm::ConsPropagate::make(what, where),                \
+                   crellvm::TyCppDebugInfo::make(__FILE__, __LINE__))
 
 #define PHIPOS(SCOPE, PHIBlock, prevBlock)                                     \
-  llvmberry::TyPosition::make(SCOPE, PHIBlock, prevBlock)                           
+  crellvm::TyPosition::make(SCOPE, PHIBlock, prevBlock)                           
 #define PHIPOSJustPhi(SCOPE, PN)                                               \
-  llvmberry::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
-#define INSTPOS(SCOPE, I) llvmberry::TyPosition::make(SCOPE, *(I))
+  crellvm::TyPosition::make(SCOPE, PN.getParent()->getName(), "")
+#define INSTPOS(SCOPE, I) crellvm::TyPosition::make(SCOPE, *(I))
 #define INDEXEDPOS(SCOPE, I, index, prev)                                      \
-  llvmberry::TyPosition::make(SCOPE, *(I), index, prev)
+  crellvm::TyPosition::make(SCOPE, *(I), index, prev)
 #define STARTPOS(SCOPE, BBname)                                                \
-  llvmberry::TyPosition::make_start_of_block(SCOPE, BBname)
+  crellvm::TyPosition::make_start_of_block(SCOPE, BBname)
 #define ENDPOSINDEXED(SCOPE, BB, index)                                        \
-  llvmberry::TyPosition::make_end_of_block(SCOPE, *(BB), index)
+  crellvm::TyPosition::make_end_of_block(SCOPE, *(BB), index)
 #define ENDPOS(SCOPE, BB)                                                      \
-  llvmberry::TyPosition::make_end_of_block(SCOPE, *(BB))
+  crellvm::TyPosition::make_end_of_block(SCOPE, *(BB))
                                                                     
-#define POINTER(v) llvmberry::TyPointer::make(*(v))
-#define POINTER_ELEMTY(v) llvmberry::TyPointer::makeWithElementType(*(v))
+#define POINTER(v) crellvm::TyPointer::make(*(v))
+#define POINTER_ELEMTY(v) crellvm::TyPointer::makeWithElementType(*(v))
 
 // REGISTER() supports overloading of two macro functions : 
-// REGISTER(str) := llvmberry::TyRegister::make(str, llvmberry::Physical)
-// REGISTER(str, tag) := llvmberry::TyRegister::make(str, llvmberry::tag)
+// REGISTER(str) := crellvm::TyRegister::make(str, crellvm::Physical)
+// REGISTER(str, tag) := crellvm::TyRegister::make(str, crellvm::tag)
 // How it works : 
 //     REGISTER(A, B) is evaluated into _CHOOSE(, A, B, _REGISTER(A, B),
 //     _REGISTER_PHYS(A, B), NULL), which becomes _REGISTER(A, B).
 //     Similariy, REGISTER(A) is evaluated into _CHOOSE(, A, _REGISTER(A),
 //     _REGISTER_PHYS(A), NULL), which becomes _REGISTER_PHYS(A).
-#define _REGISTER_PHYS(n) llvmberry::TyRegister::make(n, llvmberry::Physical)
-#define _REGISTER(n, tag) llvmberry::TyRegister::make(n, llvmberry::tag)
+#define _REGISTER_PHYS(n) crellvm::TyRegister::make(n, crellvm::Physical)
+#define _REGISTER(n, tag) crellvm::TyRegister::make(n, crellvm::tag)
 #define REGISTER(...) _CHOOSE(,##__VA_ARGS__,                                  \
                                   _REGISTER(__VA_ARGS__),                      \
                                   _REGISTER_PHYS(__VA_ARGS__),                 \
                                   NULL)
 
-#define BITSIZE(bitwidth) llvmberry::ConsSize::make(bitwidth)
-#define BOUNDS(from, to) llvmberry::ConsBounds::make(from, to)
-#define BOUNDSET(from, to_set) llvmberry::ConsBoundSet::make(from, to_set)
+#define BITSIZE(bitwidth) crellvm::ConsSize::make(bitwidth)
+#define BOUNDS(from, to) crellvm::ConsBounds::make(from, to)
+#define BOUNDSET(from, to_set) crellvm::ConsBoundSet::make(from, to_set)
 
 // VAR supports overloading of two macro functions : 
-// VAR(str) := llvmberry::ConsVar::make(str, llvmberry::Physical)
-// VAR(str, tag) := llvmberry::ConsVar::make(str, llvmberry::tag)
+// VAR(str) := crellvm::ConsVar::make(str, crellvm::Physical)
+// VAR(str, tag) := crellvm::ConsVar::make(str, crellvm::tag)
 // How it works : 
 //     VAR(A, B) is evaluated into _CHOOSE(, A, B, _VAR(A, B),
 //     _VAR_PHYS(A, B), NULL), which becomes _VAR(A, B).
 //     Similariy, VAR(A) is evaluated into _CHOOSE(, A, _VAR(A),
 //     _VAR_PHYS(A), NULL), which becomes _VAR_PHYS(A).
 // NOTE : VAR macro makes TyExpr object
-#define _VAR_PHYS(n) llvmberry::ConsVar::make(n, llvmberry::Physical)
-#define _VAR(n, tag) llvmberry::ConsVar::make(n, llvmberry::tag)
+#define _VAR_PHYS(n) crellvm::ConsVar::make(n, crellvm::Physical)
+#define _VAR(n, tag) crellvm::ConsVar::make(n, crellvm::tag)
 #define VAR(...) _CHOOSE(,##__VA_ARGS__,_VAR(__VA_ARGS__),                     \
                         _VAR_PHYS(__VA_ARGS__), NULL)
 
 // NOTE : RHS macro makes TyExpr object
 #define RHS(name, tag, SCOPE)                                                  \
-  llvmberry::ConsRhs::make(name, llvmberry::tag, SCOPE)
+  crellvm::ConsRhs::make(name, crellvm::tag, SCOPE)
 // NOTE : INSN macro makes TyExpr object
-#define INSN(x) llvmberry::ConsInsn::make((x))
+#define INSN(x) crellvm::ConsInsn::make((x))
 #define INSNWITHGHOST(x, y)                                                    \
-  std::shared_ptr<llvmberry::TyExpr>(new llvmberry::TyExpr(                    \
-      std::shared_ptr<llvmberry::TyExprImpl>(new llvmberry::ConsInsn(            \
-          llvmberry::instructionWithGhostIdxs(x, y)))))
+  std::shared_ptr<crellvm::TyExpr>(new crellvm::TyExpr(                    \
+      std::shared_ptr<crellvm::TyExprImpl>(new crellvm::ConsInsn(            \
+          crellvm::instructionWithGhostIdxs(x, y)))))
 #define INSNALIGNONE(I)                                                        \
-  llvmberry::ConsInsn::make(std::shared_ptr<llvmberry::TyInstruction>          \
-    (new llvmberry::ConsLoadInst(llvmberry::TyLoadInst::makeAlignOne(I))))
+  crellvm::ConsInsn::make(std::shared_ptr<crellvm::TyInstruction>          \
+    (new crellvm::ConsLoadInst(crellvm::TyLoadInst::makeAlignOne(I))))
 
-#define _EXPR_PHYS(I) llvmberry::TyExpr::make(*(I), llvmberry::Physical)
-#define _EXPR(I, tag) llvmberry::TyExpr::make(*(I), llvmberry::tag)
+#define _EXPR_PHYS(I) crellvm::TyExpr::make(*(I), crellvm::Physical)
+#define _EXPR(I, tag) crellvm::TyExpr::make(*(I), crellvm::tag)
 #define EXPR(...) _CHOOSE(,##__VA_ARGS__,_EXPR(__VA_ARGS__), \
                           _EXPR_PHYS(__VA_ARGS__), NULL)
 
 // LESSDEF, NOALIAS, DIFFBLOCK, UNIQUE, PRIVATE, MAYDIFF make 
 // TyPropagateObject instance
 #define LESSDEF(left, right, SCOPE)                                            \
-  llvmberry::ConsLessdef::make(left, right, SCOPE)
+  crellvm::ConsLessdef::make(left, right, SCOPE)
 #define NOALIAS(ptr1, ptr2, SCOPE)                                             \
-  llvmberry::ConsNoalias::make(ptr1, ptr2, SCOPE)
+  crellvm::ConsNoalias::make(ptr1, ptr2, SCOPE)
 #define DIFFBLOCK(v1, v2, SCOPE)                                               \
-  llvmberry::ConsDiffblock::make(v1, v2, SCOPE)
-#define UNIQUE(reg, SCOPE) llvmberry::ConsUnique::make(reg, SCOPE)
-#define PRIVATE(reg, SCOPE) llvmberry::ConsPrivate::make(reg, SCOPE)
-#define MAYDIFF(name, tag) llvmberry::ConsMaydiff::make(name, llvmberry::tag)
+  crellvm::ConsDiffblock::make(v1, v2, SCOPE)
+#define UNIQUE(reg, SCOPE) crellvm::ConsUnique::make(reg, SCOPE)
+#define PRIVATE(reg, SCOPE) crellvm::ConsPrivate::make(reg, SCOPE)
+#define MAYDIFF(name, tag) crellvm::ConsMaydiff::make(name, crellvm::tag)
 
 // VAL, ID macros make TyValue object
-#define ID(name, tag) llvmberry::ConsId::make(name, llvmberry::tag)
+#define ID(name, tag) crellvm::ConsId::make(name, crellvm::tag)
 // Below snippet is to support overloading of two macro functions : 
-// VAL(v) := llvmberry::TyValue::make(*(v), llvmberry::Physical)
-// VAL(v, tag) := llvmberry::TyValue::make(*(v), llvmberry::tag)
-#define _VAL_SRC(I) llvmberry::TyValue::make(*(I), llvmberry::Physical)
-#define _VAL_TAG(I, tag) llvmberry::TyValue::make(*(I), llvmberry::tag)
+// VAL(v) := crellvm::TyValue::make(*(v), crellvm::Physical)
+// VAL(v, tag) := crellvm::TyValue::make(*(v), crellvm::tag)
+#define _VAL_SRC(I) crellvm::TyValue::make(*(I), crellvm::Physical)
+#define _VAL_TAG(I, tag) crellvm::TyValue::make(*(I), crellvm::tag)
 #define VAL(...) _CHOOSE(NULL, ##__VA_ARGS__,                                  \
                                 _VAL_TAG(__VA_ARGS__),                         \
                                 _VAL_SRC(__VA_ARGS__),                         \
                                 NULL)
 
 // VALTYPE, TYPEOF macros make TyValueType object
-#define VALTYPE(ty) llvmberry::TyValueType::make(*(ty))
-#define TYPEOF(I) llvmberry::TyValueType::make(*((I)->getType()))
-#define TYPEOFAI(I) llvmberry::TyValueType::make(*((AI)->getAllocatedType()))
+#define VALTYPE(ty) crellvm::TyValueType::make(*(ty))
+#define TYPEOF(I) crellvm::TyValueType::make(*((I)->getType()))
+#define TYPEOFAI(I) crellvm::TyValueType::make(*((AI)->getAllocatedType()))
 
 // BINOP, FBINOP, BINARYINSN make TyInstruction object
 #define BINOP(bop, type, val1, val2)                                           \
-  llvmberry::ConsBinaryOp::make(bop, type, val1, val2)
+  crellvm::ConsBinaryOp::make(bop, type, val1, val2)
 #define FBINOP(fbop, type, val1, val2)                                         \
-  llvmberry::ConsFloatBinaryOp::make(fbop, type, val1, val2)
+  crellvm::ConsFloatBinaryOp::make(fbop, type, val1, val2)
 #define BINARYINSN(binop, type, val1, val2)                                    \
-  llvmberry::isFloatOpcode((binop).getOpcode())                                \
-      ? FBINOP(llvmberry::getFbop((binop).getOpcode()), type, val1, val2)      \
-      : BINOP(llvmberry::getBop((binop).getOpcode()), type, val1, val2)
+  crellvm::isFloatOpcode((binop).getOpcode())                                \
+      ? FBINOP(crellvm::getFbop((binop).getOpcode()), type, val1, val2)      \
+      : BINOP(crellvm::getBop((binop).getOpcode()), type, val1, val2)
 #define ICMPINSN(pred, type, val1, val2)                                       \
-  llvmberry::ConsICmpInst::make(pred, type, val1, val2)
+  crellvm::ConsICmpInst::make(pred, type, val1, val2)
 
 // CONSTINT make TyConstInt object
 #define _CONSTINT_BITSIZE(val, bitwidth)                                       \
-  llvmberry::TyConstInt::make(val, bitwidth)
-#define _CONSTINT_LLVMOBJ(obj) llvmberry::TyConstInt::make(*(obj))
+  crellvm::TyConstInt::make(val, bitwidth)
+#define _CONSTINT_LLVMOBJ(obj) crellvm::TyConstInt::make(*(obj))
 #define CONSTINT(...) _CHOOSE(,##__VA_ARGS__,                                  \
                                 _CONSTINT_BITSIZE(__VA_ARGS__),                \
                                 _CONSTINT_LLVMOBJ(__VA_ARGS__),                \
                                 NULL)
-#define CONSTGLOBALADDR(val) llvmberry::ConsConstGlobalVarAddr::make(*(val))
-#define CONSTANT(val) llvmberry::TyConstant::make(*(val))
+#define CONSTGLOBALADDR(val) crellvm::ConsConstGlobalVarAddr::make(*(val))
+#define CONSTANT(val) crellvm::TyConstant::make(*(val))
 
-#define SRC llvmberry::Source
-#define TGT llvmberry::Target
+#define SRC crellvm::Source
+#define TGT crellvm::Target
 
 #define DICTMAP(dict, key) dict.get()->find(key)->second
 #define UNDEF(I) llvm::UndefValue::get(I->getType())
 #define UNDEFAI(I) llvm::UndefValue::get(AI->getAllocatedType())
 
-#define LLVMBERRYRPD llvmberry::Mem2RegArg::RenamePassTuple
+#define CRELLVMRPD crellvm::Mem2RegArg::RenamePassTuple
 
-namespace llvmberry {
+namespace crellvm {
 /* applyCommutativity(I, (A bop B), scope) :
  *   Applies commutativity rule ((A bop B) \in P => P += (B bop A)) to the
  * position I
  */
-void applyCommutativity(llvmberry::CoreHint &hints,llvm::Instruction *position,
+void applyCommutativity(crellvm::CoreHint &hints,llvm::Instruction *position,
                         llvm::BinaryOperator *expression, TyScope scope);
 /* applyTransitivity(I, v1, v2, v3, scope) :
  *   Applies transitivity rule (v1 >= v2 >= v3) to the position (I, scope)
  */
-void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position,
+void applyTransitivity(crellvm::CoreHint &hints, llvm::Instruction *position,
                        llvm::Value *v_greatest, llvm::Value *v_mid,
                        llvm::Value *v_smallest, TyScope scope);
 /* applyTransitivity(I, v1, v2, v3, scope, scopetag) :
  *   Applies transitivity rule (v1 >= v2 >= v3) to the position (I, scopetag)
  */
-void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position,
+void applyTransitivity(crellvm::CoreHint &hints, llvm::Instruction *position,
                        llvm::Value *v_greatest, llvm::Value *v_mid, llvm::Value *v_smallest,
                        TyScope scope, TyScope position_scopetag);
 /* propagateInstruction(I1, I2, scope, propagateEquivalence) :
@@ -198,20 +198,20 @@ void applyTransitivity(llvmberry::CoreHint &hints, llvm::Instruction *position,
  *   else :
  *     Propagate I1 >= rhs(I1) and rhs(I1) >= I1 from I1 to I2 in scope.
  */
-void propagateInstruction(llvmberry::CoreHint &hints, const llvm::Instruction *from,
+void propagateInstruction(crellvm::CoreHint &hints, const llvm::Instruction *from,
                           const llvm::Instruction *to,
                           TyScope scope, bool propagateEquivalence = false);
 /* propagateLessdef(I1, I2, v1, v2, scope) :
  *   Propagates v1 >= v2 from I1 to I2 in scope
  */
-void propagateLessdef(llvmberry::CoreHint &hints, const llvm::Instruction *from,
+void propagateLessdef(crellvm::CoreHint &hints, const llvm::Instruction *from,
                       const llvm::Instruction *to,
                       const llvm::Value *lesserval,
                       const llvm::Value *greaterval, TyScope scope);
 /* propagateMaydiffGlobal(var, tag) :
  *   Propagates variable (var, tag) globally
  */
-void propagateMaydiffGlobal(llvmberry::CoreHint &hints, std::string varname, TyTag tag);
+void propagateMaydiffGlobal(crellvm::CoreHint &hints, std::string varname, TyTag tag);
 /* generateHintForNegValue(V, I, Scope) :
  *   If V is a BinaryOperator (V = 0 - mV), propagate (V >= 0 - mV, 0 - mV >= V)
  * from V to I in Scope
@@ -274,11 +274,11 @@ void generateHintForInstructionSimplify(llvm::BinaryOperator &I, llvm::Value *V)
   INTRUDE(CAPTURE(&I, &V), {
     auto ptr = data.get<DICTKEY>();
     if(ptr->isActivated()){
-      llvmberry::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
+      crellvm::ValidationUnit::GetInstance()->setOptimizationName(ptr->getMicroOptName());
       ptr->generateHint(&I);
-      llvmberry::generateHintForReplaceAllUsesWith(&I, V);
+      crellvm::generateHintForReplaceAllUsesWith(&I, V);
     }else
-      llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+      crellvm::ValidationUnit::GetInstance()->setIsAborted();
   });
 }
 

@@ -42,9 +42,9 @@
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Infrules.h"
-#include "llvm/LLVMBerry/Hintgen.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
 
 using namespace llvm;
 
@@ -117,8 +117,8 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
     if (SSAUpdate.HasValueForBlock(ExitBB))
       continue;
 
-    if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
-      llvmberry::ValidationUnit::Begin("licm.formlcssa.newphi", Inst);
+    if (crellvm::ValidationUnit::GetCurrentPass() == crellvm::ValidationUnit::LICM) {
+      crellvm::ValidationUnit::Begin("licm.formlcssa.newphi", Inst);
     }
     PHINode *PN = PHINode::Create(Inst.getType(), PredCache.size(ExitBB),
                                   Inst.getName() + ".lcssa", ExitBB->begin());
@@ -135,12 +135,12 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
             &PN->getOperandUse(PN->getOperandNumForIncomingValue(
                  PN->getNumIncomingValues() - 1)));
     }
-    if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
+    if (crellvm::ValidationUnit::GetCurrentPass() == crellvm::ValidationUnit::LICM) {
       INTRUDE(CAPTURE(PN), {
-        llvmberry::insertSrcNopAtTgtI(hints, PN);
-        llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*PN), llvmberry::Physical);
+        crellvm::insertSrcNopAtTgtI(hints, PN);
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*PN), crellvm::Physical);
       });
-      llvmberry::ValidationUnit::End();
+      crellvm::ValidationUnit::End();
     }
 
     AddedPHIs.push_back(PN);
@@ -175,8 +175,8 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
 
     if (isa<PHINode>(UserBB->begin()) && isExitBlock(UserBB, ExitBlocks)) {
       // Tell the VHs that the uses changed. This updates SCEV's caches.
-      if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
-        llvmberry::ValidationUnit::Begin("licm.formlcssa.rewrite1", Inst);
+      if (crellvm::ValidationUnit::GetCurrentPass() == crellvm::ValidationUnit::LICM) {
+        crellvm::ValidationUnit::Begin("licm.formlcssa.rewrite1", Inst);
         // Rewrites Inst to User
         // Setting description..
         INTRUDE(CAPTURE(&Inst, User, UserBB), { 
@@ -189,16 +189,16 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
           //User->print(rso);
           //rso << "\nTo : ";
           //X->print(rso);
-          //llvmberry::ValidationUnit::GetInstance()->setDescription(str);
+          //crellvm::ValidationUnit::GetInstance()->setDescription(str);
           // This undef propagate lets validator add prev(Inst) >= phys(Inst)
           auto BBName = UserBB->getName();
           for (unsigned i = 0; i < X->getNumIncomingValues(); i++) {
             auto PrevBBName = X->getIncomingBlock(i)->getName();
             PROPAGATE(LESSDEF(EXPR(UndefValue::get(Inst.getType())), EXPR(&Inst), SRC),
-                      BOUNDS(INSTPOS(SRC, &Inst), llvmberry::TyPosition::make(SRC, BBName, PrevBBName)));
+                      BOUNDS(INSTPOS(SRC, &Inst), crellvm::TyPosition::make(SRC, BBName, PrevBBName)));
           }
         });
-        llvmberry::generateHintForReplaceAllUsesWith(&Inst, UserBB->begin(), "", INSTPOS(SRC, UserBB->begin()),
+        crellvm::generateHintForReplaceAllUsesWith(&Inst, UserBB->begin(), "", INSTPOS(SRC, UserBB->begin()),
                         [&User](const llvm::Value *V) { return V == User; });
       }
 
@@ -206,13 +206,13 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
         ValueHandleBase::ValueIsRAUWd(*UsesToRewrite[i], UserBB->begin());
       UsesToRewrite[i]->set(UserBB->begin());
 
-      if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM)
-        llvmberry::ValidationUnit::End();
+      if (crellvm::ValidationUnit::GetCurrentPass() == crellvm::ValidationUnit::LICM)
+        crellvm::ValidationUnit::End();
       continue;
     }
 
-    if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
-      llvmberry::ValidationUnit::Begin("licm.formlcssa.rewrite2", Inst);
+    if (crellvm::ValidationUnit::GetCurrentPass() == crellvm::ValidationUnit::LICM) {
+      crellvm::ValidationUnit::Begin("licm.formlcssa.rewrite2", Inst);
       // Setting description..
       INTRUDE(CAPTURE(&UsesToRewrite, i), {
         Value *V = UsesToRewrite[i]->get();
@@ -223,15 +223,15 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
         V->print(rso);
         rso << "\nat : ";
         W->print(rso);
-        llvmberry::ValidationUnit::GetInstance()->setDescription(str);
+        crellvm::ValidationUnit::GetInstance()->setDescription(str);
       });
     }
 
     // Otherwise, do full PHI insertion.
     SSAUpdate.RewriteUse(*UsesToRewrite[i]);
 
-    if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM)
-      llvmberry::ValidationUnit::End();
+    if (crellvm::ValidationUnit::GetCurrentPass() == crellvm::ValidationUnit::LICM)
+      crellvm::ValidationUnit::End();
   }
 
   // Post process PHI instructions that were inserted into another disjoint loop
@@ -256,16 +256,16 @@ static bool processInstruction(Loop &L, Instruction &Inst, DominatorTree &DT,
   // Remove PHI nodes that did not have any uses rewritten.
   for (unsigned i = 0, e = AddedPHIs.size(); i != e; ++i) {
     if (AddedPHIs[i]->use_empty()) {
-      if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM) {
-        llvmberry::name_instruction(Inst);
-        llvmberry::ValidationUnit::Begin("licm.formlcssa.deleteunsedphi", Inst, false);
-        llvmberry::generateHintForTrivialDCE(*AddedPHIs[i]);
+      if (crellvm::ValidationUnit::GetCurrentPass() == crellvm::ValidationUnit::LICM) {
+        crellvm::name_instruction(Inst);
+        crellvm::ValidationUnit::Begin("licm.formlcssa.deleteunsedphi", Inst, false);
+        crellvm::generateHintForTrivialDCE(*AddedPHIs[i]);
       }
 
       AddedPHIs[i]->eraseFromParent();
 
-      if (llvmberry::ValidationUnit::GetCurrentPass() == llvmberry::ValidationUnit::LICM)
-        llvmberry::ValidationUnit::End();
+      if (crellvm::ValidationUnit::GetCurrentPass() == crellvm::ValidationUnit::LICM)
+        crellvm::ValidationUnit::End();
     }
   }
 

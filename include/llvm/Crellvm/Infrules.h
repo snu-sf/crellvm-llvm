@@ -6,7 +6,7 @@
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/json.hpp"
 
-namespace llvmberry {
+namespace crellvm {
 
 struct TyAddCommutativeTgt {
 public:
@@ -2220,6 +2220,6 @@ private:
 };
 
 
-} // llvmberry
+} // crellvm
 
 #endif

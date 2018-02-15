@@ -1,5 +1,5 @@
 [component_0]
 type = Library
-name = LLVMBerry
+name = Crellvm
 parent = Libraries
 required_libraries = BitWriter
