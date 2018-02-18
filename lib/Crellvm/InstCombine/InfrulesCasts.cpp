@@ -1,11 +1,11 @@
 #include <string>
 #include <cassert>
 #include <cereal/archives/json.hpp>
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/InstCombine/InfrulesCasts.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/InstCombine/InfrulesCasts.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 TyBitcastBitcast::TyBitcastBitcast(std::shared_ptr<TyValue> _src,
                                    std::shared_ptr<TyValue> _mid,

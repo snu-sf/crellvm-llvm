@@ -21,12 +21,12 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
 
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/Infrules.h"
-#include "llvm/LLVMBerry/InstCombine/InfrulesLoadStoreAlloca.h"
-#include "llvm/LLVMBerry/Hintgen.h"
-#include "llvm/LLVMBerry/Dictionary.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesLoadStoreAlloca.h"
+#include "llvm/Crellvm/Hintgen.h"
+#include "llvm/Crellvm/Dictionary.h"
 #include <vector>
 #include <memory>
 
@@ -989,10 +989,10 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
   // alloca dead.
   if (Ptr->hasOneUse()) {
     if (isa<AllocaInst>(Ptr)) {
-      llvmberry::ValidationUnit::Begin("dead_store_elim", SI);
+      crellvm::ValidationUnit::Begin("dead_store_elim", SI);
       INTRUDE(CAPTURE(&SI, &Ptr), {
         AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
-        llvmberry::insertTgtNopAtSrcI(hints, &SI);
+        crellvm::insertTgtNopAtSrcI(hints, &SI);
         PROPAGATE(PRIVATE(REGISTER(*Ptr), SRC), BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
       });
       return EraseInstFromFunction(SI);

@@ -1,12 +1,12 @@
 #ifndef INFRULES_ADD_SUB
 #define INFRUELS_ADD_SUB
 
-#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/Crellvm/Structure.h"
 #include "llvm/IR/Instructions.h"
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/json.hpp"
 
-namespace llvmberry {
+namespace crellvm {
 
 struct TyAddSignbit {
 public:
@@ -645,6 +645,6 @@ private:
   std::shared_ptr<TyAddXorAnd> add_xor_and;
 };
 
-} // llvmberry
+} // crellvm
 
 #endif

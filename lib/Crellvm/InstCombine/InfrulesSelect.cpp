@@ -1,11 +1,11 @@
 #include <string>
 #include <cassert>
 #include <cereal/archives/json.hpp>
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/InstCombine/InfrulesSelect.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/InstCombine/InfrulesSelect.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 TyFbopDistributiveOverSelectinst::TyFbopDistributiveOverSelectinst(
     TyFbop _fopcode, std::shared_ptr<TyRegister> _r,
@@ -567,7 +567,7 @@ TyBopDistributiveOverSelectinst::TyBopDistributiveOverSelectinst(
       bopsz(std::move(_bopsz)), selty(std::move(_selty)) {}
 void TyBopDistributiveOverSelectinst::serialize(
     cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("opcode", llvmberry::toString(opcode)));
+  archive(cereal::make_nvp("opcode", crellvm::toString(opcode)));
   archive(CEREAL_NVP(r));
   archive(CEREAL_NVP(s));
   archive(CEREAL_NVP(tprime));
@@ -621,7 +621,7 @@ TyBopDistributiveOverSelectinst2::TyBopDistributiveOverSelectinst2(
       bopsz(std::move(_bopsz)), selty(std::move(_selty)) {}
 void TyBopDistributiveOverSelectinst2::serialize(
     cereal::JSONOutputArchive &archive) const {
-  archive(cereal::make_nvp("opcode", llvmberry::toString(opcode)));
+  archive(cereal::make_nvp("opcode", crellvm::toString(opcode)));
   archive(CEREAL_NVP(r));
   archive(CEREAL_NVP(s));
   archive(CEREAL_NVP(tprime));

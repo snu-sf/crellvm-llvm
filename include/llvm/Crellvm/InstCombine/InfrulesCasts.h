@@ -1,12 +1,12 @@
 #ifndef INFRULES_CASTS
 #define INFRUELS_CASTS
 
-#include "llvm/LLVMBerry/Structure.h"
+#include "llvm/Crellvm/Structure.h"
 #include "llvm/IR/Instructions.h"
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/json.hpp"
 
-namespace llvmberry {
+namespace crellvm {
 
 struct TyBitcastBitcast {
 public:
@@ -1396,6 +1396,6 @@ private:
   std::shared_ptr<TyBitcastPtrtoint> bitcast_ptrtoint;
 };
 
-} // llvmberry
+} // crellvm
 
 #endif

@@ -8,10 +8,10 @@
 #include <cereal/types/memory.hpp>
 #include <cereal/types/polymorphic.hpp>
 #include <cfloat>
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Infrules.h"
-#include "llvm/LLVMBerry/RuntimeOptions.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/RuntimeOptions.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -28,12 +28,12 @@ void throw_exception(std::exception const &e) {
 
 namespace {
 
-std::string toString(llvmberry::TyPostpropInfo::POSTPROP_OPT opt) {
+std::string toString(crellvm::TyPostpropInfo::POSTPROP_OPT opt) {
   //enum POSTPROP_OPT { POSTPROP_GVN = 0, POSTPROP_NONE };
   switch (opt) {
-  case llvmberry::TyPostpropInfo::POSTPROP_GVN:
+  case crellvm::TyPostpropInfo::POSTPROP_GVN:
     return std::string("POSTPROP_GVN");
-  case llvmberry::TyPostpropInfo::POSTPROP_NONE:
+  case crellvm::TyPostpropInfo::POSTPROP_NONE:
     return std::string("POSTPROP_NONE");
   default:
     assert(false && "POSTPROP_OPT toString");
@@ -41,13 +41,13 @@ std::string toString(llvmberry::TyPostpropInfo::POSTPROP_OPT opt) {
   return "";
 }
 
-std::string toString(llvmberry::CoreHint::RETURN_CODE return_code) {
+std::string toString(crellvm::CoreHint::RETURN_CODE return_code) {
   switch (return_code) {
-  case llvmberry::CoreHint::ACTUAL:
+  case crellvm::CoreHint::ACTUAL:
     return std::string("ACTUAL");
-  case llvmberry::CoreHint::ADMITTED:
+  case crellvm::CoreHint::ADMITTED:
     return std::string("ADMITTED");
-  case llvmberry::CoreHint::FAIL:
+  case crellvm::CoreHint::FAIL:
     return std::string("FAIL");
   default:
     assert(false && "RETURN_CODE toString");
@@ -55,17 +55,17 @@ std::string toString(llvmberry::CoreHint::RETURN_CODE return_code) {
   return "";
 }
 
-std::string toString(llvmberry::CoreHint::AUTO_OPT auto_opt) {
+std::string toString(crellvm::CoreHint::AUTO_OPT auto_opt) {
   switch (auto_opt) {
-  case llvmberry::CoreHint::AUTO_GVN:
+  case crellvm::CoreHint::AUTO_GVN:
     return std::string("AUTO_GVN");
-  case llvmberry::CoreHint::AUTO_SROA:
+  case crellvm::CoreHint::AUTO_SROA:
     return std::string("AUTO_SROA");
-  case llvmberry::CoreHint::AUTO_INSTCOMBINE:
+  case crellvm::CoreHint::AUTO_INSTCOMBINE:
     return std::string("AUTO_INSTCOMBINE");
-  case llvmberry::CoreHint::AUTO_LICM:
+  case crellvm::CoreHint::AUTO_LICM:
     return std::string("AUTO_LICM");
-  case llvmberry::CoreHint::AUTO_DEFAULT:
+  case crellvm::CoreHint::AUTO_DEFAULT:
     return std::string("AUTO_DEFAULT");
   default:
     assert(false && "RETURN_CODE toString");
@@ -73,11 +73,11 @@ std::string toString(llvmberry::CoreHint::AUTO_OPT auto_opt) {
   return "";
 }
 
-std::string toString(llvmberry::TyScope scope) {
+std::string toString(crellvm::TyScope scope) {
   switch (scope) {
-  case llvmberry::Source:
+  case crellvm::Source:
     return std::string("Source");
-  case llvmberry::Target:
+  case crellvm::Target:
     return std::string("Target");
   default:
     assert(false && "Scope toString");
@@ -85,13 +85,13 @@ std::string toString(llvmberry::TyScope scope) {
   return "";
 }
 
-std::string toString(llvmberry::TyTag tag) {
+std::string toString(crellvm::TyTag tag) {
   switch (tag) {
-  case llvmberry::Physical:
+  case crellvm::Physical:
     return std::string("Physical");
-  case llvmberry::Previous:
+  case crellvm::Previous:
     return std::string("Previous");
-  case llvmberry::Ghost:
+  case crellvm::Ghost:
     return std::string("Ghost");
   default:
     assert(false && "Tag toString");
@@ -199,7 +199,7 @@ static void PrintLLVMName(llvm::raw_ostream &OS, const llvm::Value *V) {
 
 
 
-namespace llvmberry {
+namespace crellvm {
 
 /// @return the index of the BasicBlock w.r.t. the parent function.
 std::string getBasicBlockIndex(const llvm::BasicBlock *block) {
@@ -263,17 +263,17 @@ llvm::Instruction *getPHIResolved(llvm::Instruction *I, llvm::BasicBlock *PB) {
   return result;
 }
 
-std::string toString(llvmberry::TyFbop bop) {
+std::string toString(crellvm::TyFbop bop) {
   switch (bop) {
-  case llvmberry::BopFadd:
+  case crellvm::BopFadd:
     return std::string("BopFadd");
-  case llvmberry::BopFsub:
+  case crellvm::BopFsub:
     return std::string("BopFsub");
-  case llvmberry::BopFmul:
+  case crellvm::BopFmul:
     return std::string("BopFmul");
-  case llvmberry::BopFdiv:
+  case crellvm::BopFdiv:
     return std::string("BopFdiv");
-  case llvmberry::BopFrem:
+  case crellvm::BopFrem:
     return std::string("BopFrem");
   default:
     assert(false && "Fbop toString");
@@ -281,33 +281,33 @@ std::string toString(llvmberry::TyFbop bop) {
   return "";
 }
 
-std::string toString(llvmberry::TyBop bop) {
+std::string toString(crellvm::TyBop bop) {
   switch (bop) {
-  case llvmberry::BopAdd:
+  case crellvm::BopAdd:
     return std::string("BopAdd");
-  case llvmberry::BopSub:
+  case crellvm::BopSub:
     return std::string("BopSub");
-  case llvmberry::BopMul:
+  case crellvm::BopMul:
     return std::string("BopMul");
-  case llvmberry::BopUdiv:
+  case crellvm::BopUdiv:
     return std::string("BopUdiv");
-  case llvmberry::BopSdiv:
+  case crellvm::BopSdiv:
     return std::string("BopSdiv");
-  case llvmberry::BopUrem:
+  case crellvm::BopUrem:
     return std::string("BopUrem");
-  case llvmberry::BopSrem:
+  case crellvm::BopSrem:
     return std::string("BopSrem");
-  case llvmberry::BopShl:
+  case crellvm::BopShl:
     return std::string("BopShl");
-  case llvmberry::BopLshr:
+  case crellvm::BopLshr:
     return std::string("BopLshr");
-  case llvmberry::BopAshr:
+  case crellvm::BopAshr:
     return std::string("BopAshr");
-  case llvmberry::BopAnd:
+  case crellvm::BopAnd:
     return std::string("BopAnd");
-  case llvmberry::BopOr:
+  case crellvm::BopOr:
     return std::string("BopOr");
-  case llvmberry::BopXor:
+  case crellvm::BopXor:
     return std::string("BopXor");
   default:
     assert(false && "Bop toString");
@@ -315,19 +315,19 @@ std::string toString(llvmberry::TyBop bop) {
   return "";
 }
 
-std::string toString(llvmberry::TyFloatType float_type) {
+std::string toString(crellvm::TyFloatType float_type) {
   switch (float_type) {
-  case llvmberry::HalfType:
+  case crellvm::HalfType:
     return std::string("HalfType");
-  case llvmberry::FloatType:
+  case crellvm::FloatType:
     return std::string("FloatType");
-  case llvmberry::DoubleType:
+  case crellvm::DoubleType:
     return std::string("DoubleType");
-  case llvmberry::FP128Type:
+  case crellvm::FP128Type:
     return std::string("FP128Type");
-  case llvmberry::PPC_FP128Type:
+  case crellvm::PPC_FP128Type:
     return std::string("PPC_FP128Type");
-  case llvmberry::X86_FP80Type:
+  case crellvm::X86_FP80Type:
     return std::string("X86_FP80Type");
   default:
     assert(false && "FloatType toString");
@@ -335,27 +335,27 @@ std::string toString(llvmberry::TyFloatType float_type) {
   return "";
 }
 
-std::string toString(llvmberry::TyIcmpPred cond) {
+std::string toString(crellvm::TyIcmpPred cond) {
   switch (cond) {
-  case llvmberry::CondEq:
+  case crellvm::CondEq:
     return std::string("CondEq");
-  case llvmberry::CondNe:
+  case crellvm::CondNe:
     return std::string("CondNe");
-  case llvmberry::CondUgt:
+  case crellvm::CondUgt:
     return std::string("CondUgt");
-  case llvmberry::CondUge:
+  case crellvm::CondUge:
     return std::string("CondUge");
-  case llvmberry::CondUlt:
+  case crellvm::CondUlt:
     return std::string("CondUlt");
-  case llvmberry::CondUle:
+  case crellvm::CondUle:
     return std::string("CondUle");
-  case llvmberry::CondSgt:
+  case crellvm::CondSgt:
     return std::string("CondSgt");
-  case llvmberry::CondSge:
+  case crellvm::CondSge:
     return std::string("CondSge");
-  case llvmberry::CondSlt:
+  case crellvm::CondSlt:
     return std::string("CondSlt");
-  case llvmberry::CondSle:
+  case crellvm::CondSle:
     return std::string("CondSle");
   default:
     assert(false && "Cond toString");
@@ -363,61 +363,61 @@ std::string toString(llvmberry::TyIcmpPred cond) {
   return "";
 }
 
-std::string toString(llvmberry::TyFcmpPred fcond) {
+std::string toString(crellvm::TyFcmpPred fcond) {
   switch (fcond) {
-  case llvmberry::CondFfalse:
+  case crellvm::CondFfalse:
     return std::string("CondFfalse");
-  case llvmberry::CondFoeq:
+  case crellvm::CondFoeq:
     return std::string("CondFoeq");
-  case llvmberry::CondFogt:
+  case crellvm::CondFogt:
     return std::string("CondFogt");
-  case llvmberry::CondFoge:
+  case crellvm::CondFoge:
     return std::string("CondFoge");
-  case llvmberry::CondFolt:
+  case crellvm::CondFolt:
     return std::string("CondFolt");
-  case llvmberry::CondFole:
+  case crellvm::CondFole:
     return std::string("CondFole");
-  case llvmberry::CondFone:
+  case crellvm::CondFone:
     return std::string("CondFone");
-  case llvmberry::CondFord:
+  case crellvm::CondFord:
     return std::string("CondFord");
-  case llvmberry::CondFuno:
+  case crellvm::CondFuno:
     return std::string("CondFuno");
-  case llvmberry::CondFueq:
+  case crellvm::CondFueq:
     return std::string("CondFueq");
-  case llvmberry::CondFugt:
+  case crellvm::CondFugt:
     return std::string("CondFugt");
-  case llvmberry::CondFuge:
+  case crellvm::CondFuge:
     return std::string("CondFuge");
-  case llvmberry::CondFult:
+  case crellvm::CondFult:
     return std::string("CondFult");
-  case llvmberry::CondFule:
+  case crellvm::CondFule:
     return std::string("CondFule");
-  case llvmberry::CondFune:
+  case crellvm::CondFune:
     return std::string("CondFune");
-  case llvmberry::CondFtrue:
+  case crellvm::CondFtrue:
     return std::string("CondFtrue");
   default:
-    assert("llvmberry::toString(llvmberry::TyFCond fcond) : unknown fcond" &&
+    assert("crellvm::toString(crellvm::TyFCond fcond) : unknown fcond" &&
            false);
   }
   return "";
 }
 
-llvmberry::TyFloatType getFloatType(llvm::Type *typ) {
-  llvmberry::TyFloatType fty;
+crellvm::TyFloatType getFloatType(llvm::Type *typ) {
+  crellvm::TyFloatType fty;
   if (typ->isHalfTy())
-    fty = llvmberry::HalfType;
+    fty = crellvm::HalfType;
   else if (typ->isFloatTy())
-    fty = llvmberry::FloatType;
+    fty = crellvm::FloatType;
   else if (typ->isDoubleTy())
-    fty = llvmberry::DoubleType;
+    fty = crellvm::DoubleType;
   else if (typ->isX86_FP80Ty())
-    fty = llvmberry::X86_FP80Type;
+    fty = crellvm::X86_FP80Type;
   else if (typ->isFP128Ty())
-    fty = llvmberry::FP128Type;
+    fty = crellvm::FP128Type;
   else if (typ->isPPC_FP128Ty())
-    fty = llvmberry::PPC_FP128Type;
+    fty = crellvm::PPC_FP128Type;
   else
     assert("Unknown floating point type" && false);
   return fty;
@@ -440,23 +440,23 @@ TyFbop getFbop(llvm::Instruction::BinaryOps ops) {
   TyFbop tyfbop;
   switch (ops) {
   case llvm::Instruction::FAdd:
-    tyfbop = llvmberry::BopFadd;
+    tyfbop = crellvm::BopFadd;
     break;
   case llvm::Instruction::FSub:
-    tyfbop = llvmberry::BopFsub;
+    tyfbop = crellvm::BopFsub;
     break;
   case llvm::Instruction::FMul:
-    tyfbop = llvmberry::BopFmul;
+    tyfbop = crellvm::BopFmul;
     break;
   case llvm::Instruction::FDiv:
-    tyfbop = llvmberry::BopFdiv;
+    tyfbop = crellvm::BopFdiv;
     break;
   case llvm::Instruction::FRem:
-    tyfbop = llvmberry::BopFrem;
+    tyfbop = crellvm::BopFrem;
     break;
   default:
     assert(
-        "llvmberry::getFbop(llvm::Instruction::BinaryOps) : unknown opcode" &&
+        "crellvm::getFbop(llvm::Instruction::BinaryOps) : unknown opcode" &&
         false);
   }
   return tyfbop;
@@ -466,46 +466,46 @@ TyBop getBop(llvm::Instruction::BinaryOps ops) {
   TyBop bop;
   switch (ops) {
   case llvm::Instruction::Add:
-    bop = llvmberry::BopAdd;
+    bop = crellvm::BopAdd;
     break;
   case llvm::Instruction::Sub:
-    bop = llvmberry::BopSub;
+    bop = crellvm::BopSub;
     break;
   case llvm::Instruction::Mul:
-    bop = llvmberry::BopMul;
+    bop = crellvm::BopMul;
     break;
   case llvm::Instruction::UDiv:
-    bop = llvmberry::BopUdiv;
+    bop = crellvm::BopUdiv;
     break;
   case llvm::Instruction::SDiv:
-    bop = llvmberry::BopSdiv;
+    bop = crellvm::BopSdiv;
     break;
   case llvm::Instruction::URem:
-    bop = llvmberry::BopUrem;
+    bop = crellvm::BopUrem;
     break;
   case llvm::Instruction::SRem:
-    bop = llvmberry::BopSrem;
+    bop = crellvm::BopSrem;
     break;
   case llvm::Instruction::Shl:
-    bop = llvmberry::BopShl;
+    bop = crellvm::BopShl;
     break;
   case llvm::Instruction::LShr:
-    bop = llvmberry::BopLshr;
+    bop = crellvm::BopLshr;
     break;
   case llvm::Instruction::AShr:
-    bop = llvmberry::BopAshr;
+    bop = crellvm::BopAshr;
     break;
   case llvm::Instruction::And:
-    bop = llvmberry::BopAnd;
+    bop = crellvm::BopAnd;
     break;
   case llvm::Instruction::Or:
-    bop = llvmberry::BopOr;
+    bop = crellvm::BopOr;
     break;
   case llvm::Instruction::Xor:
-    bop = llvmberry::BopXor;
+    bop = crellvm::BopXor;
     break;
   default:
-    assert("llvmberry::getBop(llvm::Instruction::BinaryOps) : unknown opcode" &&
+    assert("crellvm::getBop(llvm::Instruction::BinaryOps) : unknown opcode" &&
            false);
   }
   return bop;
@@ -516,37 +516,37 @@ TyIcmpPred getIcmpPred(llvm::ICmpInst::Predicate prd) {
 
   switch (prd) {
   case llvm::ICmpInst::ICMP_EQ:
-    predicate = llvmberry::CondEq;
+    predicate = crellvm::CondEq;
     break;
   case llvm::ICmpInst::ICMP_NE:
-    predicate = llvmberry::CondNe;
+    predicate = crellvm::CondNe;
     break;
   case llvm::ICmpInst::ICMP_UGT:
-    predicate = llvmberry::CondUgt;
+    predicate = crellvm::CondUgt;
     break;
   case llvm::ICmpInst::ICMP_UGE:
-    predicate = llvmberry::CondUge;
+    predicate = crellvm::CondUge;
     break;
   case llvm::ICmpInst::ICMP_ULT:
-    predicate = llvmberry::CondUlt;
+    predicate = crellvm::CondUlt;
     break;
   case llvm::ICmpInst::ICMP_ULE:
-    predicate = llvmberry::CondUle;
+    predicate = crellvm::CondUle;
     break;
   case llvm::ICmpInst::ICMP_SGT:
-    predicate = llvmberry::CondSgt;
+    predicate = crellvm::CondSgt;
     break;
   case llvm::ICmpInst::ICMP_SGE:
-    predicate = llvmberry::CondSge;
+    predicate = crellvm::CondSge;
     break;
   case llvm::ICmpInst::ICMP_SLT:
-    predicate = llvmberry::CondSlt;
+    predicate = crellvm::CondSlt;
     break;
   case llvm::ICmpInst::ICMP_SLE:
-    predicate = llvmberry::CondSle;
+    predicate = crellvm::CondSle;
     break;
   default:
-    assert("llvmberry::getIcmpPred(llvm::ICmpInst::Predicate prd) : unknown "
+    assert("crellvm::getIcmpPred(llvm::ICmpInst::Predicate prd) : unknown "
            "predicate" &&
            false);
   }
@@ -558,55 +558,55 @@ TyFcmpPred getFcmpPred(llvm::FCmpInst::Predicate prd) {
 
   switch (prd) {
   case llvm::FCmpInst::FCMP_FALSE:
-    predicate = llvmberry::CondFfalse;
+    predicate = crellvm::CondFfalse;
     break;
   case llvm::FCmpInst::FCMP_OEQ:
-    predicate = llvmberry::CondFoeq;
+    predicate = crellvm::CondFoeq;
     break;
   case llvm::FCmpInst::FCMP_OGT:
-    predicate = llvmberry::CondFogt;
+    predicate = crellvm::CondFogt;
     break;
   case llvm::FCmpInst::FCMP_OGE:
-    predicate = llvmberry::CondFoge;
+    predicate = crellvm::CondFoge;
     break;
   case llvm::FCmpInst::FCMP_OLT:
-    predicate = llvmberry::CondFolt;
+    predicate = crellvm::CondFolt;
     break;
   case llvm::FCmpInst::FCMP_OLE:
-    predicate = llvmberry::CondFole;
+    predicate = crellvm::CondFole;
     break;
   case llvm::FCmpInst::FCMP_ONE:
-    predicate = llvmberry::CondFone;
+    predicate = crellvm::CondFone;
     break;
   case llvm::FCmpInst::FCMP_ORD:
-    predicate = llvmberry::CondFord;
+    predicate = crellvm::CondFord;
     break;
   case llvm::FCmpInst::FCMP_UNO:
-    predicate = llvmberry::CondFuno;
+    predicate = crellvm::CondFuno;
     break;
   case llvm::FCmpInst::FCMP_UEQ:
-    predicate = llvmberry::CondFueq;
+    predicate = crellvm::CondFueq;
     break;
   case llvm::FCmpInst::FCMP_UGT:
-    predicate = llvmberry::CondFugt;
+    predicate = crellvm::CondFugt;
     break;
   case llvm::FCmpInst::FCMP_UGE:
-    predicate = llvmberry::CondFuge;
+    predicate = crellvm::CondFuge;
     break;
   case llvm::FCmpInst::FCMP_ULT:
-    predicate = llvmberry::CondFult;
+    predicate = crellvm::CondFult;
     break;
   case llvm::FCmpInst::FCMP_ULE:
-    predicate = llvmberry::CondFule;
+    predicate = crellvm::CondFule;
     break;
   case llvm::FCmpInst::FCMP_UNE:
-    predicate = llvmberry::CondFune;
+    predicate = crellvm::CondFune;
     break;
   case llvm::FCmpInst::FCMP_TRUE:
-    predicate = llvmberry::CondFtrue;
+    predicate = crellvm::CondFtrue;
     break;
   default:
-    assert("llvmberry::getFCmpPred(llvm::FCmpInst::Predicate pred) : unknown "
+    assert("crellvm::getFCmpPred(llvm::FCmpInst::Predicate pred) : unknown "
            "predicate" &&
            false);
   }
@@ -1007,11 +1007,11 @@ instructionWithGhostIdxs(const llvm::Instruction &i,
     return TyInstruction::make(i);
   if (auto si = llvm::dyn_cast<llvm::SelectInst>(&i)) {
     // TODO generalize a bit more to support previous?
-    llvmberry::TyTag tags[3] = {llvmberry::Physical, llvmberry::Physical,
-                                llvmberry::Physical};
+    crellvm::TyTag tags[3] = {crellvm::Physical, crellvm::Physical,
+                                crellvm::Physical};
     for (auto idx : ghostIdxs) {
       assert(0 <= idx && idx < i.getNumOperands());
-      tags[idx] = llvmberry::Ghost;
+      tags[idx] = crellvm::Ghost;
     }
 
     auto ret = std::shared_ptr<TySelectInst>(
@@ -1410,26 +1410,26 @@ std::shared_ptr<TyConstant> TyConstant::make(const llvm::Constant &value) {
     const llvm::APFloat &apf = v->getValueAPF();
     const llvm::Type *typ = v->getType();
 
-    llvmberry::TyFloatType fty;
+    crellvm::TyFloatType fty;
     if (typ->isHalfTy())
-      fty = llvmberry::HalfType;
+      fty = crellvm::HalfType;
     else if (typ->isFloatTy())
-      fty = llvmberry::FloatType;
+      fty = crellvm::FloatType;
     else if (typ->isDoubleTy())
-      fty = llvmberry::DoubleType;
+      fty = crellvm::DoubleType;
     else if (typ->isX86_FP80Ty())
-      fty = llvmberry::X86_FP80Type;
+      fty = crellvm::X86_FP80Type;
     else if (typ->isFP128Ty())
-      fty = llvmberry::FP128Type;
+      fty = crellvm::FP128Type;
     else if (typ->isPPC_FP128Ty())
-      fty = llvmberry::PPC_FP128Type;
+      fty = crellvm::PPC_FP128Type;
     else
       assert("Unknown floating point type" && false);
 
-    if (fty == llvmberry::DoubleType) {
+    if (fty == crellvm::DoubleType) {
       return std::shared_ptr<TyConstant>(
           new ConsConstFloat(TyConstFloat::make(apf.convertToDouble(), fty)));
-    } else if (fty == llvmberry::FloatType) {
+    } else if (fty == crellvm::FloatType) {
       return std::shared_ptr<TyConstant>(
           new ConsConstFloat(TyConstFloat::make(apf.convertToFloat(), fty)));
     } else {
@@ -1874,7 +1874,7 @@ TyGetElementPtrInst::make(const llvm::GetElementPtrInst &gepi) {
 
 std::shared_ptr<TyBinaryOperator>
 TyBinaryOperator::make(const llvm::BinaryOperator &bopinst) {
-  llvmberry::TyBop bop = llvmberry::getBop(bopinst.getOpcode());
+  crellvm::TyBop bop = crellvm::getBop(bopinst.getOpcode());
   return std::shared_ptr<TyBinaryOperator>(
       new TyBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
                            TyValue::make(*bopinst.getOperand(0)),
@@ -1883,7 +1883,7 @@ TyBinaryOperator::make(const llvm::BinaryOperator &bopinst) {
 
 std::shared_ptr<TyFloatBinaryOperator>
 TyFloatBinaryOperator::make(const llvm::BinaryOperator &bopinst) {
-  llvmberry::TyFbop bop = llvmberry::getFbop(bopinst.getOpcode());
+  crellvm::TyFbop bop = crellvm::getFbop(bopinst.getOpcode());
   return std::shared_ptr<TyFloatBinaryOperator>(
       new TyFloatBinaryOperator(bop, TyValueType::make(*bopinst.getType()),
                                 TyValue::make(*bopinst.getOperand(0)),
@@ -1891,8 +1891,8 @@ TyFloatBinaryOperator::make(const llvm::BinaryOperator &bopinst) {
 }
 
 std::shared_ptr<TyICmpInst> TyICmpInst::make(const llvm::ICmpInst &icmpInst) {
-  llvmberry::TyIcmpPred predicate =
-      llvmberry::getIcmpPred(icmpInst.getPredicate());
+  crellvm::TyIcmpPred predicate =
+      crellvm::getIcmpPred(icmpInst.getPredicate());
   return std::shared_ptr<TyICmpInst>(new TyICmpInst(
       predicate, TyValueType::make(*icmpInst.getOperand(0)->getType()),
       TyValue::make(*icmpInst.getOperand(0)),
@@ -1900,8 +1900,8 @@ std::shared_ptr<TyICmpInst> TyICmpInst::make(const llvm::ICmpInst &icmpInst) {
 }
 
 std::shared_ptr<TyFCmpInst> TyFCmpInst::make(const llvm::FCmpInst &fcmpInst) {
-  llvmberry::TyFcmpPred predicate =
-      llvmberry::getFcmpPred(fcmpInst.getPredicate());
+  crellvm::TyFcmpPred predicate =
+      crellvm::getFcmpPred(fcmpInst.getPredicate());
   return std::shared_ptr<TyFCmpInst>(new TyFCmpInst(
       predicate, TyValueType::make(*fcmpInst.getOperand(0)->getType()),
       TyValue::make(*fcmpInst.getOperand(0)),
@@ -3009,7 +3009,7 @@ std::shared_ptr<TyExpr> ConsVar::make(std::string _name, enum TyTag _tag) {
 }
 
 std::shared_ptr<TyExpr> ConsVar::make(const llvm::Instruction &v, enum TyTag _tag) {
-  return make(llvmberry::getVariable(v), _tag);
+  return make(crellvm::getVariable(v), _tag);
 }
 
 ConsVar* ConsVar::getConsVar() {
@@ -3506,7 +3506,7 @@ void CoreHint::setReturnCodeToFail() {
 
 void CoreHint::addCommand(std::shared_ptr<TyCommand> c) {
   commands.push_back(std::make_pair(c,
-                                    llvmberry::TyCppDebugInfo::make("", 0)));
+                                    crellvm::TyCppDebugInfo::make("", 0)));
 }
 
 void CoreHint::addCommand(std::shared_ptr<TyCommand> c,
@@ -3550,4 +3550,4 @@ void intrude(std::function<void()> func) {
   func();
 }
 
-} // llvmberry
+} // crellvm

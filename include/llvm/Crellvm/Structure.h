@@ -30,7 +30,7 @@ void save(cereal::JSONOutputArchive &archive, std::pair<T1, T2> const &p) {
 }
 } // cereal
 
-namespace llvmberry {
+namespace crellvm {
 
 enum TyScope { Source = 0, Target };
 
@@ -104,11 +104,11 @@ int getTerminatorIndex(const llvm::TerminatorInst *instr);
 bool name_instructions(llvm::Function &F);
 bool name_instruction(llvm::Instruction &I);
 
-std::string toString(llvmberry::TyBop bop);
-std::string toString(llvmberry::TyFbop bop);
-std::string toString(llvmberry::TyFloatType bop);
-std::string toString(llvmberry::TyIcmpPred cond);
-std::string toString(llvmberry::TyFcmpPred fcond);
+std::string toString(crellvm::TyBop bop);
+std::string toString(crellvm::TyFbop bop);
+std::string toString(crellvm::TyFloatType bop);
+std::string toString(crellvm::TyIcmpPred cond);
+std::string toString(crellvm::TyFcmpPred fcond);
 
 bool isFloatOpcode(llvm::Instruction::BinaryOps ops);
 TyFloatType getFloatType(llvm::Type *typ);
@@ -648,7 +648,7 @@ public:
   virtual void serialize(cereal::JSONOutputArchive &archive) const = 0;
 
   static std::shared_ptr<TyValue> make(const llvm::Value &value,
-                                       enum TyTag _tag = llvmberry::Physical);
+                                       enum TyTag _tag = crellvm::Physical);
 };
 
 struct ConsId : public TyValue {
@@ -1321,7 +1321,7 @@ public:
 
   static std::shared_ptr<TyExpr> make(const std::shared_ptr<TyValue> tyval);
   static std::shared_ptr<TyExpr> make(const llvm::Value &value,
-                                      enum TyTag _tag = llvmberry::Physical);
+                                      enum TyTag _tag = crellvm::Physical);
 
   TyExpr(std::shared_ptr<TyExprImpl> ei);
 
@@ -1338,7 +1338,7 @@ public:
 
   static std::shared_ptr<TyExprImpl> make(const std::shared_ptr<TyValue> tyval);
   static std::shared_ptr<TyExprImpl> make(const llvm::Value &value,
-                                      enum TyTag _tag = llvmberry::Physical);
+                                      enum TyTag _tag = crellvm::Physical);
   virtual ConsVar* getConsVar() = 0;
 };
 
@@ -1740,6 +1740,6 @@ private:
 
 void intrude(std::function<void()> func);
 
-} // llvmberry
+} // crellvm
 
 #endif

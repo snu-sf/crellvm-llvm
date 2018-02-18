@@ -7,39 +7,39 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/RuntimeOptions.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/RuntimeOptions.h"
 
-////// LLVMBerry option
+////// Crellvm option
 llvm::cl::opt<std::string>
-    LLVMBerryOutputDirectory("llvmberry-outputdir",
-       llvm::cl::desc("Specify output directory of LLVMBerry"),
+    CrellvmOutputDirectory("crellvm-outputdir",
+       llvm::cl::desc("Specify output directory of Crellvm"),
        llvm::cl::value_desc("dir"));
 
 static llvm::cl::opt<std::string>
-    LLVMBerryWhiteList("llvmberry-whitelist",
+    CrellvmWhiteList("crellvm-whitelist",
        llvm::cl::desc("Enable hint generation for specific "
                 "optimizations only"),
        llvm::cl::value_desc("opt-names(use commas)"),
        llvm::cl::init("-"));
 
 static llvm::cl::opt<std::string>
-    LLVMBerryPassWhiteList("llvmberry-passwhitelist",
+    CrellvmPassWhiteList("crellvm-passwhitelist",
        llvm::cl::desc("Enable hint generation for specific "
                 "passes only (instcombine|mem2reg|gvn|pre|licm)"),
        llvm::cl::value_desc("pass-names(use commas)"),
        llvm::cl::init("-"));
 
 static llvm::cl::opt<bool>
-    LLVMBerryCompactJson("llvmberry-compactjson",
+    CrellvmCompactJson("crellvm-compactjson",
         llvm::cl::desc("Use compact json for hint"));
 
 static llvm::cl::opt<bool>
-    LLVMBerryNoCommit("llvmberry-nocommit",
+    CrellvmNoCommit("crellvm-nocommit",
         llvm::cl::desc("Use compact json for hint"));
 
 
-namespace llvmberry {
+namespace crellvm {
 
 std::string RuntimeOptions::_DefaultOutputDir;
 std::vector<std::string> RuntimeOptions::_OptWhiteList;
@@ -187,7 +187,7 @@ void ValidationUnit::begin(bool rename) {
 
   // print src
   if (rename)
-    llvmberry::name_instructions(*_func);
+    crellvm::name_instructions(*_func);
   _srcfile_buffer = new std::string();
   if (!RuntimeOptions::NoCommit())
     writeModuleToBuffer(*module, _srcfile_buffer, _func);
@@ -213,7 +213,7 @@ void ValidationUnit::commit() {
   src_ofs.close();
   if (src_ofs.fail() || src_ofs.bad()) {
     std::cerr
-        << "LLVMBerry : ValidationUnit::commit() : Fail to write source file"
+        << "Crellvm : ValidationUnit::commit() : Fail to write source file"
         << std::endl;
     std::exit(-10);
   }
@@ -227,7 +227,7 @@ void ValidationUnit::commit() {
   tgt_ofs.close();
   if (tgt_ofs.fail() || tgt_ofs.bad()) {
     std::cerr
-        << "LLVMBerry : ValidationUnit::commit() : Fail to write target file"
+        << "Crellvm : ValidationUnit::commit() : Fail to write target file"
         << std::endl;
     std::exit(-11);
   }
@@ -243,7 +243,7 @@ void ValidationUnit::commit() {
   ofs << std::endl;
   if (ofs.fail() || ofs.bad()) {
     std::cerr
-        << "LLVMBerry : ValidationUnit::commit() : Fail to write core hint file"
+        << "Crellvm : ValidationUnit::commit() : Fail to write core hint file"
         << std::endl;
     std::exit(-12);
   }
@@ -267,13 +267,13 @@ void ValidationUnit::StartPass(PASS pass) {
   PassDictionary::Create();
 
   // JYLEE : I put this code here because I could't find where to place this
-  // kind of 'global LLVMBerry-beginning' code. each of `opt` and `clang` has
+  // kind of 'global Crellvm-beginning' code. each of `opt` and `clang` has
   // own main(), and it is too burdensome to place this RuntimeOptions::Init in
   // both main() functions considering that we're maintaining only llvm repo,
   // not clang repo..
-  RuntimeOptions::Init(LLVMBerryOutputDirectory, LLVMBerryWhiteList,
-                            LLVMBerryPassWhiteList, LLVMBerryCompactJson,
-                            LLVMBerryNoCommit);
+  RuntimeOptions::Init(CrellvmOutputDirectory, CrellvmWhiteList,
+                            CrellvmPassWhiteList, CrellvmCompactJson,
+                            CrellvmNoCommit);
 }
 
 ValidationUnit::PASS ValidationUnit::GetCurrentPass() {
@@ -332,4 +332,4 @@ bool ValidationUnit::EndIfExists() {
   return true;
 }
 
-} // llvmberry
+} // crellvm

@@ -1,4 +1,4 @@
-add_llvm_library(LLVMLLVMBerry
+add_llvm_library(LLVMCrellvm
   Infrules.cpp
   Structure.cpp
   Hintgen.cpp
@@ -13,4 +13,4 @@ add_llvm_library(LLVMLLVMBerry
   InstCombine/InfrulesSelect.cpp
   )
 
-add_dependencies(LLVMLLVMBerry LLVMBitWriter)
+add_dependencies(LLVMCrellvm LLVMBitWriter)

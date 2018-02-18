@@ -11,14 +11,14 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Bitcode/ReaderWriter.h"
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/Dictionary.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Dictionary.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 class ValidationUnit {
 public:
-  typedef llvmberry::Dictionary Dictionary;
+  typedef crellvm::Dictionary Dictionary;
   enum PASS { NOTHING = 0, GVN, MEM2REG, PRE, INSTCOMBINE, LICM };
 
   CoreHint &getHint();
@@ -64,6 +64,6 @@ private:
   static PASS _CurrentPass;
 };
 
-} // llvmberry
+} // crellvm
 
 #endif

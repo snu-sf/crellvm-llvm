@@ -22,4 +22,4 @@ subdirectories = IPA
 type = Library
 name = Analysis
 parent = Libraries
-required_libraries = Core Support LLVMBerry
+required_libraries = Core Support Crellvm

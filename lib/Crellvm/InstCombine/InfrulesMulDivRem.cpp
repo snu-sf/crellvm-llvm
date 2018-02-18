@@ -1,11 +1,11 @@
 #include <string>
 #include <cassert>
 #include <cereal/archives/json.hpp>
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/InstCombine/InfrulesMulDivRem.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/InstCombine/InfrulesMulDivRem.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 TyMulMone::TyMulMone(std::shared_ptr<TyRegister> _z,
                      std::shared_ptr<TyValue> _x, std::shared_ptr<TySize> _sz)

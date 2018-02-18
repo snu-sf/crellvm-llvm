@@ -1888,7 +1888,7 @@ APFloat::opStatus APFloat::roundToIntegral(roundingMode rounding_mode) {
 }
 
 
-/* Added for crellvm(llvmberry): Comparison for ordered set.  */
+/* Added for crellvm(crellvm): Comparison for ordered set.  */
 APFloat::cmpResult
 APFloat::compare_ord(const APFloat &rhs) const
 {

@@ -17,11 +17,11 @@
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/PatternMatch.h"
 
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/Infrules.h"
-#include "llvm/LLVMBerry/InstCombine/InfrulesSelect.h"
-#include "llvm/LLVMBerry/Hintgen.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesSelect.h"
+#include "llvm/Crellvm/Hintgen.h"
 
 using namespace llvm;
 using namespace PatternMatch;
@@ -149,7 +149,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
   if (!isa<BinaryOperator>(TI))
     return nullptr;
 
-  llvmberry::ValidationUnit::Begin("select_bop_fold", SI);
+  crellvm::ValidationUnit::Begin("select_bop_fold", SI);
   // Figure out if the operations have any operands in common.
   Value *MatchOp, *OtherOpT, *OtherOpF;
   bool MatchIsOpZero;
@@ -159,7 +159,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
     INTRUDE(CAPTURE(), {
-      data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = llvmberry::FoldSelectOpOpArg::XY_XZ;
+      data.create<crellvm::ArgForFoldSelectOpOp>()->the_case = crellvm::FoldSelectOpOpArg::XY_XZ;
     });
   } else if (TI->getOperand(1) == FI->getOperand(1)) {
     MatchOp  = TI->getOperand(1);
@@ -167,11 +167,11 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = false;
     INTRUDE(CAPTURE(), {
-      data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = llvmberry::FoldSelectOpOpArg::YX_ZX;
+      data.create<crellvm::ArgForFoldSelectOpOp>()->the_case = crellvm::FoldSelectOpOpArg::YX_ZX;
     });
   } else if (!TI->isCommutative()) {
-    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-    llvmberry::ValidationUnit::End();
+    crellvm::ValidationUnit::GetInstance()->setIsAborted();
+    crellvm::ValidationUnit::End();
 
     return nullptr;
   } else if (TI->getOperand(0) == FI->getOperand(1)) {
@@ -180,7 +180,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = true;
     INTRUDE(CAPTURE(), {
-      data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = llvmberry::FoldSelectOpOpArg::XY_ZX;
+      data.create<crellvm::ArgForFoldSelectOpOp>()->the_case = crellvm::FoldSelectOpOpArg::XY_ZX;
     });
   } else if (TI->getOperand(1) == FI->getOperand(0)) {
     MatchOp  = TI->getOperand(1);
@@ -188,11 +188,11 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
     INTRUDE(CAPTURE(), {
-      data.create<llvmberry::ArgForFoldSelectOpOp>()->the_case = llvmberry::FoldSelectOpOpArg::YX_XZ;
+      data.create<crellvm::ArgForFoldSelectOpOp>()->the_case = crellvm::FoldSelectOpOpArg::YX_XZ;
     });
   } else {
-    llvmberry::ValidationUnit::GetInstance()->setIsAborted();
-    llvmberry::ValidationUnit::End();
+    crellvm::ValidationUnit::GetInstance()->setIsAborted();
+    crellvm::ValidationUnit::End();
 
     return nullptr;
   }
@@ -202,7 +202,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
                                        OtherOpF, SI.getName()+".v");
 
   INTRUDE(CAPTURE(&SI, &TI, &FI, &MatchOp, &NewSI, &OtherOpT, &OtherOpF), {
-    auto the_case = data.get<llvmberry::ArgForFoldSelectOpOp>()->the_case;
+    auto the_case = data.get<crellvm::ArgForFoldSelectOpOp>()->the_case;
     // case == "XY/XZ" : 
     //        <src>          |         <tgt>
     // R  = X bop Y          | R = X bop Y
@@ -249,37 +249,37 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     Value *X = MatchOp, *Y = OtherOpT, *Z = OtherOpF, *C = SI.getCondition();
     Instruction::BinaryOps bop = R->getOpcode();
 
-    llvmberry::insertSrcNopAtTgtI(hints, Tprime);
-    PROPAGATE(MAYDIFF(llvmberry::getVariable(*Tprime), Physical), llvmberry::ConsGlobal::make());
+    crellvm::insertSrcNopAtTgtI(hints, Tprime);
+    PROPAGATE(MAYDIFF(crellvm::getVariable(*Tprime), Physical), crellvm::ConsGlobal::make());
 
-    llvmberry::propagateInstruction(hints, R, T0, TGT);
-    llvmberry::propagateInstruction(hints, S, T0, TGT);
-    llvmberry::propagateInstruction(hints, Tprime, T0, TGT);
+    crellvm::propagateInstruction(hints, R, T0, TGT);
+    crellvm::propagateInstruction(hints, S, T0, TGT);
+    crellvm::propagateInstruction(hints, Tprime, T0, TGT);
     
     // auto: (XY_ZX case) If S = Z bop X, apply commutativity
-    //if (the_case == llvmberry::FoldSelectOpOpArg::XY_ZX)
-    //  llvmberry::applyCommutativity(hints, T0, S, TGT);
+    //if (the_case == crellvm::FoldSelectOpOpArg::XY_ZX)
+    //  crellvm::applyCommutativity(hints, T0, S, TGT);
     // auto: (YX_XZ case) If R = Y bop X, apply commutativity
-    //else if (the_case == llvmberry::FoldSelectOpOpArg::YX_XZ)
-    //  llvmberry::applyCommutativity(hints, T0, R, TGT);
+    //else if (the_case == crellvm::FoldSelectOpOpArg::YX_XZ)
+    //  crellvm::applyCommutativity(hints, T0, R, TGT);
 
-    if (the_case == llvmberry::FoldSelectOpOpArg::YX_ZX) {
-      if(llvmberry::isFloatOpcode(bop))
-        INFRULE(INSTPOS(TGT, T0), llvmberry::ConsFbopDistributiveOverSelectinst2::make(
-              llvmberry::getFbop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime),
-              REGISTER(*T0), VAL(X), VAL(Y), VAL(Z),VAL(C), llvmberry::getFloatType(R->getType()), VALTYPE(C->getType())));
+    if (the_case == crellvm::FoldSelectOpOpArg::YX_ZX) {
+      if(crellvm::isFloatOpcode(bop))
+        INFRULE(INSTPOS(TGT, T0), crellvm::ConsFbopDistributiveOverSelectinst2::make(
+              crellvm::getFbop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime),
+              REGISTER(*T0), VAL(X), VAL(Y), VAL(Z),VAL(C), crellvm::getFloatType(R->getType()), VALTYPE(C->getType())));
       else
-        INFRULE(INSTPOS(TGT, T0), llvmberry::ConsBopDistributiveOverSelectinst2::make(
-              llvmberry::getBop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime),
+        INFRULE(INSTPOS(TGT, T0), crellvm::ConsBopDistributiveOverSelectinst2::make(
+              crellvm::getBop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime),
               REGISTER(*T0), VAL(X), VAL(Y), VAL(Z), VAL(C), BITSIZE(*R), VALTYPE(C->getType())));
     } else {
-      if(llvmberry::isFloatOpcode(bop))
-        INFRULE(INSTPOS(TGT, T0), llvmberry::ConsFbopDistributiveOverSelectinst::make(
-            llvmberry::getFbop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime), REGISTER(*T0),
-            VAL(X), VAL(Y), VAL(Z), VAL(C), llvmberry::getFloatType(R->getType()), VALTYPE(C->getType())));
+      if(crellvm::isFloatOpcode(bop))
+        INFRULE(INSTPOS(TGT, T0), crellvm::ConsFbopDistributiveOverSelectinst::make(
+            crellvm::getFbop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime), REGISTER(*T0),
+            VAL(X), VAL(Y), VAL(Z), VAL(C), crellvm::getFloatType(R->getType()), VALTYPE(C->getType())));
       else
-        INFRULE(INSTPOS(TGT, T0), llvmberry::ConsBopDistributiveOverSelectinst::make(
-            llvmberry::getBop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime), REGISTER(*T0),
+        INFRULE(INSTPOS(TGT, T0), crellvm::ConsBopDistributiveOverSelectinst::make(
+            crellvm::getBop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime), REGISTER(*T0),
             VAL(X), VAL(Y), VAL(Z), VAL(C), BITSIZE(*R), VALTYPE(C->getType())));
     }
   });
@@ -538,9 +538,9 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         else // (Pred == ICmpInst::ICMP_ULT || Pred == ICmpInst::ICMP_SLT)
           AdjustedRHS = ConstantInt::get(CI->getContext(), CI->getValue() - 1);
 
-        llvmberry::ValidationUnit::Begin("select_icmp_unknown_const", SI);
+        crellvm::ValidationUnit::Begin("select_icmp_unknown_const", SI);
         INTRUDE(CAPTURE(), {
-          auto ptr = data.create<llvmberry::ArgForSelectIcmpConst>();
+          auto ptr = data.create<crellvm::ArgForSelectIcmpConst>();
           ptr->activated = false;
         });
         // X > C ? X : C+1  -->  X < C+1 ? C+1 : X
@@ -549,7 +549,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
             (CmpLHS == FalseVal && AdjustedRHS == TrueVal)) {
           ; // Nothing to do here. Values match without any sign/zero extension.
           INTRUDE(CAPTURE(),
-          { data.get<llvmberry::ArgForSelectIcmpConst>()->activated = true; });
+          { data.get<crellvm::ArgForSelectIcmpConst>()->activated = true; });
         }
 
         // Types do not match. Instead of calculating this with mixed types
@@ -586,20 +586,20 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
               CmpLHS = FalseVal;
               AdjustedRHS = zextRHS;
             } else {
-              llvmberry::ValidationUnit::Abort();
+              crellvm::ValidationUnit::Abort();
               break;
             }
           } else {
-            llvmberry::ValidationUnit::Abort();
+            crellvm::ValidationUnit::Abort();
             break;
           }
         } else {
-          llvmberry::ValidationUnit::Abort();
+          crellvm::ValidationUnit::Abort();
           break;
         }
 
         INTRUDE(CAPTURE(&ICI, &SI, &CI, &AdjustedRHS, &Pred), {
-          auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
+          auto ptr = data.get<crellvm::ArgForSelectIcmpConst>();
           if (ptr->activated) {
             //    <src>                   |    <tgt>
             // Y = icmp sgt/ugt X, C      | Y = icmp slt/ult X, (C+1)
@@ -616,11 +616,11 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
             ptr->isGtToLt = Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_SGT;
             ptr->isUnsigned = Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_ULT;
             ptr->selectCommutative = SI.getOperand(1) != ICI->getOperand(0);
-            llvmberry::insertTgtNopAtSrcI(hints, ptr->Y);
-            llvmberry::propagateMaydiffGlobal(hints, llvmberry::getVariable(*ptr->Y), llvmberry::Physical);
-            llvmberry::propagateInstruction(hints, ptr->Y, ptr->Z, SRC);
+            crellvm::insertTgtNopAtSrcI(hints, ptr->Y);
+            crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*ptr->Y), crellvm::Physical);
+            crellvm::propagateInstruction(hints, ptr->Y, ptr->Z, SRC);
           } else {
-            llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+            crellvm::ValidationUnit::GetInstance()->setIsAborted();
           }
         });
 
@@ -638,7 +638,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         ICI->moveBefore(&SI);
 
         INTRUDE(CAPTURE(), {
-          auto ptr = data.get<llvmberry::ArgForSelectIcmpConst>();
+          auto ptr = data.get<crellvm::ArgForSelectIcmpConst>();
           if (ptr->activated) {
             //unsigned int bitsize = ptr->C->getType()->getIntegerBitWidth();
             auto Z = ptr->Z;
@@ -647,35 +647,35 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
             auto Y = ptr->Y;
             auto X = ptr->X;
             bool select_commutative = ptr->selectCommutative;
-            auto vY = llvmberry::getVariable(*Y);
+            auto vY = crellvm::getVariable(*Y);
 
-            llvmberry::insertSrcNopAtTgtI(hints, ptr->Y);
+            crellvm::insertSrcNopAtTgtI(hints, ptr->Y);
             PROPAGATE(LESSDEF(RHS(vY, Physical, TGT), VAR(vY), TGT), BOUNDS(INSTPOS(TGT, Y), INSTPOS(TGT, Z)));
-            std::function<std::shared_ptr<llvmberry::TyInfrule>(
-                std::shared_ptr<llvmberry::TyRegister>,
-                std::shared_ptr<llvmberry::TyValue>,
-                std::shared_ptr<llvmberry::TyValue>,
-                std::shared_ptr<llvmberry::TyConstInt>,
-                std::shared_ptr<llvmberry::TyConstInt>, bool,
-                std::shared_ptr<llvmberry::TySize>)> makeInfruleFunc = nullptr;
+            std::function<std::shared_ptr<crellvm::TyInfrule>(
+                std::shared_ptr<crellvm::TyRegister>,
+                std::shared_ptr<crellvm::TyValue>,
+                std::shared_ptr<crellvm::TyValue>,
+                std::shared_ptr<crellvm::TyConstInt>,
+                std::shared_ptr<crellvm::TyConstInt>, bool,
+                std::shared_ptr<crellvm::TySize>)> makeInfruleFunc = nullptr;
             std::string optname = "";
 
             if (ptr->isGtToLt) {
-              if (ptr->isUnsigned) makeInfruleFunc = llvmberry::ConsSelectIcmpUgtConst::make;
-              else makeInfruleFunc = llvmberry::ConsSelectIcmpSgtConst::make;
+              if (ptr->isUnsigned) makeInfruleFunc = crellvm::ConsSelectIcmpUgtConst::make;
+              else makeInfruleFunc = crellvm::ConsSelectIcmpSgtConst::make;
               optname = "select_icmp_gt_const";
             } else {
-              if (ptr->isUnsigned) makeInfruleFunc = llvmberry::ConsSelectIcmpUltConst::make;
-              else makeInfruleFunc = llvmberry::ConsSelectIcmpSltConst::make;
+              if (ptr->isUnsigned) makeInfruleFunc = crellvm::ConsSelectIcmpUltConst::make;
+              else makeInfruleFunc = crellvm::ConsSelectIcmpSltConst::make;
               optname = "select_icmp_lt_const";
             }
-            llvmberry::ValidationUnit::GetInstance()->setOptimizationName(optname);
+            crellvm::ValidationUnit::GetInstance()->setOptimizationName(optname);
             INFRULE(INSTPOS(SRC, Z), makeInfruleFunc(REGISTER(*Z), VAL(Y), VAL(X),
                     CONSTINT(C), CONSTINT(Cprime), select_commutative, BITSIZE(*C)));
           } else
-            llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+            crellvm::ValidationUnit::GetInstance()->setIsAborted();
         });
-        llvmberry::ValidationUnit::End();
+        crellvm::ValidationUnit::End();
 
         Changed = true;
         break;
@@ -719,13 +719,13 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
   if (CmpRHS != CmpLHS && isa<Constant>(CmpRHS)) {
     if (CmpLHS == TrueVal && Pred == ICmpInst::ICMP_EQ) {
       // Transform (X == C) ? X : Y -> (X == C) ? C : Y
-      llvmberry::ValidationUnit::Begin("select_icmp_eq", SI);
+      crellvm::ValidationUnit::Begin("select_icmp_eq", SI);
       INTRUDE(CAPTURE(&SI, &ICI, &CmpRHS, &CmpLHS, &FalseVal), {
         //    <src>           |    <tgt>
         // Y = icmp eq, X, C  | Y = icmp eq, X, C
         // Z = select Y, X, V | Z = select Y, C, V
         if (CmpRHS->getType()->isVectorTy()) {
-          llvmberry::ValidationUnit::Abort();
+          crellvm::ValidationUnit::Abort();
           return;
         }
         //SelectInst *Z = &SI;
@@ -733,35 +733,35 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         //Value *X = CmpLHS;
         //Value *V = FalseVal;
         Constant *C = dyn_cast<Constant>(CmpRHS);
-        //llvmberry::propagateInstruction(hints, Y, Z, SRC);
-        //INFRULE(INSTPOS(SRC, Z), llvmberry::ConsSelectIcmpEq::make(
+        //crellvm::propagateInstruction(hints, Y, Z, SRC);
+        //INFRULE(INSTPOS(SRC, Z), crellvm::ConsSelectIcmpEq::make(
         //           VAL(Z), VAL(Y), VAL(X), VAL(V),
         //           CONSTANT(C), VALTYPE(C->getType())));
-        llvmberry::propagateInstruction(hints, ICI, &SI, SRC);
-        INFRULE(INSTPOS(SRC, &SI), llvmberry::ConsSelectIcmpEq::make(
+        crellvm::propagateInstruction(hints, ICI, &SI, SRC);
+        INFRULE(INSTPOS(SRC, &SI), crellvm::ConsSelectIcmpEq::make(
             VAL(&SI), VAL(ICI), VAL(CmpLHS), VAL(FalseVal), CONSTANT(C), VALTYPE(C->getType())));
       });
       SI.setOperand(1, CmpRHS);
-      llvmberry::ValidationUnit::End();
+      crellvm::ValidationUnit::End();
       Changed = true;
     } else if (CmpLHS == FalseVal && Pred == ICmpInst::ICMP_NE) {
       // Transform (X != C) ? Y : X -> (X != C) ? Y : C
-      llvmberry::ValidationUnit::Begin("select_icmp_ne", SI);
+      crellvm::ValidationUnit::Begin("select_icmp_ne", SI);
       INTRUDE(CAPTURE(&SI, &ICI, &CmpRHS, &CmpLHS, &TrueVal), {
         //     <src>          |      <tgt>
         // Y = icmp ne, X, C  | Y = icmp ne, X, C
         // Z = select Y, V, X | Z = select Y, V, C
         if (CmpRHS->getType()->isVectorTy()) {
-          llvmberry::ValidationUnit::Abort();
+          crellvm::ValidationUnit::Abort();
           return;
         }
         Constant *C = dyn_cast<Constant>(CmpRHS);
-        llvmberry::propagateInstruction(hints, ICI, &SI, SRC);
-        INFRULE(INSTPOS(SRC, &SI), llvmberry::ConsSelectIcmpNe::make(
+        crellvm::propagateInstruction(hints, ICI, &SI, SRC);
+        INFRULE(INSTPOS(SRC, &SI), crellvm::ConsSelectIcmpNe::make(
             VAL(&SI), VAL(ICI), VAL(CmpLHS), VAL(TrueVal), CONSTANT(C), VALTYPE(C->getType())));
       });
       SI.setOperand(2, CmpRHS);
-      llvmberry::ValidationUnit::End();
+      crellvm::ValidationUnit::End();
       Changed = true;
     }
   }
@@ -790,7 +790,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
       TrueWhenUnset = true;
     }
     if (IsBitTest) {
-      llvmberry::ValidationUnit::Begin("select_icmp_unknown_xor", SI);
+      crellvm::ValidationUnit::Begin("select_icmp_unknown_xor", SI);
       Value *V = nullptr;
       // (X & Y) == 0 ? X : X ^ Y  --> X & ~Y
       if (TrueWhenUnset && TrueVal == X &&
@@ -811,7 +811,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
 
       if (V) {
         INTRUDE(CAPTURE(&SI, &ICI, &V, &Pred, &TrueVal, &FalseVal), {
-          using namespace llvmberry;
+          using namespace crellvm;
           name_instructions(*SI.getParent()->getParent());
           SelectInst *Z = &SI;
           BinaryOperator *Zp = dyn_cast<BinaryOperator>(V);
@@ -951,7 +951,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         });
         return ReplaceInstUsesWith(SI, V);
       }
-      llvmberry::ValidationUnit::Abort();
+      crellvm::ValidationUnit::Abort();
     }
   }
 

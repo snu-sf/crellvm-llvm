@@ -1,11 +1,11 @@
 #include <string>
 #include <cassert>
 #include <cereal/archives/json.hpp>
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/InstCombine/InfrulesLoadStoreAlloca.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/InstCombine/InfrulesLoadStoreAlloca.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 TyGepzero::TyGepzero(std::shared_ptr<TyValue> _vprime,
                      std::shared_ptr<TyExpr> _gepinst)

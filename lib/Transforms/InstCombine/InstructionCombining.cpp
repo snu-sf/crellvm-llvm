@@ -63,9 +63,9 @@
 #include <algorithm>
 #include <climits>
 
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/Infrules.h"
-#include "llvm/LLVMBerry/Hintgen.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
 
 #include <sstream>
 #include <fstream>
@@ -211,7 +211,7 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
-          llvmberry::ValidationUnit::Begin("bop_associativity", I);
+          crellvm::ValidationUnit::Begin("bop_associativity", I);
 
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
@@ -225,18 +225,18 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
               Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
 
-              llvmberry::propagateInstruction(hints, reg1_instr, &I, SRC);
+              crellvm::propagateInstruction(hints, reg1_instr, &I, SRC);
 
-              INFRULE(INSTPOS(SRC, &I), llvmberry::ConsBopAssociative::make(
+              INFRULE(INSTPOS(SRC, &I), crellvm::ConsBopAssociative::make(
                   REGISTER(*(Op0->getOperand(0))), REGISTER(*Op0),
-                  REGISTER(I), llvmberry::getBop(Opcode),
+                  REGISTER(I), crellvm::getBop(Opcode),
                   CONSTINT(dyn_cast<ConstantInt>(B)), CONSTINT(dyn_cast<ConstantInt>(C)),
                   CONSTINT(dyn_cast<ConstantInt>(V)), BITSIZE(*B)));
             } else
-              llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+              crellvm::ValidationUnit::GetInstance()->setIsAborted();
           });
 
-          llvmberry::ValidationUnit::End();
+          crellvm::ValidationUnit::End();
           
           // Conservatively clear the optional flags, since they may not be
           // preserved by the reassociation.
@@ -1943,30 +1943,30 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
   // true or false as appropriate.
   SmallVector<WeakVH, 64> Users;
   if (isAllocSiteRemovable(&MI, Users, TLI)) {
-    llvmberry::ValidationUnit::Begin("dead_store_elim2", MI);
+    crellvm::ValidationUnit::Begin("dead_store_elim2", MI);
     INTRUDE(CAPTURE(&MI, &Users), {
       // NOTE : We only support the case when Ptr is alloca and uses are store.
       bool doAbort = false;
       if (isa<AllocaInst>(&MI)) {
-        std::string regname = llvmberry::getVariable(MI);
+        std::string regname = crellvm::getVariable(MI);
         for (unsigned i = 0, e = Users.size(); i != e; ++i) {
           if (!isa<StoreInst>(&*Users[i])) {
             doAbort = true;
             break;
           }
           StoreInst *SI = dyn_cast<StoreInst>(&*Users[i]);
-          llvmberry::insertTgtNopAtSrcI(hints, SI);
+          crellvm::insertTgtNopAtSrcI(hints, SI);
           PROPAGATE(PRIVATE(REGISTER(regname), SRC),
               BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
         }
-        llvmberry::insertTgtNopAtSrcI(hints, &MI);
-        llvmberry::propagateMaydiffGlobal(hints, regname, llvmberry::Physical);
-        llvmberry::propagateMaydiffGlobal(hints, regname, llvmberry::Previous);
+        crellvm::insertTgtNopAtSrcI(hints, &MI);
+        crellvm::propagateMaydiffGlobal(hints, regname, crellvm::Physical);
+        crellvm::propagateMaydiffGlobal(hints, regname, crellvm::Previous);
       } else {
         doAbort = true;
       }
       if (doAbort)
-        llvmberry::ValidationUnit::GetInstance()->setIsAborted();
+        crellvm::ValidationUnit::GetInstance()->setIsAborted();
     });
     for (unsigned i = 0, e = Users.size(); i != e; ++i) {
       Instruction *I = cast_or_null<Instruction>(&*Users[i]);
@@ -1997,7 +1997,7 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
     }
     
     Instruction *Res = EraseInstFromFunction(MI);
-    llvmberry::ValidationUnit::End();
+    crellvm::ValidationUnit::End();
     return Res;
   }
   return nullptr;
@@ -2739,11 +2739,11 @@ bool InstCombiner::run() {
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
-      llvmberry::name_instruction(*I);
-      llvmberry::ValidationUnit::Begin("dead_code_elim", *I, false);
-      llvmberry::generateHintForTrivialDCE(*I);
+      crellvm::name_instruction(*I);
+      crellvm::ValidationUnit::Begin("dead_code_elim", *I, false);
+      crellvm::generateHintForTrivialDCE(*I);
       EraseInstFromFunction(*I);
-      llvmberry::ValidationUnit::End();
+      crellvm::ValidationUnit::End();
       ++NumDeadInst;
       MadeIRChange = true;
       continue;
@@ -2845,22 +2845,22 @@ bool InstCombiner::run() {
 
         EraseInstFromFunction(*I);
 
-        llvmberry::ValidationUnit::EndIfExists();
+        crellvm::ValidationUnit::EndIfExists();
       } else {
 #ifndef NDEBUG
         DEBUG(dbgs() << "IC: Mod = " << OrigI << '\n'
                      << "    New = " << *I << '\n');
 #endif
-        llvmberry::ValidationUnit::EndIfExists();
+        crellvm::ValidationUnit::EndIfExists();
 
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
-          llvmberry::name_instruction(*I);
-          llvmberry::ValidationUnit::Begin("dead_code_elim", *I, false);
-          llvmberry::generateHintForTrivialDCE(*I);
+          crellvm::name_instruction(*I);
+          crellvm::ValidationUnit::Begin("dead_code_elim", *I, false);
+          crellvm::generateHintForTrivialDCE(*I);
           EraseInstFromFunction(*I);
-          llvmberry::ValidationUnit::End();
+          crellvm::ValidationUnit::End();
         } else {
           Worklist.Add(I);
           Worklist.AddUsersToWorkList(*I);
@@ -2908,11 +2908,11 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (isInstructionTriviallyDead(Inst, TLI)) {
         ++NumDeadInst;
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
-        llvmberry::name_instruction(*Inst);
-        llvmberry::ValidationUnit::Begin("dead_code_elim", *Inst, false);
-        llvmberry::generateHintForTrivialDCE(*Inst);
+        crellvm::name_instruction(*Inst);
+        crellvm::ValidationUnit::Begin("dead_code_elim", *Inst, false);
+        crellvm::generateHintForTrivialDCE(*Inst);
         Inst->eraseFromParent();
-        llvmberry::ValidationUnit::End();
+        crellvm::ValidationUnit::End();
         continue;
       }
 
@@ -3084,7 +3084,7 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
 PreservedAnalyses InstCombinePass::run(Function &F,
                                        AnalysisManager<Function> *AM) {
   
-  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
+  crellvm::ValidationUnit::StartPass(crellvm::ValidationUnit::INSTCOMBINE);
   
   auto &AC = AM->getResult<AssumptionAnalysis>(F);
   auto &DT = AM->getResult<DominatorTreeAnalysis>(F);
@@ -3102,7 +3102,7 @@ PreservedAnalyses InstCombinePass::run(Function &F,
   PreservedAnalyses PA;
   PA.preserve<DominatorTreeAnalysis>();
   
-  llvmberry::ValidationUnit::EndPass();
+  crellvm::ValidationUnit::EndPass();
 
   return PA;
 }
@@ -3140,7 +3140,7 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   if (skipOptnoneFunction(F))
     return false;
 
-  llvmberry::ValidationUnit::StartPass(llvmberry::ValidationUnit::INSTCOMBINE);
+  crellvm::ValidationUnit::StartPass(crellvm::ValidationUnit::INSTCOMBINE);
   
   // Required analyses.
   auto AA = &getAnalysis<AliasAnalysis>();
@@ -3153,7 +3153,7 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   auto *LI = LIWP ? &LIWP->getLoopInfo() : nullptr;
 
   bool result = combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
-  llvmberry::ValidationUnit::EndPass();
+  crellvm::ValidationUnit::EndPass();
 
   return result;
 }

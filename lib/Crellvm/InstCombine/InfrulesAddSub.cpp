@@ -1,11 +1,11 @@
 #include <string>
 #include <cassert>
 #include <cereal/archives/json.hpp>
-#include "llvm/LLVMBerry/Structure.h"
-#include "llvm/LLVMBerry/ValidationUnit.h"
-#include "llvm/LLVMBerry/InstCombine/InfrulesAddSub.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/InstCombine/InfrulesAddSub.h"
 
-namespace llvmberry {
+namespace crellvm {
 
 TyAddSignbit::TyAddSignbit(std::shared_ptr<TyRegister> _x,
                            std::shared_ptr<TyValue> _e1,
