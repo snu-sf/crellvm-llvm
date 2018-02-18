@@ -204,8 +204,11 @@ void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
   if (llvmberry::TyInstruction::isSupported(*I)) {
     if (isa<ExtractValueInst>(I) || isa<InsertValueInst>(I)) return;
     if (not_supported_floatingTy(I)) return;
-    if (I->getNumOperands() > 0 && I->getOperand(0)->getType()->isIntegerTy() &&
-        I->getOperand(0)->getType()->getIntegerBitWidth() > 64) return;
+    // if (I->getNumOperands() > 0 && I->getOperand(0)->getType()->isIntegerTy() &&
+    //    I->getOperand(0)->getType()->getIntegerBitWidth() > 64) return;
+    for (unsigned i = 0; i < I->getNumOperands(); ++i)
+      if (ConstantInt *CI = dyn_cast<ConstantInt>(I->getOperand(i)))
+        if (I->getOperand(i)->getType()->getIntegerBitWidth() > 64) return;
 
     std::shared_ptr<llvmberry::ConsInsn> ginsn = std::static_pointer_cast<llvmberry::ConsInsn>(INSN(*I)->get());
 
