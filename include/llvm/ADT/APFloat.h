@@ -18,6 +18,10 @@
 #define LLVM_ADT_APFLOAT_H
 
 #include "llvm/ADT/APInt.h"
+/* added for vellvm - start */
+#include "llvm-c/Core.h"
+#include "llvm/Support/CBindingWrapping.h"
+/* added for vellvm - end */
 
 namespace llvm {
 
@@ -380,6 +384,10 @@ public:
   /// unordered, 0==-0).
   cmpResult compare(const APFloat &) const;
 
+  /* Added for crellvm */
+  cmpResult compare_ord(const APFloat &) const;
+  /* End */
+
   /// Bitwise comparison for equality (QNaNs compare equal, 0!=-0).
   bool bitwiseIsEqual(const APFloat &) const;
 
@@ -518,6 +526,28 @@ public:
 
   /// \brief Returns: X * 2^Exp for integral exponents.
   friend APFloat scalbn(APFloat X, int Exp);
+
+  /* added for vellvm - start */
+  /// extended to check floating point type */
+  bool isIEEEhalf() { 
+    return semantics == (const llvm::fltSemantics*)&IEEEhalf; 
+  }
+  bool isIEEEsingle() { 
+    return semantics == (const llvm::fltSemantics*)&IEEEsingle; 
+  }
+  bool isIEEEdouble() { 
+    return semantics == (const llvm::fltSemantics*)&IEEEdouble; 
+  }
+  bool isIEEEquad()   { 
+    return semantics == (const llvm::fltSemantics*)&IEEEquad; 
+  }
+  bool isPPCDoubleDouble() { 
+    return semantics == (const llvm::fltSemantics*)&PPCDoubleDouble; 
+  }
+  bool isX87DoubleExtended() { 
+    return semantics == (const llvm::fltSemantics*)&x87DoubleExtended; 
+  }
+  /* added for vellvm - end */
 
 private:
 
@@ -675,6 +705,10 @@ inline APFloat maxnum(const APFloat &A, const APFloat &B) {
   return (A.compare(B) == APFloat::cmpLessThan) ? B : A;
 }
 
+/* added for vellvm - start */
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(APFloat,            LLVMAPFloatRef       )
+/* added for vellvm - end */  
+  
 } // namespace llvm
 
 #endif // LLVM_ADT_APFLOAT_H

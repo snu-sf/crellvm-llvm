@@ -34,6 +34,12 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/IR/ValueHandle.h"
 #include <algorithm>
+
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
+#include <memory>
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -1281,19 +1287,53 @@ Value *llvm::SimplifyFRemInst(Value *Op0, Value *Op1, FastMathFlags FMF,
 
 /// isUndefShift - Returns true if a shift by \c Amount always yields undef.
 static bool isUndefShift(Value *Amount) {
+  bool crellvm_doHintGen = crellvm::ValidationUnit::Exists() &&
+      crellvm::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_shift";
   Constant *C = dyn_cast<Constant>(Amount);
   if (!C)
     return false;
 
   // X shift by undef -> undef because it may shift by the bitwidth.
-  if (isa<UndefValue>(C))
+  if (isa<UndefValue>(C)) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(), {
+      //    <src>        |  <tgt>
+      // Z = X >>a undef | (Z equals undef)
+      //    <src>        |  <tgt>
+      // Z = X >>l undef | (Z equals undef)
+      //    <src>        |  <tgt>
+      // Z = X <<  undef | (Z equals undef)
+      auto ptr = data.get<crellvm::ArgForSimplifyShiftInst>();
+
+      ptr->setHintGenFunc("shift_undef1", [&hints](llvm::Instruction *I) {
+        INFRULE(INSTPOS(SRC, I), crellvm::ConsShiftUndef1::make(VAL(I), VAL(I->getOperand(0)), BITSIZE(*I)));
+      });
+    });
     return true;
+  }
 
   // Shifting by the bitwidth or more is undefined.
   if (ConstantInt *CI = dyn_cast<ConstantInt>(C))
     if (CI->getValue().getLimitedValue() >=
-        CI->getType()->getScalarSizeInBits())
+        CI->getType()->getScalarSizeInBits()) {
+      INTRUDE_IF(crellvm_doHintGen, CAPTURE(CI), {
+        //    <src>    |  <tgt>
+        // Z = X >>a C | (Z equals undef)
+        //   (C is not smaller than size of bit)
+        //    <src>    |  <tgt>
+        // Z = X >>l C | (Z equals undef)
+        //   (C is not smaller than size of bit)
+        //    <src>    |  <tgt>
+        // Z = X <<  C | (Z equals undef)
+        //   (C is not smaller than size of bit)
+        auto ptr = data.get<crellvm::ArgForSimplifyShiftInst>();
+
+        ptr->setHintGenFunc("shift_undef2", [CI, &hints](llvm::Instruction *I) {
+          INFRULE(INSTPOS(SRC, I), crellvm::ConsShiftUndef2::make(
+              VAL(I), VAL(I->getOperand(0)), CONSTINT(dyn_cast<ConstantInt>(CI)), BITSIZE(*I)));
+        });
+      });
       return true;
+    }
 
   // If all lanes of a vector shift are undefined the whole shift is.
   if (isa<ConstantVector>(C) || isa<ConstantDataVector>(C)) {
@@ -1310,6 +1350,8 @@ static bool isUndefShift(Value *Amount) {
 /// fold the result.  If not, this returns null.
 static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
                             const Query &Q, unsigned MaxRecurse) {
+  bool crellvm_doHintGen = crellvm::ValidationUnit::Exists() &&
+      crellvm::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_shift";
   if (Constant *C0 = dyn_cast<Constant>(Op0)) {
     if (Constant *C1 = dyn_cast<Constant>(Op1)) {
       Constant *Ops[] = { C0, C1 };
@@ -1317,17 +1359,56 @@ static Value *SimplifyShift(unsigned Opcode, Value *Op0, Value *Op1,
     }
   }
 
+  INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+    if (Op0->getType()->isVectorTy())
+      data.get<crellvm::ArgForSimplifyShiftInst>()->abort();
+    else if (!Op0->getType()->isIntegerTy())
+      assert(false && "Op0 must be integer or vector ty");
+  });
+
   // 0 shift by X -> 0
-  if (match(Op0, m_Zero()))
+  if (match(Op0, m_Zero())) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>    |  <tgt>
+      // Z = 0 >>a X | (Z equals 0)
+      //    <src>    |  <tgt>
+      // Z = 0 >>l X | (Z equals 0)
+      //    <src>    |  <tgt>
+      // Z = 0 <<  X | (Z equals 0)
+      auto ptr = data.get<crellvm::ArgForSimplifyShiftInst>();
+
+      ptr->setHintGenFunc("shift_zero1", [Op0, Op1, &hints](llvm::Instruction *I) {
+        INFRULE(INSTPOS(SRC, I), crellvm::ConsShiftZero1::make(VAL(I), VAL(I->getOperand(1)), BITSIZE(*I)));
+      });
+    });
     return Op0;
+  }
 
   // X shift by 0 -> X
-  if (match(Op1, m_Zero()))
+  if (match(Op1, m_Zero())) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>    |  <tgt>
+      // Z = X >>a 0 | (Z equals X)
+      //    <src>    |  <tgt>
+      // Z = X >>l 0 | (Z equals X)
+      //    <src>    |  <tgt>
+      // Z = X <<  0 | (Z equals X)
+      auto ptr = data.get<crellvm::ArgForSimplifyShiftInst>();
+
+      ptr->setHintGenFunc("shift_zero2", [Op0, Op1, &hints](llvm::Instruction *I) {
+        INFRULE(INSTPOS(SRC, I), crellvm::ConsShiftZero2::make(VAL(I), VAL(I->getOperand(0)), BITSIZE(*I)));
+      });
+    });
     return Op0;
+  }
 
   // Fold undefined shifts.
   if (isUndefShift(Op1))
     return UndefValue::get(Op0->getType());
+
+  INTRUDE_IF(crellvm_doHintGen, CAPTURE(), {
+    data.get<crellvm::ArgForSimplifyShiftInst>()->abort();
+  });
 
   // If the operation is with the result of a select instruction, check whether
   // operating on either branch of the select always yields the same value.
@@ -1558,6 +1639,14 @@ static Value *SimplifyAndOfICmps(ICmpInst *Op0, ICmpInst *Op1) {
 /// fold the result.  If not, this returns null.
 static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
                               unsigned MaxRecurse) {
+  bool crellvm_doHintGen = crellvm::ValidationUnit::Exists() &&
+        crellvm::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_and_inst";
+  INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+    if (Op0->getType()->isVectorTy())
+      data.get<crellvm::ArgForSimplifyAndInst>()->abort();
+    else if (!Op0->getType()->isIntegerTy())
+      assert(false && "Op0 must be integer or vector ty");
+  });
   if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
     if (Constant *CRHS = dyn_cast<Constant>(Op1)) {
       Constant *Ops[] = { CLHS, CRHS };
@@ -1570,36 +1659,138 @@ static Value *SimplifyAndInst(Value *Op0, Value *Op1, const Query &Q,
   }
 
   // X & undef -> 0
-  if (match(Op1, m_Undef()))
+  if (match(Op1, m_Undef())){
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>      |  <tgt>
+      // Z = X & undef | (Z equals 0)
+      auto ptr = data.get<crellvm::ArgForSimplifyAndInst>();
+
+      ptr->setHintGenFunc("and_undef", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        // auto zero = Constant::getNullValue(Op0->getType());
+        // auto: If Z = undef & X, apply commutativity
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsAndUndef::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
     return Constant::getNullValue(Op0->getType());
+  }
 
   // X & X = X
-  if (Op0 == Op1)
+  if (Op0 == Op1){
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>  |  <tgt>
+      // Z = X & X | (Z equals X)
+      auto ptr = data.get<crellvm::ArgForSimplifyAndInst>();
+      
+      ptr->setHintGenFunc("and_same", [Op0, Op1, &hints](llvm::Instruction *I){
+        INFRULE(INSTPOS(SRC, I), crellvm::ConsAndSame::make(VAL(I), VAL(Op0), BITSIZE(*I)));
+      });
+    });
     return Op0;
+  }
 
   // X & 0 = 0
-  if (match(Op1, m_Zero()))
+  if (match(Op1, m_Zero())){
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>  |  <tgt>
+      // Z = X & 0 | (Z equals 0)
+      auto ptr = data.get<crellvm::ArgForSimplifyAndInst>();
+
+      ptr->setHintGenFunc("and_zero", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        // auto: If Z = 0 & X, apply commutativity
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsAndZero::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
     return Op1;
+  }
 
   // X & -1 = X
-  if (match(Op1, m_AllOnes()))
+  if (match(Op1, m_AllOnes())){
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>   |  <tgt>
+      // Z = X & -1 | (Z equals X)
+      auto ptr = data.get<crellvm::ArgForSimplifyAndInst>();
+      
+      ptr->setHintGenFunc("and_mone", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        // auto: If Z = -1 & X, apply commutativity
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsAndMone::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
     return Op0;
+  }
 
   // A & ~A  =  ~A & A  =  0
   if (match(Op0, m_Not(m_Specific(Op1))) ||
-      match(Op1, m_Not(m_Specific(Op0))))
+      match(Op1, m_Not(m_Specific(Op0)))){
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>   |  <tgt>
+      // Y = X ^ -1 | Y = X ^ -1
+      // Z = X & Y  | (Z equals 0)
+      auto ptr = data.get<crellvm::ArgForSimplifyAndInst>();
+      bool isOp1NotOfOp0 = match(Op1, m_Not(m_Specific(Op0))); // if this is true, (Op0 & Op1) coalesces with and_not inference rule
+      
+      ptr->setHintGenFunc("and_not", [isOp1NotOfOp0, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        Value *X = isOp1NotOfOp0 ? Op0 : Op1;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOfOp0 ? Op1 : Op0);
+        //assert(Y);
+
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+        // auto: If Y = -1 ^ X, apply commutativity
+        //if((isSwapped && isOp1NotOfOp0) || (!isSwapped && !isOp1NotOfOp0))
+        //  crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsAndNot::make(VAL(Z), VAL(X), VAL(Y), BITSIZE(*Z)));
+      });
+    });
     return Constant::getNullValue(Op0->getType());
+  }
 
   // (A | ?) & A = A
   Value *A = nullptr, *B = nullptr;
   if (match(Op0, m_Or(m_Value(A), m_Value(B))) &&
-      (A == Op1 || B == Op1))
+      (A == Op1 || B == Op1)){
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>  |   <tgt>
+      // Y = X | A | Y = X | A
+      // Z = X & Y | (Z equals X)
+      auto ptr = data.get<crellvm::ArgForSimplifyAndInst>();
+      
+      ptr->setHintGenFunc("and_or", [Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
+        //assert(Z);
+        //assert(Y);
+        crellvm::generateHintForAndOr(Z, Op1, Y, 
+            (Y->getOperand(0) == Op1 ? Y->getOperand(1) : Y->getOperand(0)));
+      });
+    });
     return Op1;
+  }
 
   // A & (A | ?) = A
   if (match(Op1, m_Or(m_Value(A), m_Value(B))) &&
-      (A == Op0 || B == Op0))
-    return Op0;
+      (A == Op0 || B == Op0)){
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>  |   <tgt>
+      // Y = X | A | Y = X | A
+      // Z = X & Y | (Z equals X)
+      auto ptr = data.get<crellvm::ArgForSimplifyAndInst>();
+      
+      ptr->setHintGenFunc("and_or", [Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+        //assert(Y);
+        crellvm::generateHintForAndOr(Z, Op0, Y, 
+            (Y->getOperand(0) == Op0 ? Y->getOperand(1) : Y->getOperand(0)));
+      });
+    });
+   return Op0;
+  }
+
+  INTRUDE_IF(crellvm_doHintGen, CAPTURE(),
+  { data.get<crellvm::ArgForSimplifyAndInst>()->abort(); });
 
   // A & (-A) = A if A is a power of two or zero.
   if (match(Op0, m_Neg(m_Specific(Op1))) ||
@@ -1717,6 +1908,15 @@ static Value *SimplifyOrOfICmps(ICmpInst *Op0, ICmpInst *Op1) {
 /// fold the result.  If not, this returns null.
 static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
                              unsigned MaxRecurse) {
+  bool crellvm_doHintGen = crellvm::ValidationUnit::Exists() &&
+        crellvm::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_or_inst";
+  INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0), {
+    if (Op0->getType()->isVectorTy())
+      data.get<crellvm::ArgForSimplifyOrInst>()->abort();
+    else if (!Op0->getType()->isIntegerTy())
+      assert(false && "Op0 must be integer or vector ty");
+  });
+
   if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
     if (Constant *CRHS = dyn_cast<Constant>(Op1)) {
       Constant *Ops[] = { CLHS, CRHS };
@@ -1729,36 +1929,119 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   }
 
   // X | undef -> -1
-  if (match(Op1, m_Undef()))
+  if (match(Op1, m_Undef())) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>      |  <tgt>
+      // Z = X | undef | (Z equals -1)
+      auto ptr = data.get<crellvm::ArgForSimplifyOrInst>();
+      
+      ptr->setHintGenFunc("or_undef", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        // auto one = Constant::getAllOnesValue(Op0->getType());
+        // auto: If Z = undef | Z, apply commutativity
+        //if (ptr->isSwapped) crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsOrUndef::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
+
     return Constant::getAllOnesValue(Op0->getType());
+  }
 
   // X | X = X
-  if (Op0 == Op1)
+  if (Op0 == Op1) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0), {
+      //    <src>  |  <tgt>
+      // Z = X | X | (Z equals X)
+      auto ptr = data.get<crellvm::ArgForSimplifyOrInst>();
+      ptr->setHintGenFunc("or_same", [Op0, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsOrSame::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
+
     return Op0;
+  }
 
   // X | 0 = X
-  if (match(Op1, m_Zero()))
+  if (match(Op1, m_Zero())) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>  |  <tgt>
+      // Z = X | 0 | (Z equals X)
+      auto ptr = data.get<crellvm::ArgForSimplifyOrInst>();
+      
+      ptr->setHintGenFunc("or_zero", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        // auto: If Z = 0 | X, apply commutativity
+        //if (ptr->isSwapped) crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsOrZero::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
     return Op0;
+  }
 
   // X | -1 = -1
-  if (match(Op1, m_AllOnes()))
+  if (match(Op1, m_AllOnes())) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>   |  <tgt>
+      // Z = X | -1 | (Z equals -1)
+      auto ptr = data.get<crellvm::ArgForSimplifyOrInst>();
+      
+      ptr->setHintGenFunc("or_mone", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        // auto: If Z = -1 | X, apply commutativity
+        //if (ptr->isSwapped) crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsOrMone::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
     return Op1;
+  }
 
   // A | ~A  =  ~A | A  =  -1
   if (match(Op0, m_Not(m_Specific(Op1))) ||
-      match(Op1, m_Not(m_Specific(Op0))))
+      match(Op1, m_Not(m_Specific(Op0)))) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>   |  <tgt>
+      // Y = X ^ -1 | Y = X ^ -1
+      // Z = X | Y  | (Z equals -1)
+      auto ptr = data.get<crellvm::ArgForSimplifyOrInst>();
+      //bool isSwapped = ptr->isSwapped;
+      bool isOp1NotOp0 = match(Op1, m_Not(m_Specific(Op0)));
+
+      ptr->setHintGenFunc("or_not", [isOp1NotOp0, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        Value *X = isOp1NotOp0 ? Op0 : Op1;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOp0 ? Op1 : Op0);
+        //assert(Y && "Y must be a binary operator");
+        
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+        
+        // auto: If Y = -1 ^ X, apply commmutativity
+        //if (Y->getOperand(0) != X) crellvm::applyCommutativity(hints, Z, Y, SRC);
+        //if ((!isSwapped && !isOp1NotOp0) || (isSwapped && isOp1NotOp0))
+        //  crellvm::applyCommutativity(hints, Z, Z, SRC);
+
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsOrNot::make(VAL(Z), VAL(Y), VAL(X), BITSIZE(*Z)));
+      });
+    });
     return Constant::getAllOnesValue(Op0->getType());
+  }
 
   // (A & ?) | A = A
   Value *A = nullptr, *B = nullptr;
   if (match(Op0, m_And(m_Value(A), m_Value(B))) &&
-      (A == Op1 || B == Op1))
+      (A == Op1 || B == Op1)) {
+    if (crellvm_doHintGen)
+      crellvm::generateHintForOrAnd(dyn_cast<BinaryOperator>(Op0), Op1, (A == Op1 ? B : A));
     return Op1;
+  }
 
   // A | (A & ?) = A
   if (match(Op1, m_And(m_Value(A), m_Value(B))) &&
-      (A == Op0 || B == Op0))
+      (A == Op0 || B == Op0)) {
+    if (crellvm_doHintGen)
+      crellvm::generateHintForOrAnd(dyn_cast<BinaryOperator>(Op0), Op1, (A == Op1 ? B : A));
     return Op0;
+  }
 
   // ~(A & ?) | A = -1
   if (match(Op0, m_Not(m_And(m_Value(A), m_Value(B)))) &&
@@ -1769,6 +2052,9 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const Query &Q,
   if (match(Op1, m_Not(m_And(m_Value(A), m_Value(B)))) &&
       (A == Op0 || B == Op0))
     return Constant::getAllOnesValue(Op0->getType());
+
+  INTRUDE_IF(crellvm_doHintGen, CAPTURE(),
+  { data.get<crellvm::ArgForSimplifyOrInst>()->abort(); });
 
   if (auto *ICILHS = dyn_cast<ICmpInst>(Op0)) {
     if (auto *ICIRHS = dyn_cast<ICmpInst>(Op1)) {
@@ -1853,6 +2139,14 @@ Value *llvm::SimplifyOrInst(Value *Op0, Value *Op1, const DataLayout &DL,
 /// fold the result.  If not, this returns null.
 static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
                               unsigned MaxRecurse) {
+  bool crellvm_doHintGen = crellvm::ValidationUnit::Exists() &&
+        crellvm::ValidationUnit::GetInstance()->getOptimizationName() == "simplify_xor_inst";
+  INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0), {
+    if (Op0->getType()->isVectorTy())
+      data.get<crellvm::ArgForSimplifyXorInst>()->abort();
+    else if (!Op0->getType()->isIntegerTy())
+      assert(false && "Op0 must be integer or vector ty");
+  });
   if (Constant *CLHS = dyn_cast<Constant>(Op0)) {
     if (Constant *CRHS = dyn_cast<Constant>(Op1)) {
       Constant *Ops[] = { CLHS, CRHS };
@@ -1865,21 +2159,83 @@ static Value *SimplifyXorInst(Value *Op0, Value *Op1, const Query &Q,
   }
 
   // A ^ undef -> undef
-  if (match(Op1, m_Undef()))
+  if (match(Op1, m_Undef())) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>      |  <tgt>
+      // Z = X ^ undef | (Z equals undef)
+      auto ptr = data.get<crellvm::ArgForSimplifyXorInst>();
+      
+      ptr->setHintGenFunc("xor_undef", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        // auto: If Z = undef ^ X, apply commutativity
+        //if(ptr->isSwapped) crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsXorUndef::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
     return Op1;
+  }
 
   // A ^ 0 = A
-  if (match(Op1, m_Zero()))
+  if (match(Op1, m_Zero())) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>  |  <tgt>
+      // Z = X ^ 0 | (Z equals A)
+      auto ptr = data.get<crellvm::ArgForSimplifyXorInst>();
+      ptr->setHintGenFunc("xor_zero", [ptr, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        // auto: If Z = 0 ^ X, apply commutativity
+        //if(ptr->isSwapped) crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsXorZero::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
     return Op0;
+  }
 
   // A ^ A = 0
-  if (Op0 == Op1)
+  if (Op0 == Op1) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>  |  <tgt>
+      // Z = X ^ X | (Z equals 0)
+      auto ptr = data.get<crellvm::ArgForSimplifyXorInst>();
+
+      ptr->setHintGenFunc("xor_same", [Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsXorSame::make(VAL(Z), VAL(Op0), BITSIZE(*Z)));
+      });
+    });
     return Constant::getNullValue(Op0->getType());
+  }
 
   // A ^ ~A  =  ~A ^ A  =  -1
   if (match(Op0, m_Not(m_Specific(Op1))) ||
-      match(Op1, m_Not(m_Specific(Op0))))
+      match(Op1, m_Not(m_Specific(Op0)))) {
+    INTRUDE_IF(crellvm_doHintGen, CAPTURE(Op0, Op1), {
+      //    <src>   |  <tgt>
+      // Y = X ^ -1 | Y = X ^ -1
+      // Z = X ^ Y  | (Z equals -1)
+      auto ptr = data.get<crellvm::ArgForSimplifyXorInst>();
+      bool isOp1NotOfOp0 = match(Op1, m_Not(m_Specific(Op0))); // if this is true, (Op0 & Op1) coalesces with and_not inference rule
+      
+      ptr->setHintGenFunc("xor_not", [isOp1NotOfOp0, Op0, Op1, &hints](llvm::Instruction *I){
+        BinaryOperator *Z = dyn_cast<BinaryOperator>(I);
+        Value *X = isOp1NotOfOp0 ? Op0 : Op1;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(isOp1NotOfOp0 ? Op1 : Op0);
+        //assert(Y);
+
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+        // auto: If Y = -1 ^ X, apply commutativity
+        //if(Y->getOperand(0) != X)
+        //  crellvm::applyCommutativity(hints, Z, Y, SRC);
+        //if((isSwapped && isOp1NotOfOp0) || (!isSwapped && !isOp1NotOfOp0))
+        //  crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsXorNot::make(VAL(Z), VAL(X), VAL(Y), BITSIZE(*Z)));
+      });
+    });
     return Constant::getAllOnesValue(Op0->getType());
+  }
+
+  INTRUDE_IF(crellvm_doHintGen, CAPTURE(),
+  { data.get<crellvm::ArgForSimplifyXorInst>()->abort(); });
 
   // Try some generic simplifications for associative operations.
   if (Value *V = SimplifyAssociativeBinOp(Instruction::Xor, Op0, Op1, Q,

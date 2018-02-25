@@ -124,7 +124,6 @@ typedef struct LLVMOpaquePassRegistry *LLVMPassRegistryRef;
  * @see llvm::Use */
 typedef struct LLVMOpaqueUse *LLVMUseRef;
 
-
 /**
  * @see llvm::DiagnosticInfo
  */
@@ -3018,6 +3017,225 @@ LLVMBool LLVMIsMultithreaded(void);
  * @}
  */
 
+/** Used to get the APInt. See the llvm::APInt class. */
+typedef struct LLVMOpaqueAPInt *LLVMAPIntRef;
+
+/** Used to get the APFloat. See the llvm::APFloat class. */
+typedef struct LLVMOpaqueAPFloat *LLVMAPFloatRef;
+
+/* Used to provide a slot tracker.
+ * See the llvm::SlotTracker class.
+ */
+typedef struct LLVMOpaqueSlotTracker *LLVMSlotTrackerRef;
+
+  
+/* added for vellvm - start */
+
+typedef enum {
+  LLVMIEEEhalf         = 0,
+  LLVMIEEEsingle         ,
+  LLVMIEEEdouble         ,
+  LLVMIEEEquad           ,
+  LLVMPPCDoubleDouble    ,
+  LLVMX87DoubleExtended 
+} LLVMAPFloatSemantics;
+
+typedef enum {
+  LLVMLessThan		= 0,
+  LLVMEqual		,
+  LLVMGreaterThan	,
+  LLVMUnordered		
+} LLVMAPFloatCmpResult;	    
+
+typedef enum {
+  LLVMNotIntrinsic      	= 0,
+  LLVMExpect			,
+  LLVMSetjmp			,
+  LLVMSigSetjmp			,
+  LLVMLongjmp			,
+  LLVMSigLongjmp		,
+  LLVMCtpop			,
+  LLVMBswap			,
+  LLVMCtlz			,
+  LLVMCttz			,
+  LLVMStackSave			,
+  LLVMStackRestore		,
+  LLVMReturnAddress		,
+  LLVMFrameAddress		,
+  LLVMPrefetch			,
+  LLVMPcmarker			,
+  LLVMReadCycleCounter		,
+  LLVMDbgDeclare		,
+  /* LLVMEhException		, */
+  /* LLVMEhSelector		, */
+  LLVMEhTypeidFor		,
+  LLVMVarAnnotation		,
+  LLVMMemcpy			,
+  LLVMMemmove			,
+  LLVMMemset			,
+  LLVMSqrt			,
+  LLVMLog			,
+  LLVMLog2			,
+  LLVMLog10			,
+  LLVMExp			,
+  LLVMExp2			,
+  LLVMPow			,
+  LLVMFltRounds			,
+  LLVMInvariantStart		,
+  LLVMLifetimeStart		,
+  LLVMInvariantEnd		,
+  LLVMLifetimeEnd		,
+  LLVMUnsupportedIntrinsic
+} LLVMIntrinsicID;
+  
+/* Operations on all values */  
+const char *LLVMGetEscapedValueName(LLVMValueRef Val);
+int LLVMHasName(LLVMValueRef Val);
+int LLVMIsGlobalValue(LLVMValueRef Val);
+  
+/* Constant expressions */
+unsigned LLVMConstAggregateValueGetNumIndices(LLVMValueRef AggConstant);
+void LLVMConstAggregateValueGetIndices(LLVMValueRef AggConstant, 
+		                          unsigned *IdxList, 
+                                          unsigned NumIdx);  
+
+/* Operations on global variables */
+int LLVMHasInitializer(LLVMValueRef GlobalVar);
+
+/* Operations on functions */  
+LLVMIntrinsicID LLVMGetSupportedIntrinsicID(LLVMValueRef Fn);  
+
+/*===-- Named Types -------------------------------------------------------===*/
+const char *LLVMGetFirstNamedType(LLVMModuleRef M);
+const char *LLVMGetNextNamedType(LLVMModuleRef M, const char *Name);
+
+/* Operations on Users */
+void LLVMGetOperands(LLVMValueRef Val, LLVMValueRef *Operands);
+
+/* Operations on APInt */
+void LLVMDisposeAPInt(LLVMAPIntRef I);
+void LLVMAPIntDump(LLVMAPIntRef I);
+const char * LLVMAPIntToString(LLVMAPIntRef I, unsigned Radix, int Signed);
+unsigned long long LLVMAPIntGetZExtValue(LLVMAPIntRef I);
+unsigned long long LLVMAPIntGetSExtValue(LLVMAPIntRef I);
+int LLVMAPIntArrayIndex(LLVMAPIntRef I, unsigned BitPosition);
+unsigned long long LLVMAPIntGetRawData(LLVMAPIntRef I, unsigned Index);
+int LLVMAPIntIsNegative(LLVMAPIntRef I);
+int LLVMAPIntIsNonNegative(LLVMAPIntRef I);
+int LLVMAPIntIsStrictlyPositive(LLVMAPIntRef I);
+int LLVMAPIntGetBoolValue(LLVMAPIntRef I);
+unsigned LLVMAPIntGetBitWidth(LLVMAPIntRef I);
+unsigned LLVMAPIntGetNumWords(LLVMAPIntRef I);
+unsigned LLVMAPIntGetActiveBits(LLVMAPIntRef I);
+unsigned LLVMAPIntGetActiveWords(LLVMAPIntRef I);
+LLVMAPIntRef LLVMAPIntInc(LLVMAPIntRef I);
+int LLVMAPIntCompare(LLVMAPIntRef I1, LLVMAPIntRef I2);
+int LLVMAPIntCompareOrd(LLVMAPIntRef I1, LLVMAPIntRef I2);
+LLVMAPIntRef LLVMAPIntConstIntGetValue(LLVMValueRef ConstantVal);
+LLVMValueRef LLVMAPIntConstAPInt(LLVMContextRef Context, LLVMAPIntRef N);
+LLVMAPIntRef LLVMAPIntOfInt64(unsigned NumBits, unsigned long long Val,
+		              int IsSigned);
+
+/* Operations on APFloat */
+void LLVMDisposeAPFloat(LLVMAPFloatRef F);
+LLVMAPIntRef LLVMAPFloatBitcastToAPInt(LLVMAPFloatRef F);
+double LLVMAPFloatConvertToDouble(LLVMAPFloatRef F);
+double LLVMAPFloatConvertToFloat(LLVMAPFloatRef F);
+LLVMAPFloatSemantics LLVMAPFloatGetSemantics(LLVMAPFloatRef F);
+LLVMAPFloatCmpResult LLVMAPFloatCompare(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
+LLVMAPFloatCmpResult LLVMAPFloatCompareOrd(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
+int LLVMAPFloatBitwiseIsEqual(LLVMAPFloatRef F1, LLVMAPFloatRef F2);
+LLVMAPFloatRef LLVMAPFloatConstFloatGetValue(LLVMValueRef ConstantVal);
+LLVMValueRef LLVMAPFloatConstAPFloat(LLVMContextRef Ctx, LLVMAPFloatRef F);
+const char * LLVMAPFloatToString(LLVMAPFloatRef F);  
+
+int LLVMHasFnAttr(LLVMValueRef Fn, LLVMAttribute PA);
+int LLVMHasRetAttr(LLVMValueRef Fn, LLVMAttribute PA);
+int LLVMHasAttribute(LLVMValueRef Arg, LLVMAttribute PA);
+
+int LLVMHasInstrRetAttribute(LLVMValueRef Instr, LLVMAttribute PA);
+int LLVMHasInstrParamAttribute(LLVMValueRef Instr, unsigned index, 
+                              LLVMAttribute PA);
+int LLVMHasInstrAttribute(LLVMValueRef Instr, LLVMAttribute PA);  
+
+/* Operations on AllocationInst */
+int LLVMAllocationInstIsArrayAllocation(LLVMValueRef Inst);
+LLVMValueRef LLVMAllocationInstGetArraySize(LLVMValueRef Inst);
+LLVMTypeRef LLVMAllocationInstGetAllocatedType(LLVMValueRef Inst);
+unsigned LLVMAllocationInstGetAlignment(LLVMValueRef Inst);
+
+/* Operations on LoadInst */
+unsigned LLVMLoadInstGetAlignment(LLVMValueRef Inst);
+
+/* Operations on StoreInst */
+unsigned LLVMStoreInstGetAlignment(LLVMValueRef Inst);
+  
+/* Operations on CmpInst */
+LLVMIntPredicate LLVMCmpInstGetPredicate(LLVMValueRef Inst);
+LLVMIntPredicate LLVMCmpInstConstGetPredicate(LLVMValueRef CE);
+
+/* Operations on BranchInst */
+int LLVMBranchInstIsConditional(LLVMValueRef Inst);
+LLVMValueRef LLVMBranchInstGetCondition(LLVMValueRef Inst);
+LLVMBasicBlockRef LLVMBranchInstGetSuccessor(LLVMValueRef Inst, unsigned idx);
+
+/* Operations on SwitchInst */
+LLVMValueRef LLVMSwitchInstGetCondition(LLVMValueRef Inst);
+LLVMBasicBlockRef LLVMSwitchInstGetDefaultDest(LLVMValueRef Inst);
+LLVMBasicBlockRef LLVMSwitchInstGetSuccessor(LLVMValueRef Inst, unsigned idx);
+LLVMValueRef LLVMSwitchInstGetCaseValue(LLVMValueRef Inst, unsigned idx);
+
+/* Operations on GetElementPtrInst */
+int LLVMGetElementPtrInstIsInBounds(LLVMValueRef Inst);  
+
+/* Operations on ReturnInst */
+int LVMReturnInstIsVoid(LLVMValueRef Inst);
+
+/* Operations on InsertValueInst */
+unsigned LLVMInsertValueInstGetNumIndices(LLVMValueRef Inst);
+void LLVMInsertValueInstGetIndices(LLVMValueRef Inst, unsigned *IdxList, 
+		                   unsigned NumIdx);
+
+/* Operations on ExtractValueInst */
+unsigned LLVMExtractValueInstGetNumIndices(LLVMValueRef Inst);
+void LLVMExtractValueInstGetIndices(LLVMValueRef Inst, unsigned *IdxList, 
+		                    unsigned NumIdx);
+
+/* Operations on CallInst */
+LLVMValueRef LLVMGetCalledValue(LLVMValueRef Inst);
+  
+/*===-- SlotTracker -------------------------------------------------------===*/
+
+/** Constructs a new SlotTracker for a module. 
+ *  See the constructor of llvm::SlotTracker. */
+LLVMSlotTrackerRef LLVMCreateSlotTrackerOfModule(LLVMModuleRef M);
+
+/** Allows us to deal with a function [f] instead of just a module, use 
+ * this method to get its data into the SlotTracker.
+ * See the method llvm::SlotTracker::incorporateFunction. */
+void LLVMSlotTrackerIncorporateFunction(LLVMSlotTrackerRef ST, LLVMValueRef Fn);
+
+/** After calling incorporateFunction, use this method to remove the most recently 
+ *  incorporated function from the SlotTracker. This will reset the state of 
+ *  the machine back to just the module contents. 
+ *  See the method llvm::SlotTracker::purgeFucntion. */
+void LLVMSlotTrackerPurgeFunction(LLVMSlotTrackerRef ST);
+
+/** Gets the slot number of a global value.
+    See the method llvm::SlotTracker::getGlobalSlot. */
+int LLVMSlotTrackerGetGlobalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Global);
+
+/** Gets the slot number of a local value.
+    See the method llvm::SlotTracker::getLocalSlot. */
+int LLVMSlotTrackerGetLocalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Val);
+
+/** Disposes a SlotTracker.
+ *  See llvm::SlotTracker::~SlotTracker. */
+void LLVMDisposeSlotTracker(LLVMSlotTrackerRef ST);
+
+unsigned LLVMGetArrayLengthOfDataArray(LLVMValueRef c);  
+/* added for vellvm - end */
+  
 #ifdef __cplusplus
 }
 #endif /* !defined(__cplusplus) */

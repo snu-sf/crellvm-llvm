@@ -16,6 +16,11 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesCasts.h"
+#include "llvm/Crellvm/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -296,6 +301,145 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
             isEliminableCastPair(CSrc, CI.getOpcode(), CI.getType(), DL)) {
       // The first cast (CSrc) is eliminable so we need to fix up or replace
       // the second cast (CI). CSrc will then have a good chance of being dead.
+      
+      crellvm::ValidationUnit::Begin("cast_cast", CI);
+      INTRUDE(CAPTURE(&CI, &CSrc), {
+        //     <src>                          |    <tgt>
+        // mid = <opcode1> srcty src to midty | mod = <opcode1> srcty src to midty
+        // dst = <opcode2> midty mid to dstty | dst = <opcode'> srcty src to dstty
+        Value *src = CSrc->getOperand(0);
+        CastInst *mid = CSrc;
+        CastInst *dst = &CI;
+        Type *srcty = src->getType();
+        Type *midty = mid->getType();
+        Type *dstty = dst->getType();
+        
+        auto _create_infrule_name = [](CastInst *fst, CastInst *snd){
+          return std::string(snd->getOpcodeName()) + "_" + fst->getOpcodeName();
+        };
+
+        std::function<std::shared_ptr<crellvm::TyInfrule>(std::shared_ptr<crellvm::TyValue>, 
+            std::shared_ptr<crellvm::TyValue>, std::shared_ptr<crellvm::TyValue>,
+            std::shared_ptr<crellvm::TyValueType>, std::shared_ptr<crellvm::TyValueType>, 
+            std::shared_ptr<crellvm::TyValueType>) >
+            makeInfruleFunc = nullptr;
+        std::string new_optname;
+
+        crellvm::propagateInstruction(hints, mid, dst, SRC);
+
+        if (llvm::isa<BitCastInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsBitcastBitcast::make;
+          else if (llvm::isa<FPExtInst>(dst))
+            makeInfruleFunc = crellvm::ConsFpextBitcast::make;
+          else if (llvm::isa<FPToSIInst>(dst))
+            makeInfruleFunc = crellvm::ConsFptosiBitcast::make;
+          else if (llvm::isa<FPToUIInst>(dst))
+            makeInfruleFunc = crellvm::ConsFptouiBitcast::make;
+          else if (llvm::isa<FPTruncInst>(dst))
+            makeInfruleFunc = crellvm::ConsFptruncBitcast::make;
+          else if (llvm::isa<IntToPtrInst>(dst))
+            makeInfruleFunc = crellvm::ConsInttoptrBitcast::make;
+          else if (llvm::isa<PtrToIntInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsPtrtointBitcast::make;
+          else if (llvm::isa<SExtInst>(dst))
+            makeInfruleFunc = crellvm::ConsSextBitcast::make;
+          else if (llvm::isa<SIToFPInst>(dst))
+            makeInfruleFunc = crellvm::ConsSitofpBitcast::make;
+          else if (llvm::isa<TruncInst>(dst))
+            makeInfruleFunc = crellvm::ConsTruncBitcast::make;
+          else if (llvm::isa<UIToFPInst>(dst))
+            makeInfruleFunc = crellvm::ConsUitofpBitcast::make;
+          else if (llvm::isa<ZExtInst>(dst))
+            makeInfruleFunc = crellvm::ConsZextBitcast::make;
+          
+        } else if (llvm::isa<FPExtInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastFpext::make;
+          else if (llvm::isa<FPExtInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsFpextFpext::make;
+          else if (llvm::isa<FPToSIInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsFptosiFpext::make;
+          else if (llvm::isa<FPToUIInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsFptouiFpext::make;
+          else if (llvm::isa<FPTruncInst>(dst))
+            makeInfruleFunc = crellvm::ConsFptruncFpext::make;
+        
+        } else if (llvm::isa<FPToSIInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsBitcastFptosi::make;
+
+        } else if (llvm::isa<FPToUIInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastFptoui::make;
+
+        } else if (llvm::isa<FPTruncInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsBitcastFptrunc::make;
+
+        } else if (llvm::isa<IntToPtrInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastInttoptr::make;
+          else if (llvm::isa<PtrToIntInst>(dst))
+            makeInfruleFunc = crellvm::ConsPtrtointInttoptr::make;
+            
+        } else if (llvm::isa<PtrToIntInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastPtrtoint::make;
+          else if (llvm::isa<IntToPtrInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsInttoptrPtrtoint::make;
+          else if (llvm::isa<TruncInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsTruncPtrtoint::make;
+
+        } else if (llvm::isa<SExtInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastSext::make;
+          else if (llvm::isa<SExtInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsSextSext::make;
+          else if (llvm::isa<SIToFPInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsSitofpSext::make;
+          else if (llvm::isa<TruncInst>(dst))
+            makeInfruleFunc = crellvm::ConsTruncSext::make;
+        
+        } else if (llvm::isa<SIToFPInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastSitofp::make;
+
+        } else if (llvm::isa<TruncInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastTrunc::make;
+          else if (llvm::isa<TruncInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsTruncTrunc::make;
+
+        } else if (llvm::isa<UIToFPInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastUitofp::make;
+
+        } else if (llvm::isa<ZExtInst>(mid)) {
+          if (llvm::isa<BitCastInst>(dst))
+            makeInfruleFunc = crellvm::ConsBitcastZext::make;
+          else if (llvm::isa<SExtInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsSextZext::make;
+          else if (llvm::isa<SIToFPInst>(dst))
+            makeInfruleFunc = crellvm::ConsSitofpZext::make;
+          else if (llvm::isa<TruncInst>(dst))
+            makeInfruleFunc = crellvm::ConsTruncZext::make;
+          else if (llvm::isa<UIToFPInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsUitofpZext::make;
+          else if (llvm::isa<ZExtInst>(dst)) 
+            makeInfruleFunc = crellvm::ConsZextZext::make;
+
+        }
+        if (!(makeInfruleFunc == nullptr)) {
+          new_optname = _create_infrule_name(mid, dst);
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName(new_optname);
+          INFRULE(INSTPOS(SRC, dst), makeInfruleFunc(VAL(src), VAL(mid),
+                  VAL(dst), VALTYPE(srcty), VALTYPE(midty), VALTYPE(dstty)));
+        } else {
+          crellvm::ValidationUnit::Abort();
+        }
+      });
+
       return CastInst::Create(opc, CSrc->getOperand(0), CI.getType());
     }
   }
@@ -470,8 +614,28 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
 
   // Canonicalize trunc x to i1 -> (icmp ne (and x, 1), 0), likewise for vector.
   if (DestTy->getScalarSizeInBits() == 1) {
+    // XXX : trunc_onebit ValidationUnit
+    crellvm::ValidationUnit::Begin("trunc_onebit", CI);
+    
     Constant *One = ConstantInt::get(Src->getType(), 1);
     Src = Builder->CreateAnd(Src, One);
+
+    INTRUDE(CAPTURE(&CI, &Src), {
+      crellvm::name_instructions(*CI.getParent()->getParent());
+      //     <src>               <tgt>
+      //                   | y = and x, 1
+      // z = trunc x to i1 | z = icmp ne y, 0
+      TruncInst *Z = dyn_cast<TruncInst>(&CI);
+      BinaryOperator *Y = dyn_cast<BinaryOperator>(Src);
+      Value *X = CI.getOperand(0);
+
+      crellvm::insertSrcNopAtTgtI(hints, Y);
+      PROPAGATE(MAYDIFF(crellvm::getVariable(*Y), Physical), crellvm::ConsGlobal::make());
+      
+      crellvm::propagateInstruction(hints, Y, Z, TGT);
+      INFRULE(INSTPOS(TGT, Z), crellvm::ConsTruncOnebit::make(
+          VAL(Z), VAL(X), VAL(Y), BITSIZE(*X)));
+    });
     Value *Zero = Constant::getNullValue(Src->getType());
     return new ICmpInst(ICmpInst::ICMP_NE, Src, Zero);
   }
@@ -874,23 +1038,88 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
   Value *X;
   if (SrcI &&
       match(SrcI, m_OneUse(m_And(m_Trunc(m_Value(X)), m_Constant(C)))) &&
-      X->getType() == CI.getType())
+      X->getType() == CI.getType()) {
+    crellvm::ValidationUnit::Begin("zext_trunc_and", CI);
+    INTRUDE(CAPTURE(&CI, &X, &C), {
+      //        <src>        |       <tgt>
+      // y = trunc s x to s' | y = trunc s x to s'
+      // w = and y, c        | w = and y, c
+      // z = zext s' w to s  | z = and x, (zext s c)
+      ZExtInst *Z = dyn_cast<ZExtInst>(&CI);
+      BinaryOperator *W = dyn_cast<BinaryOperator>(Z->getOperand(0));
+      Instruction *Y = dyn_cast<Instruction>(W->getOperand(0));
+
+      crellvm::propagateInstruction(hints, Y, Z, SRC);
+      crellvm::propagateInstruction(hints, W, Z, SRC);
+      INFRULE(INSTPOS(SRC, Z), crellvm::ConsZextTruncAnd::make(
+          VAL(Z), VAL(X), VAL(Y), VAL(W), CONSTANT(C), BITSIZE(*X), BITSIZE(*Y)));
+    });
     return BinaryOperator::CreateAnd(X, ConstantExpr::getZExt(C, CI.getType()));
+  }
 
   // zext((trunc(X) & C) ^ C) -> ((X & zext(C)) ^ zext(C)).
   Value *And;
   if (SrcI && match(SrcI, m_OneUse(m_Xor(m_Value(And), m_Constant(C)))) &&
       match(And, m_OneUse(m_And(m_Trunc(m_Value(X)), m_Specific(C)))) &&
       X->getType() == CI.getType()) {
+    crellvm::ValidationUnit::Begin("zext_trunc_and_xor", CI);
+    
     Constant *ZC = ConstantExpr::getZExt(C, CI.getType());
-    return BinaryOperator::CreateXor(Builder->CreateAnd(X, ZC), ZC);
+    Value *NewAnd = Builder->CreateAnd(X, ZC);
+
+    INTRUDE(CAPTURE(&CI, &X, &And, &NewAnd, &C), {
+      crellvm::name_instructions(*CI.getParent()->getParent());
+      //        <src>        |       <tgt>
+      // v = trunc s x to s' | v = trunc s x to s'
+      // w = and s' v, c     | w = and s' v, c
+      // y = xor s' w, c     | y = xor s' w, c
+      // <nop>               | y' = and s x, (zext c to s)
+      // z = zext s' y to s  | z  = xor s y', (zext c to s)
+      ZExtInst *Z = dyn_cast<ZExtInst>(&CI);
+      BinaryOperator *Yprime = dyn_cast<BinaryOperator>(NewAnd);
+      BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(0));
+      BinaryOperator *W = dyn_cast<BinaryOperator>(And);
+      TruncInst *V = dyn_cast<TruncInst>(W->getOperand(0));
+
+      crellvm::insertSrcNopAtTgtI(hints, Yprime);
+      PROPAGATE(MAYDIFF(crellvm::getVariable(*Yprime), Physical), crellvm::ConsGlobal::make());
+
+      crellvm::propagateInstruction(hints, V, Z, TGT);
+      crellvm::propagateInstruction(hints, W, Z, TGT);
+      crellvm::propagateInstruction(hints, Y, Z, TGT);
+      crellvm::propagateInstruction(hints, Yprime, Z, TGT);
+      INFRULE(INSTPOS(TGT, Z), crellvm::ConsZextTruncAndXor::make(
+          VAL(Z), VAL(X), VAL(V), VAL(W), VAL(Y), VAL(Yprime), CONSTANT(C), BITSIZE(*Z), BITSIZE(*V)));
+    });
+    return BinaryOperator::CreateXor(NewAnd, ZC);
   }
 
   // zext (xor i1 X, true) to i32  --> xor (zext i1 X to i32), 1
   if (SrcI && SrcI->hasOneUse() &&
       SrcI->getType()->getScalarType()->isIntegerTy(1) &&
       match(SrcI, m_Not(m_Value(X))) && (!X->hasOneUse() || !isa<CmpInst>(X))) {
+    crellvm::ValidationUnit::Begin("zext_xor", CI);
+    
     Value *New = Builder->CreateZExt(X, CI.getType());
+
+    INTRUDE(CAPTURE(&CI, &X, &New), {
+      crellvm::name_instructions(*CI.getParent()->getParent());
+      //        <src>        |       <tgt>
+      // y = xor i1 x, 1     | y = xor i1 x, 1
+      // <nop>               | y' = zext i1 x to sz
+      // z = zext y to sz   | z = xor i32 y', 1
+      ZExtInst *Z = dyn_cast<ZExtInst>(&CI);
+      BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(0));
+      ZExtInst *Yprime = dyn_cast<ZExtInst>(New);
+
+      crellvm::insertSrcNopAtTgtI(hints, Yprime);
+      PROPAGATE(MAYDIFF(crellvm::getVariable(*Yprime), Physical), crellvm::ConsGlobal::make());
+
+      crellvm::propagateInstruction(hints, Y, Z, TGT);
+      crellvm::propagateInstruction(hints, Yprime, Z, TGT);
+      INFRULE(INSTPOS(TGT, Z), crellvm::ConsZextXor::make(
+          VAL(Z), VAL(Y), VAL(Yprime), VAL(X), BITSIZE(*Yprime)));
+    });
     return BinaryOperator::CreateXor(New, ConstantInt::get(CI.getType(), 1));
   }
 
@@ -1109,9 +1338,30 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
       uint32_t SrcBitSize = SrcTy->getScalarSizeInBits();
       uint32_t DestBitSize = DestTy->getScalarSizeInBits();
 
+      crellvm::ValidationUnit::Begin("sext_trunc_ashr", CI);
+
       // We need to emit a shl + ashr to do the sign extend.
       Value *ShAmt = ConstantInt::get(DestTy, DestBitSize-SrcBitSize);
       Value *Res = Builder->CreateShl(TI->getOperand(0), ShAmt, "sext");
+
+      INTRUDE(CAPTURE(&CI, &TI, &Res, SrcBitSize, DestBitSize, &ShAmt), {
+        //   <src>              |    <tgt>
+        // X = trunc t1 v to t2 | X = trunc t1 v to t2
+        // <nop>                | X' = shl v (sizeof(t1) - sizeof(t2))
+        // Z = sext t2 X to t1  | Z = ashr v (sizeof(t1) - sizeof(t2))
+        TruncInst *X = TI;
+        Value *V = X->getOperand(0);
+        SExtInst *Z = &CI;
+        BinaryOperator *Xprime = dyn_cast<BinaryOperator>(Res);
+
+        crellvm::insertSrcNopAtTgtI(hints, Xprime);
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*Xprime), crellvm::Physical);
+        crellvm::propagateInstruction(hints, X, Z, TGT);
+        crellvm::propagateInstruction(hints, Xprime, Z, TGT);
+        INFRULE(INSTPOS(TGT, Z), crellvm::ConsSextTruncAshr::make(
+            VAL(Z), VAL(X), VAL(Xprime), VAL(V), BITSIZE(DestBitSize), BITSIZE(SrcBitSize), 
+            CONSTINT(dyn_cast<ConstantInt>(ShAmt))));
+      });
       return BinaryOperator::CreateAShr(Res, ShAmt);
     }
 
@@ -1760,8 +2010,15 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
 
   // Get rid of casts from one type to the same type. These are useless and can
   // be replaced by the operand.
-  if (DestTy == Src->getType())
+  if (DestTy == Src->getType()) {
+    crellvm::ValidationUnit::Begin("bitcast_sametype", CI);
+    INTRUDE(CAPTURE(&CI, &Src), {
+      INFRULE(INSTPOS(SRC, &CI), crellvm::ConsBitcastSametype::make(
+                  VAL(Src), VAL(&CI), VALTYPE(Src->getType())));
+      crellvm::generateHintForReplaceAllUsesWith(&CI, Src);
+    });
     return ReplaceInstUsesWith(CI, Src);
+  }
 
   if (PointerType *DstPTy = dyn_cast<PointerType>(DestTy)) {
     PointerType *SrcPTy = cast<PointerType>(SrcTy);

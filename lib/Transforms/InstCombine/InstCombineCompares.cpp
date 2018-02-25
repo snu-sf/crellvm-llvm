@@ -26,6 +26,12 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesCompares.h"
+#include "llvm/Crellvm/Hintgen.h"
+#include "llvm/Crellvm/Dictionary.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -2640,7 +2646,13 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
   if (Op0Cplxity < Op1Cplxity ||
         (Op0Cplxity == Op1Cplxity &&
          swapMayExposeCSEOpportunities(Op0, Op1))) {
+    crellvm::ValidationUnit::Begin("icmp_swap", I);
+    INTRUDE(CAPTURE(&I, &Op0, &Op1), { INFRULE(INSTPOS(SRC, &I), crellvm::ConsIcmpSwapOperands::make(I)); });
+
     I.swapOperands();
+    
+    crellvm::ValidationUnit::End();
+    
     std::swap(Op0, Op1);
     Changed = true;
   }
@@ -2671,44 +2683,191 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
 
   // icmp's with boolean values can always be turned into bitwise operations
   if (Ty->isIntegerTy(1)) {
+    crellvm::ValidationUnit::Begin("icmp_unnamed", I);
+    INTRUDE(CAPTURE(), { data.create<crellvm::ArgForVisitICmp>(); });
     switch (I.getPredicate()) {
     default: llvm_unreachable("Invalid icmp instruction!");
     case ICmpInst::ICMP_EQ: {               // icmp eq i1 A, B -> ~(A^B)
       Value *Xor = Builder->CreateXor(Op0, Op1, I.getName()+"tmp");
+
+      INTRUDE(CAPTURE(&I, &Xor), {
+        crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_eq_xor_not");
+        //        <src>        |      <tgt>
+        // <nop>               | Z' = xor A, B
+        // Z = icmp eq i1 A, B | Z  = xor Z', -1
+        //ICmpInst *Z = &I;
+        BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Xor);
+        Value *A = Zprime->getOperand(0), *B = Zprime->getOperand(1);
+        crellvm::insertSrcNopAtTgtI(hints, Zprime);
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*Xor), crellvm::Physical);
+        crellvm::propagateInstruction(hints, Zprime, &I, TGT);
+        INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpEqXorNot::make(
+             VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+      });
+
       return BinaryOperator::CreateNot(Xor);
     }
     case ICmpInst::ICMP_NE:                  // icmp eq i1 A, B -> A^B
+      INTRUDE(CAPTURE(&I), {
+        crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_ne_xor");
+        //        <src>        |      <tgt>
+        // Z = icmp ne i1 A, B | Z  = xor A, B
+        INFRULE(INSTPOS(SRC, &I), crellvm::ConsIcmpNeXor::make(
+            VAL(&I), VAL(I.getOperand(0)), VAL(I.getOperand(1)), BITSIZE(I)));
+      });
+      
       return BinaryOperator::CreateXor(Op0, Op1);
 
     case ICmpInst::ICMP_UGT:
+      INTRUDE(CAPTURE(), { data.get<crellvm::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp ugt -> icmp ult
       // FALL THROUGH
     case ICmpInst::ICMP_ULT:{               // icmp ult i1 A, B -> ~A & B
       Value *Not = Builder->CreateNot(Op0, I.getName()+"tmp");
+
+      INTRUDE(CAPTURE(&I, &Not, &Op0, &Op1), {
+        //        <src>         |      <tgt>
+        // <nop>                | Z' = xor -1, A
+        // Z = icmp ult i1 A, B | Z  = and Z', B
+        //        <src>         |      <tgt>
+        // <nop>                | Z' = xor -1, B
+        // Z = icmp ugt i1 A, B | Z  = and Z', A
+        BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
+        Value *A = I.getOperand(0), *B = I.getOperand(1);
+        
+        crellvm::insertSrcNopAtTgtI(hints, Zprime);
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*Not), crellvm::Physical);
+        crellvm::propagateInstruction(hints, Zprime, &I, TGT);
+        // auto: If Z' = xor A, -1 , apply commutativity
+        //if(Zprime->getOperand(0) == Op0)
+        //  crellvm::applyCommutativity(hints, &I, Zprime, TGT);
+
+        if (data.get<crellvm::ArgForVisitICmp>()->swapOps) {
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_ugt_and_not");
+          INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpUgtAndNot::make(
+                VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+        } else {
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_ult_and_not");
+          INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpUltAndNot::make(
+                VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+        }
+      });
+
       return BinaryOperator::CreateAnd(Not, Op1);
     }
     case ICmpInst::ICMP_SGT:
+      INTRUDE(CAPTURE(), { data.get<crellvm::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp sgt -> icmp slt
       // FALL THROUGH
     case ICmpInst::ICMP_SLT: {               // icmp slt i1 A, B -> A & ~B
       Value *Not = Builder->CreateNot(Op1, I.getName()+"tmp");
+
+      INTRUDE(CAPTURE(&I, &Not, &Op0, &Op1), {
+        //        <src>         |      <tgt>
+        // <nop>                | Z' = xor -1, B
+        // Z = icmp slt i1 A, B | Z  = and Z', A
+        //        <src>         |      <tgt>
+        // <nop>                | Z' = xor -1, A
+        // Z = icmp sgt i1 A, B | Z  = and Z', B
+        //ICmpInst *Z = &I;
+        BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
+        Value *A = I.getOperand(0), *B = I.getOperand(1);
+
+        crellvm::insertSrcNopAtTgtI(hints, Zprime);
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*Not), crellvm::Physical);
+        crellvm::propagateInstruction(hints, Zprime, &I, TGT);
+        // auto: If Z' = xor B, -1 , apply commutativity
+        //if(Zprime->getOperand(0) == Op1)
+        //  crellvm::applyCommutativity(hints, &I, Zprime, TGT);
+
+        if (data.get<crellvm::ArgForVisitICmp>()->swapOps) {
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_sgt_and_not");
+          INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpSgtAndNot::make(
+                VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+        } else {
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_slt_and_not");
+          INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpSltAndNot::make(
+                VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+        }
+      });
+      
       return BinaryOperator::CreateAnd(Not, Op0);
     }
     case ICmpInst::ICMP_UGE:
+      INTRUDE(CAPTURE(), { data.get<crellvm::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp uge -> icmp ule
       // FALL THROUGH
     case ICmpInst::ICMP_ULE: {               //  icmp ule i1 A, B -> ~A | B
       Value *Not = Builder->CreateNot(Op0, I.getName()+"tmp");
+
+      INTRUDE(CAPTURE(&I, &Not, &Op0, &Op1), {
+        //        <src>         |      <tgt>
+        // <nop>                | Z' = xor -1, A
+        // Z = icmp ule i1 A, B | Z  = or  Z', B
+        //        <src>         |      <tgt>
+        // <nop>                | Z' = xor -1, B
+        // Z = icmp uge i1 A, B | Z  = or  Z', A
+        BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
+        Value *A = I.getOperand(0), *B = I.getOperand(1);
+
+        crellvm::insertSrcNopAtTgtI(hints, Zprime);
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*Not), crellvm::Physical);
+        crellvm::propagateInstruction(hints, Zprime, &I, TGT);
+        // auto: If Z' = A ^ -1, apply commutativity
+        //if(Zprime->getOperand(0) == Op0)
+        //  crellvm::applyCommutativity(hints, &I, Zprime, TGT);
+
+        if (data.get<crellvm::ArgForVisitICmp>()->swapOps) {
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_uge_or_not");
+          INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpUgeOrNot::make(
+                VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+        } else {
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_ule_or_not");
+          INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpUleOrNot::make(
+                VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+        }
+      });
       return BinaryOperator::CreateOr(Not, Op1);
     }
     case ICmpInst::ICMP_SGE:
+      INTRUDE(CAPTURE(), { data.get<crellvm::ArgForVisitICmp>()->swapOps = true; });
       std::swap(Op0, Op1);                   // Change icmp sge -> icmp sle
       // FALL THROUGH
     case ICmpInst::ICMP_SLE: {               //  icmp sle i1 A, B -> A | ~B
       Value *Not = Builder->CreateNot(Op1, I.getName()+"tmp");
+
+      INTRUDE(CAPTURE(&I, &Not, &Op0, &Op1), {
+        //        <src>         |      <tgt>
+        // <nop>                | Z' = xor -1, B
+        // Z = icmp sle i1 A, B | Z  = or  Z', A
+        //        <src>         |      <tgt>
+        // <nop>                | Z' = xor -1, A
+        // Z = icmp sge i1 A, B | Z  = or  Z', B
+        //ICmpInst *Z = &I;
+        BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Not);
+        Value *A = I.getOperand(0), *B = I.getOperand(1);
+
+        crellvm::insertSrcNopAtTgtI(hints, Zprime);
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*Not), crellvm::Physical);
+        crellvm::propagateInstruction(hints, Zprime, &I, TGT);
+        // auto: If Z' = xor B, -1, apply commutativity
+        //if(Zprime->getOperand(0) == Op1)
+        //  crellvm::applyCommutativity(hints, &I, Zprime, TGT);
+
+        if (data.get<crellvm::ArgForVisitICmp>()->swapOps) {
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_sge_or_not");
+          INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpSgeOrNot::make(
+                VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+        } else {
+          crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_sle_or_not");
+          INFRULE(INSTPOS(TGT, &I), crellvm::ConsIcmpSleOrNot::make(
+                VAL(&I), VAL(Zprime), VAL(A), VAL(B), BITSIZE(I)));
+        }
+      });
       return BinaryOperator::CreateOr(Not, Op0);
     }
     }
+    crellvm::ValidationUnit::GetInstance()->setIsAborted();
   }
 
   unsigned BitWidth = 0;
@@ -2748,8 +2907,35 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
     if (Op0->hasOneUse()) {
       // (icmp ne/eq (sub A B) 0) -> (icmp ne/eq A, B)
       if (I.isEquality() && CI->isZero() &&
-          match(Op0, m_Sub(m_Value(A), m_Value(B))))
+          match(Op0, m_Sub(m_Value(A), m_Value(B)))) {
+        crellvm::ValidationUnit::Begin("icmp_unknown_sub", I);
+        INTRUDE(CAPTURE(&I, &Op0, &A, &B), {
+          BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
+          Value *A = X->getOperand(0), *B = X->getOperand(1);
+          ICmpInst *Z = dyn_cast<ICmpInst>(&I);
+
+          crellvm::propagateInstruction(hints, X, Z, SRC);
+          if (I.getPredicate() == ICmpInst::ICMP_EQ) {
+            crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_eq_sub");
+            //     <src>       |     <tgt>
+            // X = sub A B     | X = sub A B
+            // Z = icmp eq X 0 | Z = icmp eq A B
+            INFRULE(INSTPOS(SRC, Z), crellvm::ConsIcmpEqSub::make(
+                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(*X)));
+          } else if (I.getPredicate() == ICmpInst::ICMP_NE) {
+            crellvm::ValidationUnit::GetInstance()->setOptimizationName("icmp_ne_sub");
+            //     <src>       |     <tgt>
+            // X = sub A B     | X = sub A B
+            // Z = icmp ne X 0 | Z = icmp ne A B
+            INFRULE(INSTPOS(SRC, Z), crellvm::ConsIcmpNeSub::make(
+                        VAL(Z), VAL(X), VAL(A), VAL(B), BITSIZE(*X)));
+          } else {
+            assert(false && "I.getPredicate() must be EQ or NE");
+          }
+        });
+
         return new ICmpInst(I.getPredicate(), A, B);
+      }
 
       // (icmp sgt (sub nsw A B), -1) -> (icmp sge A, B)
       if (I.getPredicate() == ICmpInst::ICMP_SGT && CI->isAllOnesValue() &&
@@ -3281,6 +3467,22 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
         Y = A;
         Z = C;
       }
+      crellvm::ValidationUnit::Begin("icmp_eq_bop", I);
+      INTRUDE(CAPTURE(&I, &BO0, &BO1), {
+        //       <src>      |      <tgt>
+        // W = A + X        | W = A + X
+        // Y = B + X        | Y = B + X
+        // Z = icmp eq W, Y | Z = icmp eq A, B
+        //       <src>      |      <tgt>
+        // W = A + X        | W = A + X
+        // Y = B + X        | Y = B + X
+        // Z = icmp ne W, Y | Z = icmp ne A, B
+        if (ICmpInst::isEquality(I.getPredicate()))
+          crellvm::generateHintForIcmpEqNeBopBop(&I, BO0, BO1);
+        else
+          crellvm::ValidationUnit::GetInstance()->setIsAborted();
+      });
+
       return new ICmpInst(Pred, Y, Z);
     }
 
@@ -3352,8 +3554,24 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
     // icmp (Y-X), (Z-X) -> icmp Y, Z for equalities or if there is no overflow.
     if (B && D && B == D && NoOp0WrapProblem && NoOp1WrapProblem &&
         // Try not to increase register pressure.
-        BO0->hasOneUse() && BO1->hasOneUse())
+        BO0->hasOneUse() && BO1->hasOneUse()) {
+      crellvm::ValidationUnit::Begin("icmp_eq_bop", I);
+      INTRUDE(CAPTURE(&I, &BO0, &BO1), {
+        //       <src>      |      <tgt>
+        // W = A - X        | W = A - X
+        // Y = B - X        | Y = B - X
+        // Z = icmp eq W, Y | Z = icmp eq A, B
+        //       <src>      |      <tgt>
+        // W = A - X        | W = A - X
+        // Y = B - X        | Y = B - X
+        // Z = icmp ne W, Y | Z = icmp ne A, B
+        if (ICmpInst::isEquality(I.getPredicate()))
+          crellvm::generateHintForIcmpEqNeBopBop(&I, BO0, BO1);
+        else
+          crellvm::ValidationUnit::GetInstance()->setIsAborted();
+      });
       return new ICmpInst(Pred, A, C);
+    }
 
     // icmp (X-Y), (X-Z) -> icmp Z, Y for equalities or if there is no overflow.
     if (A && C && A == C && NoOp0WrapProblem && NoOp1WrapProblem &&
@@ -3386,8 +3604,52 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       switch (SRem == BO0 ? ICmpInst::getSwappedPredicate(Pred) : Pred) {
         default: break;
         case ICmpInst::ICMP_EQ:
+          crellvm::ValidationUnit::Begin("icmp_eq_srem", I);
+          INTRUDE(CAPTURE(&SRem, &I), {
+            // W = X % Y        | W = X % Y
+            // Z = icmp eq W, Y | Z = icmp eq W, Y
+            //                  | (Replace uses of Z with false)
+            // W = X % Y        | W = X % Y
+            // Z = icmp eq Y, W | Z = icmp eq Y, W
+            //                  | (Replace uses of Z with false)
+            BinaryOperator *W = SRem;
+            Value *X = W->getOperand(0), *Y = W->getOperand(1);
+            ICmpInst *Z = &I;
+
+            Constant *newv = ConstantInt::getFalse(Z->getType());
+            crellvm::propagateInstruction(hints, W, Z, SRC);
+            if (Y == Z->getOperand(0))
+              // Needs to swap icmp operands
+              INFRULE(INSTPOS(SRC, Z), crellvm::ConsIcmpSwapOperands::make(*Z));
+            INFRULE(INSTPOS(SRC, Z), crellvm::ConsIcmpEqSrem::make(
+                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(*W)));
+            crellvm::generateHintForReplaceAllUsesWith(Z, newv);
+          });
+
           return ReplaceInstUsesWith(I, ConstantInt::getFalse(I.getType()));
         case ICmpInst::ICMP_NE:
+          crellvm::ValidationUnit::Begin("icmp_ne_srem", I);
+          INTRUDE(CAPTURE(&SRem, &I), {
+            // W = X % Y        | W = X % Y
+            // Z = icmp ne W, Y | Z = icmp ne W, Y
+            //                  | (Replace uses of Z with true)
+            // W = X % Y        | W = X % Y
+            // Z = icmp ne Y, W | Z = icmp ne Y, W
+            //                  | (Replace uses of Z with true)
+            BinaryOperator *W = SRem;
+            Value *X = W->getOperand(0), *Y = W->getOperand(1);
+            ICmpInst *Z = &I;
+
+            Constant *newv = ConstantInt::getTrue(Z->getType());
+            crellvm::propagateInstruction(hints, W, Z, SRC);
+            if (Y == Z->getOperand(0))
+              // Needs to swap icmp operands
+              INFRULE(INSTPOS(SRC, Z), crellvm::ConsIcmpSwapOperands::make(*Z));
+            INFRULE(INSTPOS(SRC, Z), crellvm::ConsIcmpNeSrem::make(
+                        VAL(Z), VAL(W), VAL(X), VAL(Y), BITSIZE(*W)));
+            crellvm::generateHintForReplaceAllUsesWith(Z, newv);
+          });
+
           return ReplaceInstUsesWith(I, ConstantInt::getTrue(I.getType()));
         case ICmpInst::ICMP_SGT:
         case ICmpInst::ICMP_SGE:
@@ -3408,9 +3670,38 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
       case Instruction::Add:
       case Instruction::Sub:
       case Instruction::Xor:
-        if (I.isEquality())    // a+x icmp eq/ne b+x --> a icmp b
+        if (I.isEquality()) { // a+x icmp eq/ne b+x --> a icmp b
+          crellvm::ValidationUnit::Begin("icmp_eq_bop", I);
+          INTRUDE(CAPTURE(&I, &BO0, &BO1), {
+            //       <src>      |      <tgt>
+            // W = A + X        | W = A + X
+            // Y = B + X        | Y = B + X
+            // Z = icmp eq W, Y | Z = icmp eq A, B
+            //       <src>      |      <tgt>
+            // W = A - X        | W = A - X
+            // Y = B - X        | Y = B - X
+            // Z = icmp eq W, Y | Z = icmp eq A, B
+            //       <src>      |      <tgt>
+            // W = A ^ X        | W = A ^ X
+            // Y = B ^ X        | Y = B ^ X
+            // Z = icmp eq W, Y | Z = icmp eq A, B
+            //       <src>      |      <tgt>
+            // W = A + X        | W = A + X
+            // Y = B + X        | Y = B + X
+            // Z = icmp ne W, Y | Z = icmp ne A, B
+            //       <src>      |      <tgt>
+            // W = A - X        | W = A - X
+            // Y = B - X        | Y = B - X
+            // Z = icmp ne W, Y | Z = icmp ne A, B
+            //       <src>      |      <tgt>
+            // W = A ^ X        | W = A ^ X
+            // Y = B ^ X        | Y = B ^ X
+            // Z = icmp ne W, Y | Z = icmp ne A, B
+            crellvm::generateHintForIcmpEqNeBopBop(&I, BO0, BO1);
+          });
           return new ICmpInst(I.getPredicate(), BO0->getOperand(0),
                               BO1->getOperand(0));
+        }
         // icmp u/s (a ^ signbit), (b ^ signbit) --> icmp s/u a, b
         if (ConstantInt *CI = dyn_cast<ConstantInt>(BO0->getOperand(1))) {
           if (CI->getValue().isSignBit()) {

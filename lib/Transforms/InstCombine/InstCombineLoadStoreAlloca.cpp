@@ -20,6 +20,16 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
+
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesLoadStoreAlloca.h"
+#include "llvm/Crellvm/Hintgen.h"
+#include "llvm/Crellvm/Dictionary.h"
+#include <vector>
+#include <memory>
+
 using namespace llvm;
 
 #define DEBUG_TYPE "instcombine"
@@ -978,8 +988,15 @@ Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
   // If the RHS is an alloca with a single use, zapify the store, making the
   // alloca dead.
   if (Ptr->hasOneUse()) {
-    if (isa<AllocaInst>(Ptr))
+    if (isa<AllocaInst>(Ptr)) {
+      crellvm::ValidationUnit::Begin("dead_store_elim", SI);
+      INTRUDE(CAPTURE(&SI, &Ptr), {
+        AllocaInst *ai = dyn_cast<AllocaInst>(Ptr);
+        crellvm::insertTgtNopAtSrcI(hints, &SI);
+        PROPAGATE(PRIVATE(REGISTER(*Ptr), SRC), BOUNDS(INSTPOS(SRC, ai), INSTPOS(SRC, &SI)));
+      });
       return EraseInstFromFunction(SI);
+    }
     if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Ptr)) {
       if (isa<AllocaInst>(GEP->getOperand(0))) {
         if (GEP->getOperand(0)->hasOneUse())

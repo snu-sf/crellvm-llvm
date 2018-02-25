@@ -50,6 +50,10 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
+
 #include <vector>
 using namespace llvm;
 using namespace PatternMatch;
@@ -122,6 +126,8 @@ namespace {
                                      Value *LHS, Value *RHS);
     Expression create_extractvalue_expression(ExtractValueInst* EI);
     uint32_t lookup_or_add_call(CallInst* C);
+    // For Crellvm
+    void constructVET(Instruction *I, Expression e, uint32_t vn);
   public:
     ValueTable() : nextValueNumber(1) { }
     uint32_t lookup_or_add(Value *V);
@@ -137,6 +143,9 @@ namespace {
     void setDomTree(DominatorTree* D) { DT = D; }
     uint32_t getNextUnusedValueNumber() { return nextValueNumber; }
     void verifyRemoved(const Value *) const;
+    // For Crellvm
+    uint32_t lookup_safe (Value *V) const;
+    DominatorTree *getDomTree() { return DT; }
   };
 }
 
@@ -165,6 +174,65 @@ template <> struct DenseMapInfo<Expression> {
 //                     ValueTable Internal Functions
 //===----------------------------------------------------------------------===//
 
+// For crellvm
+#define GVNDICT(A) crellvm::PassDictionary::GetInstance().get<crellvm::ArgForGVN>()->A
+
+#define INSERT_IF_NOT_EXISTS(dict, key, val)    \
+  if (dict->count(key) == 0) (*dict)[key] = val
+
+#define PUSH_INFRULE(name, ...)                   \
+  GVNDICT(infrules).push_back(crellvm::Cons##name::make( __VA_ARGS__ ));         \
+  GVNDICT(infrules).push_back(crellvm::Cons##name##Tgt::make( __VA_ARGS__ ))
+
+#define GVAR(vn) VAR("g" + std::to_string(vn), Ghost)
+
+#define INVARIANT_UNION(set0, set1) \
+  for (auto I = set1.begin(), E = set1.end(); I != E; ++I) set0.insert(*I);
+
+bool not_supported_floatingTy(Instruction *I) {
+  for (auto OI = I->op_begin(), OE = I->op_end(); OI != OE; ++OI) {
+    auto ty = (*OI)->getType();
+    if (ty->isFloatingPointTy() && (!ty->isFloatTy() && !ty->isDoubleTy())) return true;
+  }
+  return false;
+}
+
+void ValueTable::constructVET(Instruction *I, Expression e, uint32_t vn) {
+  INSERT_IF_NOT_EXISTS(GVNDICT(VNCnt), vn, 0);
+  ++(*GVNDICT(VNCnt))[vn];
+
+  if (crellvm::TyInstruction::isSupported(*I)) {
+    if (isa<ExtractValueInst>(I) || isa<InsertValueInst>(I)) return;
+    if (not_supported_floatingTy(I)) return;
+
+    std::shared_ptr<crellvm::ConsInsn> ginsn = std::static_pointer_cast<crellvm::ConsInsn>(INSN(*I)->get());
+
+    if (isa<CmpInst>(I) || I->isCommutative())
+      if (lookup(I->getOperand(0)) != e.varargs[0]) std::swap(e.varargs[0], e.varargs[1]);
+    (*GVNDICT(VET))[I] = std::make_pair(e.varargs, SmallSetVector<crellvm::GVNArg::TyInvTKey, 4>());
+    SmallSetVector<crellvm::GVNArg::TyInvTKey, 4> &invks = (*GVNDICT(VET))[I].second;
+
+    for (unsigned i = 0; i < e.varargs.size(); ++i)
+      if (Instruction *I_op = dyn_cast<Instruction>(I->getOperand(i))) {
+        // Constructing ginsn
+        ginsn->replace_op(i, ID("g" + std::to_string(e.varargs[i]), Ghost));
+
+        // Constructing VET[I]
+        if (GVNDICT(VET)->count(I_op) > 0)
+          INVARIANT_UNION(invks, (*GVNDICT(VET))[I_op].second);
+      }
+
+    // Make own invariant, and insert own inv of VET[I]
+    std::shared_ptr<crellvm::TyExpr> ginsn_e(new crellvm::TyExpr(ginsn));
+    bool b = false;
+    if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(I)) b = GEP->isInBounds();
+    auto key = std::make_pair(vn, b);
+    INSERT_IF_NOT_EXISTS(GVNDICT(InvT), key, std::make_pair(LESSDEF(ginsn_e, GVAR(vn), SRC),
+                                                            LESSDEF(GVAR(vn), ginsn_e, TGT)));
+    invks.insert(key);
+  }
+}
+
 Expression ValueTable::create_expression(Instruction *I) {
   Expression e;
   e.type = I->getType();
@@ -172,6 +240,7 @@ Expression ValueTable::create_expression(Instruction *I) {
   for (Instruction::op_iterator OI = I->op_begin(), OE = I->op_end();
        OI != OE; ++OI)
     e.varargs.push_back(lookup_or_add(*OI));
+
   if (I->isCommutative()) {
     // Ensure that commutative instructions that only differ by a permutation
     // of their operands get the same value number by sorting the operand value
@@ -285,6 +354,7 @@ uint32_t ValueTable::lookup_or_add_call(CallInst *C) {
     uint32_t &e = expressionNumbering[exp];
     if (!e) e = nextValueNumber++;
     valueNumbering[C] = e;
+    crellvm::intrude([&C, &exp, e, this]{ constructVET(C, exp, e); });
     return e;
   } else if (AA->onlyReadsMemory(C)) {
     Expression exp = create_expression(C);
@@ -292,11 +362,13 @@ uint32_t ValueTable::lookup_or_add_call(CallInst *C) {
     if (!e) {
       e = nextValueNumber++;
       valueNumbering[C] = e;
+      crellvm::intrude([&C, &exp, e, this]{ constructVET(C, exp, e); });
       return e;
     }
     if (!MD) {
       e = nextValueNumber++;
       valueNumbering[C] = e;
+      crellvm::intrude([&C, &exp, e, this]{ constructVET(C, exp, e); });
       return e;
     }
 
@@ -456,6 +528,7 @@ uint32_t ValueTable::lookup_or_add(Value *V) {
   uint32_t& e = expressionNumbering[exp];
   if (!e) e = nextValueNumber++;
   valueNumbering[V] = e;
+  crellvm::intrude([&V, &exp, e, this]{ constructVET(cast<Instruction>(V), exp, e); });
   return e;
 }
 
@@ -464,6 +537,13 @@ uint32_t ValueTable::lookup_or_add(Value *V) {
 uint32_t ValueTable::lookup(Value *V) const {
   DenseMap<Value*, uint32_t>::const_iterator VI = valueNumbering.find(V);
   assert(VI != valueNumbering.end() && "Value not numbered?");
+  return VI->second;
+}
+
+// For Crellvm
+uint32_t ValueTable::lookup_safe(Value *V) const {
+  DenseMap<Value*, uint32_t>::const_iterator VI = valueNumbering.find(V);
+  if (VI == valueNumbering.end()) return 0;
   return VI->second;
 }
 
@@ -752,6 +832,248 @@ void GVN::dump(DenseMap<uint32_t, Value*>& d) {
   errs() << "}\n";
 }
 #endif
+
+// Crellvm hint generation code
+
+void hintgenLoadOpt(crellvm::CoreHint &hints, Instruction *I, Instruction *pos, Value *ptr, crellvm::TyScope scp) {
+  std::string id = crellvm::getVariable(*I);
+  if (I != pos) {
+    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, scp), scp), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, pos)));
+    PROPAGATE(LESSDEF(RHS(id, Physical, scp), VAR(id), scp), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, pos)));
+  }
+
+  if (I->getOperand(0) != ptr)
+    if (Instruction *Iop = dyn_cast<Instruction>(I->getOperand(0)))
+      hintgenLoadOpt(hints, Iop, pos, ptr, scp);
+}
+
+void insertProofForPropEq(crellvm::CoreHint &hints, std::vector<llvm::Instruction*> props,
+                          std::vector<std::shared_ptr<crellvm::TyInfrule>> infrs,
+                          bool is_src, BasicBlock *BB, Instruction *cur_pos) {
+  auto scp = is_src? SRC : TGT;
+  TerminatorInst *TI = BB->getSinglePredecessor()->getTerminator();
+  Instruction *I_cond = nullptr;
+  ConstantInt *C_cond = nullptr;
+
+  if (BranchInst *BI = dyn_cast<BranchInst>(TI)) {
+    I_cond = cast<Instruction>(BI->getCondition());
+    if (BI->getSuccessor(0) == BB) C_cond = ConstantInt::getTrue(BB->getContext());
+    else if (BI->getSuccessor(1) == BB) C_cond = ConstantInt::getFalse(BB->getContext());
+  } else if (SwitchInst *SI = dyn_cast<SwitchInst>(TI)) {
+    I_cond = dyn_cast<Instruction>(SI->getCondition());
+    for (SwitchInst::CaseIt i = SI->case_begin(), e = SI->case_end(); i != e; ++i)
+      if (i.getCaseSuccessor() == BB) C_cond = i.getCaseValue();
+  } else assert(false && "GVN make_repl_inv: Unexpected terminator.");
+
+  std::string id_I_cond = crellvm::getVariable(*I_cond);
+    
+  PROPAGATE(LESSDEF(EXPR(C_cond, Physical), VAR(id_I_cond), scp), BOUNDS(STARTPOS(SRC, BB->getName()), INSTPOS(SRC, cur_pos)));
+  PROPAGATE(LESSDEF(VAR(id_I_cond), EXPR(C_cond, Physical), scp), BOUNDS(STARTPOS(SRC, BB->getName()), INSTPOS(SRC, cur_pos)));
+
+  // TODO: factor this out to a function
+  for (auto II = props.begin(), EI = props.end(); II != EI; ++II) {
+    Instruction *I = *II;
+    std::string id = crellvm::getVariable(*I);
+    PROPAGATE(LESSDEF(VAR(id), RHS(id, Physical, scp), scp), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, cur_pos)));
+    PROPAGATE(LESSDEF(RHS(id, Physical, scp), VAR(id), scp), BOUNDS(INSTPOS(SRC, I), INSTPOS(SRC, cur_pos)));
+  }
+  for (auto II = infrs.begin(), EI = infrs.end(); II != EI; ++II) {
+    if (TerminatorInst *TI = dyn_cast<TerminatorInst>(cur_pos))
+      for (unsigned i = 0; i < TI->getNumSuccessors(); ++i)
+        INFRULE(PHIPOS(scp, TI->getSuccessor(i)->getName(), TI->getParent()->getName()), *II);
+    else INFRULE(INSTPOS(scp, cur_pos), *II);
+  }
+}
+
+bool lookupCT(ValueTable &VN, crellvm::GVNArg::TyCT &CT,
+              crellvm::GVNArg::TyCTElem &elem,
+              Value *V, uint32_t vn, Instruction *pos) {
+  DominatorTree *DT = VN.getDomTree();
+  bool flag = false;
+  std::vector<crellvm::GVNArg::TyCTElem> &ct_list = DICTMAP(CT, std::make_pair(V, vn));
+
+  for (auto II = ct_list.begin(), IE = ct_list.end(); II != IE; ++II) {
+    elem = *II;
+    BasicBlock *cur = elem.first;
+    Instruction *cur_begin = cur->begin();
+    if (DT->dominates(cur_begin, pos) || cur_begin == pos){
+      flag = true;
+      break;
+    }
+  }
+
+  return flag;
+}
+
+void PropagateVETInv(crellvm::CoreHint &hints, crellvm::GVNArg::TyInvT &InvT,
+                     crellvm::GVNArg::TyVNCnt &VNCnt,
+                     SmallSetVector<crellvm::GVNArg::TyInvTKey, 4> &s,
+                     Instruction *from, Instruction *to) {
+  if (from != to)
+    for (auto I = s.begin(), E = s.end(); I != E; ++I) {
+      if ((*VNCnt)[I->first] <= 1) continue;
+      std::pair<std::shared_ptr<crellvm::TyPropagateObject>,
+                std::shared_ptr<crellvm::TyPropagateObject>> &prop_pair = (*InvT)[*I];
+      PROPAGATE(prop_pair.first, BOUNDS(INSTPOS(SRC, from), INSTPOS(SRC, to)));
+      PROPAGATE(prop_pair.second, BOUNDS(INSTPOS(SRC, from), INSTPOS(SRC, to)));
+    }
+}
+
+static inline Value *src_tgt(bool is_src, Value *src, Value *tgt, Value *v) {
+  if (!is_src && (src == v)) return tgt;
+  return v;
+}
+
+bool proofGenGVNUnary(crellvm::CoreHint &hints, ValueTable &VN,
+                      crellvm::GVNArg::TyVET &VET, crellvm::GVNArg::TyInvT &InvT,
+                      crellvm::GVNArg::TyCT &CT, crellvm::GVNArg::TyCTInv &CTInv,
+                      crellvm::GVNArg::TyCallPHI &CallPHIs,
+                      crellvm::GVNArg::TyVNCnt &VNCnt,
+                      std::map<uint32_t, Instruction*> &calls,
+                      std::map<uint32_t, LoadInst*> &loads,
+                      Value *V_term, Instruction *l_end, uint32_t vn, bool is_src) {
+  SmallVector<std::pair<Instruction*, std::pair<Value *, uint32_t>>, 4> worklist;
+  SmallSetVector<std::pair<Instruction*, std::pair<Value *, uint32_t>>, 4> visited;
+
+  worklist.push_back(std::make_pair(l_end, std::make_pair(V_term, vn)));
+  visited.insert(std::make_pair(l_end, std::make_pair(V_term, vn)));
+
+  while(!worklist.empty()) {
+    Instruction *cur_pos = worklist.back().first;
+    Value *V = worklist.back().second.first;
+    uint32_t vn = worklist.back().second.second;
+    worklist.pop_back();
+
+    if (Instruction *I_V = dyn_cast<Instruction>(V)) {
+      bool is_call = false;
+      Value *V_t = src_tgt(is_src, l_end, V_term, V);
+
+      std::string id_V = crellvm::getVariable(*I_V),
+        id_V_t = crellvm::getVariable(*V_t);
+
+      if (isa<CallInst>(I_V)) is_call = true;
+      if (PHINode *PN = dyn_cast<PHINode>(I_V))
+        if (CallPHIs->count(PN) > 0) is_call = true;
+
+      if (is_call) {
+        auto II = calls.find(vn);
+        if (II != calls.end()) {
+          if (I_V != II->second) {
+            // We admit readonly call cases now.
+            hints.appendToDescription("GVN: Readonly calls.");
+            hints.setReturnCodeToAdmitted();
+            return false;
+          }
+        } else calls.insert(std::make_pair(vn, I_V));
+      }
+
+      if (vn != VN.lookup_safe(I_V)) {
+        if (Instruction *TR = dyn_cast<TruncInst>(I_V)) {
+          if (loads.count(vn) > 0) {
+            LoadInst *LI = loads[vn];
+            std::string id_L = crellvm::getVariable(*LI);
+            PROPAGATE(LESSDEF(RHS(id_L, Physical, SRC), VAR(id_L), SRC), BOUNDS(INSTPOS(SRC, LI), INSTPOS(SRC, TR)));
+            PROPAGATE(LESSDEF(GVAR(vn), RHS(id_L, Physical, SRC), TGT), BOUNDS(INSTPOS(SRC, LI), INSTPOS(SRC, TR)));
+            hintgenLoadOpt(hints, TR, TR, LI->getPointerOperand(), TGT);
+
+            PROPAGATE(is_src? LESSDEF(VAR(id_V), GVAR(vn), SRC) : LESSDEF(GVAR(vn), VAR(id_V), TGT),
+                      BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
+          }
+        } else {
+          PROPAGATE(LESSDEF(VAR(id_V), GVAR(vn), SRC), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
+          PROPAGATE(LESSDEF(GVAR(vn), VAR(id_V), TGT), BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
+        }
+      } else {
+        if (LoadInst *LI = dyn_cast<LoadInst>(I_V)) loads[vn] = LI;
+
+        if (I_V != cur_pos) PROPAGATE(is_src? LESSDEF(VAR(id_V), GVAR(vn), SRC) : LESSDEF(GVAR(vn), VAR(id_V_t), TGT),
+                                      BOUNDS(INSTPOS(SRC, I_V), INSTPOS(SRC, cur_pos)));
+
+        if (((*VNCnt)[vn] > 1) && (VET->count(I_V) > 0)) {
+          PropagateVETInv(hints, InvT, VNCnt, (*VET)[I_V].second, I_V, cur_pos);
+
+          for (unsigned i = 0; i < I_V->getNumOperands(); ++i) {
+            uint32_t vn_op = (isa<PHINode>(I_V))? vn : (*VET)[I_V].first[i];
+            Instruction *new_pos = I_V;
+
+            if (PHINode *PN = dyn_cast<PHINode>(I_V))
+              new_pos = PN->getIncomingBlock(i)->getTerminator();
+
+            // Value *V_wl = I_V->getOperand(i);
+            // if (!is_src && (V_wl == l_end)) V_wl = V_term;
+            Value *V_wl = src_tgt(is_src, l_end, V_term, I_V->getOperand(i));
+
+            auto to_insert = std::make_pair(new_pos, std::make_pair(V_wl, vn_op));
+            if (visited.insert(to_insert)) worklist.push_back(to_insert);
+          }
+        }
+      }
+    } else {
+      if (VN.lookup_safe(V) == vn) continue;
+
+      crellvm::GVNArg::TyCTElem elem;
+      bool flag = lookupCT(VN, CT, elem, V, vn, cur_pos);
+      assert(flag && "CT not found!");
+      auto proofs = DICTMAP(CTInv, elem.first);
+      insertProofForPropEq(hints, proofs.first, proofs.second, is_src, elem.first, cur_pos);
+
+      auto to_insert = std::make_pair(cur_pos, elem.second);
+      if (visited.insert(to_insert)) worklist.push_back(to_insert);
+    }
+  }
+  return true;
+}
+
+void proofGenGVN(crellvm::CoreHint &hints, ValueTable &VN,
+                 crellvm::GVNArg::TyVET &VET, crellvm::GVNArg::TyInvT &InvT,
+                 crellvm::GVNArg::TyCT &CT, crellvm::GVNArg::TyCTInv &CTInv,
+                 crellvm::GVNArg::TyCallPHI &CallPHIs, crellvm::GVNArg::TyVNCnt &VNCnt,
+                 Instruction *I_rem, Value *repl) {
+  uint32_t vn = VN.lookup(I_rem);
+  std::map<uint32_t, Instruction*> calls;
+  std::map<uint32_t, LoadInst*> loads;
+
+  if (proofGenGVNUnary(hints, VN, VET, InvT, CT, CTInv, CallPHIs, VNCnt, calls, loads, I_rem, I_rem, vn, true) &&
+      proofGenGVNUnary(hints, VN, VET, InvT, CT, CTInv, CallPHIs, VNCnt, calls, loads, repl, I_rem, vn, false)) {
+    // Check whether it's GVN BUG found by us. (This doesn't work for PRE now.)
+    if (Instruction *It = dyn_cast<Instruction>(repl))
+      if (GetElementPtrInst *gep_s = dyn_cast<GetElementPtrInst>(I_rem))
+        if (GetElementPtrInst *gep_t = dyn_cast<GetElementPtrInst>(It))
+          if (!gep_s->isInBounds() && gep_t->isInBounds())
+            hints.appendToDescription("GVN GEP BUG FOUND BY US");
+  }
+}
+
+void updateVETInPRE(ValueTable &VN, crellvm::GVNArg::TyVET &VET,
+                    crellvm::GVNArg::TyCT &CT,
+                    PHINode *PN, uint32_t vn) {
+  (*VET)[PN] = std::make_pair(SmallVector<uint32_t, 4>(),
+                              SmallSetVector<crellvm::GVNArg::TyInvTKey, 4>());
+  SmallSetVector<crellvm::GVNArg::TyInvTKey, 4> &prop_objs = (*VET)[PN].second;
+
+  for (unsigned i = 0; i < PN->getNumIncomingValues(); ++i) {
+    // if gep, test all inbounds
+    Value *V_op = PN->getIncomingValue(i);
+
+    if (Instruction *I = dyn_cast<Instruction>(V_op)) {
+      if (VET->count(I) > 0) {
+        SmallSetVector<crellvm::GVNArg::TyInvTKey, 4> &sec = (*VET)[I].second;
+        INVARIANT_UNION(prop_objs, sec);
+      } else return;
+    } else {
+      crellvm::GVNArg::TyCTElem elem;
+      TerminatorInst *TI = PN->getIncomingBlock(i)->getTerminator();
+      lookupCT(VN, CT, elem, V_op, vn, TI);
+
+      uint32_t vn_elem = elem.second.second;
+      if (vn != vn_elem) return;
+
+      INVARIANT_UNION(prop_objs, (*VET)[elem.second.first].second);
+    }
+  }
+}
+
+// End Crellvm
 
 /// Return true if we can prove that the value
 /// we're analyzing is fully available in the specified block.  As we go, keep
@@ -1639,7 +1961,13 @@ bool GVN::PerformLoadPRE(LoadInst *LI, AvailValInBlkVect &ValuesPerBlock,
     while (!NewInsts.empty()) {
       Instruction *I = NewInsts.pop_back_val();
       if (MD) MD->removeInstruction(I);
+      crellvm::intrude([&I]() {
+        crellvm::name_instructions(*(I->getParent()->getParent()));
+        crellvm::ValidationUnit::Begin("GVN_dead_code_elim2", I->getParent()->getParent());
+        crellvm::generateHintForGVNDCE(*I);
+      });
       I->eraseFromParent();
+      crellvm::intrude([]() { crellvm::ValidationUnit::End(); });
     }
     // HINT: Don't revert the edge-splitting as following transformation may
     // also need to split these critical edges.
@@ -1810,7 +2138,44 @@ static void patchReplacementInstruction(Instruction *I, Value *Repl) {
 
 static void patchAndReplaceAllUsesWith(Instruction *I, Value *Repl) {
   patchReplacementInstruction(I, Repl);
+
+  crellvm::intrude([&I, &Repl]() {
+    crellvm::name_instructions(*(I->getParent()->getParent()));
+
+    crellvm::ValidationUnit::Begin("GVN_replace", I->getParent()->getParent());
+    crellvm::ValidationUnit::GetInstance()->intrude([&I, &Repl](
+        crellvm::ValidationUnit::Dictionary &data, crellvm::CoreHint &hints) {
+      if (!GVNDICT(isGVNReplace)) {
+        // patchAndReplaceAllUsesWith called not for GVN
+        crellvm::ValidationUnit::GetInstance()->setIsAborted();
+        return;
+      }
+      GVNDICT(isGVNReplace) = false;
+
+      ValueTable &VN = *boost::any_cast<ValueTable *>(GVNDICT(VNptr));
+
+      proofGenGVN(hints, VN, GVNDICT(VET), GVNDICT(InvT), GVNDICT(CT), GVNDICT(CTInv),
+                  GVNDICT(CallPHIs), GVNDICT(VNCnt), I, Repl);
+
+      auto prop_src = LESSDEF(crellvm::TyExpr::make(*I), GVAR(VN.lookup(I)), SRC),
+        prop_tgt = LESSDEF(GVAR(VN.lookup(I)), crellvm::TyExpr::make(*Repl), TGT);
+
+      for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+        Instruction *userI = cast<Instruction>(UI->getUser());
+
+        std::string prev_block_name = "";
+        if (PHINode *PN = dyn_cast<PHINode>(userI))
+          prev_block_name = crellvm::getBasicBlockIndex(PN->getIncomingBlock(*UI));
+
+        PROPAGATE(prop_src, BOUNDS(INSTPOS(SRC, I), PHIPOS(SRC, *userI, prev_block_name)));
+        PROPAGATE(prop_tgt, BOUNDS(INSTPOS(SRC, I), PHIPOS(SRC, *userI, prev_block_name)));
+      }
+    });
+  });
+
   I->replaceAllUsesWith(Repl);
+
+  crellvm::ValidationUnit::EndIfExists();
 }
 
 /// Attempt to eliminate a load, first by eliminating it
@@ -2061,6 +2426,11 @@ bool GVN::propagateEquality(Value *LHS, Value *RHS,
   // DT->dominates(Root, Root.getEnd());
   bool RootDominatesEnd = isOnlyReachableViaThisEdge(Root, DT);
 
+  crellvm::intrude([]() {
+      GVNDICT(to_prop).clear();
+      GVNDICT(infrules).clear();
+  });
+
   while (!Worklist.empty()) {
     std::pair<Value*, Value*> Item = Worklist.pop_back_val();
     LHS = Item.first; RHS = Item.second;
@@ -2101,8 +2471,19 @@ bool GVN::propagateEquality(Value *LHS, Value *RHS,
     // using the leader table is about compiling faster, not optimizing better).
     // The leader table only tracks basic blocks, not edges. Only add to if we
     // have the simple case where the edge dominates the end.
-    if (RootDominatesEnd && !isa<Instruction>(RHS))
+    if (RootDominatesEnd && !isa<Instruction>(RHS)) {
+      crellvm::intrude([LVN, LHS, RHS, Root, this]() {
+          if (Instruction *I_LHS = dyn_cast<Instruction>(LHS)) {
+            BasicBlock *BB = const_cast<BasicBlock*>(Root.getEnd());
+
+            auto key = std::make_pair(RHS, LVN);
+            INSERT_IF_NOT_EXISTS(GVNDICT(CT), key, std::vector<crellvm::GVNArg::TyCTElem>());
+
+            (*GVNDICT(CT))[key].push_back(std::make_pair(BB, std::make_pair(I_LHS, LVN)));
+          }
+        });
       addToLeaderTable(LVN, RHS, Root.getEnd());
+    }
 
     // Replace all occurrences of 'LHS' with 'RHS' everywhere in the scope.  As
     // LHS always has at least one use that is not dominated by Root, this will
@@ -2133,6 +2514,25 @@ bool GVN::propagateEquality(Value *LHS, Value *RHS,
     Value *A, *B;
     if ((isKnownTrue && match(LHS, m_And(m_Value(A), m_Value(B)))) ||
         (isKnownFalse && match(LHS, m_Or(m_Value(A), m_Value(B))))) {
+      crellvm::intrude([isKnownTrue, Root, LHS, A, B]() {
+          Instruction *I = cast<Instruction>(LHS);
+          std::string id_I = crellvm::getVariable(*I);
+          GVNDICT(to_prop).push_back(I);
+
+          auto op0 = VAL(I->getOperand(0)), op1 = VAL(I->getOperand(1));
+
+          if (isKnownTrue) {
+            std::shared_ptr<crellvm::TyExpr> expr_true = EXPR(ConstantInt::getTrue(I->getContext()));
+
+            PUSH_INFRULE(Transitivity, expr_true, VAR(id_I), RHS(id_I, Physical, SRC));
+            PUSH_INFRULE(AndTrueBool, op0, op1);
+          } else {
+            std::shared_ptr<crellvm::TyExpr> expr_false = EXPR(ConstantInt::getFalse(I->getContext()));
+
+            PUSH_INFRULE(Transitivity, expr_false, VAR(id_I), RHS(id_I, Physical, SRC));
+            PUSH_INFRULE(OrFalse, op0, op1, BITSIZE(1));
+          }
+        });
       Worklist.push_back(std::make_pair(A, RHS));
       Worklist.push_back(std::make_pair(B, RHS));
       continue;
@@ -2147,8 +2547,26 @@ bool GVN::propagateEquality(Value *LHS, Value *RHS,
       // If "A == B" is known true, or "A != B" is known false, then replace
       // A with B everywhere in the scope.
       if ((isKnownTrue && Cmp->getPredicate() == CmpInst::ICMP_EQ) ||
-          (isKnownFalse && Cmp->getPredicate() == CmpInst::ICMP_NE))
+          (isKnownFalse && Cmp->getPredicate() == CmpInst::ICMP_NE)) {
+        crellvm::intrude([isKnownTrue, Cmp]() {
+            ICmpInst *ICmp = dyn_cast<ICmpInst>(Cmp);
+            std::string id_I = crellvm::getVariable(*ICmp);
+            GVNDICT(to_prop).push_back(ICmp);
+
+            if (isKnownTrue) {
+              auto expr_true = EXPR(ConstantInt::getTrue(Cmp->getContext()));
+
+              PUSH_INFRULE(Transitivity, expr_true, VAR(id_I), RHS(id_I, Physical, SRC));
+              PUSH_INFRULE(IcmpEqSame, *ICmp);
+            } else {
+              auto expr_false = EXPR(ConstantInt::getFalse(Cmp->getContext()));
+
+              PUSH_INFRULE(Transitivity, expr_false, VAR(id_I), RHS(id_I, Physical, SRC));
+              PUSH_INFRULE(IcmpNeqSame, *ICmp);
+            }
+          });
         Worklist.push_back(std::make_pair(Op0, Op1));
+      }
 
       // Handle the floating point versions of equality comparisons too.
       if ((isKnownTrue && Cmp->getPredicate() == CmpInst::FCMP_OEQ) ||
@@ -2189,12 +2607,35 @@ bool GVN::propagateEquality(Value *LHS, Value *RHS,
       // is replaced with false.
       // The leader table only tracks basic blocks, not edges. Only add to if we
       // have the simple case where the edge dominates the end.
-      if (RootDominatesEnd)
+      if (RootDominatesEnd) {
+        crellvm::intrude([Root, NotVal, Num, LVN, Cmp, isKnownFalse]() {
+            // We don't currently handle FCmps
+            ICmpInst *ICmp = dyn_cast<ICmpInst>(Cmp);
+            if (ICmp) {
+              std::string id_I = crellvm::getVariable(*ICmp);
+              BasicBlock *BB = const_cast<BasicBlock *>(Root.getEnd());
+
+              auto key = std::make_pair(NotVal, Num);
+              INSERT_IF_NOT_EXISTS(GVNDICT(CT), key, std::vector<crellvm::GVNArg::TyCTElem>());
+              (*GVNDICT(CT))[key].push_back(std::make_pair(BB, std::make_pair(ICmp, LVN)));
+
+              GVNDICT(to_prop).push_back(ICmp);
+              PUSH_INFRULE(Transitivity, RHS(id_I, Physical, SRC), VAR(id_I),
+                           EXPR(ConstantInt::get(Cmp->getType(), !isKnownFalse)));
+              GVNDICT(infrules).push_back(crellvm::ConsIcmpInverseTgt::make(*ICmp, !isKnownFalse));
+            }
+          });
+
         addToLeaderTable(Num, NotVal, Root.getEnd());
+      }
 
       continue;
     }
   }
+  crellvm::intrude([Root]() {
+    BasicBlock *BB = const_cast<BasicBlock *>(Root.getEnd());
+    (*GVNDICT(CTInv))[BB] = std::make_pair(GVNDICT(to_prop), GVNDICT(infrules));
+  });
 
   return Changed;
 }
@@ -2221,8 +2662,7 @@ bool GVN::processInstruction(Instruction *I) {
   }
 
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
-    if (processLoad(LI))
-      return true;
+    if (processLoad(LI)) return true;
 
     unsigned Num = VN.lookup_or_add(LI);
     addToLeaderTable(Num, LI, LI->getParent());
@@ -2314,6 +2754,10 @@ bool GVN::processInstruction(Instruction *I) {
   }
 
   // Remove it!
+  crellvm::intrude([this]() {
+      GVNDICT(isGVNReplace) = true;
+      GVNDICT(VNptr) = &VN;
+  });
   patchAndReplaceAllUsesWith(I, repl);
   if (MD && repl->getType()->getScalarType()->isPointerTy())
     MD->invalidateCachedPointerInfo(repl);
@@ -2326,6 +2770,11 @@ bool GVN::runOnFunction(Function& F) {
   if (skipOptnoneFunction(F))
     return false;
 
+  crellvm::ValidationUnit::StartPass(crellvm::ValidationUnit::GVN);
+  crellvm::intrude([&F]() {
+    crellvm::name_instructions(F);
+    crellvm::PassDictionary::GetInstance().create<crellvm::ArgForGVN>();
+  });
   if (!NoLoads)
     MD = &getAnalysis<MemoryDependenceAnalysis>();
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
@@ -2379,6 +2828,9 @@ bool GVN::runOnFunction(Function& F) {
   // iteration. 
   DeadBlocks.clear();
 
+  crellvm::intrude([]() { crellvm::PassDictionary::GetInstance().erase<crellvm::ArgForGVN>(); });
+  crellvm::ValidationUnit::EndPass();
+
   return Changed;
 }
 
@@ -2414,7 +2866,13 @@ bool GVN::processBlock(BasicBlock *BB) {
       DEBUG(dbgs() << "GVN removed: " << **I << '\n');
       if (MD) MD->removeInstruction(*I);
       DEBUG(verifyRemoved(*I));
+      crellvm::intrude([&I]() {
+        crellvm::name_instructions(*((*I)->getParent()->getParent()));
+        crellvm::ValidationUnit::Begin("GVN_dead_code_elim1", (*I)->getParent()->getParent());
+        crellvm::generateHintForGVNDCE(**I);
+      });
       (*I)->eraseFromParent();
+      crellvm::intrude([]() { crellvm::ValidationUnit::End();});
     }
     InstrsToErase.clear();
 
@@ -2559,6 +3017,12 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
       delete PREInstr;
       return false;
     }
+    crellvm::intrude([&CurInst, &PREInstr, &ValNo]() {
+        if (GVNDICT(VET)->count(CurInst) > 0) {
+          ++(*GVNDICT(VNCnt))[ValNo];
+          (*GVNDICT(VET))[PREInstr] = (*GVNDICT(VET))[CurInst];
+        }
+      });
   }
 
   // Either we should have filled in the PRE instruction, or we should
@@ -2566,6 +3030,11 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   assert (PREInstr != nullptr || NumWithout == 0);
 
   ++NumGVNPRE;
+
+  crellvm::intrude([&CurInst, this]() {
+      crellvm::name_instructions(*(CurInst->getParent()->getParent()));
+      crellvm::ValidationUnit::Begin("GVN_PRE", CurInst->getParent()->getParent());
+    });
 
   // Create a PHI to make the value available in this block.
   PHINode *Phi =
@@ -2581,7 +3050,46 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
   VN.add(Phi, ValNo);
   addToLeaderTable(ValNo, Phi, CurrentBlock);
   Phi->setDebugLoc(CurInst->getDebugLoc());
+
+  crellvm::intrude([&CurInst, &Phi, this]() {
+    crellvm::ValidationUnit::GetInstance()->intrude([&CurInst, &Phi, this](
+        crellvm::ValidationUnit::Dictionary &data,
+        crellvm::CoreHint &hints) {
+      Instruction *I = CurInst;
+      std::string id_I = crellvm::getVariable(*I);
+      std::string id_p = crellvm::getVariable(*Phi);
+
+      crellvm::propagateMaydiffGlobal(hints, id_p, crellvm::Physical);
+      crellvm::propagateMaydiffGlobal(hints, id_p, crellvm::Previous);
+
+      updateVETInPRE(VN, GVNDICT(VET), GVNDICT(CT), Phi, VN.lookup(I));
+      if (isa<CallInst>(I)) (*GVNDICT(CallPHIs))[Phi] = VN.lookup(I);
+
+      proofGenGVN(hints, VN, GVNDICT(VET), GVNDICT(InvT), GVNDICT(CT), GVNDICT(CTInv),
+                  GVNDICT(CallPHIs), GVNDICT(VNCnt), I, Phi);
+
+      auto prop_src = LESSDEF(EXPR(CurInst), GVAR(VN.lookup(I)), SRC),
+        prop_tgt = LESSDEF(GVAR(VN.lookup(I)), EXPR(Phi), TGT);
+
+      for (auto UI = I->use_begin(); UI != I->use_end(); ++UI) {
+        Instruction *userI = cast<Instruction>(UI->getUser());
+        std::string userI_id = crellvm::getVariable(*userI);
+
+        std::string prev_block_name = "";
+        if (PHINode *PN = dyn_cast<PHINode>(userI))
+          prev_block_name = crellvm::getBasicBlockIndex(PN->getIncomingBlock(*UI));
+
+        PROPAGATE(prop_src, BOUNDS(INSTPOS(SRC, I), PHIPOS(SRC, *userI, prev_block_name)));
+        PROPAGATE(prop_tgt, BOUNDS(INSTPOS(SRC, I), PHIPOS(SRC, *userI, prev_block_name)));
+      }
+      crellvm::insertTgtNopAtSrcI(hints, I);
+      crellvm::propagateMaydiffGlobal(hints, id_I, crellvm::Physical); // id
+      crellvm::propagateMaydiffGlobal(hints, id_I, crellvm::Previous); // id
+    });
+  });
+
   CurInst->replaceAllUsesWith(Phi);
+
   if (Phi->getType()->getScalarType()->isPointerTy()) {
     // Because we have added a PHI-use of the pointer value, it has now
     // "escaped" from alias analysis' perspective.  We need to inform
@@ -2602,6 +3110,7 @@ bool GVN::performScalarPRE(Instruction *CurInst) {
     MD->removeInstruction(CurInst);
   DEBUG(verifyRemoved(CurInst));
   CurInst->eraseFromParent();
+  crellvm::intrude([] { crellvm::ValidationUnit::End(); });
   ++NumGVNInstr;
   
   return true;
@@ -2661,6 +3170,14 @@ bool GVN::splitCriticalEdges() {
 /// Executes one iteration of GVN
 bool GVN::iterateOnFunction(Function &F) {
   cleanupGlobalSets();
+  crellvm::intrude([this]() {
+      GVNDICT(VET)->clear();
+      GVNDICT(InvT)->clear();
+      GVNDICT(CT)->clear();
+      GVNDICT(CTInv)->clear();
+      GVNDICT(CallPHIs)->clear();
+      GVNDICT(VNCnt)->clear();
+  });
 
   // Top-down walk of the dominator tree
   bool Changed = false;

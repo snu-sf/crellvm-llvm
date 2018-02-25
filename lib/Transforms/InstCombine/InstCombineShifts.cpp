@@ -16,6 +16,10 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PatternMatch.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -696,10 +700,16 @@ Instruction *InstCombiner::visitShl(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
+  crellvm::ValidationUnit::Begin("simplify_shift", I);
+  INTRUDE(CAPTURE(), { data.create<crellvm::ArgForSimplifyShiftInst>(); });
+
   if (Value *V =
           SimplifyShlInst(I.getOperand(0), I.getOperand(1), I.hasNoSignedWrap(),
-                          I.hasNoUnsignedWrap(), DL, TLI, DT, AC))
+                          I.hasNoUnsignedWrap(), DL, TLI, DT, AC)) {
+    crellvm::generateHintForInstructionSimplify<crellvm::ArgForSimplifyShiftInst>(I, V);
     return ReplaceInstUsesWith(I, V);
+  }
+  crellvm::ValidationUnit::Abort();
 
   if (Instruction *V = commonShiftTransforms(I))
     return V;
@@ -738,9 +748,15 @@ Instruction *InstCombiner::visitLShr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
+  crellvm::ValidationUnit::Begin("simplify_shift", I);
+  INTRUDE(CAPTURE(), { data.create<crellvm::ArgForSimplifyShiftInst>(); });
+
   if (Value *V = SimplifyLShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
-                                  DL, TLI, DT, AC))
+                                  DL, TLI, DT, AC)) {
+    crellvm::generateHintForInstructionSimplify<crellvm::ArgForSimplifyShiftInst>(I, V);
     return ReplaceInstUsesWith(I, V);
+  }
+  crellvm::ValidationUnit::Abort();
 
   if (Instruction *R = commonShiftTransforms(I))
     return R;
@@ -782,9 +798,15 @@ Instruction *InstCombiner::visitAShr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
+  crellvm::ValidationUnit::Begin("simplify_shift", I);
+  INTRUDE(CAPTURE(), { data.create<crellvm::ArgForSimplifyShiftInst>(); });
+
   if (Value *V = SimplifyAShrInst(I.getOperand(0), I.getOperand(1), I.isExact(),
-                                  DL, TLI, DT, AC))
+                                  DL, TLI, DT, AC)) {
+    crellvm::generateHintForInstructionSimplify<crellvm::ArgForSimplifyShiftInst>(I, V);
     return ReplaceInstUsesWith(I, V);
+  }
+  crellvm::ValidationUnit::Abort();
 
   if (Instruction *R = commonShiftTransforms(I))
     return R;

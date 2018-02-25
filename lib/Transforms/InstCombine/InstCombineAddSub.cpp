@@ -17,8 +17,15 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/PatternMatch.h"
+
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesAddSub.h"
+#include "llvm/Crellvm/Hintgen.h"
+
 using namespace llvm;
-using namespace PatternMatch;
+using namespace llvm::PatternMatch;
 
 #define DEBUG_TYPE "instcombine"
 
@@ -1065,8 +1072,17 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   if (ConstantInt *CI = dyn_cast<ConstantInt>(RHS)) {
     // X + (signbit) --> X ^ signbit
     const APInt &Val = CI->getValue();
-    if (Val.isSignBit())
+    if (Val.isSignBit()) {
+      crellvm::ValidationUnit::Begin("add_signbit", I);
+
+      INTRUDE(CAPTURE(&I, &LHS, &RHS), {
+        // I = LHS + RHS --> I = LHS ^ 1
+        INFRULE(INSTPOS(SRC, &I), crellvm::ConsAddSignbit::make(
+                REGISTER(I), VAL(LHS), VAL(RHS), BITSIZE(*LHS)));
+      });
+
       return BinaryOperator::CreateXor(LHS, RHS);
+    }
 
     // See if SimplifyDemandedBits can simplify this.  This handles stuff like
     // (X & 254)+1 -> (X&254)|1
@@ -1075,8 +1091,32 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
     // zext(bool) + C -> bool ? C + 1 : C
     if (ZExtInst *ZI = dyn_cast<ZExtInst>(LHS))
-      if (ZI->getSrcTy()->isIntegerTy(1))
+      if (ZI->getSrcTy()->isIntegerTy(1)){
+        crellvm::ValidationUnit::Begin("add_zext_bool", I);
+
+        INTRUDE(CAPTURE(&I, &ZI, &CI), {
+          BinaryOperator &Y = I;
+          ZExtInst *X = ZI;
+          ConstantInt *C = CI;
+          // src : 
+          // x = zext i1 b to i<sz> 
+          // y = x + c          
+          //
+          // tgt : 
+          // x = zext i1 b to i<sz> 
+          // y = select i1 b, (c + 1), c
+          int64_t cprime = C->getSExtValue() + 1;
+          int cprime_bitwidth = C->getType()->getIntegerBitWidth();
+
+          crellvm::propagateInstruction(hints, X, &Y, crellvm::Source);
+
+          INFRULE(INSTPOS(SRC, &Y), crellvm::ConsAddZextBool::make(
+                  REGISTER(*X), REGISTER(Y), VAL(X->getOperand(0)), CONSTINT(C),
+                  CONSTINT(cprime, cprime_bitwidth), BITSIZE(*C)));
+        });
+
         return SelectInst::Create(ZI->getOperand(0), AddOne(CI), CI);
+      }
 
     Value *XorLHS = nullptr; ConstantInt *XorRHS = nullptr;
     if (match(LHS, m_Xor(m_Value(XorLHS), m_ConstantInt(XorRHS)))) {
@@ -1127,15 +1167,41 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     if (Instruction *NV = FoldOpIntoPhi(I))
       return NV;
 
-  if (I.getType()->getScalarType()->isIntegerTy(1))
+  if (I.getType()->getScalarType()->isIntegerTy(1)){
+    crellvm::ValidationUnit::Begin("add_onebit", I);
+
+    INTRUDE(CAPTURE(&I), {
+      BinaryOperator &Z = I;
+      // src : 
+      // z = x + y (both are i1 type) 
+      //
+      // tgt : 
+      // z = x ^ y
+
+      INFRULE(INSTPOS(SRC, &Z), crellvm::ConsAddOnebit::make(
+              REGISTER(Z), VAL(Z.getOperand(0)), VAL(Z.getOperand(1))));
+    });
+    
     return BinaryOperator::CreateXor(LHS, RHS);
+  }
 
   // X + X --> X << 1
   if (LHS == RHS) {
+    crellvm::ValidationUnit::Begin("add_shift", I);
+
     BinaryOperator *New =
       BinaryOperator::CreateShl(LHS, ConstantInt::get(I.getType(), 1));
     New->setHasNoSignedWrap(I.hasNoSignedWrap());
     New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
+
+    INTRUDE(CAPTURE(&I, &LHS, &RHS), {
+      // I = LHS + RHS
+
+      // from "y = v + v", create "y = v << 1"
+      INFRULE(INSTPOS(SRC, &I), crellvm::ConsAddShift::make(
+              REGISTER(I), VAL(LHS), BITSIZE(*LHS)));
+    });
+
     return New;
   }
 
@@ -1144,17 +1210,90 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   if (Value *LHSV = dyn_castNegVal(LHS)) {
     if (!isa<Constant>(RHS))
       if (Value *RHSV = dyn_castNegVal(RHS)) {
+        crellvm::ValidationUnit::Begin("add_dist_sub", I);
+        
         Value *NewAdd = Builder->CreateAdd(LHSV, RHSV, "sum");
+
+        INTRUDE(CAPTURE(&LHS, &LHSV, &RHS, &RHSV, &I, &NewAdd), {
+          //    <src>        <tgt>
+          // mx = 0 - x | mx = 0 - x
+          // my = 0 - y | my = 0 - y
+          //            |  w = x + y
+          //  z = x + y |  z = 0 - w
+          BinaryOperator *MX = dyn_cast<BinaryOperator>(LHS);
+          Value *MY = RHS;
+          Value *X = LHSV;
+          Value *Y = RHSV;
+          BinaryOperator *W = dyn_cast<BinaryOperator>(NewAdd);
+          BinaryOperator *Z = &I;
+          assert(W != nullptr);
+
+          // prepare variables
+          std::string reg_w_name = crellvm::getVariable(*W);
+
+          // propagate "mx = 0 - x"
+          crellvm::generateHintForNegValue(MX, *Z, crellvm::Target);
+          
+          // propagate "my = 0 - y"
+          crellvm::generateHintForNegValue(MY, *Z, crellvm::Target);
+          
+          // add nop into source
+          crellvm::insertSrcNopAtTgtI(hints, W);
+         
+          // propagate "w = x + y"
+          PROPAGATE(LESSDEF(RHS(reg_w_name, Physical, TGT), VAR(reg_w_name), TGT),
+                    BOUNDS(INSTPOS(TGT, W), INSTPOS(TGT, Z)));
+
+          // maydiff global w
+          PROPAGATE(MAYDIFF(reg_w_name, Physical), crellvm::ConsGlobal::make());
+ 
+          // create z = x + y in tgt
+          INFRULE(INSTPOS(TGT, Z), crellvm::ConsAddDistSub::make(
+                  REGISTER(*Z), REGISTER(*MX), VAL(MY), REGISTER(reg_w_name), VAL(X), VAL(Y), BITSIZE(*Z)));
+        });
+
+
         return BinaryOperator::CreateNeg(NewAdd);
       }
+
+    crellvm::ValidationUnit::Begin("add_comm_sub", I);
+    INTRUDE(CAPTURE(&LHS, &LHSV, &RHS, &I), {
+      // LHS = 0   - LHSV    my = 0  - y
+      //   I = LHS + RHS      z = my + x
+
+      // propagate "my = 0 - y"
+      crellvm::propagateInstruction(hints, dyn_cast<Instruction>(LHS), &I, SRC);
+
+      // auto: from "z = my + x", create "z = x + my"
+      //INFRULE(INSTPOS(SRC, &I), crellvm::ConsBopCommutative::make(
+      //        VAR(I), crellvm::TyBop::BopAdd, VAL(LHS), VAL(RHS), BITSIZE(*LHSV)));
+
+      // from "z = x + my" and "my = 0 - y", create "z = x - y"
+      INFRULE(INSTPOS(SRC, &I), crellvm::ConsAddSub::make(
+              REGISTER(*LHS), REGISTER(I), VAL(RHS), VAL(LHSV), BITSIZE(*LHSV)));
+    });
 
     return BinaryOperator::CreateSub(RHS, LHSV);
   }
 
   // A + -B  -->  A - B
   if (!isa<Constant>(RHS))
-    if (Value *V = dyn_castNegVal(RHS))
+    if (Value *V = dyn_castNegVal(RHS)) {
+      crellvm::ValidationUnit::Begin("add_sub", I);
+      INTRUDE(CAPTURE(&V, &LHS, &RHS, &I), {
+        // RHS = 0   - V       my = 0 - y
+        //   I = LHS + RHS      z = x + my
+
+        // propagate "my = 0 - y"
+        crellvm::propagateInstruction(hints, dyn_cast<Instruction>(RHS), &I, SRC);
+
+        // from "z = x + my" and "my = 0 - y", create "z = x - y"
+        INFRULE(INSTPOS(SRC, &I), crellvm::ConsAddSub::make(
+                REGISTER(*RHS), REGISTER(I), VAL(LHS), VAL(V), BITSIZE(*V)));
+      });
+
       return BinaryOperator::CreateSub(LHS, V);
+    }
 
   if (Value *V = checkForNegativeOperand(I, Builder))
     return ReplaceInstUsesWith(I, V);
@@ -1165,8 +1304,30 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
   if (Constant *CRHS = dyn_cast<Constant>(RHS)) {
     Value *X;
-    if (match(LHS, m_Not(m_Value(X)))) // ~X + C --> (C-1) - X
+    if (match(LHS, m_Not(m_Value(X)))){ // ~X + C --> (C-1) - X
+      crellvm::ValidationUnit::Begin("add_const_not", I);
+      INTRUDE(CAPTURE(&CRHS, &LHS, &I, &X), {
+        // Y = X ^ -1
+        // Z = Y + C1
+        Instruction *Y = dyn_cast<Instruction>(LHS);
+        ConstantInt *C1_ptr = dyn_cast<ConstantInt>(CRHS);
+        int64_t C1 = C1_ptr->getSExtValue();
+        Instruction *Z = &I;
+
+        // prepare variables
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        // propagate "Y = X ^ -1"
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+
+        // To Z, apply add_const_not
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsAddConstNot::make(
+                REGISTER(*Z), REGISTER(*Y), VAL(X), CONSTINT(C1, bitwidth),
+                CONSTINT(C1 - 1, bitwidth), BITSIZE(bitwidth)));
+      });
+
       return BinaryOperator::CreateSub(SubOne(CRHS), X);
+    }
   }
 
   if (ConstantInt *CRHS = dyn_cast<ConstantInt>(RHS)) {
@@ -1187,8 +1348,44 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
       APInt AddRHSHighBitsAnd(AddRHSHighBits & C2->getValue());
 
       if (AddRHSHighBits == AddRHSHighBitsAnd) {
+        crellvm::ValidationUnit::Begin("add_mask", I);
+        
         // Okay, the xform is safe.  Insert the new add pronto.
         Value *NewAdd = Builder->CreateAdd(X, CRHS, LHS->getName());
+
+        INTRUDE(CAPTURE(&I, &LHS, &CRHS, &X, &C2, &NewAdd), {
+          //   <src>     |     <tgt>
+          // Y = X & c2  | Y  = X  & c2
+          // nop         | Y' = X  + c1
+          // Z = Y + c1  | Z  = Y' & c2
+          
+          int64_t c1 = CRHS->getSExtValue();
+          int64_t c2 = C2->getSExtValue();
+          Instruction *Y = dyn_cast<Instruction>(LHS);
+          Instruction *Z = dyn_cast<Instruction>(&I);
+          Instruction *Yprime = dyn_cast<Instruction>(NewAdd);
+
+          // prepare variables
+          std::string reg_yprime_name = crellvm::getVariable(*Yprime);
+
+          int bitwidth = Z->getType()->getIntegerBitWidth();
+
+          // propagate "Y = X & c2" in target
+          crellvm::propagateInstruction(hints, Y, Z, TGT);
+
+          // propagate "Y' = X + c1" in target
+          crellvm::propagateInstruction(hints, Yprime, Z, TGT);
+
+          // To Z, apply add_mask
+          INFRULE(INSTPOS(TGT, Z), crellvm::ConsAddMask::make(
+                  REGISTER(*Z), REGISTER(*Y), REGISTER(*Yprime), VAL(X),
+                  CONSTINT(c1, bitwidth), CONSTINT(c2, bitwidth), BITSIZE(bitwidth)));
+          
+          // Propagate yp_var maydiff global
+          crellvm::propagateMaydiffGlobal(hints, reg_yprime_name, crellvm::Physical);
+                  
+          insertSrcNopAtTgtI(hints, Yprime);
+        });
         return BinaryOperator::CreateAnd(NewAdd, C2);
       }
     }
@@ -1203,9 +1400,11 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
   {
     SelectInst *SI = dyn_cast<SelectInst>(LHS);
     Value *A = RHS;
+    //bool crellvm_needsCommutativity = false;
     if (!SI) {
       SI = dyn_cast<SelectInst>(RHS);
       A = LHS;
+      //crellvm_needsCommutativity = true;
     }
     if (SI && SI->hasOneUse()) {
       Value *TV = SI->getTrueValue();
@@ -1214,13 +1413,25 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
 
       // Can we fold the add into the argument of the select?
       // We check both true and false select arguments for a matching subtract.
-      if (match(FV, m_Zero()) && match(TV, m_Sub(m_Value(N), m_Specific(A))))
+      if (match(FV, m_Zero()) && match(TV, m_Sub(m_Value(N), m_Specific(A)))){
+        crellvm::ValidationUnit::Begin("add_select_zero", I);
+        crellvm::generateHintForAddSelectZero(&I, dyn_cast<BinaryOperator>(TV), SI,
+                //crellvm_needsCommutativity,
+                true);
+        
         // Fold the add into the true select value.
         return SelectInst::Create(SI->getCondition(), N, A);
+      }
 
-      if (match(TV, m_Zero()) && match(FV, m_Sub(m_Value(N), m_Specific(A))))
+      if (match(TV, m_Zero()) && match(FV, m_Sub(m_Value(N), m_Specific(A)))){
+        crellvm::ValidationUnit::Begin("add_select_zero2", I);
+        crellvm::generateHintForAddSelectZero(&I, dyn_cast<BinaryOperator>(FV), SI,
+                //crellvm_needsCommutativity,
+                false);
+
         // Fold the add into the false select value.
         return SelectInst::Create(SI->getCondition(), A, N);
+      }
     }
   }
 
@@ -1264,13 +1475,23 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     Value *A = nullptr, *B = nullptr;
     if (match(RHS, m_Xor(m_Value(A), m_Value(B))) &&
         (match(LHS, m_And(m_Specific(A), m_Specific(B))) ||
-         match(LHS, m_And(m_Specific(B), m_Specific(A)))))
+         match(LHS, m_And(m_Specific(B), m_Specific(A))))){
+      crellvm::ValidationUnit::Begin("add_xor_and", I);
+      crellvm::generateHintForAddXorAnd(&I, 
+          dyn_cast<BinaryOperator>(RHS), dyn_cast<BinaryOperator>(LHS), A, B);
+          //A, B, match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true, true);
       return BinaryOperator::CreateOr(A, B);
+    }
 
     if (match(LHS, m_Xor(m_Value(A), m_Value(B))) &&
         (match(RHS, m_And(m_Specific(A), m_Specific(B))) ||
-         match(RHS, m_And(m_Specific(B), m_Specific(A)))))
+         match(RHS, m_And(m_Specific(B), m_Specific(A))))){
+      crellvm::ValidationUnit::Begin("add_xor_and", I);
+      crellvm::generateHintForAddXorAnd(&I, 
+          dyn_cast<BinaryOperator>(LHS), dyn_cast<BinaryOperator>(RHS), A, B);
+          //A, B, match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true, false);
       return BinaryOperator::CreateOr(A, B);
+    }
   }
 
   // (add (or A, B) (and A, B)) --> (add A, B)
@@ -1279,18 +1500,26 @@ Instruction *InstCombiner::visitAdd(BinaryOperator &I) {
     if (match(RHS, m_Or(m_Value(A), m_Value(B))) &&
         (match(LHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(LHS, m_And(m_Specific(B), m_Specific(A))))) {
+      crellvm::ValidationUnit::Begin("add_or_and", I);
       auto *New = BinaryOperator::CreateAdd(A, B);
       New->setHasNoSignedWrap(I.hasNoSignedWrap());
       New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
+      crellvm::generateHintForAddOrAnd(&I, 
+          dyn_cast<BinaryOperator>(RHS), dyn_cast<BinaryOperator>(LHS), A, B);
+          //A, B, match(LHS, m_And(m_Specific(A), m_Specific(B))) ? false : true, true);
       return New;
     }
 
     if (match(LHS, m_Or(m_Value(A), m_Value(B))) &&
         (match(RHS, m_And(m_Specific(A), m_Specific(B))) ||
          match(RHS, m_And(m_Specific(B), m_Specific(A))))) {
+      crellvm::ValidationUnit::Begin("add_or_and", I);
       auto *New = BinaryOperator::CreateAdd(A, B);
       New->setHasNoSignedWrap(I.hasNoSignedWrap());
       New->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
+      crellvm::generateHintForAddOrAnd(&I, 
+          dyn_cast<BinaryOperator>(LHS), dyn_cast<BinaryOperator>(RHS), A, B);
+          //A, B, match(RHS, m_And(m_Specific(A), m_Specific(B))) ? false : true, false);
       return New;
     }
   }
@@ -1518,21 +1747,88 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
         Res->setHasNoSignedWrap(true);
     }
 
+    crellvm::ValidationUnit::Begin("sub_add", I);
+
+    // Op1 will be propagated to Z if it is id
+    // Inference rule will be applied if is a constant
+    crellvm::generateHintForNegValue(Op1, I);
+
+    INTRUDE(CAPTURE(&Op0, &I, &Op1, &V), {
+      //    <src>   |    <tgt>
+      // my = 0 - y | my = 0 - y
+      // z = x - my | z = x + y
+      //std::string reg0_name = crellvm::getVariable(I);
+
+      if (I.getType()->isVectorTy()) { crellvm::ValidationUnit::Abort(); return; }
+
+      INFRULE(INSTPOS(SRC, &I), crellvm::ConsSubAdd::make(
+              REGISTER(I), VAL(Op1), VAL(Op0), VAL(V), BITSIZE(I)));
+    });
+
     return Res;
   }
 
-  if (I.getType()->isIntegerTy(1))
+
+  if (I.getType()->isIntegerTy(1)){
+    crellvm::ValidationUnit::Begin("sub_onebit", I);
+
+    INTRUDE(CAPTURE(&I), {
+      //   <src>          <tgt>
+      // Z = X - Y  | Z = X ^ Y
+      BinaryOperator *Z = &I;
+
+      INFRULE(INSTPOS(SRC, Z), crellvm::ConsSubOnebit::make(
+              REGISTER(*Z), VAL(Z->getOperand(0)), VAL(Z->getOperand(1))));
+    });
+
     return BinaryOperator::CreateXor(Op0, Op1);
+  }
 
   // Replace (-1 - A) with (~A).
-  if (match(Op0, m_AllOnes()))
+  if (match(Op0, m_AllOnes())){
+    crellvm::ValidationUnit::Begin("sub_mone", I);
+
+    INTRUDE(CAPTURE(&I), {
+      //   <src>          <tgt>
+      // Z = -1 - X  | Z = -1 ^ X
+      BinaryOperator *Z = &I;
+
+      INFRULE(INSTPOS(SRC, Z), crellvm::ConsSubMone::make(
+              REGISTER(*Z), VAL(Z->getOperand(1)), BITSIZE(*Z)));
+    });
+
+
     return BinaryOperator::CreateNot(Op1);
+  }
 
   if (Constant *C = dyn_cast<Constant>(Op0)) {
     // C - ~X == X + (1+C)
     Value *X = nullptr;
-    if (match(Op1, m_Not(m_Value(X))))
+    if (match(Op1, m_Not(m_Value(X)))){
+      crellvm::ValidationUnit::Begin("sub_const_not", I);
+
+      INTRUDE(CAPTURE(&I, &C, &X), {
+        //     <src>     <tgt>
+        // Y = X  ^ -1 | Y = X ^ -1
+        // Z = C1 -  Y | Z = X + C2
+
+        BinaryOperator *Z = &I;
+        ConstantInt *C1 = dyn_cast<ConstantInt>(C);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(1));
+
+        int64_t c2 = C1->getSExtValue() + 1;
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsSubConstNot::make(
+                REGISTER(*Z), REGISTER(*Y), VAL(X),
+                CONSTINT(C1), CONSTINT(c2, bitwidth), BITSIZE(bitwidth)));
+      });
+
+
       return BinaryOperator::CreateAdd(X, AddOne(C));
+    }
 
     // Try to fold constant sub into select arguments.
     if (SelectInst *SI = dyn_cast<SelectInst>(Op1))
@@ -1541,8 +1837,36 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
 
     // C-(X+C2) --> (C-C2)-X
     Constant *C2;
-    if (match(Op1, m_Add(m_Value(X), m_Constant(C2))))
+    if (match(Op1, m_Add(m_Value(X), m_Constant(C2)))){
+      crellvm::ValidationUnit::Begin("sub_const_add", I);
+      INTRUDE(CAPTURE(&I, &C2, &X, &C), {
+        //     <src>     <tgt>
+        // Y = X  + C1 | Y = X  + C1
+        // Z = C2 -  Y | Z = (C2 - C1) - X
+
+        BinaryOperator *Z = &I;
+        if (Z->getType()->isVectorTy()) {
+          crellvm::ValidationUnit::Abort();
+          return;
+        }
+        ConstantInt *C1 = dyn_cast<ConstantInt>(C2);
+        ConstantInt *C2 = dyn_cast<ConstantInt>(C);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Z->getOperand(1));
+
+        int64_t c1 = C1->getSExtValue();
+        int64_t c2 = C2->getSExtValue();
+        //int64_t c3 = c2 - c1;
+        int bitwidth = Z->getType()->getIntegerBitWidth();
+
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsSubConstAdd::make(
+                REGISTER(*Z), REGISTER(*Y), VAL(X),
+                CONSTINT(c1, bitwidth), CONSTINT(c2, bitwidth),
+                CONSTINT(c2 - c1, bitwidth), BITSIZE(bitwidth)));
+      });
       return BinaryOperator::CreateSub(ConstantExpr::getSub(C, C2), X);
+    }
 
     if (SimplifyDemandedInstructionBits(I))
       return &I;
@@ -1594,12 +1918,43 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     Value *Y;
     // X-(X+Y) == -Y    X-(Y+X) == -Y
     if (match(Op1, m_Add(m_Specific(Op0), m_Value(Y))) ||
-        match(Op1, m_Add(m_Value(Y), m_Specific(Op0))))
+        match(Op1, m_Add(m_Value(Y), m_Specific(Op0)))) {
+      crellvm::ValidationUnit::Begin("sub_remove", I);
+      INTRUDE(CAPTURE(&I, &Op1, &Op0, &Y), {
+        // prepare variable
+        Instruction *reg_y_instr = dyn_cast<Instruction>(Op1);
+
+        std::string reg_y_name = crellvm::getVariable(*Op1);
+        crellvm::propagateInstruction(hints, reg_y_instr, &I, SRC);
+
+        // auto : If Y = Op0 + Y, apply commutativity 
+        //INFRULE(INSTPOS(SRC, reg_y_instr), crellvm::ConsBopCommutative::make(
+        //        VAR(reg_y_name), crellvm::TyBop::BopAdd, VAL(Op0), VAL(Y), BITSIZE(*Op1)));
+        INFRULE(INSTPOS(SRC, &I), crellvm::ConsSubRemove::make(
+                REGISTER(I), REGISTER(reg_y_name), VAL(Op0), VAL(Y), BITSIZE(*Op1)));
+      });
+      crellvm::ValidationUnit::End();
+
       return BinaryOperator::CreateNeg(Y);
+    }
 
     // (X-Y)-X == -Y
-    if (match(Op0, m_Sub(m_Specific(Op1), m_Value(Y))))
+    if (match(Op0, m_Sub(m_Specific(Op1), m_Value(Y)))){
+      crellvm::ValidationUnit::Begin("sub_sub", I);
+      INTRUDE(CAPTURE(&I, &Op1, &Op0, &Y), {
+        //    <src>      <tgt>
+        // W = X - Y | W = X - Y
+        // Z = W - X | Z = 0 - Y
+        BinaryOperator *W = dyn_cast<BinaryOperator>(Op0);
+        //assert(W);
+
+        crellvm::propagateInstruction(hints, W, &I, SRC);
+
+        INFRULE(INSTPOS(SRC, &I), crellvm::ConsSubSub::make(
+                REGISTER(I), VAL(Op1), VAL(Y), VAL(Op0), BITSIZE(*Op1)));
+      });
       return BinaryOperator::CreateNeg(Y);
+    }
   }
 
   // (sub (or A, B) (xor A, B)) --> (and A, B)
@@ -1607,8 +1962,30 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
     Value *A = nullptr, *B = nullptr;
     if (match(Op1, m_Xor(m_Value(A), m_Value(B))) &&
         (match(Op0, m_Or(m_Specific(A), m_Specific(B))) ||
-         match(Op0, m_Or(m_Specific(B), m_Specific(A)))))
+         match(Op0, m_Or(m_Specific(B), m_Specific(A))))){
+      crellvm::ValidationUnit::Begin("sub_or_xor", I);
+      INTRUDE(CAPTURE(&I, &Op1, &Op0, &A, &B), {
+        //    <src>      <tgt>
+        // X = A | B | X = A | B
+        // Y = A ^ B | Y = A ^ B
+        // Z = X - Y | Z = A & B
+        BinaryOperator *Z = &I;
+        BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+        //assert(X);
+        //assert(Y);
+
+        crellvm::propagateInstruction(hints, X, Z, SRC);
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+        // If X = B | A, apply commutativity by auto
+        //if(match(X, m_Or(m_Specific(B), m_Specific(A))))
+        //  crellvm::applyCommutativity(hints, Z, X, SRC);
+
+        INFRULE(INSTPOS(SRC, &I), crellvm::ConsSubOrXor::make(
+                REGISTER(*Z), VAL(A), VAL(B), REGISTER(*X), REGISTER(*Y), BITSIZE(*Z)));
+      });
       return BinaryOperator::CreateAnd(A, B);
+    }
   }
 
   // (sub (select (a, c, b)), (select (a, d, b))) -> (select (a, (sub c, d), 0))
@@ -1669,9 +2046,29 @@ Instruction *InstCombiner::visitSub(BinaryOperator &I) {
       return BinaryOperator::CreateSDiv(X, ConstantExpr::getNeg(C));
 
     // 0 - (X << Y)  -> (-X << Y)   when X is freely negatable.
-    if (match(Op1, m_Shl(m_Value(X), m_Value(Y))) && match(Op0, m_Zero()))
-      if (Value *XNeg = dyn_castNegVal(X))
+    if (match(Op1, m_Shl(m_Value(X), m_Value(Y))) && match(Op0, m_Zero())){
+      if (Value *XNeg = dyn_castNegVal(X)){
+        {
+          //     <src>       <tgt>
+          // X = 0 - mX | X =  0 - mX
+          // Y = X << A | Y =  X << A
+          // Z = 0 -  Y | Z = mX << A
+          crellvm::ValidationUnit::Begin("sub_shl", I);
+          crellvm::generateHintForNegValue(X, I);
+          INTRUDE(CAPTURE(&I, &Op1, &Y, &XNeg, &X), {
+            BinaryOperator *Z = &I;
+            BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+            Value *A = Y->getOperand(1);
+            Value *mX = XNeg;
+            crellvm::propagateInstruction(hints, Y, Z, SRC);
+            INFRULE(INSTPOS(SRC, Z), crellvm::ConsSubShl::make(
+                    REGISTER(*Z), VAL(X), REGISTER(*Y), VAL(mX), VAL(A), BITSIZE(*Z)));
+          });
+        }
+ 
         return BinaryOperator::CreateShl(XNeg, Y);
+      }
+    }
 
     // X - A*-B -> X + A*B
     // X - -A*B -> X + A*B

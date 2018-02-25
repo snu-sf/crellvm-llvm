@@ -62,6 +62,16 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include <algorithm>
 #include <climits>
+
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
+
+#include <sstream>
+#include <fstream>
+#include <iostream>
+#include <vector>
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -201,9 +211,33 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, DL)) {
+          crellvm::ValidationUnit::Begin("bop_associativity", I);
+
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
           I.setOperand(1, V);
+
+          INTRUDE(CAPTURE(&Op0, &I, &B, &C, &V, &Opcode), {
+            if (isa<ConstantInt>(B) && isa<ConstantInt>(C) && isa<ConstantInt>(V)) {
+              //    <src>    |     <tgt>
+              // Y = X op C1 | Y = X op C1
+              // Z = Y op C2 | Z = X op (C1 op C2)
+
+              Instruction *reg1_instr = dyn_cast<Instruction>(Op0);
+
+              crellvm::propagateInstruction(hints, reg1_instr, &I, SRC);
+
+              INFRULE(INSTPOS(SRC, &I), crellvm::ConsBopAssociative::make(
+                  REGISTER(*(Op0->getOperand(0))), REGISTER(*Op0),
+                  REGISTER(I), crellvm::getBop(Opcode),
+                  CONSTINT(dyn_cast<ConstantInt>(B)), CONSTINT(dyn_cast<ConstantInt>(C)),
+                  CONSTINT(dyn_cast<ConstantInt>(V)), BITSIZE(*B)));
+            } else
+              crellvm::ValidationUnit::GetInstance()->setIsAborted();
+          });
+
+          crellvm::ValidationUnit::End();
+          
           // Conservatively clear the optional flags, since they may not be
           // preserved by the reassociation.
           if (MaintainNoSignedWrap(I, B, C) &&
@@ -1909,6 +1943,31 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
   // true or false as appropriate.
   SmallVector<WeakVH, 64> Users;
   if (isAllocSiteRemovable(&MI, Users, TLI)) {
+    crellvm::ValidationUnit::Begin("dead_store_elim2", MI);
+    INTRUDE(CAPTURE(&MI, &Users), {
+      // NOTE : We only support the case when Ptr is alloca and uses are store.
+      bool doAbort = false;
+      if (isa<AllocaInst>(&MI)) {
+        std::string regname = crellvm::getVariable(MI);
+        for (unsigned i = 0, e = Users.size(); i != e; ++i) {
+          if (!isa<StoreInst>(&*Users[i])) {
+            doAbort = true;
+            break;
+          }
+          StoreInst *SI = dyn_cast<StoreInst>(&*Users[i]);
+          crellvm::insertTgtNopAtSrcI(hints, SI);
+          PROPAGATE(PRIVATE(REGISTER(regname), SRC),
+              BOUNDS(INSTPOS(SRC, &MI), INSTPOS(SRC, SI)));
+        }
+        crellvm::insertTgtNopAtSrcI(hints, &MI);
+        crellvm::propagateMaydiffGlobal(hints, regname, crellvm::Physical);
+        crellvm::propagateMaydiffGlobal(hints, regname, crellvm::Previous);
+      } else {
+        doAbort = true;
+      }
+      if (doAbort)
+        crellvm::ValidationUnit::GetInstance()->setIsAborted();
+    });
     for (unsigned i = 0, e = Users.size(); i != e; ++i) {
       Instruction *I = cast_or_null<Instruction>(&*Users[i]);
       if (!I) continue;
@@ -1936,7 +1995,10 @@ Instruction *InstCombiner::visitAllocSite(Instruction &MI) {
       InvokeInst::Create(F, II->getNormalDest(), II->getUnwindDest(),
                          None, "", II->getParent());
     }
-    return EraseInstFromFunction(MI);
+    
+    Instruction *Res = EraseInstFromFunction(MI);
+    crellvm::ValidationUnit::End();
+    return Res;
   }
   return nullptr;
 }
@@ -2677,7 +2739,11 @@ bool InstCombiner::run() {
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, TLI)) {
       DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
+      crellvm::name_instruction(*I);
+      crellvm::ValidationUnit::Begin("dead_code_elim", *I, false);
+      crellvm::generateHintForTrivialDCE(*I);
       EraseInstFromFunction(*I);
+      crellvm::ValidationUnit::End();
       ++NumDeadInst;
       MadeIRChange = true;
       continue;
@@ -2778,16 +2844,23 @@ bool InstCombiner::run() {
         InstParent->getInstList().insert(InsertPos, Result);
 
         EraseInstFromFunction(*I);
+
+        crellvm::ValidationUnit::EndIfExists();
       } else {
 #ifndef NDEBUG
         DEBUG(dbgs() << "IC: Mod = " << OrigI << '\n'
                      << "    New = " << *I << '\n');
 #endif
+        crellvm::ValidationUnit::EndIfExists();
 
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
         if (isInstructionTriviallyDead(I, TLI)) {
+          crellvm::name_instruction(*I);
+          crellvm::ValidationUnit::Begin("dead_code_elim", *I, false);
+          crellvm::generateHintForTrivialDCE(*I);
           EraseInstFromFunction(*I);
+          crellvm::ValidationUnit::End();
         } else {
           Worklist.Add(I);
           Worklist.AddUsersToWorkList(*I);
@@ -2835,7 +2908,11 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       if (isInstructionTriviallyDead(Inst, TLI)) {
         ++NumDeadInst;
         DEBUG(dbgs() << "IC: DCE: " << *Inst << '\n');
+        crellvm::name_instruction(*Inst);
+        crellvm::ValidationUnit::Begin("dead_code_elim", *Inst, false);
+        crellvm::generateHintForTrivialDCE(*Inst);
         Inst->eraseFromParent();
+        crellvm::ValidationUnit::End();
         continue;
       }
 
@@ -3006,6 +3083,9 @@ combineInstructionsOverFunction(Function &F, InstCombineWorklist &Worklist,
 
 PreservedAnalyses InstCombinePass::run(Function &F,
                                        AnalysisManager<Function> *AM) {
+  
+  crellvm::ValidationUnit::StartPass(crellvm::ValidationUnit::INSTCOMBINE);
+  
   auto &AC = AM->getResult<AssumptionAnalysis>(F);
   auto &DT = AM->getResult<DominatorTreeAnalysis>(F);
   auto &TLI = AM->getResult<TargetLibraryAnalysis>(F);
@@ -3021,6 +3101,9 @@ PreservedAnalyses InstCombinePass::run(Function &F,
   // FIXME: Need a way to preserve CFG analyses here!
   PreservedAnalyses PA;
   PA.preserve<DominatorTreeAnalysis>();
+  
+  crellvm::ValidationUnit::EndPass();
+
   return PA;
 }
 
@@ -3057,6 +3140,8 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   if (skipOptnoneFunction(F))
     return false;
 
+  crellvm::ValidationUnit::StartPass(crellvm::ValidationUnit::INSTCOMBINE);
+  
   // Required analyses.
   auto AA = &getAnalysis<AliasAnalysis>();
   auto &AC = getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
@@ -3067,7 +3152,10 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
   auto *LIWP = getAnalysisIfAvailable<LoopInfoWrapperPass>();
   auto *LI = LIWP ? &LIWP->getLoopInfo() : nullptr;
 
-  return combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
+  bool result = combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, DT, LI);
+  crellvm::ValidationUnit::EndPass();
+
+  return result;
 }
 
 char InstructionCombiningPass::ID = 0;

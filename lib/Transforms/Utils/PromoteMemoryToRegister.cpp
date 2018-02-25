@@ -39,6 +39,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include <algorithm>
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Hintgen.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "mem2reg"
@@ -72,9 +74,9 @@ bool llvm::isAllocaPromotable(const AllocaInst *AI) {
           II->getIntrinsicID() != Intrinsic::lifetime_end)
         return false;
     } else if (const BitCastInst *BCI = dyn_cast<BitCastInst>(U)) {
-      if (BCI->getType() != Type::getInt8PtrTy(U->getContext(), AS))
-        return false;
-      if (!onlyUsedByLifetimeMarkers(BCI))
+      if (BCI->getType() != Type::getInt8PtrTy(U->getContext(), AS)) 
+        return false; 
+      if (!onlyUsedByLifetimeMarkers(BCI)) 
         return false;
     } else if (const GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(U)) {
       if (GEPI->getType() != Type::getInt8PtrTy(U->getContext(), AS))
@@ -150,7 +152,7 @@ struct AllocaInfo {
   }
 };
 
-// Data package used by RenamePass()
+// Data package used by RenamePasa()
 class RenamePassData {
 public:
   typedef std::vector<Value *> ValVector;
@@ -322,6 +324,12 @@ static void removeLifetimeIntrinsicUsers(AllocaInst *AI) {
         Inst->eraseFromParent();
       }
     }
+
+    INTRUDE(CAPTURE(&I), {
+      hints.appendToDescription("removeLifeTime");
+      hints.setReturnCodeToAdmitted();
+    });
+
     I->eraseFromParent();
   }
 }
@@ -345,7 +353,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
   // Clear out UsingBlocks.  We will reconstruct it here if needed.
   Info.UsingBlocks.clear();
-
   for (auto UI = AI->user_begin(), E = AI->user_end(); UI != E;) {
     Instruction *UserInst = cast<Instruction>(*UI++);
     if (!isa<LoadInst>(UserInst)) {
@@ -371,7 +378,6 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
           Info.UsingBlocks.push_back(StoreBB);
           continue;
         }
-
       } else if (LI->getParent() != StoreBB &&
                  !DT.dominates(StoreBB, LI->getParent())) {
         // If the load and store are in different blocks, use BB dominance to
@@ -384,11 +390,73 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
 
     // Otherwise, we *can* safely rewrite this load.
     Value *ReplVal = OnlyStore->getOperand(0);
+
+    INTRUDE(CAPTURE(&AI, &OnlyStore, &LI, &ReplVal, &StoringGlobalVal), {
+      //        <src>          |     <tgt>
+      // %x = alloca i32       | nop
+      // store i32 1, %x       | nop
+      // %a = load i32 %x      | nop
+      // %b = load i32 %x      | nop
+      // %c = add i32 %a, %b   | %c = add i32 1, 1
+      // ret i32 %c            | ret i32 %c
+
+      // prepare variables
+      auto &storeItem = *(data.get<crellvm::ArgForMem2Reg>()->storeItem);
+      auto instrIndices = data.get<crellvm::ArgForIndices>()->instrIndices;
+
+      std::string Rstore = crellvm::getVariable(*(OnlyStore->getOperand(1)));
+      std::string Rload = crellvm::getVariable(*LI);
+
+      // do this if stored object(OnlyStore->getOperand(0)) is
+      // not an instruction
+      if (StoringGlobalVal && !isa<Function>(ReplVal)) {
+        // propagate stored value from alloca to load 
+        crellvm::propagateLoadGhostValueFromAIToLI(AI, LI, ReplVal, data, hints);
+    
+        if (isa<GlobalValue>(ReplVal) || isa<Argument>(ReplVal))
+          PROPAGATE(LESSDEF(EXPR(UNDEF(ReplVal), Physical), EXPR(ReplVal, Physical), SRC),
+                    BOUNDS(STARTPOS(SRC, std::string(AI->getParent()->getName())), INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), "")));
+
+        if (isa<Constant>(ReplVal)) 
+          INFRULE(INDEXEDPOS(SRC, AI, DICTMAP(instrIndices, AI), ""), crellvm::ConsLessthanUndef::make(TYPEOF(ReplVal), VAL(ReplVal))); 
+
+        std::shared_ptr<crellvm::TyExpr> expr = EXPR(OnlyStore->getOperand(0), Physical);
+        
+        if (equalsIfConsVar(storeItem[OnlyStore].expr, expr)) {
+          data.get<crellvm::ArgForMem2Reg>()->replaceTag.get()->push_back(expr);
+        } else if (storeItem[OnlyStore].op0 != "") { expr = VAR(storeItem[OnlyStore].op0, Ghost); }
+
+        INFRULE(INDEXEDPOS(SRC, OnlyStore, DICTMAP(instrIndices, OnlyStore), ""),
+                crellvm::ConsIntroGhost::make(expr, REGISTER(Rstore, Ghost)));
+      } else { crellvm::propagateLoadGhostValueFromSIToLI(OnlyStore, LI, ReplVal, data, hints, true); }
+        // Step1: propagate store instruction
+        //        <src>                               |     <tgt>
+        // %x = alloca i32                            | nop
+        // store i32 1, %x       | nop
+        // %a = load i32 %x      | %a = load i32 1
+        // %b = load i32 %x      | %b = load i32 1
+        // %c = add i32 %a, %b   | %c = add i32 %a, %b
+        // ret i32 %c            | ret i32 %c
+
+      crellvm::propagateLoadInstToUse(LI, ReplVal == LI? UNDEF(LI) : ReplVal, Rstore, data, hints, true);
+      crellvm::propagateMaydiffGlobal(hints, Rload, crellvm::Physical);
+      crellvm::propagateMaydiffGlobal(hints, Rload, crellvm::Previous);
+
+      hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(instrIndices, LI)-1, ""));
+    });
+
     // If the replacement value is the load, this must occur in unreachable
     // code.
     if (ReplVal == LI)
       ReplVal = UndefValue::get(LI->getType());
+
+    INTRUDE(CAPTURE(&LI, &ReplVal), {
+      crellvm::replaceExpr(LI, ReplVal, data);
+      crellvm::replaceTag(LI, crellvm::Ghost, data);
+    });
+
     LI->replaceAllUsesWith(ReplVal);
+
     if (AST && LI->getType()->isPointerTy())
       AST->deleteValue(LI);
     LI->eraseFromParent();
@@ -408,6 +476,24 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
     DDI->eraseFromParent();
     LBI.deleteValue(DDI);
   }
+
+  // add alloca and store into maydiff
+  INTRUDE(CAPTURE(&AI, &OnlyStore), {
+    std::string Ralloca = crellvm::getVariable(*AI);
+    auto instrIndices = data.get<crellvm::ArgForIndices>()->instrIndices;
+
+    // propagate maydiff
+    crellvm::propagateMaydiffGlobal(hints, Ralloca, crellvm::Physical);
+    crellvm::propagateMaydiffGlobal(hints, Ralloca, crellvm::Previous);
+
+    // add nop
+    hints.addNopPosition(INDEXEDPOS(TGT, AI, DICTMAP(instrIndices, AI)-1, ""));
+    hints.addNopPosition(INDEXEDPOS(TGT, OnlyStore, DICTMAP(instrIndices, OnlyStore)-1, ""));
+
+    if (LoadInst *check = dyn_cast<LoadInst>(OnlyStore->getOperand(0)))
+      crellvm::eraseInstrOfUseIndices(check, OnlyStore, data);
+  });
+
   // Remove the (now dead) store and alloca.
   Info.OnlyStore->eraseFromParent();
   LBI.deleteValue(Info.OnlyStore);
@@ -445,7 +531,7 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
   StoresByIndexTy StoresByIndex;
 
   for (User *U : AI->users())
-    if (StoreInst *SI = dyn_cast<StoreInst>(U))
+    if (StoreInst *SI = dyn_cast<StoreInst>(U)) 
       StoresByIndex.push_back(std::make_pair(LBI.getInstructionIndex(SI), SI));
 
   // Sort the stores by their index, making it efficient to do a lookup with a
@@ -468,11 +554,36 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                                         static_cast<StoreInst *>(nullptr)),
                          less_first());
 
+    INTRUDE(CAPTURE(&AI, &LI, &I, &StoresByIndex), {
+      // prepare variables
+      std::string Rload = crellvm::getVariable(*LI);
+      Value* value;
+
+      if (I == StoresByIndex.begin()) { 
+        value = UNDEF(LI);
+        crellvm::propagateLoadGhostValueFromAIToLI(AI, LI, value, data, hints);
+        if (!StoresByIndex.empty()) 
+          hints.appendToDescription("MEM2REG SINGLE BLOCK ALLOCA BUG FOUND BY US");
+      } else { 
+        StoreInst* SI = std::prev(I)->second;
+        value = SI->getOperand(0);
+        crellvm::propagateLoadGhostValueFromSIToLI(SI, LI, value, data, hints, true);
+      }
+        
+      crellvm::propagateLoadInstToUse(LI, value, crellvm::getVariable(*AI), data, hints, true);
+      crellvm::propagateMaydiffGlobal(hints, Rload, crellvm::Physical);
+      crellvm::propagateMaydiffGlobal(hints, Rload, crellvm::Previous);
+
+      hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(data.get<crellvm::ArgForIndices>()->instrIndices, LI)-1, ""));
+      
+      crellvm::replaceExpr(LI, value, data);
+      crellvm::replaceTag(LI, crellvm::Ghost, data);
+    });
+
+
     if (I == StoresByIndex.begin())
-      // If there is no store before this load, the load takes the undef value.
       LI->replaceAllUsesWith(UndefValue::get(LI->getType()));
     else
-      // Otherwise, there was a store before this load, the load takes its value.
       LI->replaceAllUsesWith(std::prev(I)->second->getOperand(0));
 
     if (AST && LI->getType()->isPointerTy())
@@ -490,9 +601,27 @@ static void promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
                     /*AllowUnresolved*/ false);
       ConvertDebugDeclareToDebugValue(DDI, SI, DIB);
     }
+
+    INTRUDE(CAPTURE(&SI), {
+      hints.addNopPosition(INDEXEDPOS(TGT, SI, DICTMAP(data.get<crellvm::ArgForIndices>()->instrIndices, SI)-1, ""));
+      
+      if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0)))
+        crellvm::eraseInstrOfUseIndices(check, SI, data);
+    });
+
     SI->eraseFromParent();
     LBI.deleteValue(SI);
   }
+
+  INTRUDE(CAPTURE(&AI), {
+    std::string Ralloca = crellvm::getVariable(*AI);
+
+    // propagate maydiff
+    crellvm::propagateMaydiffGlobal(hints, Ralloca, crellvm::Physical);
+    crellvm::propagateMaydiffGlobal(hints, Ralloca, crellvm::Previous);
+
+    hints.addNopPosition(INDEXEDPOS(TGT, AI, DICTMAP(data.get<crellvm::ArgForIndices>()->instrIndices, AI)-1, ""));
+  });
 
   if (AST)
     AST->deleteValue(AI);
@@ -519,6 +648,65 @@ void PromoteMem2Reg::run() {
   LargeBlockInfo LBI;
   IDFCalculator IDF(DT);
 
+  crellvm::ValidationUnit::StartPass(crellvm::ValidationUnit::MEM2REG);
+  crellvm::ValidationUnit::Begin("mem2reg", &F);
+
+  INTRUDE(CAPTURE(&F, this), {
+    data.create<crellvm::ArgForMem2Reg>();
+    data.create<crellvm::ArgForIndices>();
+    crellvm::saveInstrIndices(&F, data);
+    crellvm::saveUseIndices(&F, Instruction::Load, data);
+    auto &storeItem = *(data.get<crellvm::ArgForMem2Reg>()->storeItem);
+
+    // initialize dictionary datum
+    // memorize indices of alloca, store, load, and terminator instructions
+    for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
+      AllocaInst *AItmp = Allocas[tmpNum];
+
+      // initialize information of each alloca's store and alloca
+      for (auto UI = AItmp->user_begin(), E = AItmp->user_end(); UI != E;) {
+        Instruction *tmpInst = cast<Instruction>(*UI++);
+
+        if (isa<StoreInst>(tmpInst)) {
+          StoreInst* SI = dyn_cast<StoreInst>(tmpInst);
+
+          storeItem[SI].value = crellvm::TyValue::make(*(SI->getOperand(0)));
+          storeItem[SI].expr = EXPR(SI->getOperand(0), Physical);
+
+          if (isa<GlobalValue>(SI->getOperand(0)) || std::string(SI->getOperand(0)->getName())=="")
+            storeItem[SI].op0 = "";
+          else
+            storeItem[SI].op0 = "%" + std::string(SI->getOperand(0)->getName());
+        }
+      }
+    }
+
+    for (auto BS = F.begin(), BE = F.end(); BS != BE;) {
+      BasicBlock *BB = BS++;
+      std::string blockName = crellvm::getBasicBlockIndex(BB);
+
+      std::shared_ptr<crellvm::TyPosition> from_pos;
+      std::shared_ptr<crellvm::TyPosition> to_pos = ENDPOSINDEXED(SRC, BB, DICTMAP(data.get<crellvm::ArgForIndices>()->termIndices, blockName));
+
+      if (BB != F.begin())
+        from_pos = STARTPOS(SRC, blockName);
+      
+      for (unsigned tmpNum = 0; tmpNum != Allocas.size(); ++tmpNum) {
+        AllocaInst *AItmp = Allocas[tmpNum];
+        std::string Ralloca = crellvm::getVariable(*AItmp);
+
+        // TODO: if we can validate "call -> nop", we need below condition
+        //if (!crellvm::hasBitcastOrGEP(AI)) { 
+        if (BB == F.begin())
+          from_pos = INDEXEDPOS(SRC, AItmp, DICTMAP(data.get<crellvm::ArgForIndices>()->instrIndices, AItmp), "");
+
+        PROPAGATE(UNIQUE(Ralloca, SRC), BOUNDS(from_pos, to_pos));
+        PROPAGATE(PRIVATE(REGISTER(Ralloca, Physical), SRC), BOUNDS(from_pos, to_pos));
+        //}
+      }
+    }
+  }); 
+
   for (unsigned AllocaNum = 0; AllocaNum != Allocas.size(); ++AllocaNum) {
     AllocaInst *AI = Allocas[AllocaNum];
 
@@ -529,6 +717,17 @@ void PromoteMem2Reg::run() {
     removeLifetimeIntrinsicUsers(AI);
 
     if (AI->use_empty()) {
+      // hints when alloca has no use
+      INTRUDE(CAPTURE(AI), {
+        std::string Ralloca = crellvm::getVariable(*AI);
+
+        // propagate maydiff
+        crellvm::propagateMaydiffGlobal(hints, Ralloca, crellvm::Physical);
+        crellvm::propagateMaydiffGlobal(hints, Ralloca, crellvm::Previous);
+
+        hints.addNopPosition(INDEXEDPOS(TGT, AI, DICTMAP(data.get<crellvm::ArgForIndices>()->instrIndices, AI)-1, ""));
+      });
+
       // If there are no uses of the alloca, just delete it now.
       if (AST)
         AST->deleteValue(AI);
@@ -559,7 +758,6 @@ void PromoteMem2Reg::run() {
     // linear sweep over the block to eliminate it.
     if (Info.OnlyUsedInOneBlock) {
       promoteSingleBlockAlloca(AI, Info, LBI, AST);
-
       // The alloca has been processed, move on.
       RemoveFromAllocasList(AllocaNum);
       continue;
@@ -589,9 +787,6 @@ void PromoteMem2Reg::run() {
     // the standard SSA construction algorithm.  Determine which blocks need PHI
     // nodes and see if we can optimize out some work by avoiding insertion of
     // dead phi nodes.
-
-
-    // Unique the set of defining blocks for efficient lookup.
     SmallPtrSet<BasicBlock *, 32> DefBlocks;
     DefBlocks.insert(Info.DefiningBlocks.begin(), Info.DefiningBlocks.end());
 
@@ -619,8 +814,12 @@ void PromoteMem2Reg::run() {
       QueuePhiNode(PHIBlocks[i], AllocaNum, CurrentVersion);
   }
 
-  if (Allocas.empty())
+  if (Allocas.empty()) {
+    crellvm::ValidationUnit::End();
+    crellvm::ValidationUnit::EndPass();
+
     return; // All of the allocas must have been trivial!
+  }
 
   LBI.clear();
 
@@ -629,18 +828,43 @@ void PromoteMem2Reg::run() {
   // been stored yet.  In this case, it will get this null value.
   //
   RenamePassData::ValVector Values(Allocas.size());
-  for (unsigned i = 0, e = Allocas.size(); i != e; ++i)
+  for (unsigned i = 0, e = Allocas.size(); i != e; ++i) {
     Values[i] = UndefValue::get(Allocas[i]->getAllocatedType());
+
+    INTRUDE(CAPTURE(&i, this), {
+      AllocaInst* AI = Allocas[i];
+
+      data.get<crellvm::ArgForMem2Reg>()->recentInstr.get()->insert(std::pair<unsigned, CRELLVMRPD>
+        (i, { INSNALIGNONE(AI), EXPR(UNDEFAI(AI), Physical),
+              INDEXEDPOS(SRC, AI, DICTMAP(data.get<crellvm::ArgForIndices>()->instrIndices, AI), ""),
+              "", crellvm::getVariable(*AI), AI->getParent(), false }));
+    });
+  }
 
   // Walks all basic blocks in the function performing the SSA rename algorithm
   // and inserting the phi nodes we marked as necessary
   //
   std::vector<RenamePassData> RenamePassWorkList;
   RenamePassWorkList.emplace_back(F.begin(), nullptr, std::move(Values));
+
+  INTRUDE(CAPTURE(), {
+    auto recentInstr = data.get<crellvm::ArgForMem2Reg>()->recentInstr;
+    auto instrWorkList = data.get<crellvm::ArgForMem2Reg>()->instrWorkList;
+    instrWorkList.get()->push_back(*(recentInstr.get())); 
+  });
+
   do {
     RenamePassData RPD;
     RPD.swap(RenamePassWorkList.back());
     RenamePassWorkList.pop_back();
+
+    INTRUDE(CAPTURE(), {
+      auto recentInstr = data.get<crellvm::ArgForMem2Reg>()->recentInstr;
+      auto instrWorkList = data.get<crellvm::ArgForMem2Reg>()->instrWorkList;
+      recentInstr.get()->swap(instrWorkList.get()->back());
+      instrWorkList.get()->pop_back();
+    });
+
     // RenamePass may add new worklist entries.
     RenamePass(RPD.BB, RPD.Pred, RPD.Values, RenamePassWorkList);
   } while (!RenamePassWorkList.empty());
@@ -651,6 +875,16 @@ void PromoteMem2Reg::run() {
   // Remove the allocas themselves from the function.
   for (unsigned i = 0, e = Allocas.size(); i != e; ++i) {
     Instruction *A = Allocas[i];
+
+    INTRUDE(CAPTURE(&A), {
+      std::string Ralloca = crellvm::getVariable(*A);
+
+      // propagate maydiff
+      crellvm::propagateMaydiffGlobal(hints, Ralloca, crellvm::Physical);
+      crellvm::propagateMaydiffGlobal(hints, Ralloca, crellvm::Previous);
+
+      hints.addNopPosition(INDEXEDPOS(TGT, A, DICTMAP(data.get<crellvm::ArgForIndices>()->instrIndices, A)-1, ""));
+    });
 
     // If there are any uses of the alloca instructions left, they must be in
     // unreachable basic blocks that were not processed by walking the dominator
@@ -686,11 +920,35 @@ void PromoteMem2Reg::run() {
              E = NewPhiNodes.end();
          I != E;) {
       PHINode *PN = I->second;
-
       // If this PHI node merges one value and/or undefs, get the value.
       if (Value *V = SimplifyInstruction(PN, DL, nullptr, &DT, AC)) {
         if (AST && PN->getType()->isPointerTy())
           AST->deleteValue(PN);
+        
+        INTRUDE(CAPTURE(&PN, &V), {
+          for (unsigned i = 0; i != PN->getNumIncomingValues(); ++i) {
+            Value *check = dyn_cast<Value>(PN->getIncomingValue(i));
+
+            // find undef prev block
+            if (check == UNDEF(PN)) {
+              BasicBlock *Income = PN->getIncomingBlock(i);
+              BasicBlock *Current = PN->getParent();
+
+              if (Instruction *In = dyn_cast<Instruction>(V)) {
+                // value is instr
+                // from to prpagate undef > value
+                PROPAGATE(LESSDEF(EXPR(UNDEF(PN), Physical), VAR(crellvm::getVariable(*In), Physical), TGT),
+                          BOUNDS(INSTPOS(TGT, In), ENDPOSINDEXED(SRC, Income, DICTMAP(data.get<crellvm::ArgForIndices>()->termIndices, Income->getName()))));
+              } else if (isa<ConstantInt>(V) || isa<ConstantFP>(V)) {
+                // value is constInt or constFloat
+                // infrule lessthanundef target undef > const
+                INFRULE(PHIPOS(SRC, Current->getName(), Income->getName()), crellvm::ConsLessthanUndefTgt::make(TYPEOF(V), VAL(V)));
+              } else { hints.appendToDescription("MEM2REG UNSUPPORTED TYPE OF CONSTANT"); }
+            }
+          }
+          crellvm::replaceExpr(PN, V, data);
+        });
+
         PN->replaceAllUsesWith(V);
         PN->eraseFromParent();
         NewPhiNodes.erase(I++);
@@ -754,12 +1012,17 @@ void PromoteMem2Reg::run() {
     while ((SomePHI = dyn_cast<PHINode>(BBI++)) &&
            SomePHI->getNumIncomingValues() == NumBadPreds) {
       Value *UndefVal = UndefValue::get(SomePHI->getType());
-      for (unsigned pred = 0, e = Preds.size(); pred != e; ++pred)
+      for (unsigned pred = 0, e = Preds.size(); pred != e; ++pred) {
         SomePHI->addIncoming(UndefVal, Preds[pred]);
+
+        INTRUDE(CAPTURE(&Preds, &pred), { crellvm::unreachableBlockPropagateFalse(Preds[pred], hints); });
+      }
     }
   }
 
   NewPhiNodes.clear();
+  crellvm::ValidationUnit::End();
+  crellvm::ValidationUnit::EndPass();
 }
 
 /// \brief Determine which blocks the value is live in.
@@ -857,7 +1120,7 @@ bool PromoteMem2Reg::QueuePhiNode(BasicBlock *BB, unsigned AllocaNo,
                        BB->begin());
   ++NumPHIInsert;
   PhiToAllocaMap[PN] = AllocaNo;
-
+  
   if (AST && PN->getType()->isPointerTy())
     AST->copyValue(PointerAllocaValues[AllocaNo], PN);
 
@@ -894,13 +1157,31 @@ NextIteration:
       BasicBlock::iterator PNI = BB->begin();
       do {
         unsigned AllocaNo = PhiToAllocaMap[APN];
-
+      
         // Add N incoming values to the PHI node.
         for (unsigned i = 0; i != NumEdges; ++i)
           APN->addIncoming(IncomingVals[AllocaNo], Pred);
 
+
         // The currently active variable for this block is now the PHI.
         IncomingVals[AllocaNo] = APN;
+
+        INTRUDE(CAPTURE(&APN, &Pred, &AllocaNo), {
+          std::string Rphi = crellvm::getVariable(*APN);
+          auto recentInstr = data.get<crellvm::ArgForMem2Reg>()->recentInstr;
+          auto instrIndices = data.get<crellvm::ArgForIndices>()->instrIndices;
+
+          // propagate maydiff
+          crellvm::propagateMaydiffGlobal(hints, Rphi, crellvm::Physical);
+          crellvm::propagateMaydiffGlobal(hints, Rphi, crellvm::Previous);
+
+          crellvm::propagateFromInsnToPhi(AllocaNo, APN, Pred, data, hints);
+
+          recentInstr.get()->at(AllocaNo) =
+            { DICTMAP(recentInstr, AllocaNo).instrL, VAR(Rphi, Physical),
+              INDEXEDPOS(SRC, APN, DICTMAP(instrIndices, APN), crellvm::getBasicBlockIndex(Pred)),
+              "crellvm::PHI", DICTMAP(recentInstr, AllocaNo).op1, APN->getParent(), false };
+        });
 
         // Get the next phi node.
         ++PNI;
@@ -932,6 +1213,21 @@ NextIteration:
 
       Value *V = IncomingVals[AI->second];
 
+      INTRUDE(CAPTURE(&LI, &V, &AI), {
+        auto recentInstr = data.get<crellvm::ArgForMem2Reg>()->recentInstr;
+        auto instrIndices = data.get<crellvm::ArgForIndices>()->instrIndices;
+
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*LI), crellvm::Physical);
+        crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*LI), crellvm::Previous);
+        crellvm::propagateFromInsnToLoad(AI->second, LI, data, hints);
+        crellvm::propagateLoadInstToUse(LI, V, DICTMAP(recentInstr, AI->second).op1, data, hints, true);
+
+        hints.addNopPosition(INDEXEDPOS(TGT, LI, DICTMAP(instrIndices, LI)-1, ""));
+
+        crellvm::replaceExpr(LI, V, data);
+        crellvm::replaceTag(LI, crellvm::Ghost, data);
+      });
+
       // Anything using the load now uses the current value.
       LI->replaceAllUsesWith(V);
       if (AST && LI->getType()->isPointerTy())
@@ -948,11 +1244,34 @@ NextIteration:
       if (ai == AllocaLookup.end())
         continue;
 
+      INTRUDE(CAPTURE(&SI, &ai), {
+        auto recentInstr = data.get<crellvm::ArgForMem2Reg>()->recentInstr;
+        auto instrIndices = data.get<crellvm::ArgForIndices>()->instrIndices;
+
+        crellvm::checkSIOperand(ai->second, SI,  data, hints);
+
+        std::string op0 = "";
+        if (!isa<Constant>(*(SI->getOperand(0))))
+          op0 = crellvm::getVariable(*(SI->getOperand(0)));
+
+        recentInstr.get()->at(ai->second) =
+          { INSNALIGNONE(SI), EXPR(SI->getOperand(0), Physical),
+            INDEXEDPOS(SRC, SI, DICTMAP(instrIndices, SI), ""), op0,
+            crellvm::getVariable(*(SI->getOperand(1))), SI->getParent(),
+            DICTMAP(recentInstr, ai->second).check };
+
+        hints.addNopPosition(INDEXEDPOS(TGT, SI, DICTMAP(instrIndices, SI)-1, ""));
+
+        if (LoadInst *check = dyn_cast<LoadInst>(SI->getOperand(0)))
+          crellvm::eraseInstrOfUseIndices(check, SI, data);
+      });
+
       // what value were we writing?
       IncomingVals[ai->second] = SI->getOperand(0);
       // Record debuginfo for the store before removing it.
       if (DbgDeclareInst *DDI = AllocaDbgDeclares[ai->second])
         ConvertDebugDeclareToDebugValue(DDI, SI, DIB);
+
       BB->getInstList().erase(SI);
     }
   }
@@ -972,8 +1291,14 @@ NextIteration:
   ++I;
 
   for (; I != E; ++I)
-    if (VisitedSuccs.insert(*I).second)
+    if (VisitedSuccs.insert(*I).second) {
       Worklist.emplace_back(*I, Pred, IncomingVals);
+
+      INTRUDE(CAPTURE(), { 
+        auto recentInstr = data.get<crellvm::ArgForMem2Reg>()->recentInstr;
+        auto instrWorkList = data.get<crellvm::ArgForMem2Reg>()->instrWorkList;
+        instrWorkList.get()->push_back(*(recentInstr.get())); });
+    }
 
   goto NextIteration;
 }

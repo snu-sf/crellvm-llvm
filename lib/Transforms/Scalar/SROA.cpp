@@ -57,6 +57,8 @@
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 
+#include "llvm/Crellvm/ValidationUnit.h"
+
 #if __cplusplus >= 201103L && !defined(NDEBUG)
 // We only use this for a debug check in C++11
 #include <random>

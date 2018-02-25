@@ -16,6 +16,11 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PatternMatch.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesMulDivRem.h"
+#include "llvm/Crellvm/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -180,9 +185,18 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
 
   // X * -1 == 0 - X
   if (match(Op1, m_AllOnes())) {
+    crellvm::ValidationUnit::Begin("mul_mone", I);
+    
     BinaryOperator *BO = BinaryOperator::CreateNeg(Op0, I.getName());
     if (I.hasNoSignedWrap())
       BO->setHasNoSignedWrap();
+
+    INTRUDE(CAPTURE(&I, &Op0), {
+      //    <src>           <tgt>
+      //  z = x * (-1) |  z = 0 - x
+      INFRULE(INSTPOS(TGT, &I), crellvm::ConsMulMone::make(REGISTER(I), VAL(Op0), BITSIZE(I)));
+    });
+
     return BO;
   }
 
@@ -290,6 +304,15 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
           match(Op0, m_NSWSub(m_Value(), m_Value())) &&
           match(Op1, m_NSWSub(m_Value(), m_Value())))
         BO->setHasNoSignedWrap();
+      crellvm::ValidationUnit::Begin("mul_neg", I);
+
+      crellvm::generateHintForNegValue(Op0, I); //Op0 will be propagate to Z if is id and infrule will be applied if is constant
+      crellvm::generateHintForNegValue(Op1, I);
+
+      INTRUDE(CAPTURE(&Op0, &Op1, &Op0v, &Op1v, &I), {
+        INFRULE(INSTPOS(SRC, &I), crellvm::ConsMulNeg::make(
+                REGISTER(I), VAL(Op0), VAL(Op1), VAL(Op0v), VAL(Op1v), BITSIZE(I)));
+      });
       return BO;
     }
   }
@@ -334,29 +357,68 @@ Instruction *InstCombiner::visitMul(BinaryOperator &I) {
   }
 
   /// i1 mul -> i1 and.
-  if (I.getType()->getScalarType()->isIntegerTy(1))
+  if (I.getType()->getScalarType()->isIntegerTy(1)) {
+    crellvm::ValidationUnit::Begin("mul_bool", I);
+
+    INTRUDE(CAPTURE(&I, &Op0, &Op1), {
+      INFRULE(INSTPOS(SRC, &I), crellvm::ConsMulBool::make(
+              REGISTER(I), REGISTER(*Op0), REGISTER(*Op1)));
+    });
+
     return BinaryOperator::CreateAnd(Op0, Op1);
+  }
 
   // X*(1 << Y) --> X << Y
   // (1 << Y)*X --> X << Y
-  {
+  {      
+    crellvm::ValidationUnit::Begin("mul_shl", I);
+ 
     Value *Y;
     BinaryOperator *BO = nullptr;
     bool ShlNSW = false;
     if (match(Op0, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op1, Y);
       ShlNSW = cast<ShlOperator>(Op0)->hasNoSignedWrap();
+      INTRUDE(CAPTURE(),
+      { data.create<crellvm::ArgForVisitMul>()->needsComm = false; });
     } else if (match(Op1, m_Shl(m_One(), m_Value(Y)))) {
       BO = BinaryOperator::CreateShl(Op0, Y);
       ShlNSW = cast<ShlOperator>(Op1)->hasNoSignedWrap();
+      INTRUDE(CAPTURE(),
+      { data.create<crellvm::ArgForVisitMul>()->needsComm = true; });
     }
+
     if (BO) {
+      INTRUDE(CAPTURE(&I, &Op0, &Op1, &Y), {
+        //    <src>   |    <tgt>
+        // Y = 1 << A | Y = 1 << A
+        // Z = Y *  X | Z = X << A
+        bool needsComm = data.get<crellvm::ArgForVisitMul>()->needsComm;
+        Value *X = needsComm ? Op0 : Op1, *A = Y;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(needsComm ? Op1 : Op0);
+        BinaryOperator *Z = &I;
+
+        // propagate Y = 1 << A
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+        
+        // auto: replace Z = X * Y to Z = Y * X
+        //if(needsComm)
+        //  crellvm::applyCommutativity(hints, Z, Z, SRC);
+
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsMulShl::make(
+                REGISTER(*Z), REGISTER(*Y), VAL(X), VAL(A), BITSIZE(*Z)));
+        
+        data.erase<crellvm::ArgForVisitMul>();
+      });
+ 
       if (I.hasNoUnsignedWrap())
         BO->setHasNoUnsignedWrap();
       if (I.hasNoSignedWrap() && ShlNSW)
         BO->setHasNoSignedWrap();
       return BO;
     }
+    crellvm::ValidationUnit::GetInstance()->setIsAborted();
+    crellvm::ValidationUnit::End();
   }
 
   // If one of the operands of the multiply is a cast from a boolean value, then
@@ -1120,8 +1182,18 @@ Instruction *InstCombiner::visitSDiv(BinaryOperator &I) {
     return Common;
 
   // sdiv X, -1 == -X
-  if (match(Op1, m_AllOnes()))
+  if (match(Op1, m_AllOnes())){
+    crellvm::ValidationUnit::Begin("sdiv_mone", I);
+
+    INTRUDE(CAPTURE(&I), {
+      //    <src>     |    <tgt>
+      // z = x / (-1) | z = 0 - x
+      INFRULE(INSTPOS(SRC, &I), crellvm::ConsSdivMone::make(
+              REGISTER(I), VAL(I.getOperand(0)), BITSIZE(I)));
+    });
+ 
     return BinaryOperator::CreateNeg(Op0);
+  }
 
   if (ConstantInt *RHS = dyn_cast<ConstantInt>(Op1)) {
     // sdiv X, C  -->  ashr exact X, log2(C)

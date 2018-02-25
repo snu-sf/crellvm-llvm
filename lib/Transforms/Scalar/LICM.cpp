@@ -32,6 +32,7 @@
 
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/AliasSetTracker.h"
 #include "llvm/Analysis/ConstantFolding.h"
@@ -56,7 +57,14 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
+#include "llvm/Crellvm/Dictionary.h"
+
 #include <algorithm>
+#include <sstream>
 using namespace llvm;
 
 #define DEBUG_TYPE "licm"
@@ -179,6 +187,11 @@ bool LICM::runOnLoop(Loop *L, LPPassManager &LPM) {
   if (skipOptnoneFunction(L))
     return false;
 
+  crellvm::ValidationUnit::StartPass(crellvm::ValidationUnit::LICM);
+  crellvm::intrude([]() {
+    crellvm::PassDictionary &pdata = crellvm::PassDictionary::GetInstance();
+    pdata.create<crellvm::ArgForHoistOrSinkCond>();
+  });
   Changed = false;
 
   // Get our Loop and Alias Analysis information...
@@ -208,6 +221,10 @@ bool LICM::runOnLoop(Loop *L, LPPassManager &LPM) {
   }
 
   CurLoop = L;
+  crellvm::intrude([this]() {
+    crellvm::PassDictionary &pdata = crellvm::PassDictionary::GetInstance();
+    pdata.get<crellvm::ArgForHoistOrSinkCond>()->CurLoop = this->CurLoop;
+  });
 
   // Get the preheader block to move instructions into...
   Preheader = L->getLoopPreheader();
@@ -286,6 +303,12 @@ bool LICM::runOnLoop(Loop *L, LPPassManager &LPM) {
     LoopToAliasSetMap[L] = CurAST;
   else
     delete CurAST;
+  
+  crellvm::intrude([]() {
+    crellvm::PassDictionary &pdata = crellvm::PassDictionary::GetInstance();
+    pdata.erase<crellvm::ArgForHoistOrSinkCond>();
+  });
+  crellvm::ValidationUnit::EndPass();
   return Changed;
 }
 
@@ -328,7 +351,11 @@ bool llvm::sinkRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
       DEBUG(dbgs() << "LICM deleting dead inst: " << I << '\n');
       ++II;
       CurAST->deleteValue(&I);
+      crellvm::name_instruction(I);
+      crellvm::ValidationUnit::Begin("licm.sinkregion.dce", I, false);
+      crellvm::generateHintForTrivialDCE(I);
       I.eraseFromParent();
+      crellvm::ValidationUnit::End();
       Changed = true;
       continue;
     }
@@ -373,15 +400,22 @@ bool llvm::hoistRegion(DomTreeNode *N, AliasAnalysis *AA, LoopInfo *LI,
       // Try constant folding this instruction.  If all the operands are
       // constants, it is technically hoistable, but it would be better to just
       // fold it.
+      crellvm::ValidationUnit::Begin("licm.hoistregion.constantfold", I);
       if (Constant *C = ConstantFoldInstruction(
               &I, I.getModule()->getDataLayout(), TLI)) {
+        INTRUDE(CAPTURE(), {
+          hints.setDescription("We do not deal with ConstantFold");
+          hints.setReturnCodeToAdmitted();
+        });
         DEBUG(dbgs() << "LICM folding inst: " << I << "  --> " << *C << '\n');
         CurAST->copyValue(&I, C);
         CurAST->deleteValue(&I);
         I.replaceAllUsesWith(C);
         I.eraseFromParent();
+        crellvm::ValidationUnit::End();
         continue;
       }
+      crellvm::ValidationUnit::Abort();
 
       // Try hoisting the instruction out to the preheader.  We can only do this
       // if all of the operands of the instruction are loop invariant and if it
@@ -430,11 +464,19 @@ void llvm::computeLICMSafetyInfo(LICMSafetyInfo * SafetyInfo, Loop * CurLoop) {
 bool canSinkOrHoistInst(Instruction &I, AliasAnalysis *AA, DominatorTree *DT,
                         TargetLibraryInfo *TLI, Loop *CurLoop,
                         AliasSetTracker *CurAST, LICMSafetyInfo *SafetyInfo) {
+  crellvm::intrude([]() {
+    auto &dic = crellvm::PassDictionary::GetInstance();
+    dic.get<crellvm::ArgForHoistOrSinkCond>()->useAA = false;
+  });
   // Loads have extra constraints we have to verify before we can hoist them.
   if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
     if (!LI->isUnordered())
       return false;        // Don't hoist volatile/atomic loads!
 
+    crellvm::intrude([]() {
+      auto &dic = crellvm::PassDictionary::GetInstance();
+      dic.get<crellvm::ArgForHoistOrSinkCond>()->useAA = true;
+    });
     // Loads from constant memory are always safe to move, even if they end up
     // in the same alias set as something that ends up being modified.
     if (AA->pointsToConstantMemory(LI->getOperand(0)))
@@ -457,6 +499,10 @@ bool canSinkOrHoistInst(Instruction &I, AliasAnalysis *AA, DominatorTree *DT,
       return false;
 
     // Handle simple cases by querying alias analysis.
+    crellvm::intrude([]() {
+      auto &dic = crellvm::PassDictionary::GetInstance();
+      dic.get<crellvm::ArgForHoistOrSinkCond>()->useAA = true;
+    });
     AliasAnalysis::ModRefBehavior Behavior = AA->getModRefBehavior(CI);
     if (Behavior == AliasAnalysis::DoesNotAccessMemory)
       return true;
@@ -548,9 +594,26 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
                                                 BasicBlock &ExitBlock,
                                                 PHINode &PN,
                                                 const LoopInfo *LI) {
+  crellvm::ValidationUnit::Begin("licm.sink.cloneinst.clone", ExitBlock.getParent());
+
   Instruction *New = I.clone();
   ExitBlock.getInstList().insert(ExitBlock.getFirstInsertionPt(), New);
   if (!I.getName().empty()) New->setName(I.getName() + ".le");
+
+  INTRUDE(CAPTURE(New), {
+    auto &pdic = crellvm::PassDictionary::GetInstance();
+    if (pdic.get<crellvm::ArgForHoistOrSinkCond>()->useAA) {
+      crellvm::ValidationUnit::GetInstance()->setDescription(
+          "Cannot create a new instruction while sinking (LICM) "
+          "is done because alias analysis reported"
+          "that is safe.");
+      hints.setReturnCodeToAdmitted();
+      return;
+    }
+    crellvm::insertSrcNopAtTgtI(hints, New);
+    crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*New), crellvm::Physical);
+  });
+  crellvm::ValidationUnit::End();
 
   // Build LCSSA PHI nodes for any in-loop operands. Note that this is
   // particularly cheap because we can rip off the PHI node that we're
@@ -564,12 +627,31 @@ static Instruction *CloneInstructionInExitBlock(const Instruction &I,
     if (Instruction *OInst = dyn_cast<Instruction>(*OI))
       if (Loop *OLoop = LI->getLoopFor(OInst->getParent()))
         if (!OLoop->contains(&PN)) {
+          crellvm::ValidationUnit::Begin("licm.sink.cloneinst.phicreate", ExitBlock.getParent());
           PHINode *OpPN =
               PHINode::Create(OInst->getType(), PN.getNumIncomingValues(),
                               OInst->getName() + ".lcssa", ExitBlock.begin());
           for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i)
             OpPN->addIncoming(OInst, PN.getIncomingBlock(i));
+
+          INTRUDE(CAPTURE(OpPN), {
+            crellvm::insertSrcNopAtTgtI(hints, OpPN);
+            crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*OpPN), crellvm::Physical);
+          });
+          crellvm::ValidationUnit::End();
+
+          crellvm::ValidationUnit::Begin("licm.sink.cloneinst.phireplace", ExitBlock.getParent());
+          INTRUDE(CAPTURE(OpPN, New, OInst), {
+            // Propagating undef >= OInst enables creation of Prev(OInst) >= Phys(OInst)
+            // and Phys(OInst) >= Prev(OInst).
+            PROPAGATE(LESSDEF(EXPR(UndefValue::get(OInst->getType())), EXPR(OInst), SRC),
+                      BOUNDS(INSTPOS(SRC, OInst), INSTPOS(SRC, New)));
+            // Phys(OpPN) >= Prev(OInst) >= Phys(OInst) (AUTO)
+          });
+          crellvm::generateHintForReplaceAllUsesWith(OInst, OpPN, "", INSTPOS(SRC, OpPN),
+                        [&New](const llvm::Value *V) { return V == New; });
           *OI = OpPN;
+          crellvm::ValidationUnit::End();
         }
   return New;
 }
@@ -605,7 +687,11 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
     Value::user_iterator UI = I.user_begin();
     auto *User = cast<Instruction>(*UI);
     if (!DT->isReachableFromEntry(User->getParent())) {
+      crellvm::ValidationUnit::Begin("licm.sink.makeundef1", I);
+      // Crellvm: This optimization never happens in Python, SPECCPU2006,
+      // GNU-projects, and LNT!
       User->replaceUsesOfWith(&I, UndefValue::get(I.getType()));
+      crellvm::ValidationUnit::End();
       continue;
     }
     // The user must be a PHI node.
@@ -617,7 +703,11 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
     Use &U = UI.getUse();
     BasicBlock *BB = PN->getIncomingBlock(U);
     if (!DT->isReachableFromEntry(BB)) {
+      crellvm::ValidationUnit::Begin("licm.sink.makeundef2", I);
+      // Crellvm: This optimization never happens in Python, SPECCPU2006,
+      // GNU-projects, and LNT!
       U = UndefValue::get(I.getType());
+      crellvm::ValidationUnit::End();
       continue;
     }
 
@@ -633,12 +723,106 @@ static bool sink(Instruction &I, const LoopInfo *LI, const DominatorTree *DT,
       New = SunkCopies[ExitBlock] =
             CloneInstructionInExitBlock(I, *ExitBlock, *PN, LI);
 
+    crellvm::ValidationUnit::Begin("licm.sink.replaceinst", I);
+    INTRUDE(CAPTURE(&I, New, PN, ExitBlock), {
+      auto &pdic = crellvm::PassDictionary::GetInstance();
+      if (pdic.get<crellvm::ArgForHoistOrSinkCond>()->useAA) {
+        crellvm::ValidationUnit::GetInstance()->setDescription(
+            "Cannot replace an instruction after sinking (LICM) "
+            "because alias analysis reported that is safe.");
+        hints.setReturnCodeToAdmitted();
+        return;
+      }
+      /** 
+       * loop:
+       *   X = A + B
+       *   ...
+       * exit:
+       *   X' = PHI(X)
+       *   A' = PHI(A) // may not exist
+       *   B' = PHI(B) // may not exist
+       *   Y = A' + B'
+       *   use(X') --> use(Y)
+       *
+       * Proof strategy : show
+       * X' >= X(prev) >= A + B >= A' + B' >= Y
+       */
+      const Instruction *X = &I;
+      const PHINode *Xprime = PN;
+      const Instruction *Y = New;
+      if (!crellvm::TyInstruction::isSupported(*X) ||
+          !crellvm::TyInstruction::isSupported(*Y)) {
+        std::string str;
+        llvm::raw_string_ostream rso(str);
+        rso << "\nUnsupported instruction!";
+
+        hints.appendToDescription(rso.str());
+        if (hints.getReturnCode() == crellvm::CoreHint::ACTUAL)
+          hints.setReturnCodeToAdmitted();
+        return;
+      }
+      auto XInst = crellvm::ConsInsn::make(*X);
+      auto YInst = crellvm::ConsInsn::make(*Y);
+      auto YPos = INSTPOS(TGT, Y);
+      // Setting description..
+      { 
+        std::string str;
+        raw_string_ostream rso(str);
+        rso << "X : ";
+        X->print(rso);
+        rso << "\nY : ";
+        Y->print(rso);
+        rso << "\nXprime : ";
+        Xprime->print(rso);
+        crellvm::ValidationUnit::GetInstance()->setDescription(str);
+      }
+      // 1. X' >= Prev(X) >= X
+      //    Note that Prev(X) >= X is automatically generated by validator
+      crellvm::propagateLessdef(hints, Xprime, Y, X, Xprime, TGT);
+      // 2. X >= A + B
+      crellvm::propagateInstruction(hints, X, Y, TGT, true); // note : if not true, it propagates A + B >= X.
+      INFRULE(YPos, crellvm::ConsTransitivityTgt::make(EXPR(Xprime), EXPR(X), XInst));
+      // 3. A >= Prev(A') >= A', B >= Prev(B') >= B'
+      for (User::const_op_iterator OI = Y->op_begin(), OE = Y->op_end(); OI != OE;
+           ++OI) {
+        const Value *Aprime = OI->get();
+        if (const Instruction *AprimeInst = dyn_cast<Instruction>(Aprime)) {
+          const PHINode *PHI_AprimeInst = dyn_cast<PHINode>(AprimeInst);
+          if (PHI_AprimeInst && (PHI_AprimeInst->getParent() == ExitBlock)) {
+            const Value *A = PHI_AprimeInst->getIncomingValue(0);
+            crellvm::propagateLessdef(hints, PHI_AprimeInst, Y, Aprime, A, TGT);
+            // Apply A >= Prev(A) >= A' (AUTO)
+            //    Note that A >= Prev(A) is automatically generated by validator
+          } else {
+            INFRULE(YPos, crellvm::ConsIntroEqTgt::make(VAL(Aprime)));
+          }
+        } else {
+          INFRULE(YPos, crellvm::ConsIntroEqTgt::make(VAL(Aprime)));
+        }
+      }
+      INFRULE(YPos, crellvm::ConsTransitivityTgt::make(EXPR(Xprime), XInst, YInst));
+      // 4. A' + B' >= Y  <-- created by postcond!
+      INFRULE(YPos, crellvm::ConsTransitivityTgt::make(EXPR(Xprime), YInst, EXPR(Y)));
+    });
+    crellvm::generateHintForReplaceAllUsesWithAtTgt(PN, New, INSTPOS(TGT, New));
+
     PN->replaceAllUsesWith(New);
+
+    crellvm::ValidationUnit::End();
+
+    crellvm::name_instruction(I);
+    crellvm::ValidationUnit::Begin("licm.sink.eraseoldphi", I, false);
+    crellvm::generateHintForTrivialDCE(*PN);
     PN->eraseFromParent();
+    crellvm::ValidationUnit::End();
   }
 
   CurAST->deleteValue(&I);
+  crellvm::name_instruction(I);
+  crellvm::ValidationUnit::Begin("licm.sink.eraseoldinst", I, false);
+  crellvm::generateHintForTrivialDCE(I);
   I.eraseFromParent();
+  crellvm::ValidationUnit::End();
   return Changed;
 }
 
@@ -649,7 +833,76 @@ static bool hoist(Instruction &I, BasicBlock *Preheader) {
   DEBUG(dbgs() << "LICM hoisting to " << Preheader->getName() << ": "
         << I << "\n");
   // Move the new node to the Preheader, before its terminator.
+  crellvm::ValidationUnit::Begin("licm.hoist", I);
+  INTRUDE(CAPTURE(&I, Preheader), {
+
+    auto &pdic = crellvm::PassDictionary::GetInstance();
+    if (pdic.get<crellvm::ArgForHoistOrSinkCond>()->useAA) {
+      crellvm::ValidationUnit::GetInstance()->setDescription(
+          "Hoisting (LICM) is done because alias analysis reported"
+          "that is safe.");
+      hints.setReturnCodeToAdmitted();
+      return;
+    } else if (BinaryOperator *bop = dyn_cast<BinaryOperator>(&I)) {
+      switch (bop->getOpcode()) {
+      case Instruction::UDiv:
+      case Instruction::SDiv:
+      case Instruction::URem:
+      case Instruction::SRem:
+        crellvm::ValidationUnit::GetInstance()->setDescription(
+            "Hoisting division is not implemented.");
+        hints.setReturnCodeToAdmitted();
+        return;
+      }
+    }
+    auto CurLoop = pdic.get<crellvm::ArgForHoistOrSinkCond>()->CurLoop;
+    auto Iname = crellvm::getVariable(I);
+
+    // Propagate maydiffs from header to any reachable instructions,
+    // except the instructions dominated by I.
+    SmallSet<BasicBlock*, 16> Visited;
+    SmallVector<BasicBlock*, 16> BBStack;
+    BBStack.push_back(CurLoop->getHeader());
+    Visited.insert(CurLoop->getHeader());
+    // DFS!
+    while (!BBStack.empty()) {
+      BasicBlock *CurBB = BBStack.back();
+      Visited.insert(CurBB);
+      BBStack.pop_back();
+
+      if (CurBB == I.getParent()) {
+        auto PropagateBegPos = crellvm::TyPosition::make_start_of_block(TGT, CurBB->getName());//INSTPOS(TGT, CurBB->begin());
+        auto PropagateEndPos = INSTPOS(SRC, &I); // SRC only works. why??
+        PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(PropagateBegPos, PropagateEndPos));
+        PROPAGATE(MAYDIFF(Iname, Previous), BOUNDS(PropagateBegPos, PropagateEndPos));
+        continue;
+      } else {
+        TerminatorInst *TI = CurBB->getTerminator();
+        auto PropagateEndPos = INSTPOS(TGT, TI);
+        auto PropagateBegPos = crellvm::TyPosition::make_start_of_block(TGT, CurBB->getName());
+        PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(PropagateBegPos, PropagateEndPos));
+        PROPAGATE(MAYDIFF(Iname, Previous), BOUNDS(PropagateBegPos, PropagateEndPos));
+
+        for (unsigned i = 0; i < TI->getNumSuccessors(); i++) {
+          BasicBlock *NextBB = TI->getSuccessor(i);
+          if (Visited.count(NextBB) != 0)
+            continue;
+          BBStack.push_back(NextBB);
+          Visited.insert(NextBB);
+        }
+      }
+    }
+
+    PROPAGATE(LESSDEF(RHS(Iname, Physical, TGT), VAR(I), TGT), BOUNDS(INSTPOS(TGT, Preheader->getTerminator()), INSTPOS(TGT, &I)));
+    insertTgtNopAtSrcI(hints, &I);
+    insertSrcNopAtTgtI(hints, Preheader->getTerminator());
+  });
   I.moveBefore(Preheader->getTerminator());
+  INTRUDE(CAPTURE(&I, Preheader), {
+    auto Iname = crellvm::getVariable(I);
+    PROPAGATE(MAYDIFF(Iname, Physical), BOUNDS(INSTPOS(TGT, &I), INSTPOS(TGT, Preheader->getTerminator())));
+  });
+  crellvm::ValidationUnit::End();
 
   if (isa<LoadInst>(I)) ++NumMovedLoads;
   else if (isa<CallInst>(I)) ++NumMovedCalls;
@@ -676,7 +929,6 @@ static bool isGuaranteedToExecute(const Instruction &Inst,
                                   const DominatorTree *DT,
                                   const Loop *CurLoop,
                                   const LICMSafetyInfo * SafetyInfo) {
-
   // We have to check to make sure that the instruction dominates all
   // of the exit blocks.  If it doesn't, then there is a path out of the loop
   // which does not execute this instruction, so we can't hoist it.
@@ -952,6 +1204,12 @@ bool llvm::promoteLoopAccessesToScalars(AliasSet &AS,
                         PointerMustAliases, ExitBlocks,
                         InsertPts, PIC, *CurAST, *LI, DL, Alignment, AATags);
 
+  crellvm::ValidationUnit::Begin("licm.promoteloopaccessestoscalars", Preheader->getParent());
+  INTRUDE(CAPTURE(), {
+    hints.setDescription("We do not deal with promoteLoopAccessToScalars because it uses AA");
+    hints.setReturnCodeToAdmitted();
+  });
+
   // Set up the preheader to have a definition of the value.  It is the live-out
   // value from the preheader that uses in the loop will use.
   LoadInst *PreheaderLoad =
@@ -969,6 +1227,8 @@ bool llvm::promoteLoopAccessesToScalars(AliasSet &AS,
   // If the SSAUpdater didn't use the load in the preheader, just zap it now.
   if (PreheaderLoad->use_empty())
     PreheaderLoad->eraseFromParent();
+
+  crellvm::ValidationUnit::End();
 
   return Changed;
 }

@@ -44,4 +44,5 @@ add_llvm_library(LLVMTransformUtils
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms/Utils
   )
 
+add_dependencies(LLVMTransformUtils LLVMCrellvm)
 add_dependencies(LLVMTransformUtils intrinsics_gen)

@@ -62,7 +62,31 @@ public:
   /// is currently incorporated, this is a no-op.
   void incorporateFunction(const Function &F);
 };
+  /* added for vellvm - start */
+  
+class VSlotTracker {
+private:
+  SlotTracker *st;
 
+public:
+  explicit VSlotTracker(const Module* M);
+
+  ~VSlotTracker();
+  
+  void incorporateFunction(const Function *F);
+
+  void purgeFunction();
+
+  int getGlobalSlot(const GlobalValue *V);
+
+  int getLocalSlot(const Value *V);
+  
+};
+
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(VSlotTracker, LLVMSlotTrackerRef)
+  
+    
+  /* added for vellvm - end */
 } // end namespace llvm
 
 #endif

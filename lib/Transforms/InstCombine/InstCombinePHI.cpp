@@ -15,6 +15,9 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/InstructionSimplify.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Hintgen.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "instcombine"
@@ -76,9 +79,11 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
 
   // Otherwise, this is safe to transform!
 
-  Value *InLHS = FirstInst->getOperand(0);
-  Value *InRHS = FirstInst->getOperand(1);
-  PHINode *NewLHS = nullptr, *NewRHS = nullptr;
+  crellvm::ValidationUnit::Begin("fold_phi_bin", *FirstInst);
+
+  Value *InLHS = FirstInst->getOperand(0);    //a
+  Value *InRHS = FirstInst->getOperand(1);    //b
+  PHINode *NewLHS = nullptr, *NewRHS = nullptr; //in this example LHSVal is a and RHSVal is null
   if (!LHSVal) {
     NewLHS = PHINode::Create(LHSType, PN.getNumIncomingValues(),
                              FirstInst->getOperand(0)->getName() + ".pn");
@@ -90,7 +95,7 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
   if (!RHSVal) {
     NewRHS = PHINode::Create(RHSType, PN.getNumIncomingValues(),
                              FirstInst->getOperand(1)->getName() + ".pn");
-    NewRHS->addIncoming(InRHS, PN.getIncomingBlock(0));
+    NewRHS->addIncoming(InRHS, PN.getIncomingBlock(0)); //NewRhs = (b , _ )
     InsertNewInstBefore(NewRHS, PN);
     RHSVal = NewRHS;
   }
@@ -109,6 +114,19 @@ Instruction *InstCombiner::FoldPHIArgBinOpIntoPHI(PHINode &PN) {
       }
     }
   }
+
+  // ex) FirstInst x = a + b  I = a + c
+  INTRUDE(CAPTURE(&PN, &NewLHS, &NewRHS, this), {
+    std::string oldphi = crellvm::getVariable(PN);
+
+    BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
+    crellvm::insertSrcNopAtTgtI(hints, InsertPos);
+    //insert nop in src where first nonPhi instruction begin. this position should be where z = a + t is located.
+    // (or where z = a+b is located)
+
+    PROPAGATE(MAYDIFF(oldphi, Physical), BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
+  });
+  crellvm::generateHintForFoldPhiBin(PN, NewLHS, NewRHS, this->getDominatorTree());
 
   if (CmpInst *CIOp = dyn_cast<CmpInst>(FirstInst)) {
     CmpInst *NewCI = CmpInst::Create(CIOp->getOpcode(), CIOp->getPredicate(),
@@ -467,12 +485,33 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
   }
 
   Value *PhiVal;
+
+  if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst)) { //in this function cast op does optimization too
+    crellvm::ValidationUnit::Begin("fold_phi_bin_const", *FirstInst);
+
+    INTRUDE(CAPTURE(&PN), {
+      std::string oldphi = crellvm::getVariable(PN);
+      BasicBlock::iterator InsertPos = PN.getParent()->getFirstInsertionPt();
+      crellvm::insertSrcNopAtTgtI(hints, InsertPos);
+
+      //from PN to insertPos propagate z in maydiff
+      PROPAGATE(MAYDIFF(oldphi, Physical), BOUNDS(PHIPOSJustPhi(SRC, PN), INSTPOS(TGT, InsertPos)));
+    });
+  }
+
   if (InVal) {
     // The new PHI unions all of the same values together.  This is really
     // common, so we handle it intelligently here for compile-time speed.
+
+    if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst))
+      crellvm::generateHintForFoldPhiBin(PN, nullptr, nullptr, this->getDominatorTree());
+
     PhiVal = InVal;
     delete NewPN;
   } else {
+    if (isa<BinaryOperator>(FirstInst) || isa<CmpInst>(FirstInst))
+      crellvm::generateHintForFoldPhiBin(PN, NewPN, nullptr, this->getDominatorTree());
+    
     InsertNewInstBefore(NewPN, PN);
     PhiVal = NewPN;
   }

@@ -18,4 +18,5 @@ add_llvm_library(LLVMInstCombine
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms/InstCombine
   )
 
+add_dependencies(LLVMInstCombine LLVMCrellvm)
 add_dependencies(LLVMInstCombine intrinsics_gen)

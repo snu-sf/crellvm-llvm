@@ -1355,3 +1355,320 @@ module PassManager = struct
   external finalize : [ `Function ] t -> bool = "llvm_passmanager_finalize"
   external dispose : [< any ] t -> unit = "llvm_passmanager_dispose"
 end
+
+(* added for vellvm - start *)
+
+module IntrinsicID = struct
+  type t =
+  | NotIntrinsic      
+  | Expect		
+  | Setjmp		
+  | SigSetjmp		
+  | Longjmp		
+  | SigLongjmp		
+  | Ctpop		
+  | Bswap		
+  | Ctlz		
+  | Cttz		
+  | StackSave		
+  | StackRestore	
+  | ReturnAddress	
+  | FrameAddress	
+  | Prefetch		
+  | Pcmarker		
+  | ReadCycleCounter	
+  | DbgDeclare		
+  (* | EhException		 *)
+  (* | EhSelector		 *)
+  | EhTypeidFor		
+  | VarAnnotation	
+  | Memcpy		
+  | Memmove		
+  | Memset		
+  | Sqrt		
+  | Log			
+  | Log2		
+  | Log10		
+  | Exp			
+  | Exp2		
+  | Pow			
+  | FltRounds		
+  | InvariantStart	
+  | LifetimeStart	
+  | InvariantEnd	
+  | LifetimeEnd		
+  | UnsupportedIntrinsic
+end  
+                       
+(*===-- Values ------------------------------------------------------------===*)
+external escaped_value_name : llvalue -> string = "llvm_escaped_value_name"
+
+external has_name : llvalue -> bool = "llvm_has_name"
+(* exists in 3.6.2: external classify_value : llvalue -> ValueKind.t = "llvm_classify_value" *)
+(* not used                                       
+external is_inlineasm : llvalue -> bool = "llvm_is_inlineasm"
+external is_mdnode : llvalue -> bool = "llvm_is_mdnode"
+external is_mdstring : llvalue -> bool = "llvm_is_mdstring"
+*)
+external is_globalvalue : llvalue -> bool = "llvm_is_globalvalue"
+(* not used
+external is_globalvariable : llvalue -> bool = "llvm_is_globalvariable"
+external is_globalalias : llvalue -> bool = "llvm_is_globalalias"
+
+external is_function : llvalue -> bool = "llvm_is_function"
+external is_argument : llvalue -> bool = "llvm_is_argument"
+external is_basicblock : llvalue -> bool = "llvm_is_basicblock"
+external is_constantint : llvalue -> bool = "llvm_is_constantint"
+external is_constantfp : llvalue -> bool = "llvm_is_constantfp"
+external is_constantarry : llvalue -> bool = "llvm_is_constantarray"
+external is_constantstruct : llvalue -> bool = "llvm_is_constantstruct"
+external is_constantvector : llvalue -> bool = "llvm_is_constantvector"
+external is_constantexpr : llvalue -> bool = "llvm_is_constantexpr"                                                *)     
+                       
+(*--... Constant expressions ...............................................--*)
+external const_aggregatevalue_get_indices : llvalue -> int array
+                           = "llvm_const_aggregatevalue_get_indices"
+                                              
+(*--... Operations on global variables, functions, and aliases (globals) ...--*)
+external has_initializer : llvalue -> bool = "llvm_has_initializer"
+external get_initializer : llvalue -> llvalue = "LLVMGetInitializer"                       
+
+(*--... Operations on functions ............................................--*)                                                  
+external get_intrinsic_id : llvalue -> IntrinsicID.t = "llvm_get_intrinsic_id"
+                                                  
+(*===-- Named Types -------------------------------------------------------===*)
+external named_type_begin : llmodule -> string option = "llvm_named_type_begin"
+external named_type_succ : llmodule -> string -> string option = "llvm_named_type_succ"
+
+let iter_named_types f m =
+  let rec aux = function
+    | None -> ()
+    | Some u ->
+        f u;
+        aux (named_type_succ m u)
+  in
+  aux (named_type_begin m)
+(*
+let fold_left_named_types f init m =
+  let rec aux init u =
+    match u with
+    | None -> init
+    | Some u -> aux (f init u) (named_type_succ m u)
+  in
+  aux init (named_type_begin m)
+ *)
+let fold_right_named_types f m init =
+  let rec aux u init =
+    match u with
+    | None -> init
+    | Some u -> f u (aux (named_type_succ m u) init)
+  in
+  aux (named_type_begin m) init
+
+(*--... Operations on users ................................................--*)      
+external operands : llvalue -> llvalue array = "llvm_operands"
+
+(*--... Operations on apint ................................................--*)
+module APInt = struct 
+  type t
+
+  external dump : t -> unit = "llvm_apint_dump"
+  external _to_string : t -> int -> bool -> string = "llvm_apint_to_string"
+  let to_string i = _to_string i 10 true
+  external get_zext_value : t -> Int64.t = "llvm_apint_get_zext_value"
+  external get_sext_value : t -> Int64.t = "llvm_apint_get_sext_value"
+  external array_index : t -> int -> bool = "llvm_apint_array_index"
+  external get_raw_data : t -> int -> Int64.t = "llvm_apint_get_raw_data"
+  external is_negative : t -> bool = "llvm_apint_is_negative"
+  external is_nonnegative : t -> bool = "llvm_apint_is_nonnegative"
+  external is_strictly_positive : t -> bool = "llvm_apint_is_strictly_positive"
+  external get_bool_value : t -> bool = "llvm_apint_get_bool_value"
+  external get_bitwidth : t -> int =  "llvm_apint_get_bitwidth"
+  external get_num_words : t -> int = "llvm_apint_get_num_words"
+  external get_active_bits : t -> int = "llvm_apint_get_active_bits"
+  external get_active_words : t -> int = "llvm_apint_get_active_words"
+  external inc : t -> t = "llvm_apint_inc"
+  external compare : t -> t -> bool = "llvm_apint_compare"
+  external compare_ord : t -> t -> int = "llvm_apint_compare_ord"
+  external const_int_get_value : llvalue -> t = "llvm_apint_const_int_get_value"
+  external const_apint : llcontext -> t -> llvalue = "llvm_apint_const_apint"
+  external of_int64 : int -> Int64.t -> bool -> t = "llvm_apint_of_int64"
+end  
+
+(*--... Operations on apfloat ..............................................--*)
+module APFloat = struct
+  type t
+
+  module Semantics = struct
+      type t =
+        | IEEEhalf
+        | IEEEsingle
+        | IEEEdouble
+        | IEEEquad
+        | PPCDoubleDouble
+        | X87DoubleExternded
+    end
+
+  module CmpResult = struct
+      type t =
+        | LessThan
+        | Equal
+        | GreaterThan
+        | Unordered
+    end    
+
+  external bitcast_to_apint : t -> APInt.t = "llvm_apfloat_bitcast_to_apint"
+  external convert_to_double : t -> float = "llvm_apfloat_convert_to_double"
+  external convert_to_float : t -> float = "llvm_apfloat_convert_to_float"
+  external get_semantics : t -> Semantics.t = "llvm_apfloat_get_semantics"
+  external compare : t -> t -> CmpResult.t = "llvm_apfloat_compare"
+  external compare_ord : t -> t -> CmpResult.t = "llvm_apfloat_compare_ord"
+  external bitwise_is_equal : t -> t -> bool = "llvm_apfloat_bitwise_is_equal"
+  external const_float_get_value : llvalue -> t = "llvm_apfloat_const_float_get_value"
+  external const_apfloat : llcontext -> t -> llvalue = "llvm_apfloat_const_apint"
+
+  external to_string : t -> string = "llvm_apfloat_to_string"
+
+  let bcompare (f1:t) (f2:t) : bool =
+    if get_semantics f1 = get_semantics f2 then
+      match compare f1 f2 with          
+      | CmpResult.LessThan -> false
+      | CmpResult.Equal -> true
+      | CmpResult.GreaterThan -> false
+      | CmpResult.Unordered -> bitwise_is_equal f1 f2
+    else false
+end
+
+external const_int_get_zextvalue : llvalue -> Int64.t 
+  = "llvm_const_int_get_zextvalue"
+
+external has_fn_attr : llvalue -> Attribute.t -> bool          
+                             = "llvm_has_fn_attr"
+external has_ret_attr : llvalue -> Attribute.t -> bool = "llvm_has_ret_attr"                    
+
+external has_param_attr : llvalue -> Attribute.t -> bool
+                           = "llvm_has_param_attr"
+
+external has_instruction_ret_attr : llvalue -> Attribute.t -> bool
+                                       = "llvm_has_instruction_ret_attr"
+external has_instruction_param_attr : llvalue -> int -> Attribute.t -> bool
+                                       = "llvm_has_instruction_param_attr"
+external has_instruction_attr : llvalue -> Attribute.t -> bool
+                                       = "llvm_has_instruction_attr"
+
+(** {7 Operations on AllocationInst : AllocaInst, MallocInst} *)
+module AllocationInst = struct
+  external is_array_allocation : llvalue -> bool 
+                     = "llvm_allocationinst_is_array_allocation"
+  external get_array_size : llvalue -> llvalue
+                     = "LLVMAllocationInstGetArraySize"
+  let get_type = type_of
+  external get_allocated_type : llvalue -> lltype
+                     = "LLVMAllocationInstGetAllocatedType"
+  external get_alignment : llvalue -> int
+                     = "llvm_allocationinst_get_alignment"
+end        
+
+(** {7 Operations on LoadInst} *)
+module LoadInst = struct
+  external get_alignment : llvalue -> int
+                     = "llvm_loadinst_get_alignment"
+end                     
+
+(** {7 Operations on StoreInst} *)
+module StoreInst = struct
+  external get_alignment : llvalue -> int
+                     = "llvm_storeinst_get_alignment"
+end
+                                           
+(** {7 Operations on ICmpInst} *)
+module ICmpInst = struct
+  external get_predicate : llvalue -> Icmp.t = "llvm_icmpinst_get_predicate" 
+  external const_get_predicate : llvalue -> Icmp.t 
+    = "llvm_icmpinst_const_get_predicate" 
+end        
+
+(** {7 Operations on FCmpInst} *)
+module FCmpInst = struct
+  external get_predicate : llvalue -> Fcmp.t = "llvm_fcmpinst_get_predicate" 
+  external const_get_predicate : llvalue -> Fcmp.t 
+    = "llvm_fcmpinst_const_get_predicate" 
+end                   
+
+(** {7 Operations on BranchInst} *)
+module BranchInst = struct
+  external is_conditional : llvalue -> bool = "llvm_branchinst_is_conditional" 
+  external get_condition : llvalue -> llvalue = "LLVMBranchInstGetCondition"
+  external get_successor : llvalue -> int -> llbasicblock
+                                = "llvm_branchinst_get_successor"               
+end
+
+(** {7 Operations on SwitchInst} *)
+module SwitchInst = struct
+  external get_condition : llvalue -> llvalue = "LLVMSwitchInstGetCondition"
+  external get_default_dest : llvalue -> llbasicblock = "LLVMSwitchInstGetDefaultDest"
+  external get_successor : llvalue -> int -> llbasicblock
+    = "llvm_switchinst_get_successor"
+  external get_case_value : llvalue -> int -> llvalue
+    = "llvm_switchinst_get_case_value"
+end
+                    
+(** {7 Operations on GetElementPtrInst} *)
+module GetElementPtrInst = struct
+  external is_in_bounds : llvalue -> bool = "llvm_gep_is_in_bounds"        
+end
+
+(** {7 Operations on ReturnInst} *)
+module ReturnInst = struct
+  external is_void : llvalue -> bool = "llvm_returninst_is_void"        
+end        
+
+(** {7 Operations on InsertValueInst} *)
+module InsertValueInst = struct
+  external get_num_indices : llvalue -> int 
+    = "llvm_insertvalueinst_get_num_indices"
+  external get_indices : llvalue -> int array 
+    = "llvm_insertvalueinst_get_indices"
+end        
+
+(** {7 Operations on ExtractValueInst} *)
+module ExtractValueInst = struct
+  external get_num_indices : llvalue -> int 
+    = "llvm_extractvalueinst_get_num_indices"
+  external get_indices : llvalue -> int array 
+    = "llvm_extractvalueinst_get_indices"
+end        
+
+(** {7 Operations on CallInst} *)
+module CallInst = struct
+  external get_called_value : llvalue -> llvalue
+    = "llvm_callinst_get_called_value"
+end        
+                             
+      
+(*===-- SlotTracker -------------------------------------------------------===*)
+
+type llslottracker
+                       
+module SlotTracker = struct
+  external create_of_module : llmodule -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfModule"          
+(*  external create_of_function : llvalue -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfFunction"          
+  external create_of_value : llvalue -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfValue" *)
+  external incorporate_function : llslottracker -> llvalue -> unit 
+                                     = "llvm_slottracker_incorporate_function"
+  external purge_function : llslottracker -> unit = "llvm_slottracker_purge_function"
+  external get_global_slot : llslottracker -> llvalue -> int 
+                                             = "llvm_slottracker_get_global_slot"
+  external get_local_slot : llslottracker -> llvalue -> int
+                                              = "llvm_slottracker_get_local_slot"
+  external dispose : llslottracker -> unit = "llvm_slottracker_dispose"
+end
+
+external array_length_of_dataarr : llvalue -> int = "llvm_array_length_of_data_array"
+
+
+                                          
+(* added for vellvm - end *)                       

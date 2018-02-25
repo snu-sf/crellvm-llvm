@@ -17,6 +17,7 @@
 
 [common]
 subdirectories =
+ Crellvm
  Analysis
  AsmParser
  Bitcode

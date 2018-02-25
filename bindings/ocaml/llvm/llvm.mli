@@ -2574,3 +2574,434 @@ module PassManager : sig
       See the destructor of [llvm::BasePassManager]. *)
   val dispose : [< any ] t -> unit
 end
+
+(* added for vellvm - start *)
+
+(** The intrinsic ID *)
+module IntrinsicID : sig
+  type t =
+  | NotIntrinsic      
+  | Expect		
+  | Setjmp		
+  | SigSetjmp		
+  | Longjmp		
+  | SigLongjmp		
+  | Ctpop		
+  | Bswap		
+  | Ctlz		
+  | Cttz		
+  | StackSave		
+  | StackRestore	
+  | ReturnAddress	
+  | FrameAddress	
+  | Prefetch		
+  | Pcmarker		
+  | ReadCycleCounter	
+  | DbgDeclare		
+  (* | EhException		 *)
+  (* | EhSelector		 *)
+  | EhTypeidFor		
+  | VarAnnotation	
+  | Memcpy		
+  | Memmove		
+  | Memset		
+  | Sqrt		
+  | Log			
+  | Log2		
+  | Log10		
+  | Exp			
+  | Exp2		
+  | Pow			
+  | FltRounds		
+  | InvariantStart	
+  | LifetimeStart	
+  | InvariantEnd	
+  | LifetimeEnd		
+  | UnsupportedIntrinsic
+end  
+                       
+
+val escaped_value_name : llvalue -> string
+
+(** [has_name v] checks if users provided a name, otherwise [value_namee v]
+ * should be "", and [llvm::SlotTracker] will assign it a name when
+ * prettyprining. See the method [llvm::Value::hasName]. *)
+val has_name : llvalue -> bool
+
+(** [is_globalvalue v] returns [true] if the value [v] is a globalvalue, 
+    [false] otherwise. Similar to [llvm::isa<GlobalValue>]. *)
+val is_globalvalue : llvalue -> bool
+
+(** Assert that this is an insertvalue or extractvalue expression and return
+    the size or the list of indics. 
+    See the method [llvm::ConstantExpr::getIndices]. *)   
+val const_aggregatevalue_get_indices : llvalue -> int array                                  
+
+(** [has_initializer g] checks if the global value [g] has an initializer. See
+     method [llvm::GlobalValue::hasInitializer]. *)
+val has_initializer : llvalue -> bool
+
+(** [get_initializer g] returns the initializer of the global value [g]. See
+     method [llvm::GlobalValue::getInitializer]. *)
+val get_initializer : llvalue -> llvalue                                  
+
+(** [get_intrinsic_id f] returns intrinsic ID of the function [f].
+    See the method [llvm::Function::getIntrinsic]. *)
+val get_intrinsic_id : llvalue -> IntrinsicID.t
+                                   
+(* {6 Named Types} *)
+
+(** [named_type_begin m] returns the first position in the type symbol table 
+    for the module [m]. [named_type_begin] and [named_type_succ] can e used to 
+    iterate over the named types in order. 
+    See the method [llvm::TypeSymbolTable::begin]. *)
+val named_type_begin : llmodule -> string option
+
+(** [named_type_succ m t] returns the named type list position succeeding [t]
+    for the module [m]. 
+    See the method [llvm::TypeSymbolTable::const_iterator::operator++]. *)
+val named_type_succ : llmodule -> string -> string option
+
+(** [iter_named_type f m] applies function [f] to each of the named types 
+    of the value [m] in order. Tail recursive. *)
+val iter_named_types : (string -> unit) -> llmodule -> unit
+
+(** [fold_right_named_types f m init] is [f u1 (... (f uN init) ...)] where
+    [u1,...,uN] are the named types of the module [m]. Not tail recursive. *)
+val fold_right_named_types : (string -> 'a -> 'a) -> llmodule -> 'a -> 'a                       
+
+(* {6 Users} *)                                                                         
+(** [operands v] returns the operands of value [v].
+    See the method [llvm::User::op_begin]. *)
+val operands : llvalue -> llvalue array
+
+(* {6 APInt} *)
+
+module APInt : sig
+  (** Used to represent arbitrary precision integer. See the [llvm::APInt] class. *)
+  type t
+
+  (** [dump_apint i] prints the .ll representation of the APInt [i] to standard
+      error. See the method [llvm::APInt::dump]. *)
+  external dump : t -> unit = "llvm_apint_dump"
+
+  (** [_to_string i r b] returns the APInt [i] as a string with radix [r]
+   *  and whether it is signed [b].  Note that this is an inefficient method. 
+   *  See the method [llvm::APInt::toStrng]. *)
+  external _to_string : t -> int -> bool -> string = "llvm_apint_to_string"
+
+  (** [to_string i] calls [_to_string i 10 true]. *)
+  val to_string : t -> string
+
+  (** This method attempts to return the value of this APInt as a zero extended
+      uint64_t. The bitwidth must be <= 64 or the value must fit within a
+      uint64_t. Otherwise an assertion will result.
+      See the method [llvm::APInt::getZExtValue]. *)
+  external get_zext_value : t -> Int64.t = "llvm_apint_get_zext_value"
+
+  (** This method attempts to return the value of this APInt as a sign extended
+      int64_t. The bit width must be <= 64 or the value must fit within an
+      int64_t. Otherwise an assertion will result.
+      See the method [llvm::APInt::getSExtValue]. *)
+  external get_sext_value : t -> Int64.t = "llvm_apint_get_sext_value"
+
+  (** @returns the bit value at bitPosition
+      See the method [llvm::APInt::[]]. *)
+  external array_index : t -> int -> bool = "llvm_apint_array_index"
+
+  (** This function returns a pointer to the internal storage of the APInt.
+      This is useful for writing out the APInt in binary form without any
+      conversions. 
+      See the method [llvm::APInt::get_raw_data] and [llvm::APInt::getNumWords]. *)
+  external get_raw_data : t -> int -> Int64.t = "llvm_apint_get_raw_data"
+
+  (** This tests the high bit of this APInt to determine if it is set.
+      @returns true if this APInt is negative, false otherwise
+      See the method [llvm::APInt::isNegative]. *)
+  external is_negative : t -> bool = "llvm_apint_is_negative"
+
+  (** This tests the high bit of the APInt to determine if it is unset.
+      @brief Determine if this APInt Value is non-negative (>= 0)
+      See the method [llvm::APInt::isNonNegative]. *)
+  external is_nonnegative : t -> bool = "llvm_apint_is_nonnegative"
+
+  (** This tests if the value of this APInt is positive (> 0). Note
+      that 0 is not a positive value.
+      @returns true if this APInt is positive.
+      @brief Determine if this APInt Value is positive.
+      See the method [llvm::APInt::isStrictlyPositive]. *)
+  external is_strictly_positive : t -> bool = "llvm_apint_is_strictly_positive"
+
+  (** This converts the APInt to a boolean value as a test against zero.
+      See the method [llvm::APInt::getBoolValue]. *)
+  external get_bool_value : t -> bool = "llvm_apint_get_bool_value"
+
+  (** @returns the total number of bits.
+      See the method [llvm::APInt::getBitWidth]. *)
+  external get_bitwidth : t -> int =  "llvm_apint_get_bitwidth"
+
+  (** Here one word's bitwidth equals to that of uint64_t.
+      @returns the number of words to hold the integer value of this APInt.
+      See the method [llvm::APInt::getNumWords]. *)
+  external get_num_words : t -> int = "llvm_apint_get_num_words"
+
+  (** This function returns the number of active bits which is defined as the
+      bit width minus the number of leading zeros. This is used in several
+      computations to see how "wide" the value is.
+      @brief Compute the number of active bits in the value
+      See the method [llvm::APInt::getActiveBits]. *)
+  external get_active_bits : t -> int = "llvm_apint_get_active_bits"
+
+  (** This function returns the number of active words in the value of this
+      APInt. This is used in conjunction with getActiveData to extract the raw
+      value of the APInt.
+      See the method [llvm::APInt::getActiveWords]. *)
+  external get_active_words : t -> int = "llvm_apint_get_active_words"
+
+  (** [inc i] returns a t with value ++[i]. 
+      See the method [llvm::APInt::++]. *)
+  external inc : t -> t = "llvm_apint_inc"
+
+  (** [compare i1 i2] compairs if [i1] and [i2] are equal.
+      See the method [llvm::APInt::==]. *)
+  external compare : t -> t -> bool = "llvm_apint_compare"
+
+  external compare_ord : t -> t -> int = "llvm_apint_compare_ord"
+
+  (** [const_int_get_value c] returns APInt value. See the method
+      [llvm::ConstInt::getValue] *)
+  external const_int_get_value : llvalue -> t = "llvm_apint_const_int_get_value"
+
+  (** [const_apint ctx i] returns the integer constant of context [ctx] and 
+      value [i]. See the method [llvm::ConstantInt::get]. *)
+  external const_apint : llcontext -> t -> llvalue = "llvm_apint_const_apint"
+
+  (** [of_int64 numBits val isSigned] creates an APInt with the bit width 
+      [numBits], the initial value [val], and the signedness [isSigned]. 
+      See the constructor [llvm::APInt] whose default [isSigned] is false.  *)
+  external of_int64 : int -> Int64.t -> bool -> t = "llvm_apint_of_int64"
+
+end  
+
+(* {6 APFloat} *)
+
+module APFloat : sig
+  (** Used to represent arbitrary precision float. See the [llvm::APFloat] class. *)
+  type t
+
+  module Semantics : sig
+      type t =
+        | IEEEhalf
+        | IEEEsingle
+        | IEEEdouble
+        | IEEEquad
+        | PPCDoubleDouble
+        | X87DoubleExternded
+    end
+
+  module CmpResult : sig
+      type t =
+        | LessThan
+        | Equal
+        | GreaterThan
+        | Unordered
+    end    
+
+  (** [bitcast_to_apint f] creates an APInt that is just a bit map of the
+   * floating point constant as it would appear in memory.  It is not a
+   * conversion, and treating the result as a normal integer is unlikely to be
+   * useful. *)
+  external bitcast_to_apint : t -> APInt.t = "llvm_apfloat_bitcast_to_apint"
+
+  external convert_to_double : t -> float = "llvm_apfloat_convert_to_double"
+
+  external convert_to_float : t -> float = "llvm_apfloat_convert_to_float"
+
+  external get_semantics : t -> Semantics.t = "llvm_apfloat_get_semantics"
+
+  (** IEEE comparison with another floating point number (NaNs compare
+   * unordered, 0==-0). *)
+  external compare : t -> t -> CmpResult.t = "llvm_apfloat_compare"
+
+  (* for crellvm - ordset *)
+  external compare_ord : t -> t -> CmpResult.t = "llvm_apfloat_compare_ord"
+
+  (** Bitwise comparison for equality (QNaNs compare equal, 0!=-0). *)
+  external bitwise_is_equal : t -> t -> bool = "llvm_apfloat_bitwise_is_equal"
+
+  external const_float_get_value : llvalue -> t = "llvm_apfloat_const_float_get_value"
+
+  external const_apfloat : llcontext -> t -> llvalue = "llvm_apfloat_const_apint"
+
+  (*val to_string : t -> string*)
+  external to_string : t -> string = "llvm_apfloat_to_string"
+
+  val bcompare : t -> t -> bool
+
+end                
+
+(** [const_int_get_zext_value c] returns a 64-bit unsigned integer value after it
+ *  has been zero extended as appropriate for the type of this constant.
+ *  See the method [llvm::ConstInt::getZExtValue] *)
+val const_int_get_zextvalue : llvalue -> Int64.t 
+                   
+(** [has_fn_attr f a] checks if the function [f] has attribute [a] *)
+val has_fn_attr : llvalue -> Attribute.t -> bool          
+
+(** [has_ret_attr f a] checks if the function [f]'s return typ has attribute 
+    [a] *)
+val has_ret_attr : llvalue -> Attribute.t -> bool
+
+(** [has_param_attr p a] checks attribute [a] of parameter [p]. *)
+val has_param_attr : llvalue -> Attribute.t -> bool
+
+(** [has_instruction_ret_attr ci a] checks attribute [a] of the
+    ret of the call or invoke instruction [ci].
+    In OCaml, the first arg is from 0. In LLVM, the first arg is from 1; 0
+    stores the attr of ret. So, we have to define has_instruction_ret/param_attr
+    separately. Internally, [has_instruction_param_attr ci i a] checks i+1-th
+    attr. [has_instruction_ret_attr ci a] checks 0-th attr. *)
+val has_instruction_ret_attr : llvalue -> Attribute.t -> bool
+
+(** [has_instruction_param_attr ci i a] checks attribute [a] of the
+    [i]th parameter of the call or invoke instruction [ci]. *)
+val has_instruction_param_attr : llvalue -> int -> Attribute.t -> bool
+
+(** [has_instruction_attr ci a] checks attribute [a] of the call or invoke 
+    instruction [ci]. *)
+val has_instruction_attr : llvalue -> Attribute.t -> bool
+
+
+
+(** {7 Operations on AllocationInst : AllocaInst, MallocInst} *)
+module AllocationInst : sig
+  val is_array_allocation : llvalue -> bool 
+  val get_array_size : llvalue -> llvalue
+  val get_type : llvalue -> lltype
+  val get_allocated_type : llvalue -> lltype
+  val get_alignment : llvalue -> int
+end        
+
+(** {7 Operations on LoadInst} *)
+module LoadInst : sig
+  val get_alignment : llvalue -> int
+end                     
+
+(** {7 Operations on StoreInst} *)
+module StoreInst : sig
+  val get_alignment : llvalue -> int
+end                     
+
+                   
+(** {7 Operations on ICmpInst} *)
+module ICmpInst : sig
+  val get_predicate : llvalue -> Icmp.t
+  val const_get_predicate : llvalue -> Icmp.t 
+end        
+
+(** {7 Operations on FCmpInst} *)
+module FCmpInst : sig
+  val get_predicate : llvalue -> Fcmp.t
+  val const_get_predicate : llvalue -> Fcmp.t 
+end                           
+
+(** {7 Operations on BranchInst} *)
+module BranchInst : sig
+  val is_conditional : llvalue -> bool
+  val get_condition : llvalue -> llvalue
+  val get_successor : llvalue -> int -> llbasicblock
+end
+
+(** {7 Operations on SwitchInst} *)
+module SwitchInst : sig
+  val get_condition : llvalue -> llvalue
+  val get_default_dest : llvalue -> llbasicblock
+  val get_successor : llvalue -> int -> llbasicblock
+  val get_case_value : llvalue -> int -> llvalue
+end
+
+(** {7 Operations on GetElementPtrInst} *)
+module GetElementPtrInst : sig
+  val is_in_bounds : llvalue -> bool
+end   
+
+(** {7 Operations on ReturnInst} *)
+module ReturnInst : sig
+  val is_void : llvalue -> bool
+end        
+
+(** {7 Operations on InsertValueInst} *)
+module InsertValueInst : sig
+  val get_num_indices : llvalue -> int 
+  val get_indices : llvalue -> int array 
+end        
+
+(** {7 Operations on ExtractValueInst} *)
+module ExtractValueInst : sig
+  val get_num_indices : llvalue -> int 
+  val get_indices : llvalue -> int array 
+end        
+
+(** {7 Operations on CallInst} *)
+module CallInst : sig
+  (** [get_called_value v] get a pointer to the function that is invoked by this
+      instruction. See the method [llvm::CallInst::getCalledValue]. *)
+  val get_called_value : llvalue -> llvalue
+end        
+                             
+(** Used to generate names for unnamed variables. See the [llvm::SlotTracker] 
+    class. *)
+type llslottracker
+
+(** {6 SlotTracker} *)
+
+(* why definition, not sig? *)
+      
+module SlotTracker : sig
+  (** [create_of_module m] constructs a new SlotTracker for a module [m].
+      See the constructor of [llvm::SlotTracker]. *)
+  external create_of_module : llmodule -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfModule"          
+
+(*                                                   
+  (** [create_of_function f] constructs a new SlotTracker for a function [f].
+      See the constructor of [llvm::SlotTracker]. *)
+  external create_of_function : llvalue -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfFunction"          
+
+  (** [create_of_value v] constructs a new SlotTracker for a value [v].
+      See the static function [llvm::createSlotTracker]. *)
+  external create_of_value : llvalue -> llslottracker 
+                                               = "LLVMCreateSlotTrackerOfValue"
+*)
+                                                   
+  (** [incorporate_function f] allows us to deal with a function [f] instead 
+   *  of just a module, use this method to get its data into the SlotTracker.
+   *  See the method [llvm::SlotTracker::incorporateFunction]. *)
+  external incorporate_function : llslottracker -> llvalue -> unit 
+                                     = "llvm_slottracker_incorporate_function"
+
+  (** [purge_function f]: After calling incorporateFunction, use this method 
+   *  to remove the most recently incorporated function from the SlotTracker.
+   *  This will reset the state of the machine back to just the module 
+   *  contents. See the method [llvm::SlotTracker::purgeFucntion]. *)
+  external purge_function : llslottracker -> unit = "llvm_slottracker_purge_function"
+
+  (** [get_global_slot s v] gets the slot number of a global value [v].
+      See the method [llvm::SlotTracker::getGlobalSlot]. *)
+  external get_global_slot : llslottracker -> llvalue -> int 
+                                           = "llvm_slottracker_get_global_slot"
+
+  (** [get_local_slot s v] gets the slot number of a local value [v].
+      See the method [llvm::SlotTracker::getLocalSlot]. *)
+  external get_local_slot : llslottracker -> llvalue -> int 
+                                            = "llvm_slottracker_get_local_slot"
+
+  (** Disposes of a SlotTracker. *)
+  external dispose : llslottracker -> unit = "llvm_slottracker_dispose"
+end       
+
+external array_length_of_dataarr : llvalue -> int = "llvm_array_length_of_data_array"
+                       
+(* added for vellvm - end *)
+                       

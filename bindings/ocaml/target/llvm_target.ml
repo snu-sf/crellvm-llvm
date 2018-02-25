@@ -45,6 +45,18 @@ module CodeGenFileType = struct
   | ObjectFile
 end
 
+(* added for vellvm - start *)
+module AlignType = struct
+  type t =
+  | Invalid_align
+  | Integer_align
+  | Vector_align
+  | Float_align
+  | Aggregate_align
+(*  | Stack_align *)
+end                           
+(* added for vellvm - end *)                          
+
 exception Error of string
 
 let () = Callback.register_exception "Llvm_target.Error" (Error "")
@@ -83,6 +95,20 @@ module DataLayout = struct
                              = "llvm_datalayout_element_at_offset"
   external offset_of_element : Llvm.lltype -> int -> t -> Int64.t
                              = "llvm_datalayout_offset_of_element"
+(* added for vellvm - start *)
+  external pointer_size_in_bits : t -> int = "llvm_pointer_size_in_bits"
+  external pointer_abi_alignment : t -> int 
+    = "llvm_pointer_abi_alignment"
+  external pointer_pref_alignment : t -> int 
+    = "llvm_pointer_pref_alignment"
+
+  external get_num_alignment : t -> int = "llvm_get_num_alignment"            
+  external get_align_type_enum : t -> int -> AlignType.t 
+    = "llvm_get_align_type_enum"
+  external get_abi_align : t -> int -> int  = "llvm_get_abi_align"
+  external get_pref_align : t -> int -> int  = "llvm_get_pref_align"
+  external get_type_bitwidth : t -> int -> int  = "llvm_get_type_bit_width"
+(* added for vellvm - end *)                                 
 end
 
 module Target = struct

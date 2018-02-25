@@ -62,7 +62,6 @@ Module *Instruction::getModule() {
   return getParent()->getModule();
 }
 
-
 void Instruction::removeFromParent() {
   getParent()->getInstList().remove(this);
 }

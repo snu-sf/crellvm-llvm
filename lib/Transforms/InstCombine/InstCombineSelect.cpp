@@ -16,6 +16,13 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/PatternMatch.h"
+
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesSelect.h"
+#include "llvm/Crellvm/Hintgen.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -142,6 +149,7 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
   if (!isa<BinaryOperator>(TI))
     return nullptr;
 
+  crellvm::ValidationUnit::Begin("select_bop_fold", SI);
   // Figure out if the operations have any operands in common.
   Value *MatchOp, *OtherOpT, *OtherOpF;
   bool MatchIsOpZero;
@@ -150,24 +158,42 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     OtherOpT = TI->getOperand(1);
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
+    INTRUDE(CAPTURE(), {
+      data.create<crellvm::ArgForFoldSelectOpOp>()->the_case = crellvm::FoldSelectOpOpArg::XY_XZ;
+    });
   } else if (TI->getOperand(1) == FI->getOperand(1)) {
     MatchOp  = TI->getOperand(1);
     OtherOpT = TI->getOperand(0);
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = false;
+    INTRUDE(CAPTURE(), {
+      data.create<crellvm::ArgForFoldSelectOpOp>()->the_case = crellvm::FoldSelectOpOpArg::YX_ZX;
+    });
   } else if (!TI->isCommutative()) {
+    crellvm::ValidationUnit::GetInstance()->setIsAborted();
+    crellvm::ValidationUnit::End();
+
     return nullptr;
   } else if (TI->getOperand(0) == FI->getOperand(1)) {
     MatchOp  = TI->getOperand(0);
     OtherOpT = TI->getOperand(1);
     OtherOpF = FI->getOperand(0);
     MatchIsOpZero = true;
+    INTRUDE(CAPTURE(), {
+      data.create<crellvm::ArgForFoldSelectOpOp>()->the_case = crellvm::FoldSelectOpOpArg::XY_ZX;
+    });
   } else if (TI->getOperand(1) == FI->getOperand(0)) {
     MatchOp  = TI->getOperand(1);
     OtherOpT = TI->getOperand(0);
     OtherOpF = FI->getOperand(1);
     MatchIsOpZero = true;
+    INTRUDE(CAPTURE(), {
+      data.create<crellvm::ArgForFoldSelectOpOp>()->the_case = crellvm::FoldSelectOpOpArg::YX_XZ;
+    });
   } else {
+    crellvm::ValidationUnit::GetInstance()->setIsAborted();
+    crellvm::ValidationUnit::End();
+
     return nullptr;
   }
 
@@ -175,6 +201,90 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
   Value *NewSI = Builder->CreateSelect(SI.getCondition(), OtherOpT,
                                        OtherOpF, SI.getName()+".v");
 
+  INTRUDE(CAPTURE(&SI, &TI, &FI, &MatchOp, &NewSI, &OtherOpT, &OtherOpF), {
+    auto the_case = data.get<crellvm::ArgForFoldSelectOpOp>()->the_case;
+    // case == "XY/XZ" : 
+    //        <src>          |         <tgt>
+    // R  = X bop Y          | R = X bop Y
+    // S  = X bop Z          | S = X bop Z
+    //  <nop>                | T' = select C ? Y : Z
+    // T0 = select C ? R : S | T0 = X bop T'
+    //   or,
+    // case == "YX/ZX" : 
+    //        <src>          |         <tgt>
+    // R  = Y bop X          | R = Y bop X
+    // S  = Z bop X          | S = Z bop X
+    //  <nop>                | T' = select C ? Y : Z
+    // T0 = select C ? R : S | T0 = T' bop X
+    //   or,
+    // case == "XY/ZX" : 
+    //        <src>          |         <tgt>
+    // R  = X bop Y          | R = X bop Y
+    // S  = Z bop X          | S = Z bop X
+    //  <nop>                | T' = select C ? Y : Z
+    // T0 = select C ? R : S | T0 = X bop T'
+    //   or,
+    // case == "YX/XZ" : 
+    //        <src>          |         <tgt>
+    // R  = Y bop X          | R = Y bop X
+    // S  = X bop Z          | S = X bop Z
+    //  <nop>                | T' = select C ? Y : Z
+    // T0 = select C ? R : S | T0 = X bop T'
+
+    BinaryOperator *R = dyn_cast<BinaryOperator>(TI), *S = dyn_cast<BinaryOperator>(FI);
+    SelectInst *T0 = &SI, *Tprime = dyn_cast<SelectInst>(NewSI);
+    //assert(R);
+    //assert(S);
+    //assert(Tprime);
+    switch(R->getOpcode()) {
+    case Instruction::UDiv: case Instruction::SDiv:
+    case Instruction::URem: case Instruction::SRem:
+      // This optimization is controversial because its correctness
+      // depends on the semantics of `select`. If C is poison,
+      // the program after transformation may contain UB.
+      // See PLDI17 [Taming Undefined Behavior in LLVM].
+      hints.setReturnCodeToAdmitted();
+      return;
+    }
+    Value *X = MatchOp, *Y = OtherOpT, *Z = OtherOpF, *C = SI.getCondition();
+    Instruction::BinaryOps bop = R->getOpcode();
+
+    crellvm::insertSrcNopAtTgtI(hints, Tprime);
+    PROPAGATE(MAYDIFF(crellvm::getVariable(*Tprime), Physical), crellvm::ConsGlobal::make());
+
+    crellvm::propagateInstruction(hints, R, T0, TGT);
+    crellvm::propagateInstruction(hints, S, T0, TGT);
+    crellvm::propagateInstruction(hints, Tprime, T0, TGT);
+    
+    // auto: (XY_ZX case) If S = Z bop X, apply commutativity
+    //if (the_case == crellvm::FoldSelectOpOpArg::XY_ZX)
+    //  crellvm::applyCommutativity(hints, T0, S, TGT);
+    // auto: (YX_XZ case) If R = Y bop X, apply commutativity
+    //else if (the_case == crellvm::FoldSelectOpOpArg::YX_XZ)
+    //  crellvm::applyCommutativity(hints, T0, R, TGT);
+
+    if (the_case == crellvm::FoldSelectOpOpArg::YX_ZX) {
+      if(crellvm::isFloatOpcode(bop))
+        INFRULE(INSTPOS(TGT, T0), crellvm::ConsFbopDistributiveOverSelectinst2::make(
+              crellvm::getFbop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime),
+              REGISTER(*T0), VAL(X), VAL(Y), VAL(Z),VAL(C), crellvm::getFloatType(R->getType()), VALTYPE(C->getType())));
+      else
+        INFRULE(INSTPOS(TGT, T0), crellvm::ConsBopDistributiveOverSelectinst2::make(
+              crellvm::getBop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime),
+              REGISTER(*T0), VAL(X), VAL(Y), VAL(Z), VAL(C), BITSIZE(*R), VALTYPE(C->getType())));
+    } else {
+      if(crellvm::isFloatOpcode(bop))
+        INFRULE(INSTPOS(TGT, T0), crellvm::ConsFbopDistributiveOverSelectinst::make(
+            crellvm::getFbop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime), REGISTER(*T0),
+            VAL(X), VAL(Y), VAL(Z), VAL(C), crellvm::getFloatType(R->getType()), VALTYPE(C->getType())));
+      else
+        INFRULE(INSTPOS(TGT, T0), crellvm::ConsBopDistributiveOverSelectinst::make(
+            crellvm::getBop(bop), REGISTER(*R), REGISTER(*S), REGISTER(*Tprime), REGISTER(*T0),
+            VAL(X), VAL(Y), VAL(Z), VAL(C), BITSIZE(*R), VALTYPE(C->getType())));
+    }
+  });
+
+ 
   if (BinaryOperator *BO = dyn_cast<BinaryOperator>(TI)) {
     if (MatchIsOpZero)
       return BinaryOperator::Create(BO->getOpcode(), MatchOp, NewSI);
@@ -428,17 +538,25 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         else // (Pred == ICmpInst::ICMP_ULT || Pred == ICmpInst::ICMP_SLT)
           AdjustedRHS = ConstantInt::get(CI->getContext(), CI->getValue() - 1);
 
+        crellvm::ValidationUnit::Begin("select_icmp_unknown_const", SI);
+        INTRUDE(CAPTURE(), {
+          auto ptr = data.create<crellvm::ArgForSelectIcmpConst>();
+          ptr->activated = false;
+        });
         // X > C ? X : C+1  -->  X < C+1 ? C+1 : X
         // X < C ? X : C-1  -->  X > C-1 ? C-1 : X
         if ((CmpLHS == TrueVal && AdjustedRHS == FalseVal) ||
-            (CmpLHS == FalseVal && AdjustedRHS == TrueVal))
+            (CmpLHS == FalseVal && AdjustedRHS == TrueVal)) {
           ; // Nothing to do here. Values match without any sign/zero extension.
+          INTRUDE(CAPTURE(),
+          { data.get<crellvm::ArgForSelectIcmpConst>()->activated = true; });
+        }
 
         // Types do not match. Instead of calculating this with mixed types
         // promote all to the larger type. This enables scalar evolution to
         // analyze this expression.
-        else if (CmpRHS->getType()->getScalarSizeInBits()
-                 < SelectTy->getBitWidth()) {
+        else if (CmpRHS->getType()->getScalarSizeInBits() <
+                 SelectTy->getBitWidth()) {
           Constant *sextRHS = ConstantExpr::getSExt(AdjustedRHS, SelectTy);
 
           // X = sext x; x >s c ? X : C+1 --> X = sext x; X <s C+1 ? C+1 : X
@@ -467,12 +585,44 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
                        zextRHS == TrueVal) {
               CmpLHS = FalseVal;
               AdjustedRHS = zextRHS;
-            } else
+            } else {
+              crellvm::ValidationUnit::Abort();
               break;
-          } else
+            }
+          } else {
+            crellvm::ValidationUnit::Abort();
             break;
-        } else
+          }
+        } else {
+          crellvm::ValidationUnit::Abort();
           break;
+        }
+
+        INTRUDE(CAPTURE(&ICI, &SI, &CI, &AdjustedRHS, &Pred), {
+          auto ptr = data.get<crellvm::ArgForSelectIcmpConst>();
+          if (ptr->activated) {
+            //    <src>                   |    <tgt>
+            // Y = icmp sgt/ugt X, C      | Y = icmp slt/ult X, (C+1)
+            // Z = select Y, X, (C+1)     | Z = select Y, (C+1), X
+            //    <src>                   |    <tgt>
+            // Y = icmp slt/ult X, C      | Y = icmp sgt/ugt X, (C-1)
+            // Z = select Y, X, (C-1)     | Z = select Y, (C-1), X
+            ptr->Z = &SI;
+            ptr->Y = ICI;
+            ptr->X = ptr->Y->getOperand(0);
+            ptr->C = CI;
+            ptr->Cprime = dyn_cast<ConstantInt>(AdjustedRHS);
+            ptr->Y_org_pos = INSTPOS(SRC, ICI);
+            ptr->isGtToLt = Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_SGT;
+            ptr->isUnsigned = Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_ULT;
+            ptr->selectCommutative = SI.getOperand(1) != ICI->getOperand(0);
+            crellvm::insertTgtNopAtSrcI(hints, ptr->Y);
+            crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*ptr->Y), crellvm::Physical);
+            crellvm::propagateInstruction(hints, ptr->Y, ptr->Z, SRC);
+          } else {
+            crellvm::ValidationUnit::GetInstance()->setIsAborted();
+          }
+        });
 
         Pred = ICmpInst::getSwappedPredicate(Pred);
         CmpRHS = AdjustedRHS;
@@ -486,6 +636,46 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
         // Move ICI instruction right before the select instruction. Otherwise
         // the sext/zext value may be defined after the ICI instruction uses it.
         ICI->moveBefore(&SI);
+
+        INTRUDE(CAPTURE(), {
+          auto ptr = data.get<crellvm::ArgForSelectIcmpConst>();
+          if (ptr->activated) {
+            //unsigned int bitsize = ptr->C->getType()->getIntegerBitWidth();
+            auto Z = ptr->Z;
+            auto C = ptr->C;
+            auto Cprime = ptr->Cprime;
+            auto Y = ptr->Y;
+            auto X = ptr->X;
+            bool select_commutative = ptr->selectCommutative;
+            auto vY = crellvm::getVariable(*Y);
+
+            crellvm::insertSrcNopAtTgtI(hints, ptr->Y);
+            PROPAGATE(LESSDEF(RHS(vY, Physical, TGT), VAR(vY), TGT), BOUNDS(INSTPOS(TGT, Y), INSTPOS(TGT, Z)));
+            std::function<std::shared_ptr<crellvm::TyInfrule>(
+                std::shared_ptr<crellvm::TyRegister>,
+                std::shared_ptr<crellvm::TyValue>,
+                std::shared_ptr<crellvm::TyValue>,
+                std::shared_ptr<crellvm::TyConstInt>,
+                std::shared_ptr<crellvm::TyConstInt>, bool,
+                std::shared_ptr<crellvm::TySize>)> makeInfruleFunc = nullptr;
+            std::string optname = "";
+
+            if (ptr->isGtToLt) {
+              if (ptr->isUnsigned) makeInfruleFunc = crellvm::ConsSelectIcmpUgtConst::make;
+              else makeInfruleFunc = crellvm::ConsSelectIcmpSgtConst::make;
+              optname = "select_icmp_gt_const";
+            } else {
+              if (ptr->isUnsigned) makeInfruleFunc = crellvm::ConsSelectIcmpUltConst::make;
+              else makeInfruleFunc = crellvm::ConsSelectIcmpSltConst::make;
+              optname = "select_icmp_lt_const";
+            }
+            crellvm::ValidationUnit::GetInstance()->setOptimizationName(optname);
+            INFRULE(INSTPOS(SRC, Z), makeInfruleFunc(REGISTER(*Z), VAL(Y), VAL(X),
+                    CONSTINT(C), CONSTINT(Cprime), select_commutative, BITSIZE(*C)));
+          } else
+            crellvm::ValidationUnit::GetInstance()->setIsAborted();
+        });
+        crellvm::ValidationUnit::End();
 
         Changed = true;
         break;
@@ -529,11 +719,49 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
   if (CmpRHS != CmpLHS && isa<Constant>(CmpRHS)) {
     if (CmpLHS == TrueVal && Pred == ICmpInst::ICMP_EQ) {
       // Transform (X == C) ? X : Y -> (X == C) ? C : Y
+      crellvm::ValidationUnit::Begin("select_icmp_eq", SI);
+      INTRUDE(CAPTURE(&SI, &ICI, &CmpRHS, &CmpLHS, &FalseVal), {
+        //    <src>           |    <tgt>
+        // Y = icmp eq, X, C  | Y = icmp eq, X, C
+        // Z = select Y, X, V | Z = select Y, C, V
+        if (CmpRHS->getType()->isVectorTy()) {
+          crellvm::ValidationUnit::Abort();
+          return;
+        }
+        //SelectInst *Z = &SI;
+        //ICmpInst *Y = ICI;
+        //Value *X = CmpLHS;
+        //Value *V = FalseVal;
+        Constant *C = dyn_cast<Constant>(CmpRHS);
+        //crellvm::propagateInstruction(hints, Y, Z, SRC);
+        //INFRULE(INSTPOS(SRC, Z), crellvm::ConsSelectIcmpEq::make(
+        //           VAL(Z), VAL(Y), VAL(X), VAL(V),
+        //           CONSTANT(C), VALTYPE(C->getType())));
+        crellvm::propagateInstruction(hints, ICI, &SI, SRC);
+        INFRULE(INSTPOS(SRC, &SI), crellvm::ConsSelectIcmpEq::make(
+            VAL(&SI), VAL(ICI), VAL(CmpLHS), VAL(FalseVal), CONSTANT(C), VALTYPE(C->getType())));
+      });
       SI.setOperand(1, CmpRHS);
+      crellvm::ValidationUnit::End();
       Changed = true;
     } else if (CmpLHS == FalseVal && Pred == ICmpInst::ICMP_NE) {
       // Transform (X != C) ? Y : X -> (X != C) ? Y : C
+      crellvm::ValidationUnit::Begin("select_icmp_ne", SI);
+      INTRUDE(CAPTURE(&SI, &ICI, &CmpRHS, &CmpLHS, &TrueVal), {
+        //     <src>          |      <tgt>
+        // Y = icmp ne, X, C  | Y = icmp ne, X, C
+        // Z = select Y, V, X | Z = select Y, V, C
+        if (CmpRHS->getType()->isVectorTy()) {
+          crellvm::ValidationUnit::Abort();
+          return;
+        }
+        Constant *C = dyn_cast<Constant>(CmpRHS);
+        crellvm::propagateInstruction(hints, ICI, &SI, SRC);
+        INFRULE(INSTPOS(SRC, &SI), crellvm::ConsSelectIcmpNe::make(
+            VAL(&SI), VAL(ICI), VAL(CmpLHS), VAL(TrueVal), CONSTANT(C), VALTYPE(C->getType())));
+      });
       SI.setOperand(2, CmpRHS);
+      crellvm::ValidationUnit::End();
       Changed = true;
     }
   }
@@ -562,6 +790,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
       TrueWhenUnset = true;
     }
     if (IsBitTest) {
+      crellvm::ValidationUnit::Begin("select_icmp_unknown_xor", SI);
       Value *V = nullptr;
       // (X & Y) == 0 ? X : X ^ Y  --> X & ~Y
       if (TrueWhenUnset && TrueVal == X &&
@@ -580,8 +809,149 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
                match(FalseVal, m_Xor(m_Specific(X), m_APInt(C))) && *Y == *C)
         V = Builder->CreateOr(X, *Y);
 
-      if (V)
+      if (V) {
+        INTRUDE(CAPTURE(&SI, &ICI, &V, &Pred, &TrueVal, &FalseVal), {
+          using namespace crellvm;
+          name_instructions(*SI.getParent()->getParent());
+          SelectInst *Z = &SI;
+          BinaryOperator *Zp = dyn_cast<BinaryOperator>(V);
+          ICmpInst *V = ICI;
+          auto bsz = BITSIZE(Z->getType()->getIntegerBitWidth());
+
+          insertSrcNopAtTgtI(hints, Zp);
+          propagateMaydiffGlobal(hints, getVariable(*Zp), Physical);
+          propagateMaydiffGlobal(hints, getVariable(*Zp), Previous);
+          propagateInstruction(hints, V, Z, TGT);
+          propagateInstruction(hints, Zp, Z, TGT);
+
+          if (Pred == ICmpInst::ICMP_EQ || Pred == ICmpInst::ICMP_NE) {
+            BinaryOperator *W = dyn_cast<BinaryOperator>(V->getOperand(0));
+            Value *X = W->getOperand(0);
+            auto C = dyn_cast<ConstantInt>(W->getOperand(1));
+            auto Cp = dyn_cast<ConstantInt>(ConstantInt::get(C->getType(), ~(C->getValue())));
+            BinaryOperator *U = dyn_cast<BinaryOperator>(TrueVal == X ? FalseVal : TrueVal);
+
+            propagateInstruction(hints, U, Z, TGT);
+            propagateInstruction(hints, W, Z, TGT);
+
+            if (Pred == ICmpInst::ICMP_EQ) {
+              if (Z->getOperand(1) == X) {
+                ValidationUnit::GetInstance()->setOptimizationName("select_icmp_eq_xor1");
+                //    <src>           |     <tgt>
+                // W = X & C          | W = X & C
+                // V = icmp eq, W, 0  | V = icmp eq, W, 0
+                // U = X ^ C          | U = X ^ C
+                // <nop>              | Z' = X & ~C
+                // Z = select V, X, U | Z = select V, X, U
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z), ConsSelectIcmpEqXor1::make(
+                    VAL(Z), VAL(Zp), VAL(V), VAL(X), VAL(U), VAL(W), CONSTINT(C), CONSTINT(Cp), bsz));
+              } else if (Z->getOperand(1) == U) {
+                ValidationUnit::GetInstance()->setOptimizationName("select_icmp_eq_xor2");
+                //     <src>          |     <tgt>
+                // W = X & C          | W = X & C
+                // V = icmp eq, W, 0  | V = icmp eq, W, 0
+                // U = X ^ C          | U = X ^ C
+                // <nop>              | Z' = X | C
+                // Z = select V, U, X | Z = select V, U, X
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z), ConsSelectIcmpEqXor2::make(
+                    VAL(Z), VAL(Zp), VAL(V), VAL(X), VAL(U), VAL(W), CONSTINT(C), bsz));
+              }// else {
+              //  assert(false && "Second operand of Z must be either X or U");
+              //}
+            } else {
+              if (Z->getOperand(1) == U) {
+                ValidationUnit::GetInstance()->setOptimizationName("select_icmp_ne_xor1");
+                //     <src>          |     <tgt>
+                // W = X & C          | W = X & C
+                // V = icmp ne, W, 0  | V = icmp ne, W, 0
+                // U = X ^ C          | U = X ^ C
+                // <nop>              | Z' = X & ~C
+                // Z = select V, U, X | Z = select V, U, X
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z), ConsSelectIcmpNeXor1::make(
+                    VAL(Z), VAL(Zp), VAL(V), VAL(X), VAL(U), VAL(W), CONSTINT(C), CONSTINT(Cp), bsz));
+              } else if (Z->getOperand(1) == X) {
+                ValidationUnit::GetInstance()->setOptimizationName("select_icmp_ne_xor2");
+                //     <src>          |     <tgt>
+                // W = X & C          | W = X & C
+                // V = icmp ne, W, 0  | V = icmp ne, W, 0
+                // U = X ^ C          | U = X ^ C
+                // <nop>              | Z' = X | C
+                // Z = select V, X, U | Z = select V, X, U
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z), ConsSelectIcmpNeXor2::make(
+                    VAL(Z), VAL(Zp), VAL(V), VAL(X), VAL(U), VAL(W), CONSTINT(C), bsz));
+              }// else {
+              //  assert(false && "Second operand of Z must be either X or U");
+              //}
+            }
+          } else {
+            Value *X = Zp->getOperand(0);
+            BinaryOperator *U = dyn_cast<BinaryOperator>(TrueVal == X ? FalseVal : TrueVal);
+            auto C = dyn_cast<ConstantInt>(U->getOperand(1));
+            auto Cp = dyn_cast<ConstantInt>(Zp->getOperand(1));
+
+            propagateInstruction(hints, U, Z, TGT);
+
+            if (Pred == ICmpInst::ICMP_SLT) {
+              if (Z->getOperand(1) == U) {
+                ValidationUnit::GetInstance()->setOptimizationName("select_icmp_slt_xor1");
+                //    <src>           |    <tgt>
+                // U = X ^ C          | U = X ^ C
+                // V = icmp slt X, 0  | V = icmp slt X, 0
+                // <nop>              | Z' = X & ~C
+                // Z = select V, U, X | Z = select V, U, X
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z), ConsSelectIcmpSltXor1::make(
+                    VAL(Z), VAL(Zp), VAL(V), VAL(X), VAL(U), CONSTINT(C), CONSTINT(Cp), bsz));
+              } else if (Z->getOperand(1) == X) {
+                ValidationUnit::GetInstance()->setOptimizationName("select_icmp_slt_xor2");
+                //    <src>           |    <tgt>
+                // U = X ^ C          | U = X ^ C
+                // V = icmp slt X, 0  | V = icmp slt X, 0
+                // <nop>              | Z' = X | C
+                // Z = select V, X, U | Z = select V, X, U
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z), ConsSelectIcmpSltXor2::make(
+                    VAL(Z), VAL(Zp), VAL(V), VAL(X), VAL(U), CONSTINT(C), bsz));
+              }// else {
+              //  assert(false && "Second operand of Z must be either X or U");
+              //}
+            } else if (Pred == ICmpInst::ICMP_SGT) {
+              if (Z->getOperand(1) == X) {
+                ValidationUnit::GetInstance()->setOptimizationName("select_icmp_sgt_xor1");
+                //    <src>           |    <tgt>
+                // U = X ^ C          | U = X ^ C
+                // V = icmp sgt X, 0  | V = icmp sgt X, 0
+                // <nop>              | Z' = X & ~C
+                // Z = select V, X, U | Z = select V, X, U
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z), ConsSelectIcmpSgtXor1::make(
+                    VAL(Z), VAL(Zp), VAL(V), VAL(X), VAL(U), CONSTINT(C), CONSTINT(Cp), bsz));
+              } else if (Z->getOperand(1) == U) {
+                ValidationUnit::GetInstance()->setOptimizationName("select_icmp_sgt_xor2");
+                //    <src>           |    <tgt>
+                // U = X ^ C          | U = X ^ C
+                // V = icmp sgt X, 0  | V = icmp sgt X, 0
+                // <nop>              | Z' = X | C
+                // Z = select V, U, X | Z = select V, U, X
+                //                    | (replace Z with Z')
+                INFRULE(INSTPOS(TGT, Z), ConsSelectIcmpSgtXor2::make(
+                    VAL(Z), VAL(Zp), VAL(V), VAL(X), VAL(U), CONSTINT(C), bsz));
+              }// else {
+              //  assert(false && "Second operand of Z must be either X or U");
+              //}
+            }// else {
+            //  assert(false && "Unknown predicate");
+            //}
+          }
+          generateHintForReplaceAllUsesWithAtTgt(Z, Zp);
+        });
         return ReplaceInstUsesWith(SI, V);
+      }
+      crellvm::ValidationUnit::Abort();
     }
   }
 

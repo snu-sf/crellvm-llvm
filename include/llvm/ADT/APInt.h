@@ -19,6 +19,10 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
+/* added for vellvm - start */
+#include "llvm/Support/CBindingWrapping.h"
+#include "llvm-c/Core.h"
+/* added for vellvm - end */
 #include <cassert>
 #include <climits>
 #include <cstring>
@@ -1909,6 +1913,11 @@ inline APInt Not(const APInt &APIVal) { return ~APIVal; }
 // See friend declaration above. This additional declaration is required in
 // order to compile LLVM with IBM xlC compiler.
 hash_code hash_value(const APInt &Arg);
+
+/* added for vellvm - start */  
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(APInt,              LLVMAPIntRef         )
+/* added for vellvm - end */
+  
 } // End of llvm namespace
 
 #endif

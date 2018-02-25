@@ -34,6 +34,11 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Hintgen.h"
+#include "llvm/Crellvm/Dictionary.h"
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//

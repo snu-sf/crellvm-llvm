@@ -35,6 +35,11 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
+/* added for vellvm - start */
+#include "llvm/IR/ModuleSlotTracker.h"
+#include "llvm/ADT/StringExtras.h"
+#include <sstream>
+/* added for vellvm - end */
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -2911,3 +2916,687 @@ void LLVMStopMultithreaded() {
 LLVMBool LLVMIsMultithreaded() {
   return llvm_is_multithreaded();
 }
+
+/* added for vellvm - start */
+
+/*--.. Operations on all values ............................................--*/
+const char *LLVMGetEscapedValueName(LLVMValueRef Val) {
+  // FIXME: This function is problematic. It must be out-of-bounds
+  // for some reason. So it is not safe to use.	 
+  StringRef Name = unwrap(Val)->getName();
+  char* cstr;
+
+  // Scan the name to see if it needs quotes first.
+  bool NeedsQuotes = isdigit(Name[0]);
+  if (!NeedsQuotes) {
+    for (unsigned i = 0, e = Name.size(); i != e; ++i) {
+      char C = Name[i];
+      if (!isalnum(C) && C != '-' && C != '.' && C != '_') {
+        NeedsQuotes = true;
+        break;
+      }
+    }
+  }
+  
+  // If we didn't need any quotes, just write out the name in one blast.
+  if (!NeedsQuotes) {
+    cstr = new char [Name.size()+1];
+    strcpy (cstr, Name.data());
+    return cstr;
+  }
+  
+  // Okay, we need quotes.  Output the quotes and escape any scary characters as
+  // needed.
+  std::stringstream Out;
+  Out << '"';
+  for (unsigned i = 0, e = Name.size(); i != e; ++i) {
+    unsigned char C = Name[i];
+    if (isprint(C) && C != '\\' && C != '"')
+      Out << C;
+    else
+      Out << '\\' << hexdigit(C >> 4) << hexdigit(C & 0x0F);
+  }
+  Out << '"';
+  
+  cstr = new char [Out.str().size()+1];
+  strcpy (cstr, Out.str().c_str());
+  return cstr;
+}
+
+int LLVMHasName(LLVMValueRef Val) {
+  return unwrap(Val)->hasName();	
+}
+
+int LLVMIsGlobalValue(LLVMValueRef Val) {
+  return isa<GlobalValue>(unwrap(Val));
+}
+
+unsigned LLVMConstAggregateValueGetNumIndices(LLVMValueRef AggConstant) {
+  return unwrap<ConstantExpr>(AggConstant)->getIndices().size();
+}
+
+void LLVMConstAggregateValueGetIndices(LLVMValueRef AggConstant, 
+		                          unsigned *IdxList, 
+		                          unsigned NumIdx) {
+  ArrayRef<unsigned> idxs = unwrap<ConstantExpr>(AggConstant)->getIndices();
+  unsigned i;
+
+  for (i = 0; i < NumIdx ; i++) {
+    assert (i < idxs.size() && "Indices must be in bound.");
+    IdxList[i] = idxs[i];
+  }
+}
+
+int LLVMHasInitializer(LLVMValueRef Global) {
+  return unwrap<GlobalVariable>(Global)->hasInitializer();
+}
+
+LLVMIntrinsicID LLVMGetSupportedIntrinsicID(LLVMValueRef Fn) {
+  Function *F = dyn_cast<Function>(unwrap(Fn));
+  if (NULL == F) return LLVMNotIntrinsic;
+  switch (F->getIntrinsicID()) {
+  case Intrinsic::not_intrinsic: return LLVMNotIntrinsic;
+  default: return LLVMUnsupportedIntrinsic;
+  case Intrinsic::expect: return LLVMExpect;
+  case Intrinsic::setjmp: return LLVMSetjmp;
+  case Intrinsic::sigsetjmp: return LLVMSigSetjmp;
+  case Intrinsic::longjmp: return LLVMLongjmp;
+  case Intrinsic::siglongjmp: return LLVMSigLongjmp;
+  case Intrinsic::ctpop: return LLVMCtpop;
+  case Intrinsic::bswap: return LLVMBswap;
+  case Intrinsic::ctlz: return LLVMCtlz;
+  case Intrinsic::cttz: return LLVMCttz;
+  case Intrinsic::stacksave: return LLVMStackSave;
+  case Intrinsic::stackrestore: return LLVMStackRestore;
+  case Intrinsic::returnaddress: return LLVMReturnAddress;
+  case Intrinsic::frameaddress: return LLVMFrameAddress;
+  case Intrinsic::prefetch: return LLVMPrefetch;
+  case Intrinsic::pcmarker: return LLVMPcmarker;
+  case Intrinsic::readcyclecounter: return LLVMReadCycleCounter;
+  case Intrinsic::dbg_declare: return LLVMDbgDeclare;
+  // case Intrinsic::eh_exception: return LLVMEhException;
+  // case Intrinsic::eh_selector: return LLVMEhSelector;
+  case Intrinsic::eh_typeid_for: return LLVMEhTypeidFor;
+  case Intrinsic::var_annotation: return LLVMVarAnnotation;
+  case Intrinsic::memcpy: return LLVMMemcpy;
+  case Intrinsic::memmove: return LLVMMemmove;
+  case Intrinsic::memset: return LLVMMemset;
+  case Intrinsic::sqrt: return LLVMSqrt;
+  case Intrinsic::log: return LLVMLog;
+  case Intrinsic::log2: return LLVMLog2;
+  case Intrinsic::log10: return LLVMLog10;
+  case Intrinsic::exp: return LLVMExp;
+  case Intrinsic::exp2: return LLVMExp2;
+  case Intrinsic::pow: return LLVMPow;
+  case Intrinsic::flt_rounds: return LLVMFltRounds;
+  case Intrinsic::invariant_start: return LLVMInvariantStart;
+  case Intrinsic::lifetime_start: return LLVMLifetimeStart;
+  case Intrinsic::invariant_end: return LLVMInvariantEnd;
+  case Intrinsic::lifetime_end: return LLVMLifetimeEnd;
+  }
+}
+
+
+/*===-- Operations on named types ---------------------------------------===*/
+
+const char *LLVMGetFirstNamedType(LLVMModuleRef M) {
+  const StringMap<StructType*> &NST = unwrap(M)->getNamedTypeList();
+  Module::const_namedty_iterator I = NST.begin();
+  if (I != NST.end())
+    return I->first().data();
+  return 0;
+}
+
+const char *LLVMGetNextNamedType(LLVMModuleRef M, const char *Name) {
+  const Module::NamedTyListType &NST = unwrap(M)->getNamedTypeList();
+  Module::const_namedty_iterator I = NST.find(Name);
+  if (++I == NST.end())
+    return 0;
+  return I->first().data();
+}
+
+/*--.. Operations on Users .................................................--*/
+
+void LLVMGetOperands(LLVMValueRef Val, LLVMValueRef *OperandRefs) {
+  User *U = unwrap<User>(Val);
+  for (User::op_iterator I = U->op_begin(),
+                         E = U->op_end(); I != E; I++)
+    *OperandRefs++ = wrap(I->get());
+}
+
+/*--.. Operations on APInt .................................................--*/
+
+void LLVMDisposeAPInt(LLVMAPIntRef I) {
+  delete unwrap(I);
+}
+
+void LLVMAPIntDump(LLVMAPIntRef I) {
+  unwrap(I)->dump();
+}
+
+const char * LLVMAPIntToString(LLVMAPIntRef I, unsigned Radix, int Signed) {
+  return unwrap(I)->toString(Radix, Signed).c_str();
+}
+
+unsigned long long LLVMAPIntGetZExtValue(LLVMAPIntRef I) {
+  return unwrap(I)->getZExtValue();	
+}
+
+unsigned long long LLVMAPIntGetSExtValue(LLVMAPIntRef I) {
+  return unwrap(I)->getSExtValue();	
+}
+
+int LLVMAPIntArrayIndex(LLVMAPIntRef I, unsigned BitPosition) {
+  APInt* i = unwrap(I);	 
+  assert (BitPosition < i->getBitWidth() && "BitPosition is out of range."); 	
+  return (*i)[BitPosition];
+}
+
+unsigned long long LLVMAPIntGetRawData(LLVMAPIntRef I, unsigned Index) {
+  APInt* i = unwrap(I);	 
+  const uint64_t* pdata = NULL;
+  assert (Index < i->getNumWords() && "Index is out of range."); 	
+  pdata = i->getRawData();
+  assert (pdata && "getRawData returns NULL");
+  return pdata[Index];
+}
+
+int LLVMAPIntIsNegative(LLVMAPIntRef I) {
+  return unwrap(I)->isNegative();	
+}
+
+int LLVMAPIntIsNonNegative(LLVMAPIntRef I) {
+  return unwrap(I)->isNonNegative();	
+}
+
+int LLVMAPIntIsStrictlyPositive(LLVMAPIntRef I) {
+  return unwrap(I)->isStrictlyPositive();	
+}
+
+int LLVMAPIntGetBoolValue(LLVMAPIntRef I) {
+  return unwrap(I)->getBoolValue();	
+}
+
+unsigned LLVMAPIntGetBitWidth(LLVMAPIntRef I) {
+  return unwrap(I)->getBitWidth();	
+}
+
+unsigned LLVMAPIntGetNumWords(LLVMAPIntRef I) {
+  return unwrap(I)->getNumWords();	
+}
+
+unsigned LLVMAPIntGetActiveBits(LLVMAPIntRef I) {
+  return unwrap(I)->getActiveBits();	
+}
+
+unsigned LLVMAPIntGetActiveWords(LLVMAPIntRef I) {
+  return unwrap(I)->getActiveWords();	
+}
+
+LLVMAPIntRef LLVMAPIntInc(LLVMAPIntRef I) {
+  APInt *RI = new APInt(++(*unwrap(I)));
+  return wrap(RI);
+}
+
+int LLVMAPIntCompare(LLVMAPIntRef I1, LLVMAPIntRef I2) {
+  APInt* i1 = unwrap(I1);	 
+  APInt* i2 = unwrap(I2);	 
+  if (i1->getBitWidth() == i2->getBitWidth())
+    return *i1==*i2;
+  else 
+    return 0;
+}
+
+int LLVMAPIntCompareOrd(LLVMAPIntRef I1, LLVMAPIntRef I2) {
+  APInt* i1 = unwrap(I1);	 
+  APInt* i2 = unwrap(I2);	 
+  if (i1->getBitWidth() == i2->getBitWidth()) {
+    if (*i1==*i2) return 0;
+    if (i1->ult(*i2)) return -1;
+    return 1;
+  }
+  else if (i1->getBitWidth() < i2->getBitWidth())
+    return -1;
+  return 1; 
+}
+
+LLVMAPIntRef LLVMAPIntConstIntGetValue(LLVMValueRef ConstantVal) {
+  APInt *RI = new APInt(unwrap<ConstantInt>(ConstantVal)->getValue());	
+  return wrap(RI);
+}
+
+LLVMValueRef LLVMAPIntConstAPInt(LLVMContextRef Context, LLVMAPIntRef N) {
+  return wrap(ConstantInt::get(*unwrap(Context), *unwrap(N)));
+}
+
+LLVMAPIntRef LLVMAPIntOfInt64(unsigned NumBits, unsigned long long Val,
+		              int IsSigned) {
+  APInt *RI = new APInt(NumBits, Val, IsSigned);
+  return wrap(RI);
+}
+
+/*--.. Operations on APFloat .................................................--*/
+
+void LLVMDisposeAPFloat(LLVMAPFloatRef F) {
+  delete unwrap(F);
+}
+
+LLVMAPIntRef LLVMAPFloatBitcastToAPInt(LLVMAPFloatRef F) {
+  APInt *RI = new APInt(unwrap(F)->bitcastToAPInt());
+  return wrap(RI);
+}
+
+double LLVMAPFloatConvertToDouble(LLVMAPFloatRef F) {
+  return unwrap(F)->convertToDouble();
+}
+
+double LLVMAPFloatConvertToFloat(LLVMAPFloatRef F) {
+  return (double)(unwrap(F)->convertToFloat());
+}
+
+LLVMAPFloatSemantics LLVMAPFloatGetSemantics(LLVMAPFloatRef F) {
+  APFloat* APF = unwrap(F);
+  if (APF->isIEEEhalf())
+    return LLVMIEEEhalf;
+  if (APF->isIEEEsingle())
+    return LLVMIEEEsingle;  
+  if (APF->isIEEEdouble())
+    return LLVMIEEEdouble;  
+  if (APF->isIEEEquad())
+    return LLVMIEEEquad;  
+  if (APF->isPPCDoubleDouble())
+    return LLVMPPCDoubleDouble;  
+  if (APF->isX87DoubleExtended())
+    return LLVMX87DoubleExtended;  
+  assert(false && "Unknown APFloat Semantics.");
+  return (LLVMAPFloatSemantics)0;
+}
+
+LLVMAPFloatCmpResult LLVMAPFloatCompare(LLVMAPFloatRef F1, LLVMAPFloatRef F2) {
+  return (LLVMAPFloatCmpResult)(unwrap(F1)->compare(*unwrap(F2)));	
+}
+
+LLVMAPFloatCmpResult LLVMAPFloatCompareOrd(LLVMAPFloatRef F1, LLVMAPFloatRef F2) {
+  return (LLVMAPFloatCmpResult)(unwrap(F1)->compare_ord(*unwrap(F2)));	
+}
+
+int LLVMAPFloatBitwiseIsEqual(LLVMAPFloatRef F1, LLVMAPFloatRef F2) {
+  return unwrap(F1)->bitwiseIsEqual(*unwrap(F2));
+}
+
+LLVMAPFloatRef LLVMAPFloatConstFloatGetValue(LLVMValueRef ConstantVal) {
+  APFloat *RF = new APFloat(unwrap<ConstantFP>(ConstantVal)->getValueAPF());	
+  return wrap(RF);
+}
+
+LLVMValueRef LLVMAPFloatConstAPFloat(LLVMContextRef Ctx, LLVMAPFloatRef F) {
+  return wrap(ConstantFP::get(*unwrap(Ctx), *unwrap(F)));
+}
+
+// ftostr from lib/Target/CppBackend/CPPBackend.cpp - ys
+
+static inline std::string ftostr(const APFloat& V) {
+  std::string Buf;
+  if (&V.getSemantics() == &APFloat::IEEEdouble) {
+    raw_string_ostream(Buf) << V.convertToDouble();
+    return Buf;
+  } else if (&V.getSemantics() == &APFloat::IEEEsingle) {
+    raw_string_ostream(Buf) << (double)V.convertToFloat();
+    return Buf;
+  }
+  return "<unknown format in ftostr>"; // error
+}
+
+const char * LLVMAPFloatToString(LLVMAPFloatRef F) {
+  APFloat* apf = unwrap(F);
+  std::stringstream out;
+  char * cstr;
+
+  if (&apf->getSemantics() == &APFloat::IEEEdouble ||
+      &apf->getSemantics() == &APFloat::IEEEsingle) {
+    // We would like to output the FP constant value in exponential notation,
+    // but we cannot do this if doing so will lose precision.  Check here to
+    // make sure that we only output it in exponential format if we can parse
+    // the value back and get the same value.
+    //
+    bool ignored;
+    bool isDouble = &apf->getSemantics()==&APFloat::IEEEdouble;
+    double Val = isDouble ? apf->convertToDouble() :
+                            apf->convertToFloat();
+    std::string StrVal = ftostr(*apf);
+
+    // Check to make sure that the stringized number is not some string like
+    // "Inf" or NaN, that atof will accept, but the lexer will not.  Check
+    // that the string matches the "[-+]?[0-9]" regex.
+    //
+    if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
+        ((StrVal[0] == '-' || StrVal[0] == '+') &&
+         (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
+      // Reparse stringized version!
+      if (atof(StrVal.c_str()) == Val) {
+        out << StrVal;
+        cstr = new char [out.str().size()+1];
+        strcpy (cstr, out.str().c_str());
+        return cstr;
+      }
+    }
+    // Otherwise we could not reparse it to exactly the same value, so we must
+    // output the string in hexadecimal format!  Note that loading and storing
+    // floating point types changes the bits of NaNs on some hosts, notably
+    // x86, so we must not use these types.
+    assert(sizeof(double) == sizeof(uint64_t) &&
+           "assuming that double is 64 bits!");
+    char Buffer[40];
+    // Floats are represented in ASCII IR as double, convert.
+    APFloat apf2 = *apf;
+
+    if (!isDouble)
+      apf2.convert(APFloat::IEEEdouble, APFloat::rmNearestTiesToEven, 
+                        &ignored);
+    out << "0x" <<
+         utohex_buffer(uint64_t(apf2.bitcastToAPInt().getZExtValue()), 
+                          Buffer+40);
+    cstr = new char [out.str().size()+1];
+    strcpy (cstr, out.str().c_str());
+    return cstr;
+  }
+    
+  // Some form of long double.  These appear as a magic letter identifying
+  // the type, then a fixed number of hex digits.
+  out << "0x";
+  if (&apf->getSemantics() == &APFloat::x87DoubleExtended) {
+    out << 'K';
+    // api needed to prevent premature destruction
+    APInt api = apf->bitcastToAPInt();
+    const uint64_t* p = api.getRawData();
+    uint64_t word = p[1];
+    int shiftcount=12;
+    int width = api.getBitWidth();
+    for (int j=0; j<width; j+=4, shiftcount-=4) {
+      unsigned int nibble = (word>>shiftcount) & 15;
+      if (nibble < 10)
+        out << (unsigned char)(nibble + '0');
+      else
+        out << (unsigned char)(nibble - 10 + 'A');
+      if (shiftcount == 0 && j+4 < width) {
+        word = *p;
+        shiftcount = 64;
+        if (width-j-4 < 64)
+          shiftcount = width-j-4;
+      }
+    }
+    cstr = new char [out.str().size()+1];
+    strcpy (cstr, out.str().c_str());
+    return cstr;
+  } else if (&apf->getSemantics() == &APFloat::IEEEquad)
+    out << 'L';
+  else if (&apf->getSemantics() == &APFloat::PPCDoubleDouble)
+    out << 'M';
+  else
+    llvm_unreachable("Unsupported floating point type");
+  // api needed to prevent premature destruction
+  APInt api = apf->bitcastToAPInt();
+  const uint64_t* p = api.getRawData();
+  uint64_t word = *p;
+  int shiftcount=60;
+  int width = api.getBitWidth();
+  for (int j=0; j<width; j+=4, shiftcount-=4) {
+    unsigned int nibble = (word>>shiftcount) & 15;
+    if (nibble < 10)
+      out << (unsigned char)(nibble + '0');
+    else
+      out << (unsigned char)(nibble - 10 + 'A');
+    if (shiftcount == 0 && j+4 < width) {
+      word = *(++p);
+      shiftcount = 64;
+      if (width-j-4 < 64)
+        shiftcount = width-j-4;
+    }
+  }
+  cstr = new char [out.str().size()+1];
+  strcpy (cstr, out.str().c_str());
+  return cstr;
+}
+
+int LLVMHasFnAttr(LLVMValueRef Fn, LLVMAttribute PA) {
+  Function *Func = unwrap<Function>(Fn);
+  const AttributeSet PAL = Func->getAttributes();
+  return (int) (PAL.Raw(AttributeSet::FunctionIndex) & PA);
+}	
+
+int LLVMHasRetAttr(LLVMValueRef Fn, LLVMAttribute PA) {
+  Function *Func = unwrap<Function>(Fn);
+  const AttributeSet PAL = Func->getAttributes();
+  return (int) (PAL.Raw(AttributeSet::ReturnIndex) & PA);
+}	
+
+/*
+LLVMAttribute LLVMGetAttribute(LLVMValueRef Arg) {
+  Argument *A = unwrap<Argument>(Arg);
+  return (LLVMAttribute)A->getParent()->getAttributes().
+    Raw(A->getArgNo()+1);
+}
+*/
+
+int LLVMHasAttribute(LLVMValueRef Arg, LLVMAttribute PA) {
+  Argument *A = unwrap<Argument>(Arg);
+  return (int) (A->getParent()->getAttributes().Raw(
+    A->getArgNo()+1) & PA);
+}
+
+/*
+  void LLVMAddInstrAttribute(LLVMValueRef Instr, unsigned index,
+                           LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  AttrBuilder B(PA);
+  Call.setAttributes(
+    Call.getAttributes().addAttributes(Call->getContext(), index,
+                                       AttributeSet::get(Call->getContext(),
+                                                         index, B)));
+}
+
+void LLVMRemoveInstrAttribute(LLVMValueRef Instr, unsigned index,
+                              LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  AttrBuilder B(PA);
+  Call.setAttributes(Call.getAttributes()
+                       .removeAttributes(Call->getContext(), index,
+                                         AttributeSet::get(Call->getContext(),
+                                                           index, B)));
+}
+
+void LLVMSetInstrParamAlignment(LLVMValueRef Instr, unsigned index,
+                                unsigned align) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  AttrBuilder B;
+  B.addAlignmentAttr(align);
+  Call.setAttributes(Call.getAttributes()
+                       .addAttributes(Call->getContext(), index,
+                                      AttributeSet::get(Call->getContext(),
+                                                        index, B)));
+}
+*/
+
+int LLVMHasInstrRetAttribute(LLVMValueRef Instr, LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  return (int)((Call.getAttributes().Raw(llvm::AttributeSet::ReturnIndex) & PA) != 0);
+}
+
+int LLVMHasInstrParamAttribute(LLVMValueRef Instr, unsigned index, 
+                              LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  // Importantly, we must do index+1, but not only index. See also
+  // LLVMHasAttribute and LLVMGetAttribute
+  return (int)(Call.getAttributes().Raw(index+1) & PA);
+}
+
+int LLVMHasInstrAttribute(LLVMValueRef Instr, LLVMAttribute PA) {
+  CallSite Call = CallSite(unwrap<Instruction>(Instr));
+  return (int)((Call.getAttributes().Raw(llvm::AttributeSet::FunctionIndex) & PA) != 0);
+}
+
+/*--.. Allocation instructions ........................................--*/
+
+int LLVMAllocationInstIsArrayAllocation(LLVMValueRef Inst) {
+  AllocaInst *Instr = unwrap<AllocaInst>(Inst);
+  return Instr->isArrayAllocation(); 
+}
+
+LLVMValueRef LLVMAllocationInstGetArraySize(LLVMValueRef Inst) {
+  AllocaInst *Instr = unwrap<AllocaInst>(Inst);
+  return wrap(Instr->getArraySize()); 
+}
+
+LLVMTypeRef LLVMAllocationInstGetAllocatedType(LLVMValueRef Inst) {
+  AllocaInst *Instr = unwrap<AllocaInst>(Inst);
+  return wrap(Instr->getAllocatedType()); 
+}
+
+unsigned LLVMAllocationInstGetAlignment(LLVMValueRef Inst) {
+  AllocaInst *Instr = unwrap<AllocaInst>(Inst);
+  return Instr->getAlignment(); 
+}
+
+/*--.. Load instructions ...................................................--*/
+
+unsigned LLVMLoadInstGetAlignment(LLVMValueRef Inst) {
+  LoadInst *Instr = unwrap<LoadInst>(Inst);
+  return Instr->getAlignment(); 
+}
+
+/*--.. Store instructions ...................................................--*/
+
+unsigned LLVMStoreInstGetAlignment(LLVMValueRef Inst) {
+  StoreInst *Instr = unwrap<StoreInst>(Inst);
+  return Instr->getAlignment(); 
+}
+
+/*--.. Cmp instructions ....................................................--*/
+LLVMIntPredicate LLVMCmpInstGetPredicate(LLVMValueRef Inst) {
+  CmpInst *Instr = unwrap<CmpInst>(Inst);
+  return static_cast<LLVMIntPredicate>(Instr->getPredicate());
+}
+
+LLVMIntPredicate LLVMCmpInstConstGetPredicate(LLVMValueRef C) {
+  ConstantExpr *CE = unwrap<ConstantExpr>(C);
+  return static_cast<LLVMIntPredicate>(CE->getPredicate());
+}
+
+/*--.. Branch instructions ..................................................--*/
+int LLVMBranchInstIsConditional(LLVMValueRef Inst){
+  return unwrap<BranchInst>(Inst)->isConditional();
+}
+
+LLVMValueRef LLVMBranchInstGetCondition(LLVMValueRef Inst){
+  return wrap(unwrap<BranchInst>(Inst)->getCondition());
+}
+
+LLVMBasicBlockRef LLVMBranchInstGetSuccessor(LLVMValueRef Inst, unsigned idx){
+  return wrap(unwrap<BranchInst>(Inst)->getSuccessor(idx));
+}
+
+/*--.. Switch instructions ...............................................--*/
+
+LLVMValueRef LLVMSwitchInstGetCondition(LLVMValueRef Inst){
+  return wrap(unwrap<SwitchInst>(Inst)->getCondition());
+}
+
+LLVMBasicBlockRef LLVMSwitchInstGetDefaultDest(LLVMValueRef Inst){
+  return wrap(unwrap<SwitchInst>(Inst)->getDefaultDest());
+}
+
+LLVMBasicBlockRef LLVMSwitchInstGetSuccessor(LLVMValueRef Inst, unsigned idx){
+  assert(idx > 0 && "Use GetDefaultDest instead");
+  return wrap(unwrap<SwitchInst>(Inst)->getSuccessor(idx));
+}
+
+LLVMValueRef LLVMSwitchInstGetCaseValue(LLVMValueRef Inst, unsigned idx){
+  assert(idx > 0 && "Use GetCondition instead");
+  return wrap(unwrap<SwitchInst>(Inst)->getOperand(2*idx));
+}
+
+/*--.. GEP instructions ..................................................--*/
+int LLVMGetElementPtrInstIsInBounds(LLVMValueRef Inst) {
+  return unwrap<GEPOperator>(Inst)->isInBounds();
+}
+
+/*--.. Return instructions ...............................................--*/
+int LVMReturnInstIsVoid(LLVMValueRef Inst) {
+  return unwrap<ReturnInst>(Inst)->getReturnValue() == 0;
+}
+
+/*--.. InsertValue instructions.............................................--*/
+unsigned LLVMInsertValueInstGetNumIndices(LLVMValueRef Inst) {
+  return unwrap<InsertValueInst>(Inst)->getNumIndices();
+}
+
+void LLVMInsertValueInstGetIndices(LLVMValueRef Inst, unsigned *IdxList, 
+		                   unsigned NumIdx) {
+  InsertValueInst *Instr = unwrap<InsertValueInst>(Inst);
+  InsertValueInst::idx_iterator I = Instr->idx_begin();
+  unsigned i;
+
+  for (i = 0; i < NumIdx; i++) {
+    assert (I != Instr->idx_end() && "Indices must be in bound.");
+    IdxList[i] = *(I++);
+  }
+}
+
+/*--.. ExtractValue instructions............................................--*/
+unsigned LLVMExtractValueInstGetNumIndices(LLVMValueRef Inst) {
+  return unwrap<ExtractValueInst>(Inst)->getNumIndices();
+}
+
+void LLVMExtractValueInstGetIndices(LLVMValueRef Inst, unsigned *IdxList, 
+   		                    unsigned NumIdx) {
+  ExtractValueInst *Instr = unwrap<ExtractValueInst>(Inst);
+  ExtractValueInst::idx_iterator I = Instr->idx_begin();
+  unsigned i;
+
+  for (i = 0; i < NumIdx; i++) {
+    assert (I != Instr->idx_end() && "Indices must be in bound.");
+    IdxList[i] = *(I++);
+  }
+}
+
+/*--.. Call instructions............................................--*/
+LLVMValueRef LLVMGetCalledValue(LLVMValueRef Inst) {
+  return wrap(unwrap<CallInst>(Inst)->getCalledValue());
+}
+
+/*===-- SlotTracker -------------------------------------------------------===*/
+
+LLVMSlotTrackerRef LLVMCreateSlotTrackerOfModule(LLVMModuleRef M) {
+  return wrap(new VSlotTracker(unwrap(M)));
+}
+
+void LLVMSlotTrackerIncorporateFunction(LLVMSlotTrackerRef ST, LLVMValueRef Fn) {
+  unwrap(ST)->incorporateFunction(unwrap<Function>(Fn));
+  return;
+}
+
+void LLVMSlotTrackerPurgeFunction(LLVMSlotTrackerRef ST) {
+  unwrap(ST)->purgeFunction();
+  return;
+}
+
+int LLVMSlotTrackerGetGlobalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Global) {
+  return unwrap(ST)->getGlobalSlot(unwrap<GlobalValue>(Global));
+}
+
+int LLVMSlotTrackerGetLocalSlot(LLVMSlotTrackerRef ST, LLVMValueRef Val) {
+  return unwrap(ST)->getLocalSlot(unwrap<Value>(Val));
+}
+
+void LLVMDisposeSlotTracker(LLVMSlotTrackerRef ST) {
+  delete unwrap(ST);
+}
+
+/* for ConstantDataArray */
+
+unsigned LLVMGetArrayLengthOfDataArray(LLVMValueRef c) {
+  ArrayType *ty = static_cast<ConstantDataArray*>(unwrap(c))->getType();
+  return ty->getNumElements();
+}
+
+/* added for vellvm - end */

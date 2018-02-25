@@ -3378,3 +3378,31 @@ void Metadata::dump(const Module *M) const {
   print(dbgs(), M);
   dbgs() << '\n';
 }
+
+/* added for vellvm - start */
+
+VSlotTracker::VSlotTracker(const Module* M):
+  st(new SlotTracker(M)) {}
+
+VSlotTracker::~VSlotTracker() {
+  delete st;
+}
+
+void VSlotTracker::incorporateFunction(const Function *F) {
+  st->incorporateFunction(F);
+}
+
+void VSlotTracker::purgeFunction() {
+  st->purgeFunction();
+}
+
+int VSlotTracker::getGlobalSlot(const GlobalValue *V) {
+  return st->getGlobalSlot(V);
+}
+
+int VSlotTracker::getLocalSlot(const Value *V) {
+  return st->getLocalSlot(V);
+}
+
+
+/* added for vellvm - end */

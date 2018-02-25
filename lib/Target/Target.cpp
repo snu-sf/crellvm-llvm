@@ -131,3 +131,37 @@ unsigned long long LLVMOffsetOfElement(LLVMTargetDataRef TD, LLVMTypeRef StructT
 void LLVMDisposeTargetData(LLVMTargetDataRef TD) {
   delete unwrap(TD);
 }
+
+/* added for vellvm - start */
+unsigned LLVMPointerSizeInBits(LLVMTargetDataRef TD) {
+  return unwrap(TD)->getPointerSizeInBits();
+}
+
+unsigned LLVMPointerABIAlignment(LLVMTargetDataRef TD) {
+  return unwrap(TD)->getPointerABIAlignment();
+}
+
+unsigned LLVMPointerPrefAlignment(LLVMTargetDataRef TD) {
+  return unwrap(TD)->getPointerPrefAlignment();
+}
+
+unsigned LLVMGetNumAlignment(LLVMTargetDataRef TD) {
+  return unwrap(TD)->getNumAlignment();
+}
+
+LLVMAlignTypeEnum LLVMGetAlignTypeEnum(LLVMTargetDataRef TD, unsigned i) {
+  return (LLVMAlignTypeEnum)unwrap(TD)->getAlignTypeEnum(i);
+}
+
+unsigned char LLVMGetABIAlign(LLVMTargetDataRef TD, unsigned i) {
+  return unwrap(TD)->getABIAlign(i);
+}
+
+unsigned char LLVMGetPrefAlign(LLVMTargetDataRef TD, unsigned i) {
+  return unwrap(TD)->getPrefAlign(i);
+}
+
+uint32_t LLVMGetTypeBitWidth(LLVMTargetDataRef TD, unsigned i) {
+  return unwrap(TD)->getTypeBitWidth(i);
+}
+/* added for vellvm - end */

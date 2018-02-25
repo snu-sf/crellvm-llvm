@@ -25,6 +25,9 @@
 #include "llvm/Support/CBindingWrapping.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/DataTypes.h"
+/* added for vellvm - start */
+#include "llvm/ADT/StringMap.h"
+/* added for vellvm - end */
 #include <system_error>
 
 namespace llvm {
@@ -676,6 +679,30 @@ public:
   /// \brief Set the PIC level (small or large model)
   void setPICLevel(PICLevel::Level PL);
 /// @}
+
+  /* added for vellvm - start */
+  /// The type for the list of named types.
+  typedef StringMap<StructType*> NamedTyListType;
+  /// The Named Type iterator.
+  typedef NamedTyListType::iterator                    namedty_iterator;
+  /// The Named Type constant iterator.
+  typedef NamedTyListType::const_iterator        const_namedty_iterator;
+
+  /// Get the Module's list of named types (constant).
+  const NamedTyListType  &getNamedTypeList() const;
+  /// Get the Module's list of named types.
+  NamedTyListType &getNamedTypeList();
+
+  namedty_iterator        namedty_begin();
+  const_namedty_iterator  namedty_begin() const;
+  namedty_iterator        namedty_end  ();
+  const_namedty_iterator  namedty_end  () const;
+  size_t                  namedty_size() const;
+  bool                    namedty_empty() const;
+  
+  /* added for vellvm - end */
+
+  
 };
 
 /// An raw_ostream inserter for modules.

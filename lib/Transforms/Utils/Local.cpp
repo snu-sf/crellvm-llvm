@@ -44,6 +44,10 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/Hintgen.h"
+#include "llvm/Crellvm/Dictionary.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "local"
@@ -987,6 +991,16 @@ bool llvm::ConvertDebugDeclareToDebugValue(DbgDeclareInst *DDI,
   auto *DIExpr = DDI->getExpression();
   assert(DIVar && "Missing variable");
 
+  if (crellvm::ValidationUnit::Exists()) {
+    crellvm::ValidationUnit::GetInstance()->intrude
+            ([]
+              (crellvm::Dictionary &data, 
+               crellvm::CoreHint &hints) {
+      hints.appendToDescription("ConvertDebugDeclareToDebugValue");
+      hints.setReturnCodeToAdmitted();
+    });
+  }
+
   if (LdStHasDebugValue(DIVar, SI))
     return true;
 
@@ -1013,6 +1027,16 @@ bool llvm::ConvertDebugDeclareToDebugValue(DbgDeclareInst *DDI,
   auto *DIVar = DDI->getVariable();
   auto *DIExpr = DDI->getExpression();
   assert(DIVar && "Missing variable");
+  
+  if (crellvm::ValidationUnit::Exists()) {
+    crellvm::ValidationUnit::GetInstance()->intrude
+           ([]
+             (crellvm::Dictionary &data, 
+              crellvm::CoreHint &hints) {
+      llvm::dbgs()<< "Admit ConvertDebugDeclareToDebugValue\n";        
+      hints.setReturnCodeToAdmitted();
+    });
+  }
 
   if (LdStHasDebugValue(DIVar, LI))
     return true;

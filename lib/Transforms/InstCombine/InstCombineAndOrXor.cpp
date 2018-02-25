@@ -17,6 +17,11 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Transforms/Utils/CmpInstAnalysis.h"
+#include "llvm/Crellvm/ValidationUnit.h"
+#include "llvm/Crellvm/Structure.h"
+#include "llvm/Crellvm/Infrules.h"
+#include "llvm/Crellvm/InstCombine/InfrulesAndOrXor.h"
+#include "llvm/Crellvm/Hintgen.h"
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -171,8 +176,44 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
   case Instruction::Xor:
     if (Op->hasOneUse()) {
       // (X ^ C1) & C2 --> (X & C2) ^ (C1&C2)
+      crellvm::ValidationUnit::Begin("and_xor_const", TheAnd);
       Value *And = Builder->CreateAnd(X, AndRHS);
+      //   <src>     |   <tgt>
+      // Y = X ^ C1  | Y' = X ^ C1
+      // nop         | Y  = X & C2
+      // Z = Y & C2  | Z  = Y ^ (C1 & C2)
+
+      INTRUDE(CAPTURE(&TheAnd, &Op), {
+        // Propagate Y = X ^ C1 in Source
+        crellvm::propagateInstruction(hints, dyn_cast<BinaryOperator>(Op), &TheAnd, SRC);
+      });
+
       And->takeName(Op);
+
+      INTRUDE(CAPTURE(&TheAnd, &Op, &And, &X, &OpRHS, &AndRHS), {
+        crellvm::name_instructions(*Op->getParent()->getParent());
+
+        BinaryOperator *Z = &TheAnd, *Y = dyn_cast<BinaryOperator>(And),
+                       *Yprime = dyn_cast<BinaryOperator>(Op);
+        std::string reg_z = crellvm::getVariable(*Z), reg_y = crellvm::getVariable(*Y),
+                    reg_yprime = crellvm::getVariable(*Yprime);
+
+        int64_t c1 = OpRHS->getSExtValue(), c2 = AndRHS->getSExtValue();
+        int bw = Z->getType()->getIntegerBitWidth();
+
+        crellvm::propagateInstruction(hints, Yprime, Z, TGT);
+        crellvm::propagateInstruction(hints, Y, Z, TGT);
+        crellvm::insertSrcNopAtTgtI(hints, Y);
+
+        crellvm::propagateMaydiffGlobal(hints, reg_yprime, crellvm::Physical);
+        crellvm::propagateMaydiffGlobal(hints, reg_y, crellvm::Physical);
+        crellvm::propagateMaydiffGlobal(hints, reg_yprime, crellvm::Previous);
+        crellvm::propagateMaydiffGlobal(hints, reg_y, crellvm::Previous);
+
+        INFRULE(INSTPOS(TGT, Z), crellvm::ConsAndXorConst::make(
+                REGISTER(*Z), REGISTER(*Y), REGISTER(*Yprime), VAL(X),
+                CONSTINT(c1, bw), CONSTINT(c2, bw), CONSTINT(c1 & c2, bw), BITSIZE(bw)));
+      });
       return BinaryOperator::CreateXor(And, Together);
     }
     break;
@@ -185,14 +226,52 @@ Instruction *InstCombiner::OptAndOp(Instruction *Op,
         return BinaryOperator::CreateAnd(Or, AndRHS);
       }
 
+      // Together == OpRHS, i.e. C1 & C2 == C1
       ConstantInt *TogetherCI = dyn_cast<ConstantInt>(Together);
       if (TogetherCI && !TogetherCI->isZero()){
         // (X | C1) & C2 --> (X & (C2^(C1&C2))) | C1
         // NOTE: This reduces the number of bits set in the & mask, which
         // can expose opportunities for store narrowing.
+        crellvm::ValidationUnit::Begin("and_or_const2", TheAnd);
         Together = ConstantExpr::getXor(AndRHS, Together);
         Value *And = Builder->CreateAnd(X, Together);
+        //   <src>     |   <tgt>
+        // Y = X | C1  | Y' = X  | C1
+        // nop         | Y  = X  & (C2 ^ C1)
+        // Z = Y & C2  | Z  = Y  | C1
+
+        // Propagate Y = X | C1 in Source
+        INTRUDE(CAPTURE(&TheAnd, &Op), {
+          crellvm::propagateInstruction(hints, dyn_cast<BinaryOperator>(Op), &TheAnd, SRC);
+        });
+
         And->takeName(Op);
+
+        INTRUDE(CAPTURE(&TheAnd, &And, &Op, &X, &OpRHS, &AndRHS), {
+          crellvm::name_instructions(*Op->getParent()->getParent());
+
+          BinaryOperator *Z = &TheAnd, *Y = dyn_cast<BinaryOperator>(And),
+                         *Yprime = dyn_cast<BinaryOperator>(Op);
+          ConstantInt *C1 = OpRHS, *C2 = AndRHS;
+          std::string reg_z = crellvm::getVariable(*Z), reg_y = crellvm::getVariable(*Y),
+                      reg_yprime = crellvm::getVariable(*Yprime);
+
+          int64_t c1 = C1->getSExtValue(), c2 = C2->getSExtValue();
+          int bw = Z->getType()->getIntegerBitWidth();
+
+          crellvm::propagateInstruction(hints, Yprime, Z, TGT);
+          crellvm::propagateInstruction(hints, Y, Z, TGT);
+          crellvm::insertSrcNopAtTgtI(hints, Y);
+
+          crellvm::propagateMaydiffGlobal(hints, reg_yprime, crellvm::Physical);
+          crellvm::propagateMaydiffGlobal(hints, reg_yprime, crellvm::Previous);
+          crellvm::propagateMaydiffGlobal(hints, reg_y, crellvm::Physical);
+          crellvm::propagateMaydiffGlobal(hints, reg_y, crellvm::Previous);
+          INFRULE(INSTPOS(TGT, Z), crellvm::ConsAndOrConst2::make(
+                  REGISTER(*Z), REGISTER(*Y), REGISTER(*Yprime), VAL(X),
+                  CONSTINT(c1, bw), CONSTINT(c2, bw), CONSTINT(c2 ^ c1, bw), BITSIZE(bw)));
+        });
+
         return BinaryOperator::CreateOr(And, OpRHS);
       }
     }
@@ -1210,8 +1289,15 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  if (Value *V = SimplifyAndInst(Op0, Op1, DL, TLI, DT, AC))
+  
+  crellvm::ValidationUnit::Begin("simplify_and_inst", I);
+  INTRUDE(CAPTURE(), { data.create<crellvm::ArgForSimplifyAndInst>(); });
+
+  if (Value *V = SimplifyAndInst(Op0, Op1, DL, TLI, DT, AC)){
+    crellvm::generateHintForInstructionSimplify<crellvm::ArgForSimplifyAndInst>(I, V);
     return ReplaceInstUsesWith(I, V);
+  }
+  crellvm::ValidationUnit::Abort();
 
   // (A|B)&(A|C) -> A|(B&C) etc
   if (Value *V = SimplifyUsingDistributiveLaws(I))
@@ -1334,8 +1420,37 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
   if (Value *Op0NotVal = dyn_castNotVal(Op0))
     if (Value *Op1NotVal = dyn_castNotVal(Op1))
       if (Op0->hasOneUse() && Op1->hasOneUse()) {
+        crellvm::ValidationUnit::Begin("and_de_morgan", I);
+
         Value *Or = Builder->CreateOr(Op0NotVal, Op1NotVal,
                                       I.getName()+".demorgan");
+        INTRUDE(CAPTURE(&I, &Op0, &Op1, &Op0NotVal, &Op1NotVal, &Or), {
+          //    <src>   |     <tgt>
+          // X = A ^ -1 | X =  A  ^ -1
+          // Y = B ^ -1 | Y =  B  ^ -1
+          // nop        | Z' = A  | B
+          // Z = X & Y  | Z =  Z' ^ -1
+          BinaryOperator *Z = &I;
+          if (Z->getType()->isVectorTy()) {
+            crellvm::ValidationUnit::Abort();
+            return;
+          }
+          BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
+          BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+          BinaryOperator *Zprime = dyn_cast<BinaryOperator>(Or);
+
+          crellvm::propagateInstruction(hints, X, Z, TGT);
+          crellvm::propagateInstruction(hints, Y, Z, TGT);
+
+          crellvm::insertSrcNopAtTgtI(hints, Zprime);
+          crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*Zprime), crellvm::Physical); 
+          
+          crellvm::propagateInstruction(hints, Zprime, Z, TGT);
+          INFRULE(INSTPOS(TGT, Z), crellvm::ConsAndDeMorgan::make(
+                  REGISTER(*Z), REGISTER(*X), REGISTER(*Y), REGISTER(*Zprime),
+                  VAL(Op0NotVal), VAL(Op1NotVal), BITSIZE(*Z)));
+        });
+
         return BinaryOperator::CreateNot(Or);
       }
 
@@ -1380,10 +1495,57 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
       }
     }
 
-    // (A&((~A)|B)) -> A&B
+    // ((A|(~B))&B) -> A&B
+    // (((~B)|A)&B) -> A&B
+    //   <src>    |   <tgt>
+    // X = B ^ -1 | X = B ^ -1
+    // Y = A | X  | Y = A | X
+    // Z = Y & B  | Z = A & B
+    //   <src>    |   <tgt>
+    // X = B ^ -1 | X = B ^ -1
+    // Y = X | A  | Y = X | A
+    // Z = Y & B  | Z = A & B
     if (match(Op0, m_Or(m_Not(m_Specific(Op1)), m_Value(A))) ||
-        match(Op0, m_Or(m_Value(A), m_Not(m_Specific(Op1)))))
+        match(Op0, m_Or(m_Value(A), m_Not(m_Specific(Op1))))) {
+      crellvm::ValidationUnit::Begin("and_or_not1", I);
+
+      INTRUDE(CAPTURE(&I, &Op0, &Op1, &A), {
+        BinaryOperator *Z = &I;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
+        BinaryOperator *X;
+
+        int is_x_second = Y->getOperand(0) == A;
+
+        if (is_x_second)
+          X = dyn_cast<BinaryOperator>(Y->getOperand(1));
+        else
+          X = dyn_cast<BinaryOperator>(Y->getOperand(0));
+
+        crellvm::propagateInstruction(hints, X, Z, TGT);
+        crellvm::propagateInstruction(hints, Y, Z, TGT);
+
+        //if (is_x_second)
+        //   crellvm::applyCommutativity(hints, Z, Y, TGT);
+
+        INFRULE(INSTPOS(TGT, &I), crellvm::ConsAndOrNot1::make(
+                REGISTER(*Z), REGISTER(*X), REGISTER(*Y), VAL(A), VAL(Op1), BITSIZE(*Z)));
+      });
+
       return BinaryOperator::CreateAnd(A, Op1);
+    }
+
+    // (B&(A|(~B))) -> A&B
+    // (B&((~B)|A)) -> A&B
+    //   <src>    |   <tgt>
+    // X = B ^ -1 | X = B ^ -1
+    // Y = A | X  | Y = A | X
+    // Z = B & Y  | Z = A & B
+    //   <src>    |   <tgt>
+    // X = B ^ -1 | X = B ^ -1
+    // Y = X | A  | Y = X | A
+    // Z = B & Y  | Z = A & B
+
+	// I can't find any example
     if (match(Op1, m_Or(m_Not(m_Specific(Op0)), m_Value(A))) ||
         match(Op1, m_Or(m_Value(A), m_Not(m_Specific(Op0)))))
       return BinaryOperator::CreateAnd(A, Op0);
@@ -2148,8 +2310,14 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  if (Value *V = SimplifyOrInst(Op0, Op1, DL, TLI, DT, AC))
+  crellvm::ValidationUnit::Begin("simplify_or_inst", I);
+  INTRUDE(CAPTURE(), { data.create<crellvm::ArgForSimplifyOrInst>(); });
+
+  if (Value *V = SimplifyOrInst(Op0, Op1, DL, TLI, DT, AC)){
+    crellvm::generateHintForInstructionSimplify<crellvm::ArgForSimplifyOrInst>(I, V);
     return ReplaceInstUsesWith(I, V);
+  }
+  crellvm::ValidationUnit::Abort();
 
   // (A&B)|(A&C) -> A&(B|C) etc
   if (Value *V = SimplifyUsingDistributiveLaws(I))
@@ -2228,23 +2396,96 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
 
   // ((~A & B) | A) -> (A | B)
   if (match(Op0, m_And(m_Not(m_Value(A)), m_Value(B))) &&
-      match(Op1, m_Specific(A)))
+      match(Op1, m_Specific(A))){
+    crellvm::ValidationUnit::Begin("or_or", I);
+    INTRUDE(CAPTURE(&I, &Op0, &Op1), {
+      //    <src>   |   <tgt>
+      // X = A ^ -1 | X = A ^ -1
+      // Y = X & B  | Y = X & B
+      // Z = Y | A  | Z = A | B
+      BinaryOperator *Z = &I;
+      BinaryOperator *Y = dyn_cast<BinaryOperator>(Op0);
+      BinaryOperator *X = dyn_cast<BinaryOperator>(Y->getOperand(0));
+      //assert(X);
+      //assert(X->getOpcode() == llvm::Instruction::Xor);
+      //assert(Y);
+
+      crellvm::propagateInstruction(hints, X, Z, SRC);
+      crellvm::propagateInstruction(hints, Y, Z, SRC);
+      // auto: If X = -1 ^ A, apply commutativity
+      //if(X->getOperand(1) == Op1)
+        // commutativity.
+      //  crellvm::applyCommutativity(hints, Z, X, SRC);
+
+      INFRULE(INSTPOS(SRC, Z), crellvm::ConsOrOr::make(
+          VAL(Z), VAL(X), VAL(Y), VAL(Op1), VAL(Y->getOperand(1)), BITSIZE(*Z)));
+    });
+
     return BinaryOperator::CreateOr(A, B);
+  }
 
   // ((A & B) | ~A) -> (~A | B)
   if (match(Op0, m_And(m_Value(A), m_Value(B))) &&
-      match(Op1, m_Not(m_Specific(A))))
-    return BinaryOperator::CreateOr(Builder->CreateNot(A), B);
+      match(Op1, m_Not(m_Specific(A)))){
+    crellvm::ValidationUnit::Begin("or_or2", I);
+
+    Value *NotA = Builder->CreateNot(A);
+
+    crellvm::name_instructions(*I.getParent()->getParent());
+    INTRUDE(CAPTURE(&I, &Op0, &Op1, &NotA), {
+      //    <src>    |   <tgt>
+      // X = A & B   | X = A & B
+      // Y = A ^ -1  | Y = A ^ -1
+      // <nop>       | Y'= A ^ -1 (yes, this is strange. -_-;)
+      // Z = X | Y   | Z = Y' | B
+      BinaryOperator *Z = &I;
+      BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
+      BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+      BinaryOperator *Yprime = dyn_cast<BinaryOperator>(NotA);
+      //assert(X);
+      //assert(Y);
+      //assert(Yprime);
+      Value *A = X->getOperand(0);
+      Value *B = X->getOperand(1); // not Y->getOperand(0) because Y also can be -1 ^ A!
+
+      crellvm::insertSrcNopAtTgtI(hints, Yprime);
+      crellvm::propagateMaydiffGlobal(hints, crellvm::getVariable(*Yprime), crellvm::Physical);
+ 
+      crellvm::propagateInstruction(hints, X, Z, TGT);
+      crellvm::propagateInstruction(hints, Y, Z, TGT);
+      crellvm::propagateInstruction(hints, Yprime, Z, TGT);
+      // auto: If Y = -1 ^ A, apply commutativity
+      //if(Y->getOperand(1) == A)
+      //  crellvm::applyCommutativity(hints, Z, Y, TGT);
+
+      // auto: If Y' = -1 ^ A, apply commutativity
+      //if(Yprime->getOperand(1) == A)
+      //  crellvm::applyCommutativity(hints, Z, Yprime, TGT);
+      
+      INFRULE(INSTPOS(TGT, Z), crellvm::ConsOrOr2::make(
+          VAL(Z), VAL(X), VAL(Y), VAL(Yprime), VAL(A), VAL(B), BITSIZE(*Z)));
+    });
+ 
+    return BinaryOperator::CreateOr(NotA, B);
+  }
 
   // (A & (~B)) | (A ^ B) -> (A ^ B)
   if (match(Op0, m_And(m_Value(A), m_Not(m_Value(B)))) &&
-      match(Op1, m_Xor(m_Specific(A), m_Specific(B))))
+      match(Op1, m_Xor(m_Specific(A), m_Specific(B)))){
+    crellvm::ValidationUnit::Begin("or_xor", I);
+    crellvm::generateHintForOrXor(&I, Op0, Op1);
+
     return BinaryOperator::CreateXor(A, B);
+  }
 
   // (A ^ B) | ( A & (~B)) -> (A ^ B)
   if (match(Op0, m_Xor(m_Value(A), m_Value(B))) &&
-      match(Op1, m_And(m_Specific(A), m_Not(m_Specific(B)))))
+      match(Op1, m_And(m_Specific(A), m_Not(m_Specific(B))))){
+    crellvm::ValidationUnit::Begin("or_xor", I);
+    crellvm::generateHintForOrXor(&I, Op1, Op0);
+    
     return BinaryOperator::CreateXor(A, B);
+  }
 
   // (A & C)|(B & D)
   Value *C = nullptr, *D = nullptr;
@@ -2303,20 +2544,36 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
 
     // ((A&~B)|(~A&B)) -> A^B
     if ((match(C, m_Not(m_Specific(D))) &&
-         match(B, m_Not(m_Specific(A)))))
+         match(B, m_Not(m_Specific(A))))){
+      crellvm::ValidationUnit::Begin("or_xor2", I);
+      crellvm::generateHintForOrXor2(&I, C, B, A, D);
+
       return BinaryOperator::CreateXor(A, D);
+    }
     // ((~B&A)|(~A&B)) -> A^B
     if ((match(A, m_Not(m_Specific(D))) &&
-         match(B, m_Not(m_Specific(C)))))
+         match(B, m_Not(m_Specific(C))))){
+      crellvm::ValidationUnit::Begin("or_xor2", I);
+      crellvm::generateHintForOrXor2(&I, A, B, C, D);
+      
       return BinaryOperator::CreateXor(C, D);
+    }
     // ((A&~B)|(B&~A)) -> A^B
     if ((match(C, m_Not(m_Specific(B))) &&
-         match(D, m_Not(m_Specific(A)))))
+         match(D, m_Not(m_Specific(A))))){
+      crellvm::ValidationUnit::Begin("or_xor2", I);
+      crellvm::generateHintForOrXor2(&I, C, D, A, B);
+ 
       return BinaryOperator::CreateXor(A, B);
+    }
     // ((~B&A)|(B&~A)) -> A^B
     if ((match(A, m_Not(m_Specific(B))) &&
-         match(D, m_Not(m_Specific(C)))))
+         match(D, m_Not(m_Specific(C))))){
+      crellvm::ValidationUnit::Begin("or_xor2", I);
+      crellvm::generateHintForOrXor2(&I, A, D, C, B);
+      
       return BinaryOperator::CreateXor(C, B);
+    }
 
     // ((A|B)&1)|(B&-2) -> (A&1) | B
     if (match(A, m_Or(m_Value(V1), m_Specific(B))) ||
@@ -2380,19 +2637,73 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   // A | (~A ^ B) -> A | ~B
   // (A & B) | (A ^ B)
   if (match(Op1, m_Xor(m_Value(A), m_Value(B)))) {
-    if (Op0 == A || Op0 == B)
+    if (Op0 == A || Op0 == B) {
+      crellvm::ValidationUnit::Begin("or_xor3", I);
+      INTRUDE(CAPTURE(&I, &Op0, &Op1, &A, &B, SwappedForXor), {
+        //   <src>   |   <tgt>
+        // Y = A ^ B | Y = A ^ B
+        // Z = A | Y | Z = A | B
+        BinaryOperator *Z = &I;
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+        // auto: If Y = B ^ A, apply commutativity
+        //if (Op0 == B)
+        //  crellvm::applyCommutativity(hints, Z, Y, SRC);
+        // auto: If Z = Y | A, apply commutativity
+        //if (SwappedForXor)
+        //  crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsOrXor3::make(
+            VAL(Z), VAL(Y), (Op0 == B ? VAL(B) : VAL(A)),
+            (Op0 == B ? VAL(A) : VAL(B)), BITSIZE(*Z)));
+        // auto: If Z = B | A, apply commutativity
+        //if (Op0 == B)
+        //  INFRULE(INSTPOS(SRC, Z), crellvm::ConsBopCommutative::make(
+        //      VAR(*Z), crellvm::TyBop::BopOr, VAL(B), VAL(A), BITSIZE(*Z)));
+      });
+
       return BinaryOperator::CreateOr(A, B);
+    }
 
     if (match(Op0, m_And(m_Specific(A), m_Specific(B))) ||
-        match(Op0, m_And(m_Specific(B), m_Specific(A))))
+        match(Op0, m_And(m_Specific(B), m_Specific(A)))) {
+      crellvm::ValidationUnit::Begin("or_and_xor", I);
+      INTRUDE(CAPTURE(&I, &Op0, &Op1, &A, &B, SwappedForXor), {
+        //   <src>   |   <tgt>
+        // X = A & B | X = A & B
+        // Y = A ^ B | Y = A ^ B
+        // Z = X | Y | Z = A | B
+        BinaryOperator *Z = &I;
+        BinaryOperator *X = dyn_cast<BinaryOperator>(Op0);
+        BinaryOperator *Y = dyn_cast<BinaryOperator>(Op1);
+
+        crellvm::propagateInstruction(hints, Y, Z, SRC);
+        crellvm::propagateInstruction(hints, X, Z, SRC);
+        // auto: If X = B & A, apply commutativity
+        //if (match(Op0, m_And(m_Specific(B), m_Specific(A))))
+        //  crellvm::applyCommutativity(hints, Z, X, SRC);
+        // auto: If Z = Y | X, apply commutativity
+        //if (SwappedForXor)
+        //  crellvm::applyCommutativity(hints, Z, Z, SRC);
+        INFRULE(INSTPOS(SRC, Z), crellvm::ConsOrAndXor::make(
+            VAL(Z), VAL(X), VAL(Y), VAL(A), VAL(B), BITSIZE(*Z)));
+      });
+     
       return BinaryOperator::CreateOr(A, B);
+    }
 
     if (Op1->hasOneUse() && match(A, m_Not(m_Specific(Op0)))) {
+      crellvm::ValidationUnit::Begin("or_xor4", I);
       Value *Not = Builder->CreateNot(B, B->getName()+".not");
+      crellvm::generateHintForOrXor4(&I, Op0, dyn_cast<BinaryOperator>(Op1), 
+          dyn_cast<BinaryOperator>(A), B, dyn_cast<BinaryOperator>(Not));
       return BinaryOperator::CreateOr(Not, Op0);
     }
     if (Op1->hasOneUse() && match(B, m_Not(m_Specific(Op0)))) {
+      crellvm::ValidationUnit::Begin("or_xor4", I);
       Value *Not = Builder->CreateNot(A, A->getName()+".not");
+      crellvm::generateHintForOrXor4(&I, Op0, dyn_cast<BinaryOperator>(Op1), 
+          dyn_cast<BinaryOperator>(B), A, dyn_cast<BinaryOperator>(Not));
       return BinaryOperator::CreateOr(Not, Op0);
     }
   }
@@ -2535,8 +2846,14 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
   if (Value *V = SimplifyVectorOp(I))
     return ReplaceInstUsesWith(I, V);
 
-  if (Value *V = SimplifyXorInst(Op0, Op1, DL, TLI, DT, AC))
+  crellvm::ValidationUnit::Begin("simplify_xor_inst", I);
+  INTRUDE(CAPTURE(), { data.create<crellvm::ArgForSimplifyXorInst>(); });
+
+  if (Value *V = SimplifyXorInst(Op0, Op1, DL, TLI, DT, AC)) {
+    crellvm::generateHintForInstructionSimplify<crellvm::ArgForSimplifyXorInst>(I, V);
     return ReplaceInstUsesWith(I, V);
+  }
+  crellvm::ValidationUnit::Abort();
 
   // (A&B)^(A&C) -> A&(B^C) etc
   if (Value *V = SimplifyUsingDistributiveLaws(I))

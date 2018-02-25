@@ -37,6 +37,16 @@ extern "C" {
  * @{
  */
 
+/* added for vellvm - start */
+typedef enum {
+  LLVM_INVALID_ALIGN = 0,
+  LLVM_INTEGER_ALIGN = 'i',               
+  LLVM_VECTOR_ALIGN = 'v',                
+  LLVM_FLOAT_ALIGN = 'f',                 
+  LLVM_AGGREGATE_ALIGN = 'a',             
+} LLVMAlignTypeEnum;
+/* added for vellvm - end */
+  
 enum LLVMByteOrdering { LLVMBigEndian, LLVMLittleEndian };
 
 typedef struct LLVMOpaqueTargetData *LLVMTargetDataRef;
@@ -279,6 +289,43 @@ unsigned long long LLVMOffsetOfElement(LLVMTargetDataRef TD,
     See the destructor llvm::DataLayout::~DataLayout. */
 void LLVMDisposeTargetData(LLVMTargetDataRef TD);
 
+/* added for vellvm - start */
+
+/** Returns the pointer size in bits for a target.
+    See the method llvm::TargetData::getPointerSizeInBits. */
+unsigned LLVMPointerSizeInBits(LLVMTargetDataRef TD);
+
+/** Returns the pointer size in bytes for a target.
+    See the method llvm::TargetData::getPointerABIAlignment. */
+unsigned LLVMPointerABIAlignment(LLVMTargetDataRef TD);
+
+/** Returns the pointer size in bytes for a target.
+    See the method llvm::TargetData::getPointerPrefAlignment. */
+unsigned LLVMPointerPrefAlignment(LLVMTargetDataRef TD);
+
+/** Return the number of llvm::Target::Alignments,
+    See the method llvm::TargetData::getNumAlignment */
+unsigned LLVMGetNumAlignment(LLVMTargetDataRef TD);
+
+/** returns the [i]-th AlignType from the target [TD].
+    See the method llvm::TargetData::getAlignTypeEnum */
+LLVMAlignTypeEnum LLVMGetAlignTypeEnum(LLVMTargetDataRef TD, unsigned i);
+
+/** returns the [i]-th ABIAlign from the target [TD].
+    See the method llvm::TargetData::getABIAlign */
+unsigned char LLVMGetABIAlign(LLVMTargetDataRef TD, unsigned i);
+
+/** returns the [i]-th PrefAlign from the target [TD].
+    See the method llvm::TargetData::getPrefAlign */
+unsigned char LLVMGetPrefAlign(LLVMTargetDataRef TD, unsigned i);
+
+/** returns the [i]-th TypeBitWidth from the target [TD].
+    See the method llvm::TargetData::getTypeBitWidth */
+uint32_t LLVMGetTypeBitWidth(LLVMTargetDataRef TD, unsigned i);
+  
+/* added for vellvm - end */
+
+  
 /**
  * @}
  */
