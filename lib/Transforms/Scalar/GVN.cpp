@@ -2912,10 +2912,22 @@ bool GVN::performScalarPREInsertion(Instruction *Instr, BasicBlock *Pred,
   if (!success)
     return false;
 
+  crellvm::name_instructions(*(Pred->getParent()));
+  crellvm::ValidationUnit::Begin("GVN_PREInsertion", Pred->getParent());
+
   Instr->insertBefore(Pred->getTerminator());
   Instr->setName(Instr->getName() + ".pre");
   Instr->setDebugLoc(Instr->getDebugLoc());
   VN.add(Instr, ValNo);
+
+  crellvm::ValidationUnit::GetInstance()->intrude([&Instr](
+      crellvm::ValidationUnit::Dictionary &data,
+      crellvm::CoreHint &hints) {
+    crellvm::insertSrcNopAtTgtI(hints, Instr);
+    std::string instr_name = crellvm::getVariable(*Instr);
+    crellvm::propagateMaydiffGlobal(hints, instr_name, crellvm::Physical);
+  });
+  crellvm::intrude([]() { crellvm::ValidationUnit::End();});
 
   // Update the availability map to include the new instruction.
   addToLeaderTable(ValNo, Instr, Pred);
