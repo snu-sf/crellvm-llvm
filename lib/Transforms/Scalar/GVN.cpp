@@ -3307,17 +3307,19 @@ void GVN::addDeadBlock(BasicBlock *BB) {
         PHINode &Phi = cast<PHINode>(*II);
         Phi.setIncomingValue(Phi.getBasicBlockIndex(P),
                              UndefValue::get(Phi.getType()));
-        INTRUDE(CAPTURE(&P), { GVNDICT(deadBlockHappens) = true; });
+        crellvm::intrude([&P]() { INTRUDE(CAPTURE(&P), { GVNDICT(deadBlockHappens) = true; }); });
       }
 
-      INTRUDE(CAPTURE(this), {
-          if (GVNDICT(deadBlockHappens)) {
-            for (auto I = DeadBlocks.begin(), E = DeadBlocks.end(); I != E; ++I) {
-              // propagate false to *I
-              PROPAGATE(LESSDEF(crellvm::false_encoding.first, crellvm::false_encoding.second, SRC),
-                        BOUNDS(STARTPOS(SRC, crellvm::getBasicBlockIndex(*I)), ENDPOS(SRC, *I)));
-            }
-          } else crellvm::ValidationUnit::GetInstance()->setIsAborted();
+      crellvm::intrude([this]() {
+          INTRUDE(CAPTURE(this), {
+              if (GVNDICT(deadBlockHappens)) {
+                for (auto I = DeadBlocks.begin(), E = DeadBlocks.end(); I != E; ++I) {
+                  // propagate false to *I
+                  PROPAGATE(LESSDEF(crellvm::false_encoding.first, crellvm::false_encoding.second, SRC),
+                            BOUNDS(STARTPOS(SRC, crellvm::getBasicBlockIndex(*I)), ENDPOS(SRC, *I)));
+                }
+              } else crellvm::ValidationUnit::GetInstance()->setIsAborted();
+            });
         });
 
       crellvm::intrude([]() { crellvm::ValidationUnit::EndIfExists(); });
