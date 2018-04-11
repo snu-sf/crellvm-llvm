@@ -3276,6 +3276,9 @@ void GVN::addDeadBlock(BasicBlock *BB) {
 
   // For the dead blocks' live successors, update their phi nodes by replacing
   // the operands corresponding to dead blocks with UndefVal.
+
+  crellvm::intrude([&BB]() { crellvm::name_instructions(*(BB->getParent())); });
+
   for(SmallSetVector<BasicBlock *, 4>::iterator I = DF.begin(), E = DF.end();
         I != E; I++) {
     BasicBlock *B = *I;
@@ -3295,11 +3298,31 @@ void GVN::addDeadBlock(BasicBlock *BB) {
           DeadBlocks.insert(P = S);
       }
 
+      crellvm::intrude([&BB]() {
+          crellvm::ValidationUnit::Begin("GVN_add_dead_block", BB->getParent());
+          INTRUDE(CAPTURE(), { GVNDICT(deadBlockHappens) = false; });
+        });
+
       for (BasicBlock::iterator II = B->begin(); isa<PHINode>(II); ++II) {
         PHINode &Phi = cast<PHINode>(*II);
         Phi.setIncomingValue(Phi.getBasicBlockIndex(P),
                              UndefValue::get(Phi.getType()));
+        crellvm::intrude([&P]() { INTRUDE(CAPTURE(&P), { GVNDICT(deadBlockHappens) = true; }); });
       }
+
+      crellvm::intrude([this]() {
+          INTRUDE(CAPTURE(this), {
+              if (GVNDICT(deadBlockHappens)) {
+                for (auto I = DeadBlocks.begin(), E = DeadBlocks.end(); I != E; ++I) {
+                  // propagate false to *I
+                  PROPAGATE(LESSDEF(crellvm::false_encoding.first, crellvm::false_encoding.second, SRC),
+                            BOUNDS(STARTPOS(SRC, crellvm::getBasicBlockIndex(*I)), ENDPOS(SRC, *I)));
+                }
+              } else crellvm::ValidationUnit::GetInstance()->setIsAborted();
+            });
+        });
+
+      crellvm::intrude([]() { crellvm::ValidationUnit::EndIfExists(); });
     }
   }
 }

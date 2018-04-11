@@ -235,6 +235,7 @@ struct GVNArg {
 public:
   GVNArg();
   bool isGVNReplace;
+  bool deadBlockHappens;
   boost::any VNptr;
 
   typedef std::pair<uint32_t, bool> TyInvTKey;
