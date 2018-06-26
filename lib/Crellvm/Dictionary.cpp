@@ -94,7 +94,7 @@ void PassDictionary::Destroy() {
 }
 
 GVNArg::GVNArg()
-  : isGVNReplace(false), deadBlockHappens(false), VNptr(nullptr), VET(new TyVETobj), InvT(new TyInvTobj),
+  : isGVNReplace(false), VNptr(nullptr), VET(new TyVETobj), InvT(new TyInvTobj),
     CT(new TyCTobj), CTInv(new TyCTInvobj), CallPHIs(new TyCallPHIobj), VNCnt(new TyVNCntobj) {}
 
 LICMHoistOrSinkCond::LICMHoistOrSinkCond() {
